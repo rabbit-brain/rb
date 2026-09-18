@@ -4,7 +4,11 @@
   reversals  = iterations where the update grew by more than 5% over the previous one
   unstable   = late_share > max_late_share  or  reversals > max_reversals
                or (when max_last_update is set) last_update > max_last_update
+               or (when max_trajectory_regression is set) a trajectory regression, see below
   regression = candidate_error - baseline_error > max_regression
+  trajectory regression = candidate late_update - baseline late_update > max_trajectory_regression
+               (late_update: mean update over the last quarter of iterations; paired on the same case, label-free,
+               so it applies to cases without ground truth exactly like the error regression applies to cases with it)
 
 A converged model keeps shrinking its updates; one that keeps revising late, or re-opens its
 estimate, is unstable on that case whatever the final error says.
@@ -85,11 +89,28 @@ def side_stats(case: CaseV1, side: str) -> Optional[TrajectoryStats]:
     return trajectory_stats(values, getattr(case, f"{side}_convergence", None))
 
 
+def trajectory_change(case: CaseV1) -> Optional[float]:
+    """Candidate late movement minus the current model's on the same case; None unless both trajectories exist."""
+    b, c = side_stats(case, "baseline"), side_stats(case, "candidate")
+    if b is None or c is None or b.late_update is None or c.late_update is None:
+        return None
+    return c.late_update - b.late_update
+
+
+def trajectory_regressed(case: CaseV1, limits: Limits) -> bool:
+    if limits.max_trajectory_regression is None:
+        return False
+    d = trajectory_change(case)
+    return d is not None and d > limits.max_trajectory_regression + EPS
+
+
 def stability_outcome(case: CaseV1, limits: Limits) -> str:
     stats = side_stats(case, "candidate")
     if stats is None:
         return "not_assessed"
-    return "settled" if is_settled(stats, limits) else "unstable"
+    if not is_settled(stats, limits) or trajectory_regressed(case, limits):
+        return "unstable"
+    return "settled"
 
 
 def case_stability(case: CaseV1) -> CaseStability:
@@ -106,6 +127,8 @@ def flags_for(case: CaseV1, limits: Limits) -> list[str]:
         out.append("improved")
     if s == "unstable":
         out.append("unstable")
+    if trajectory_regressed(case, limits):
+        out.append("trajectory_regression")
     base = side_stats(case, "baseline")
     if base is not None and not is_settled(base, limits):
         out.append("baseline_unstable")

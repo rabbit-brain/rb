@@ -33,6 +33,7 @@ class Limits(BaseModel):
     max_late_share: float = Field(0.25, ge=0, le=1)
     max_reversals: int = Field(2, ge=0, le=64)
     max_last_update: Optional[float] = Field(default=None, ge=0, le=SCORE_MAX)
+    max_trajectory_regression: Optional[float] = Field(default=None, ge=0, le=SCORE_MAX)  # paired: candidate late movement minus the current model's, same case
 
 
 class Metric(BaseModel):
@@ -206,6 +207,7 @@ class CaseV2(CaseV1):
     candidate_error: Optional[float] = Field(default=None, ge=0, le=SCORE_MAX)  # type: ignore[assignment]
     has_gt: bool = True
     error_change: Optional[float] = None
+    late_update_change: Optional[float] = None  # candidate late movement minus the current model's on this case (trajectory unit)
     baseline_convergence: Optional[Convergence] = None
     candidate_convergence: Optional[Convergence] = None
     stability: CaseStability = Field(default_factory=CaseStability)
@@ -324,6 +326,9 @@ class QueueItem(BaseModel):
     baseline_reversals: Optional[int] = None
     candidate_late_share: Optional[float] = None
     candidate_reversals: Optional[int] = None
+    baseline_late_update: Optional[float] = None
+    candidate_late_update: Optional[float] = None
+    late_update_change: Optional[float] = None
     why: str
     notes: Optional[str] = None
     evidence: Optional[str] = None

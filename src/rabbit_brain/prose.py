@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from .fmt import pct, plain, to_fixed
 from .models import CaseV1, Limits
-from .stability import EPS, delta, error_outcome, is_settled, side_stats
+from .stability import EPS, delta, error_outcome, is_settled, side_stats, trajectory_change, trajectory_regressed
 
 
 def error_sentence(case: CaseV1, limits: Limits, unit: str) -> str:
@@ -24,6 +24,17 @@ def stability_sentence(case: CaseV1, limits: Limits) -> str:
     stats = side_stats(case, "candidate")
     base = side_stats(case, "baseline")
     regression = error_outcome(case, limits.max_regression) == "regression"
+    if trajectory_regressed(case, limits) and is_settled(stats, limits):
+        d = trajectory_change(case)
+        text = (f"The candidate was still moving its answer by {stats.late_update:.3f} per iteration at the end, {d:.3f} more than the current model "
+                f"on this case ({base.late_update:.3f}), above your {plain(limits.max_trajectory_regression)} limit.")
+        if regression:
+            text += " The error regressed as well."
+        elif error_outcome(case, limits.max_regression) == "not_measured":
+            text += " No ground truth here, so this is the only regression signal for this case."
+        else:
+            text += " The error looks fine; the answer is not settled."
+        return text
     if not is_settled(stats, limits):
         over_last = limits.max_last_update is not None and stats.last_update is not None and stats.last_update > limits.max_last_update + EPS
         over_v1 = stats.late_share > limits.max_late_share + EPS or stats.reversals > limits.max_reversals
@@ -61,10 +72,14 @@ DEFINITIONS = (
     "exceed {reversals}. Improved-but-unstable cases pass on error and still need a look."
 )
 LAST_UPDATE_DEFINITION = " A case is also unstable when the final update is larger than {last_update} (the model was still moving its answer when it stopped)."
+TRAJECTORY_REGRESSION_DEFINITION = (" A case is a trajectory regression when the candidate's late movement (mean update over the last quarter of iterations) "
+                                    "exceeds the current model's on the same case by more than {limit}; it counts as unstable, needs no ground truth, and is the regression test for unlabeled cases.")
 
 
 def definitions(limits: Limits, unit: str) -> str:
     text = DEFINITIONS.format(max_regression=plain(limits.max_regression), unit=unit, late=pct(limits.max_late_share), reversals=limits.max_reversals)
     if limits.max_last_update is not None:
         text += LAST_UPDATE_DEFINITION.format(last_update=plain(limits.max_last_update))
+    if limits.max_trajectory_regression is not None:
+        text += TRAJECTORY_REGRESSION_DEFINITION.format(limit=plain(limits.max_trajectory_regression))
     return text

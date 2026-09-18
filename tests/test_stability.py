@@ -124,3 +124,29 @@ def test_recorder_scale_puts_values_in_image_pixels():
     assert rec.values == [4.0, 2.0]
     c = rec.convergence()
     assert abs(c["displacement_initial"] - 2.0) < 1e-9  # first estimate 4 px, final 6 px
+
+
+def test_trajectory_regression_is_paired_and_off_for_import():
+    from rabbit_brain.models import CaseV1, Limits
+    from rabbit_brain.prose import definitions, stability_sentence
+    from rabbit_brain.stability import flags_for, stability_outcome, trajectory_change
+
+    settled = [2.0, 1.0, 0.5, 0.3, 0.2, 0.15, 0.1, 0.08, 0.06, 0.05, 0.04, 0.03]
+    moving = [2.0, 1.0, 0.5, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]   # settled by the v1 rules (late share 0.24, no reversals)
+    case = CaseV1(id="c-1", name="Corner", baseline_error=1.0, candidate_error=0.9, baseline_trajectory=settled, candidate_trajectory=moving)
+    assert abs(trajectory_change(case) - (0.4 - 0.04)) < 1e-9  # last quarter: mean of the last three values
+    # off by default: import users keep the v1 behaviour byte for byte
+    assert stability_outcome(case, Limits()) == "settled" and "trajectory_regression" not in flags_for(case, Limits())
+    lim = Limits(max_trajectory_regression=0.3)
+    assert stability_outcome(case, lim) == "unstable"
+    assert flags_for(case, lim) == ["unstable", "trajectory_regression"]
+    sentence = stability_sentence(case, lim)
+    assert "more than the current model" in sentence and "0.360" in sentence and "not settled" in sentence
+    assert "trajectory regression" in definitions(lim, "px")
+    # unlabeled case: the only regression signal
+    unl = CaseV1(id="c-2", name="Ramp", baseline_error=0.0, candidate_error=0.0, baseline_trajectory=settled, candidate_trajectory=moving)
+    unl.__dict__["baseline_error"] = None; unl.__dict__["candidate_error"] = None
+    assert "only regression signal" in stability_sentence(unl, lim)
+    # a candidate that moves less than the current model is never a trajectory regression
+    quiet = CaseV1(id="c-3", name="Aisle", baseline_error=1.0, candidate_error=1.0, baseline_trajectory=moving, candidate_trajectory=settled)
+    assert stability_outcome(quiet, lim) == "settled"

@@ -19,7 +19,7 @@ rb init --demo && rb run --baseline ckpt/synth-current.json --candidate ckpt/syn
 
 Everything runs locally and nothing leaves your machine. Every run leaves a receipt (`report.md`, `record.json`) with the exact command, the input's hash and the definitions in force, so a colleague, or you after your coding agent ran it, can verify the numbers.
 
-**What it does.** Compares two model versions case by case; flags regressions above a limit you choose; reads each model's own refinement trajectory (label-free) to flag answers that were still moving late or reversed direction; ranks what needs a decision first; explains each case in plain language; saves checks that follow case ids across checkpoints.
+**What it does.** Compares two model versions case by case; flags regressions above a limit you choose; reads each model's own refinement trajectory (label-free) and flags cases where the candidate was still moving its answer more than the current model did, which is the same regression test for cases you have no ground truth for; ranks what needs a decision first; explains each case in plain language; saves checks that follow case ids across checkpoints.
 
 **What it needs.** Either a checkpoint pair and a case set for a supported adapter (RAFT-family optical flow today; other models through a small custom adapter), or one lower-is-better error per case for both models from your own evaluator (any metric with a unit: endpoint error in px, depth error in cm, …), computed against the same ground truth and valid mask. Trajectories are recorded by the adapter with a forward hook, or by the one-line `TrajectoryRecorder` in your loop.
 

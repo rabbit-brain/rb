@@ -115,6 +115,7 @@ def render_config(cfg: Config) -> str:
         f"max_regression = {lim.max_regression}             # in the metric's unit",
         f"max_late_share = {lim.max_late_share}",
         f"max_reversals = {lim.max_reversals}",
+        (f"max_trajectory_regression = {lim.max_trajectory_regression}   # candidate late movement above the current model's on the same case, trajectory unit; label-free" if lim.max_trajectory_regression is not None else "# max_trajectory_regression = 0.3   # off: set it to flag cases where the candidate was still moving more than the current model"),
         (f"max_last_update = {lim.max_last_update}" if lim.max_last_update is not None else "# max_last_update = 0.3           # off unless set: a final update larger than this (trajectory unit) = not settled"),
         "",
         "[evidence]",

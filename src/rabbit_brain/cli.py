@@ -73,6 +73,7 @@ def limits_from(args: argparse.Namespace, base: Optional[Limits] = None) -> Limi
             max_late_share=base.max_late_share if args.max_late_share is None else args.max_late_share,
             max_reversals=base.max_reversals if args.max_reversals is None else args.max_reversals,
             max_last_update=base.max_last_update if getattr(args, "max_last_update", None) is None else args.max_last_update,
+            max_trajectory_regression=base.max_trajectory_regression if getattr(args, "max_trajectory_regression", None) is None else args.max_trajectory_regression,
         )
     except ValidationError as exc:
         raise RBError("E_LIMITS_INVALID", message=f"Limit out of range: {exc.errors()[0].get('msg', '')}")
@@ -198,7 +199,7 @@ def cmd_findings(args: argparse.Namespace, out: Out) -> int:
     s = findings.summary
     out.say(
         f"{bundle.project} · {bundle.baseline.name} → {bundle.candidate.name} · {bundle.metric.name} ({unit}), lower is better",
-        f"Limits: +{plain(limits.max_regression)} {unit} · {pct(limits.max_late_share)} late · {limits.max_reversals} reversals",
+        f"Limits: +{plain(limits.max_regression)} {unit} · {pct(limits.max_late_share)} late · {limits.max_reversals} reversals" + (f" · +{plain(limits.max_trajectory_regression)} late movement" if limits.max_trajectory_regression is not None else ""),
         f"Verdict: {findings.verdict.line}",
         f"{s.cases} cases · {s.regressions} regressions · {s.unstable} unstable ({s.improved_unstable} pass on error) · {s.settled_regressions} settled regressions · {s.flagged} flagged"
         + (f" · checks {s.checks.passing} pass / {s.checks.failing} fail / {s.checks.missing} missing" if s.checks.saved else ""),
@@ -207,6 +208,8 @@ def cmd_findings(args: argparse.Namespace, out: Out) -> int:
     )
     for q in shown:
         late = pct(q.candidate_late_share) if q.candidate_late_share is not None else "n/a"
+        if q.late_update_change is not None:
+            late += f" {signed(q.late_update_change)}mv"
         rev = str(q.candidate_reversals) if q.candidate_reversals is not None else "-"
         change = signed(q.error_change) if q.error_change is not None else "n/a"
         out.say(f"{q.rank:>3}  {q.id:<24} {change:>7} {unit:<2} {late:>5} {rev:>3}  {', '.join(q.flags) or '-'}")
@@ -246,6 +249,8 @@ def cmd_case(args: argparse.Namespace, out: Out) -> int:
         out.say(traj_line("Candidate trajectory", st.candidate))
     if st.baseline:
         out.say(traj_line("Current-model trajectory", st.baseline))
+    if q.late_update_change is not None:
+        out.say(f"Late movement vs current model: {signed(q.late_update_change)} {unit} per iteration" + (f" (limit +{plain(limits.max_trajectory_regression)})" if limits.max_trajectory_regression is not None else " (no trajectory-regression limit set)"))
     if c.candidate_frames:
         peak = max(range(len(c.candidate_frames)), key=lambda i: c.candidate_frames[i])
         out.say(f"Per-frame error: {len(c.candidate_frames)} frames · candidate peak {to_fixed(c.candidate_frames[peak])} {unit} at frame {peak + 1}")
@@ -399,6 +404,7 @@ def cmd_init(args: argparse.Namespace, out: Out) -> int:
                                             model_code=args.model_code or ("./raft" if adapter_id == "raft" else None), iterations=args.iterations or 12,
                                             device=args.device or "cuda", small=bool(args.small)),
                      dataset=DatasetSection(name=args.dataset_name or (Path(args.dataset).name if args.dataset else "cases"), kind=args.kind or "kitti", path=args.dataset, cases="all"))
+    cfg.limits = Limits(max_trajectory_regression=cfg.limits.max_regression)  # paired, label-free regression test on by default for runs
     text = render_config(cfg)
     path.write_text(text, encoding="utf-8")
     gi = Path(".gitignore")
@@ -545,6 +551,7 @@ def build_parser() -> argparse.ArgumentParser:
     lim.add_argument("--max-late-share", type=float, default=None, help="allowed share of refinement in the last third of iterations (default 0.25)")
     lim.add_argument("--max-reversals", type=int, default=None, help="allowed number of iterations where the update grew (default 2)")
     lim.add_argument("--max-last-update", type=float, default=None, help="allowed size of the final update, in the trajectory's unit (off unless set)")
+    lim.add_argument("--max-trajectory-regression", type=float, default=None, help="allowed increase of the candidate's late movement over the current model's on the same case, trajectory unit (rb init sets it to max_regression; off for rb import unless set)")
     chk = argparse.ArgumentParser(add_help=False)
     chk.add_argument("--checks", default=None, help="saved checks file (default checks.json in the current directory)")
 

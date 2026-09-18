@@ -118,7 +118,7 @@ def test_raft_adapter_mechanics(workdir, capsys):
         torch.save({"module." + k: v for k, v in m.state_dict().items()}, f"ckpt/{name}.pth")
 
     code, env, _ = run_json(capsys, "init", "--project", "raft-mechanics", "--adapter", "raft", "--model-code", RAFT_PATH, "--dataset", str(root), "--device", "cpu", "--small")
-    assert code == 0
+    assert code == 0 and "max_trajectory_regression = 0.3" in Path("rb.toml").read_text()
     code, env, _ = run_json(capsys, "doctor", "--checkpoint", "ckpt/raft-a.pth")
     assert code == 0, env.data
     code, env, _ = run_json(capsys, "verify-hook", "--checkpoint", "ckpt/raft-a.pth", "--device", "cpu")
@@ -135,6 +135,7 @@ def test_raft_adapter_mechanics(workdir, capsys):
     assert unlabeled["has_gt"] is False and unlabeled.get("candidate_error") is None and len(unlabeled["candidate_trajectory"]) == 12
     labeled = next(c for c in bundle["cases"] if c["id"] == "000000_10")
     assert labeled["candidate_error"] > 0 and labeled["error_outcome"] in ("regression", "improved", "stable")
+    assert "late_update_change" in labeled and bundle["limits"]["max_trajectory_regression"] == 0.3
     # the paper's convergence statistics ride along for both models and land in the stability block
     conv = labeled["candidate_convergence"]
     assert 0 <= conv["sign_reversal_rate"] <= 1 and conv["displacement_mean"] >= 0 and conv["update_energy"] > 0

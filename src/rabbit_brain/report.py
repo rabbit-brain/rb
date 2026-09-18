@@ -47,8 +47,13 @@ def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequen
         source_line = "Evaluated by rb run: both checkpoints were run on the case set and the trajectories recorded by the adapter.\n\n"
     else:
         source_line = "Imported evaluation results.\n\n"
+    extra_limits = ""
+    if limits.max_trajectory_regression is not None:
+        extra_limits += f", late movement above the current model's by more than {plain(limits.max_trajectory_regression)} {unit} (trajectory regression)"
+    if limits.max_last_update is not None:
+        extra_limits += f", final update ≤ {plain(limits.max_last_update)} {unit}"
     stability_line = (
-        f"Stability limits: late revision ≤ {pct(limits.max_late_share)}, reversals ≤ {limits.max_reversals}. {s.unstable} of {s.with_trajectories} cases with trajectories are unstable; {s.unstable_passing} of those pass on error.\n"
+        f"Stability limits: late revision ≤ {pct(limits.max_late_share)}, reversals ≤ {limits.max_reversals}{extra_limits}. {s.unstable} of {s.with_trajectories} cases with trajectories are unstable; {s.unstable_passing} of those pass on error.\n"
         if with_traj else "No refinement trajectories were exported, so stability was not assessed.\n"
     )
     header = f"| Case | Current ({unit}) | Candidate ({unit}) | Change ({unit}) | Error |{' Candidate late revision | Stability |' if with_traj else ''}"
@@ -101,7 +106,7 @@ def convergence_section(bundle: Bundle, limits: Limits) -> str:
         rows.append("".join(cols) + "|")
     if not rows:
         return ""
-    limit_line = f"Limits in force: late share ≤ {pct(limits.max_late_share)}, reversals ≤ {limits.max_reversals}, last update " + (f"≤ {plain(limits.max_last_update)} {unit}" if limits.max_last_update is not None else "not limited (set `max_last_update` in rb.toml or `--max-last-update`)") + "."
+    limit_line = f"Limits in force: late share ≤ {pct(limits.max_late_share)}, reversals ≤ {limits.max_reversals}, trajectory regression " + (f"> {plain(limits.max_trajectory_regression)} {unit} late movement over the current model" if limits.max_trajectory_regression is not None else "off (`max_trajectory_regression` in rb.toml)") + ", last update " + (f"≤ {plain(limits.max_last_update)} {unit}" if limits.max_last_update is not None else "not limited") + "."
     return (
         "## Convergence on this case set\n\n"
         "Median / 90th percentile / max per model. Late share and reversals are what the stability limits read; last update, "

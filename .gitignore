@@ -4,6 +4,7 @@ __pycache__/
 build/
 dist/
 .pytest_cache/
-rb-runs/
+/rb-runs/
 .venv/
 releases/
+*.tar.gz

@@ -72,6 +72,7 @@ def limits_from(args: argparse.Namespace, base: Optional[Limits] = None) -> Limi
             max_regression=base.max_regression if args.max_regression is None else args.max_regression,
             max_late_share=base.max_late_share if args.max_late_share is None else args.max_late_share,
             max_reversals=base.max_reversals if args.max_reversals is None else args.max_reversals,
+            max_last_update=base.max_last_update if getattr(args, "max_last_update", None) is None else args.max_last_update,
         )
     except ValidationError as exc:
         raise RBError("E_LIMITS_INVALID", message=f"Limit out of range: {exc.errors()[0].get('msg', '')}")
@@ -233,10 +234,18 @@ def cmd_case(args: argparse.Namespace, out: Out) -> int:
         (f"Current {to_fixed(q.baseline_error)} {unit} → candidate {to_fixed(q.candidate_error)} {unit} ({signed(q.error_change)} {unit})" if q.error_change is not None else "Error not measured (no ground truth)")
         + f" · error: {q.error_outcome.replace('_', ' ')} · stability: {q.stability_outcome.replace('_', ' ')}",
     )
+    def traj_line(label: str, t) -> str:
+        line = f"{label}: {t.iterations} iterations · late share {pct(t.late_share)} · {t.reversals} reversals"
+        if t.last_update is not None:
+            line += f" · last update {t.last_update:.3f} {unit} (first quarter {t.early_update:.3f}, last quarter {t.late_update:.3f})"
+        if t.sign_reversal_rate is not None:
+            line += f" · direction reversals {pct(t.sign_reversal_rate)} · distance from final estimate mean {t.displacement_mean:.3f} max {t.displacement_max:.3f} {unit}"
+        return line
+
     if st.candidate:
-        out.say(f"Candidate trajectory: {st.candidate.iterations} iterations · late share {pct(st.candidate.late_share)} · {st.candidate.reversals} reversals")
+        out.say(traj_line("Candidate trajectory", st.candidate))
     if st.baseline:
-        out.say(f"Current-model trajectory: {st.baseline.iterations} iterations · late share {pct(st.baseline.late_share)} · {st.baseline.reversals} reversals")
+        out.say(traj_line("Current-model trajectory", st.baseline))
     if c.candidate_frames:
         peak = max(range(len(c.candidate_frames)), key=lambda i: c.candidate_frames[i])
         out.say(f"Per-frame error: {len(c.candidate_frames)} frames · candidate peak {to_fixed(c.candidate_frames[peak])} {unit} at frame {peak + 1}")
@@ -535,6 +544,7 @@ def build_parser() -> argparse.ArgumentParser:
     lim.add_argument("--max-regression", type=float, default=None, help="allowed error increase over the current model, in the metric's unit (default 0.3)")
     lim.add_argument("--max-late-share", type=float, default=None, help="allowed share of refinement in the last third of iterations (default 0.25)")
     lim.add_argument("--max-reversals", type=int, default=None, help="allowed number of iterations where the update grew (default 2)")
+    lim.add_argument("--max-last-update", type=float, default=None, help="allowed size of the final update, in the trajectory's unit (off unless set)")
     chk = argparse.ArgumentParser(add_help=False)
     chk.add_argument("--checks", default=None, help="saved checks file (default checks.json in the current directory)")
 

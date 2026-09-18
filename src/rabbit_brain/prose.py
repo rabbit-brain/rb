@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from .fmt import pct, plain, to_fixed
 from .models import CaseV1, Limits
-from .stability import delta, error_outcome, is_settled, trajectory_stats
+from .stability import EPS, delta, error_outcome, is_settled, side_stats
 
 
 def error_sentence(case: CaseV1, limits: Limits, unit: str) -> str:
@@ -21,16 +21,24 @@ def error_sentence(case: CaseV1, limits: Limits, unit: str) -> str:
 def stability_sentence(case: CaseV1, limits: Limits) -> str:
     if not case.candidate_trajectory:
         return "No trajectory was exported for the candidate, so stability is not assessed for this case."
-    stats = trajectory_stats(case.candidate_trajectory)
-    base = trajectory_stats(case.baseline_trajectory) if case.baseline_trajectory else None
+    stats = side_stats(case, "candidate")
+    base = side_stats(case, "baseline")
     regression = error_outcome(case, limits.max_regression) == "regression"
     if not is_settled(stats, limits):
-        text = f"The candidate made {pct(stats.late_share)} of its refinement in the last third of its iterations"
-        if stats.reversals > 0:
-            text += f" and reversed direction {stats.reversals} time{'' if stats.reversals == 1 else 's'}"
-        text += f", above your {pct(limits.max_late_share)} / {limits.max_reversals} limits."
-        if base:
-            text += f" The current model settled at {pct(base.late_share)}."
+        over_last = limits.max_last_update is not None and stats.last_update is not None and stats.last_update > limits.max_last_update + EPS
+        over_v1 = stats.late_share > limits.max_late_share + EPS or stats.reversals > limits.max_reversals
+        if over_last and not over_v1:
+            text = f"The candidate was still moving its answer by {stats.last_update:.3f} per iteration at the end, above your {plain(limits.max_last_update)} limit"
+            if base and base.last_update is not None:
+                text += f" (current model: {base.last_update:.3f})"
+            text += "."
+        else:
+            text = f"The candidate made {pct(stats.late_share)} of its refinement in the last third of its iterations"
+            if stats.reversals > 0:
+                text += f" and reversed direction {stats.reversals} time{'' if stats.reversals == 1 else 's'}"
+            text += f", above your {pct(limits.max_late_share)} / {limits.max_reversals} limits."
+            if base:
+                text += f" The current model settled at {pct(base.late_share)}."
         if not regression:
             text += " The error looks fine; the answer is not settled."
         return text
@@ -52,7 +60,11 @@ DEFINITIONS = (
     "where the update grew by more than 5% over the previous one. A case is unstable when late share exceeds {late} or reversals "
     "exceed {reversals}. Improved-but-unstable cases pass on error and still need a look."
 )
+LAST_UPDATE_DEFINITION = " A case is also unstable when the final update is larger than {last_update} (the model was still moving its answer when it stopped)."
 
 
 def definitions(limits: Limits, unit: str) -> str:
-    return DEFINITIONS.format(max_regression=plain(limits.max_regression), unit=unit, late=pct(limits.max_late_share), reversals=limits.max_reversals)
+    text = DEFINITIONS.format(max_regression=plain(limits.max_regression), unit=unit, late=pct(limits.max_late_share), reversals=limits.max_reversals)
+    if limits.max_last_update is not None:
+        text += LAST_UPDATE_DEFINITION.format(last_update=plain(limits.max_last_update))
+    return text

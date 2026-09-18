@@ -3,21 +3,27 @@
   late_share = sum(updates in the last third of iterations) / sum(all updates)
   reversals  = iterations where the update grew by more than 5% over the previous one
   unstable   = late_share > max_late_share  or  reversals > max_reversals
+               or (when max_last_update is set) last_update > max_last_update
   regression = candidate_error - baseline_error > max_regression
 
 A converged model keeps shrinking its updates; one that keeps revising late, or re-opens its
 estimate, is unstable on that case whatever the final error says.
+
+The same values also give the paper's convergence statistics (quarter windows, absolute magnitudes):
+last_update, late_update (mean over the last quarter), early_update (first quarter), late_to_early.
+Runs add direction and displacement statistics computed from the update fields (see recorder.py);
+those ride along in `Convergence` and are merged into the stats here.
 """
 from __future__ import annotations
 
 from typing import Iterable, Optional, Sequence
 
-from .models import CaseStability, CaseV1, Limits, TrajectoryStats
+from .models import CaseStability, CaseV1, Convergence, Limits, TrajectoryStats
 
 EPS = 1e-9
 
 
-def trajectory_stats(values: Sequence[float]) -> TrajectoryStats:
+def trajectory_stats(values: Sequence[float], convergence: Optional[Convergence] = None) -> TrajectoryStats:
     t = [float(v) for v in values]
     total = sum(t)
     start = (len(t) * 2) // 3
@@ -27,7 +33,16 @@ def trajectory_stats(values: Sequence[float]) -> TrajectoryStats:
     for i in range(1, len(t)):
         if t[i] > t[peak]:
             peak = i
-    return TrajectoryStats(iterations=len(t), late_share=(late / total) if total > 0 else 0.0, reversals=reversals, peak_iteration=peak, total=total)
+    quarter = max(1, len(t) // 4)
+    late_update = sum(t[-quarter:]) / quarter if t else None
+    early_update = sum(t[:quarter]) / quarter if t else None
+    extra = convergence.model_dump() if convergence is not None else {}
+    return TrajectoryStats(
+        iterations=len(t), late_share=(late / total) if total > 0 else 0.0, reversals=reversals, peak_iteration=peak, total=total,
+        last_update=t[-1] if t else None, late_update=late_update, early_update=early_update,
+        late_to_early=(late_update / early_update) if early_update else None,
+        **extra,
+    )
 
 
 def late_start(length: int) -> int:
@@ -35,7 +50,11 @@ def late_start(length: int) -> int:
 
 
 def is_settled(stats: TrajectoryStats, limits: Limits) -> bool:
-    return stats.late_share <= limits.max_late_share + EPS and stats.reversals <= limits.max_reversals
+    if stats.late_share > limits.max_late_share + EPS or stats.reversals > limits.max_reversals:
+        return False
+    if limits.max_last_update is not None and stats.last_update is not None and stats.last_update > limits.max_last_update + EPS:
+        return False
+    return True
 
 
 def measured(case: CaseV1) -> bool:
@@ -59,17 +78,22 @@ def error_outcome(case: CaseV1, max_regression: float) -> str:
     return "stable"
 
 
+def side_stats(case: CaseV1, side: str) -> Optional[TrajectoryStats]:
+    values = getattr(case, f"{side}_trajectory", None)
+    if not values:
+        return None
+    return trajectory_stats(values, getattr(case, f"{side}_convergence", None))
+
+
 def stability_outcome(case: CaseV1, limits: Limits) -> str:
-    if not case.candidate_trajectory:
+    stats = side_stats(case, "candidate")
+    if stats is None:
         return "not_assessed"
-    return "settled" if is_settled(trajectory_stats(case.candidate_trajectory), limits) else "unstable"
+    return "settled" if is_settled(stats, limits) else "unstable"
 
 
 def case_stability(case: CaseV1) -> CaseStability:
-    return CaseStability(
-        baseline=trajectory_stats(case.baseline_trajectory) if case.baseline_trajectory else None,
-        candidate=trajectory_stats(case.candidate_trajectory) if case.candidate_trajectory else None,
-    )
+    return CaseStability(baseline=side_stats(case, "baseline"), candidate=side_stats(case, "candidate"))
 
 
 def flags_for(case: CaseV1, limits: Limits) -> list[str]:
@@ -82,7 +106,8 @@ def flags_for(case: CaseV1, limits: Limits) -> list[str]:
         out.append("improved")
     if s == "unstable":
         out.append("unstable")
-    if case.baseline_trajectory and not is_settled(trajectory_stats(case.baseline_trajectory), limits):
+    base = side_stats(case, "baseline")
+    if base is not None and not is_settled(base, limits):
         out.append("baseline_unstable")
     if e == "improved" and s == "unstable":
         out.append("improved_unstable")

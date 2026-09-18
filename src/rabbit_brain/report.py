@@ -6,7 +6,7 @@ from typing import Optional, Sequence, Union
 from .checks import evaluate_check
 from .fmt import pct, plain, to_fixed
 from .models import Bundle, CheckV2, ComparisonV1, Findings, Limits, Record
-from .stability import SummaryNumbers, delta, error_outcome, rank, stability_outcome, trajectory_stats
+from .stability import SummaryNumbers, delta, error_outcome, rank, side_stats, stability_outcome, trajectory_stats
 
 
 def _metric_parts(run: Union[ComparisonV1, Bundle]) -> tuple[str, str]:
@@ -22,8 +22,9 @@ def _names(run: Union[ComparisonV1, Bundle]) -> tuple[str, str, str]:
     return run.baseline, run.candidate, run.dataset
 
 
-def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequence[CheckV2] = ()) -> str:
-    """Exactly the workspace's reportMarkdown()."""
+def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequence[CheckV2] = (), max_rows: int = 40) -> str:
+    """Exactly the workspace's reportMarkdown() for up to `max_rows` cases; larger case sets list the flagged cases and the
+    top of the queue, and say how many more there are (a 200-row table is not a readable receipt)."""
     s = SummaryNumbers(run.cases, limits)
     with_traj = s.with_trajectories > 0
     metric_name, unit = _metric_parts(run)
@@ -40,14 +41,23 @@ def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequen
         so_text = "not assessed" if so == "not_assessed" else so
         return f"{base} {f'{pct(stab.late_share)} · {stab.reversals} rev.' if stab else 'n/a'} | {so_text} |"
 
-    source_line = "Illustrative example data. No model inference was performed.\n\n" if run.source == "example" else "Imported evaluation results.\n\n"
+    if run.source == "example":
+        source_line = "Illustrative example data. No model inference was performed.\n\n"
+    elif run.source == "run":
+        source_line = "Evaluated by rb run: both checkpoints were run on the case set and the trajectories recorded by the adapter.\n\n"
+    else:
+        source_line = "Imported evaluation results.\n\n"
     stability_line = (
         f"Stability limits: late revision ≤ {pct(limits.max_late_share)}, reversals ≤ {limits.max_reversals}. {s.unstable} of {s.with_trajectories} cases with trajectories are unstable; {s.unstable_passing} of those pass on error.\n"
         if with_traj else "No refinement trajectories were exported, so stability was not assessed.\n"
     )
     header = f"| Case | Current ({unit}) | Candidate ({unit}) | Change ({unit}) | Error |{' Candidate late revision | Stability |' if with_traj else ''}"
     divider = f"|---|---:|---:|---:|---|{'---|---|' if with_traj else ''}"
-    rows = "\n".join(row(c) for c in rank(run.cases, limits))
+    ranked = rank(run.cases, limits)
+    shown = ranked if len(ranked) <= max_rows else ranked[:max(max_rows, s.flagged)]  # every flagged case, then the top of the rest
+    rows = "\n".join(row(c) for c in shown)
+    if len(shown) < len(ranked):
+        rows += f"\n\n{len(ranked) - len(shown)} more cases, none of them flagged: all cases are in bundle.json and `rb findings <run> --filter all`."
     check_lines = "\n".join(
         f"- {c.case_id}: candidate error ≤ {to_fixed(c.max_error)} {unit}{f', late revision ≤ {pct(c.max_late_share)}' if c.max_late_share is not None else ''}{f', reversals ≤ {c.max_reversals}' if c.max_reversals is not None else ''}: {evaluate_check(c, run, unit).status}"
         for c in checks
@@ -58,6 +68,47 @@ def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequen
         f"Regression threshold: increase greater than {plain(limits.max_regression)} {unit}.\n{s.regressions} of {len(run.cases)} cases regress on error.\n{f'{s.not_measured} of {len(run.cases)} cases have no ground truth; their error was not measured.' + chr(10) if s.not_measured else ''}{stability_line}\n"
         f"{header}\n{divider}\n{rows}\n\n## Saved checks\n{check_lines}\n\n"
         "The check runner evaluates these supplied metrics and trajectories against the limits. It does not run inference or certify a model for deployment.\n"
+    )
+
+
+def _quantile(xs: list[float], q: float) -> float:
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(round(q * (len(xs) - 1))))]
+
+
+def convergence_section(bundle: Bundle, limits: Limits) -> str:
+    """Where the limits sit against this case set: per model, the distribution of the statistics the limits read
+    plus the paper's absolute ones. Only for runs that recorded trajectories."""
+    unit = bundle.metric.unit
+    rows = []
+    for side, name in (("baseline", bundle.baseline.name), ("candidate", bundle.candidate.name)):
+        stats = [t for t in (side_stats(c, side) for c in bundle.cases) if t is not None]
+        if not stats:
+            continue
+        cols = [f"| {name} | {len(stats)} "]
+        for key, fmt in (("late_share", "pct"), ("reversals", "int"), ("last_update", "num"), ("late_to_early", "num"), ("sign_reversal_rate", "pct"), ("displacement_mean", "num")):
+            vals = [getattr(t, key) for t in stats if getattr(t, key) is not None]
+            if not vals:
+                cols.append("| n/a ")
+                continue
+            p50, p90, mx = _quantile(vals, 0.5), _quantile(vals, 0.9), max(vals)
+            if fmt == "pct":
+                cols.append(f"| {pct(p50)} / {pct(p90)} / {pct(mx)} ")
+            elif fmt == "int":
+                cols.append(f"| {int(p50)} / {int(p90)} / {int(mx)} ")
+            else:
+                cols.append(f"| {p50:.3f} / {p90:.3f} / {mx:.3f} ")
+        rows.append("".join(cols) + "|")
+    if not rows:
+        return ""
+    limit_line = f"Limits in force: late share ≤ {pct(limits.max_late_share)}, reversals ≤ {limits.max_reversals}, last update " + (f"≤ {plain(limits.max_last_update)} {unit}" if limits.max_last_update is not None else "not limited (set `max_last_update` in rb.toml or `--max-last-update`)") + "."
+    return (
+        "## Convergence on this case set\n\n"
+        "Median / 90th percentile / max per model. Late share and reversals are what the stability limits read; last update, "
+        "late-to-early ratio, direction reversals (share of consecutive updates pointing in opposite directions) and the mean "
+        "distance of intermediate estimates from the final one are the absolute statistics from the update fields, in the trajectory's unit.\n\n"
+        f"| Model | Cases | Late share | Reversals | Last update ({unit}) | Late/early | Direction reversals | Distance from final ({unit}) |\n"
+        "|---|---:|---|---|---|---|---|---|\n" + "\n".join(rows) + f"\n\n{limit_line}\n\n"
     )
 
 
@@ -77,7 +128,13 @@ def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings
             if ref and (ref.checkpoint or ref.sha256):
                 prov.append(f"{role.capitalize()} checkpoint: {ref.checkpoint or ''}{f' (sha256 {ref.sha256[:16]}…)' if ref.sha256 else ''}")
         env = record.environment or {}
-        prov.append(f"Environment: python {env.get('python', '?')} · {env.get('platform', '?')}")
+        env_line = f"Environment: python {env.get('python', '?')} · {env.get('platform', '?')}"
+        if env.get("torch"):
+            env_line += f" · torch {env['torch']}" + (f" · cuda {env['cuda']} · {env['gpu']}" if env.get("gpu") else " · cpu")
+        prov.append(env_line)
+        if record.model_code and record.model_code.get("path"):
+            mc = record.model_code
+            prov.append(f"Model code: {mc['path']}" + (f" @ {mc['sha'][:12]}{' (uncommitted changes)' if mc.get('dirty') else ''}" if mc.get("sha") else ""))
         hook = record.hook or {}
         prov.append(f"Trajectories: {hook.get('status', 'unknown')}{'. ' + hook['note'] if hook.get('note') else ''}")
     else:
@@ -90,4 +147,5 @@ def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings
         f"- Saved checks against this run: `rb check run {bundle.run_id} --checks checks.json`\n"
         "- Definitions: `rb docs`. Schemas: `rb schema bundle|findings|checks|record`.\n"
     )
-    return f"{title}\n\n" + "\n".join(prov) + "\n\n" + verdict + "\n" + body + "\n" + reproduce
+    convergence = convergence_section(bundle, findings.limits) if bundle.source == "run" else ""
+    return f"{title}\n\n" + "\n".join(prov) + "\n\n" + verdict + "\n" + body + "\n" + convergence + reproduce

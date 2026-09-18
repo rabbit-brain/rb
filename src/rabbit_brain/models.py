@@ -25,11 +25,14 @@ def _finite_nonneg(values: list[float], name: str) -> list[float]:
 # ---------------------------------------------------------------- limits & metric
 
 class Limits(BaseModel):
-    """What gets flagged. `max_regression` is in the metric's unit; the two stability limits read the candidate's trajectory."""
+    """What gets flagged. `max_regression` is in the metric's unit; the stability limits read the candidate's trajectory.
+    `max_last_update` (same unit as the trajectory values) is off unless set: a case is not settled when the model was
+    still moving its answer by more than this per iteration at the end."""
     model_config = ConfigDict(extra="forbid")
     max_regression: float = Field(0.3, ge=0, le=SCORE_MAX)
     max_late_share: float = Field(0.25, ge=0, le=1)
     max_reversals: int = Field(2, ge=0, le=64)
+    max_last_update: Optional[float] = Field(default=None, ge=0, le=SCORE_MAX)
 
 
 class Metric(BaseModel):
@@ -146,13 +149,38 @@ class DatasetRef(BaseModel):
     case_list_hash: Optional[str] = None
 
 
+class Convergence(BaseModel):
+    """Per-case convergence history from the update fields themselves (the paper's readout families, averaged over pixels).
+    Only a run with an instrumented model produces these; imported scalar trajectories cannot."""
+    model_config = ConfigDict(extra="forbid")
+    sign_reversal_rate: float = Field(ge=0, le=1)   # share of adjacent update pairs pointing in opposite directions (cosine < 0)
+    mean_cos: float = Field(ge=-1, le=1)             # mean cosine between consecutive updates
+    displacement_mean: float = Field(ge=0)           # mean distance of the intermediate estimates from the final one
+    displacement_max: float = Field(ge=0)            # the largest of those
+    displacement_initial: float = Field(ge=0)        # distance from the first estimate to the final one
+    update_energy: float = Field(ge=0)               # sum over iterations of the squared update magnitude
+
+
 class TrajectoryStats(BaseModel):
+    """`late_share`, `reversals`, `peak_iteration`, `total`: the version-1 statistics, unchanged. The rest are the paper's
+    convergence statistics computed from the same values (quarter windows, absolute magnitudes) plus, for runs, the
+    direction and displacement statistics from the update fields."""
     model_config = ConfigDict(extra="forbid")
     iterations: int
     late_share: float
     reversals: int
     peak_iteration: int
     total: float
+    last_update: Optional[float] = None       # magnitude of the final update
+    late_update: Optional[float] = None       # mean update over the last quarter of iterations
+    early_update: Optional[float] = None      # mean update over the first quarter
+    late_to_early: Optional[float] = None     # late_update / early_update
+    sign_reversal_rate: Optional[float] = None
+    mean_cos: Optional[float] = None
+    displacement_mean: Optional[float] = None
+    displacement_max: Optional[float] = None
+    displacement_initial: Optional[float] = None
+    update_energy: Optional[float] = None
 
 
 class CaseStability(BaseModel):
@@ -178,6 +206,8 @@ class CaseV2(CaseV1):
     candidate_error: Optional[float] = Field(default=None, ge=0, le=SCORE_MAX)  # type: ignore[assignment]
     has_gt: bool = True
     error_change: Optional[float] = None
+    baseline_convergence: Optional[Convergence] = None
+    candidate_convergence: Optional[Convergence] = None
     stability: CaseStability = Field(default_factory=CaseStability)
     error_outcome: ErrorOutcome = "stable"
     stability_outcome: StabilityOutcome = "not_assessed"

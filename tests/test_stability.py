@@ -80,3 +80,36 @@ def test_report_core_is_byte_identical_to_workspace(expected):
 
 def test_minimal_example_text_matches(expected):
     assert MINIMAL_EXAMPLE == expected["minimal_example"]
+
+
+def test_paper_statistics_from_values_and_fields():
+    """Quarter windows and absolute magnitudes from the values; direction and displacement from the fields."""
+    import numpy as np
+    from rabbit_brain.models import Limits
+    from rabbit_brain.recorder import TrajectoryRecorder
+    from rabbit_brain.stability import is_settled, trajectory_stats
+
+    t = trajectory_stats([4.0, 2.0, 1.0, 0.5, 0.25, 0.125, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
+    assert t.last_update == 0.1 and t.early_update == (4.0 + 2.0 + 1.0) / 3 and abs(t.late_update - 0.1) < 1e-9
+    assert abs(t.late_to_early - 0.1 / ((4.0 + 2.0 + 1.0) / 3)) < 1e-9
+    assert t.sign_reversal_rate is None  # no fields, no direction statistics
+
+    # a 2-channel field that moves +x, +x, then -x (one direction reversal out of two pairs); 2 x 3 x 3 pixels
+    rec = TrajectoryRecorder()
+    for dx in (1.0, 0.5, -0.25):
+        field = np.zeros((1, 2, 3, 3)); field[0, 0] = dx
+        rec.step(field)
+    assert rec.values == [1.0, 0.5, 0.25]  # L2 norm per pixel, averaged
+    c = rec.convergence()
+    assert c["sign_reversal_rate"] == 0.5 and abs(c["mean_cos"] - 0.0) < 1e-9
+    # estimates after each step: 1.0, 1.5, 1.25 (final); distances of the first two from the final: 0.25, 0.25
+    assert abs(c["displacement_mean"] - 0.25) < 1e-9 and abs(c["displacement_max"] - 0.25) < 1e-9 and abs(c["displacement_initial"] - 0.25) < 1e-9
+    assert abs(c["update_energy"] - (1.0 + 0.25 + 0.0625)) < 1e-9
+    rec.reset()
+    assert rec.convergence() is None and rec.values == []
+
+    # the last-update limit is off unless set
+    settled_v1 = trajectory_stats([2.0, 1.0, 0.8, 0.7, 0.6, 0.5, 0.45, 0.4, 0.4, 0.4, 0.4, 0.4])
+    assert is_settled(settled_v1, Limits()) is True
+    assert is_settled(settled_v1, Limits(max_last_update=0.3)) is False
+    assert is_settled(settled_v1, Limits(max_last_update=0.5)) is True

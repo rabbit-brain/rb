@@ -57,7 +57,7 @@ def file_sha256(path: Path) -> str:
 # ---------------------------------------------------------------- derive
 
 def derive_case(case, limits: Limits) -> CaseV2:
-    data = case.model_dump(include=set(type(case).model_fields) & {"id", "name", "tags", "baseline_error", "candidate_error", "baseline_frames", "candidate_frames", "baseline_trajectory", "candidate_trajectory", "notes"})
+    data = case.model_dump(include=set(type(case).model_fields) & {"id", "name", "tags", "baseline_error", "candidate_error", "baseline_frames", "candidate_frames", "baseline_trajectory", "candidate_trajectory", "baseline_convergence", "candidate_convergence", "notes"})
     return CaseV2(
         **data,
         has_gt=getattr(case, "has_gt", True) and data.get("baseline_error") is not None and data.get("candidate_error") is not None,

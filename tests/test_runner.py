@@ -135,6 +135,17 @@ def test_raft_adapter_mechanics(workdir, capsys):
     assert unlabeled["has_gt"] is False and unlabeled.get("candidate_error") is None and len(unlabeled["candidate_trajectory"]) == 12
     labeled = next(c for c in bundle["cases"] if c["id"] == "000000_10")
     assert labeled["candidate_error"] > 0 and labeled["error_outcome"] in ("regression", "improved", "stable")
+    # the paper's convergence statistics ride along for both models and land in the stability block
+    conv = labeled["candidate_convergence"]
+    assert 0 <= conv["sign_reversal_rate"] <= 1 and conv["displacement_mean"] >= 0 and conv["update_energy"] > 0
+    st = labeled["stability"]["candidate"]
+    assert st["last_update"] == labeled["candidate_trajectory"][-1] and st["sign_reversal_rate"] == conv["sign_reversal_rate"]
+    # a report from a run carries the convergence section and the receipts wording
+    report = (workdir / "rb-runs" / env.run_id / "report.md").read_text()
+    assert "## Convergence on this case set" in report and "Evaluated by rb run" in report
+    # rb case prints the absolute statistics
+    code, env, text = run_json(capsys, "case", env.run_id, "000000_10")
+    assert code == 0 and env.data["stability"]["candidate"]["displacement_max"] is not None
     # the architecture is read from the checkpoint, so a wrong `small` flag in rb.toml does not matter
     Path("rb.toml").write_text(Path("rb.toml").read_text().replace("small = true", "small = false"))
     code, env, _ = run_json(capsys, "verify-hook", "--checkpoint", "ckpt/raft-a.pth", "--device", "cpu")

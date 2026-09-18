@@ -91,7 +91,10 @@ class RaftAdapter:
         if device.startswith("cuda") and not torch.cuda.is_available():
             raise RBError("E_DEVICE", message="CUDA is not available in this environment.")
         try:
-            state = torch.load(str(checkpoint), map_location="cpu")
+            try:
+                state = torch.load(str(checkpoint), map_location="cpu", weights_only=True)  # RAFT checkpoints are plain state dicts
+            except TypeError:  # torch < 1.13 has no weights_only
+                state = torch.load(str(checkpoint), map_location="cpu")
         except Exception as exc:  # noqa: BLE001  (torch raises several types for a corrupt or foreign file)
             raise RBError("E_CHECKPOINT_NOT_FOUND", message=f"{checkpoint} is not a torch checkpoint: {str(exc)[:200]}")
         if isinstance(state, dict) and "state_dict" in state and isinstance(state["state_dict"], dict):

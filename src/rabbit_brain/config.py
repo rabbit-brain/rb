@@ -115,6 +115,7 @@ def render_config(cfg: Config) -> str:
         f"max_regression = {lim.max_regression}             # in the metric's unit",
         f"max_late_share = {lim.max_late_share}",
         f"max_reversals = {lim.max_reversals}",
+        (f"max_last_update = {lim.max_last_update}" if lim.max_last_update is not None else "# max_last_update = 0.3           # off unless set: a final update larger than this (trajectory unit) = not settled"),
         "",
         "[evidence]",
         f"level = {_toml_str(e.level)}                    # none | standard | full (rendering arrives in 0.2)",

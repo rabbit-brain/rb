@@ -97,7 +97,15 @@ def evaluate_model(adapter: Any, model: Any, cases: list[Case], *, record_trajec
         values = list(rec.values)
         finite = all(math.isfinite(v) for v in values)
         traj = values if (record_trajectories and finite and 2 <= len(values) <= 64) else None
-        results[case.id] = {"error": error, "trajectory": traj, "frames": getattr(pred, "per_frame", None), "skipped": None, "fired": len(values), "finite": finite}
+        convergence = None
+        if traj is not None:
+            try:
+                convergence = rec.convergence()
+            except Exception as exc:  # noqa: BLE001  (statistics are optional; the run must not fail on them)
+                if progress:
+                    progress(f"{role}: {case.id} convergence statistics not computed ({type(exc).__name__})")
+        rec.reset()
+        results[case.id] = {"error": error, "trajectory": traj, "convergence": convergence, "frames": getattr(pred, "per_frame", None), "skipped": None, "fired": len(values), "finite": finite}
         if progress and (i % 10 == 0 or i == len(cases)):
             progress(f"{role}: {i}/{len(cases)} cases · {time.time() - t0:.0f}s")
     return results
@@ -163,6 +171,7 @@ def run(cfg: Config, baseline: Path, candidate: Path, *, limits: Optional[Limits
             id=c.id, name=c.name, tags=list(c.tags)[:8], notes=c.notes,
             baseline_error=b["error"], candidate_error=k["error"],
             baseline_trajectory=b["trajectory"], candidate_trajectory=k["trajectory"],
+            baseline_convergence=b.get("convergence"), candidate_convergence=k.get("convergence"),
             baseline_frames=b["frames"] if (b["frames"] and k["frames"] and len(b["frames"]) == len(k["frames"])) else None,
             candidate_frames=k["frames"] if (b["frames"] and k["frames"] and len(b["frames"]) == len(k["frames"])) else None,
             has_gt=b["error"] is not None and k["error"] is not None,

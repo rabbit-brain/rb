@@ -1,0 +1,85 @@
+{
+ "rb_version": "0.2.0.dev1",
+ "run_id": "20260918-1856-raft-small",
+ "command": "rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-small.pth --quiet",
+ "started": "2026-09-18T18:54:48+00:00",
+ "finished": "2026-09-18T18:56:44+00:00",
+ "wall_seconds": 115.781,
+ "source": "run",
+ "checkpoints": {
+  "baseline": {
+   "name": "raft-things",
+   "checkpoint": "raft/models/raft-things.pth",
+   "sha256": "fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1"
+  },
+  "candidate": {
+   "name": "raft-small",
+   "checkpoint": "raft/models/raft-small.pth",
+   "sha256": "c7d41b9cc88442bb8aa911dbb33086dac55a226394b142937ff22d5578717332"
+  }
+ },
+ "dataset": {
+  "name": "kitti2015-train",
+  "count": 200,
+  "case_list_hash": "f3eebc6dbd5b8a55"
+ },
+ "environment": {
+  "python": "3.11.10",
+  "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.35",
+  "rb_version": "0.2.0.dev1",
+  "torch": "2.4.1+cu124",
+  "cuda": "12.4",
+  "cuda_available": true,
+  "gpu": "NVIDIA RTX A5000",
+  "device": "cuda"
+ },
+ "hook": {
+  "status": "recorded",
+  "verified": true,
+  "iterations": 12,
+  "expected": 12,
+  "note": "Recorded once per refinement iteration."
+ },
+ "limits": {
+  "max_regression": 0.3,
+  "max_late_share": 0.25,
+  "max_reversals": 2
+ },
+ "input": {
+  "format": "run",
+  "dataset_path": "./data/kitti2015/training",
+  "cases_selector": "all",
+  "limit": null
+ },
+ "adapter": {
+  "id": "raft",
+  "version": "0.2.0.dev1",
+  "model_code": "raft",
+  "git_sha": {
+   "sha": "2888e15a51fa41140771d3f498ed8023cff098d1",
+   "dirty": false
+  },
+  "iterations": 12,
+  "small": false,
+  "mixed_precision": false,
+  "alternate_corr": false,
+  "hook": "forward hook on model.update_block (output index 2 = delta_flow, scaled by 8 to image pixels)",
+  "architectures": {
+   "raft/models/raft-things.pth": "raft",
+   "raft/models/raft-small.pth": "raft-small"
+  }
+ },
+ "model_code": {
+  "path": "raft",
+  "sha": "2888e15a51fa41140771d3f498ed8023cff098d1",
+  "dirty": false
+ },
+ "seeds": {
+  "python": 0,
+  "numpy": 0,
+  "torch": 0
+ },
+ "deterministic_algorithms": false,
+ "notes": "",
+ "skipped": {}
+}

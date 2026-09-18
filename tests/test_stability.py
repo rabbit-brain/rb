@@ -113,3 +113,14 @@ def test_paper_statistics_from_values_and_fields():
     assert is_settled(settled_v1, Limits()) is True
     assert is_settled(settled_v1, Limits(max_last_update=0.3)) is False
     assert is_settled(settled_v1, Limits(max_last_update=0.5)) is True
+
+
+def test_recorder_scale_puts_values_in_image_pixels():
+    import numpy as np
+    from rabbit_brain.recorder import TrajectoryRecorder
+    rec = TrajectoryRecorder(scale=8.0)
+    field = np.zeros((1, 2, 2, 2)); field[0, 0] = 0.5
+    rec.step(field); rec.step(field * 0.5)
+    assert rec.values == [4.0, 2.0]
+    c = rec.convergence()
+    assert abs(c["displacement_initial"] - 2.0) < 1e-9  # first estimate 4 px, final 6 px

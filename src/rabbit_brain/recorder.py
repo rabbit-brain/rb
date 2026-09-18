@@ -37,26 +37,27 @@ def _flatten(value: Any) -> Iterator[float]:
 
 
 class TrajectoryRecorder:
-    def __init__(self, mask: Optional[Any] = None, keep_fields: bool = True) -> None:
+    def __init__(self, mask: Optional[Any] = None, keep_fields: bool = True, scale: float = 1.0) -> None:
         self.values: list[float] = []
         self.mask = mask  # optional boolean tensor/array of valid pixels (same spatial shape as the update)
         self.keep_fields = keep_fields
+        self.scale = float(scale)  # multiplies every update: 8 for RAFT, whose update fields are at 1/8 resolution, so values are image pixels
         self._fields: list[Any] = []  # per-iteration update fields, shape (..., 2, H, W) or (..., H, W), same backend as given
 
     def step(self, delta: Any) -> float:
         if hasattr(delta, "detach"):  # torch tensor, e.g. shape (B, 2, H, W)
-            d = delta.detach()
-            magnitude = d.float().abs()
+            d = delta.detach().float() * self.scale
+            magnitude = d.abs()
             if magnitude.dim() >= 3 and magnitude.shape[-3] == 2:
                 magnitude = (magnitude ** 2).sum(dim=-3).sqrt()  # L2 norm of the 2-D update per pixel
             if self.mask is not None:
                 magnitude = magnitude[self.mask]
             value = float(magnitude.mean().item())
             if self.keep_fields:
-                self._fields.append(d.float())
+                self._fields.append(d)
         elif hasattr(delta, "mean") and hasattr(delta, "shape"):  # numpy array
             import numpy as np
-            d = np.asarray(delta, dtype=np.float64)
+            d = np.asarray(delta, dtype=np.float64) * self.scale
             magnitude = np.abs(d)
             if magnitude.ndim >= 3 and magnitude.shape[-3] == 2:
                 magnitude = np.sqrt((magnitude ** 2).sum(axis=-3))
@@ -66,7 +67,7 @@ class TrajectoryRecorder:
             if self.keep_fields:
                 self._fields.append(d)
         else:  # plain nested lists
-            flat = [abs(v) for v in _flatten(delta)]
+            flat = [abs(v) * self.scale for v in _flatten(delta)]
             value = sum(flat) / max(len(flat), 1)
         self.values.append(round(value, 4))
         return value

@@ -1,0 +1,30 @@
+== run: raft-things -> raft-sintel
+Run: raft-kitti · raft-things → raft-sintel · mean endpoint error (px), lower is better · 115.113s
+200 cases (200 with ground truth) · mean 5.40 → 1.52 px · 1 regressions · 0 unstable (0 pass on error)
+Trajectories: recorded. Recorded once per refinement iteration.
+Verdict: Not ready: 1 error regression. Start with 000145_10.
+Run written to rb-runs/20260918-1852-raft-sintel/ (bundle.json, record.json, findings.json, report.md)
+
+Next: rb findings 20260918-1852-raft-sintel --top 5  ·  rb case 20260918-1852-raft-sintel 000145_10
+== run: raft-things -> raft-kitti
+Run: raft-kitti · raft-things → raft-kitti · mean endpoint error (px), lower is better · 107.369s
+200 cases (200 with ground truth) · mean 5.40 → 0.61 px · 0 regressions · 1 unstable (1 pass on error)
+Trajectories: recorded. Recorded once per refinement iteration.
+Verdict: Not ready: 1 unstable case that passes on error. Start with 000079_10.
+Run written to rb-runs/20260918-1854-raft-kitti/ (bundle.json, record.json, findings.json, report.md)
+
+Next: rb findings 20260918-1854-raft-kitti --top 5  ·  rb case 20260918-1854-raft-kitti 000079_10
+== run: raft-things -> raft-small
+Run: raft-kitti · raft-things → raft-small · mean endpoint error (px), lower is better · 115.781s
+200 cases (200 with ground truth) · mean 5.40 → 8.46 px · 155 regressions · 0 unstable (0 pass on error)
+Trajectories: recorded. Recorded once per refinement iteration.
+Verdict: Not ready: 155 error regressions. Start with 000103_10.
+Run written to rb-runs/20260918-1856-raft-small/ (bundle.json, record.json, findings.json, report.md)
+
+Next: rb findings 20260918-1856-raft-small --top 5  ·  rb case 20260918-1856-raft-small 000103_10
+== runs
+20260918-1852-raft-sintel
+20260918-1854-raft-kitti
+20260918-1856-raft-small
+
+Next: rb findings 20260918-1856-raft-small

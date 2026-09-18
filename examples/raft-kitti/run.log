@@ -1,0 +1,177 @@
+== 2026-09-18T18:04:35Z rabbit-brain on RAFT / KITTI-2015 in /workspace/rb-kitti
+NVIDIA RTX A5000, 24564 MiB
+debconf: delaying package configuration, since apt-utils is not installed
+Selecting previously unselected package unzip.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 24135 files and directories currently installed.)
+Preparing to unpack .../unzip_6.0-26ubuntu3.2_amd64.deb ...
+Unpacking unzip (6.0-26ubuntu3.2) ...
+Setting up unzip (6.0-26ubuntu3.2) ...
+Processing triggers for mailcap (3.70+nmu1ubuntu1) ...
+== tool (runner is on main; PyPI 0.1.x has no rb run)
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable.It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+
+[notice] A new release of pip is available: 24.2 -> 26.2.1
+[notice] To update, run: python -m pip install --upgrade pip
+rabbit-brain 0.2.0.dev1
+== RAFT code
+2888e15
+== RAFT checkpoints (models.zip from the RAFT README's download_models.sh)
+raft-chairs.pth
+raft-kitti.pth
+raft-sintel.pth
+raft-small.pth
+raft-things.pth
+== KITTI-2015 scene flow (training: image_2 + flow_occ), about 1.7 GB
+pairs: 200, ground truth: 200
+== project
+Wrote rb.toml for project 'raft-kitti' (adapter raft).
+Added rb-runs/*/evidence/ to .gitignore.
+
+Next: rb doctor  ·  rb verify-hook --checkpoint <path>  ·  rb run --baseline <ckpt-A> --candidate <ckpt-B>
+ok    python                 3.11.10
+ok    rb                     0.2.0.dev1
+ok    config                 project 'raft-kitti', task flow, adapter raft
+ok    torch                  2.4.1+cu124 (cuda available)
+ok    device                 cuda
+ok    adapter                {'id': 'raft', 'version': '0.2.0.dev1', 'model_code': 'raft', 'git_sha': {'sha': '2888e15a51fa41140771d3f498ed8023cff098d1', 'dirty': False}, 'iterations': 12, 'small': False, 'mixed_precision': False, 'alternate_corr': False, 'hook': 'forward hook on model.update_block (output index 2 = delta_flow)'}
+ok    model_code             raft
+ok    dataset                200 cases from ./data/kitti2015/training; 200 with ground truth
+ok    checkpoint raft-things.pth raft/models/raft-things.pth
+ok    checkpoint raft-sintel.pth raft/models/raft-sintel.pth
+ok    checkpoint raft-kitti.pth raft/models/raft-kitti.pth
+ok    checkpoint raft-small.pth raft/models/raft-small.pth
+warn  hook                   not verified yet
+      → rb verify-hook --checkpoint <path>
+
+Ready to run.
+
+Next: rb verify-hook --checkpoint <path>  ·  rb run --baseline <ckpt-A> --candidate <ckpt-B>
+/usr/local/lib/python3.11/dist-packages/rabbit_brain/adapters/raft.py:94: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state = torch.load(str(checkpoint), map_location="cpu")
+/workspace/rb-kitti/raft/core/raft.py:99: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+/workspace/rb-kitti/raft/core/raft.py:110: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+/usr/local/lib/python3.11/dist-packages/torch/functional.py:513: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3609.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/workspace/rb-kitti/raft/core/raft.py:127: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+Case 000000_10 on cuda: recorder fired 12 time(s), expected 12 · 0.68s
+Values: [5.298, 2.373, 1.355, 0.9356, 0.8609, 0.7473, 0.5783, 0.4805, 0.4431, 0.3657, 0.3074, 0.2631]
+Hook verified: one value per refinement iteration.
+
+Next: rb run --baseline <ckpt-A> --candidate <ckpt-B>
+== run: raft-things -> raft-sintel (12 iterations)
+/usr/local/lib/python3.11/dist-packages/rabbit_brain/adapters/raft.py:94: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state = torch.load(str(checkpoint), map_location="cpu")
+/workspace/rb-kitti/raft/core/raft.py:99: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+/workspace/rb-kitti/raft/core/raft.py:110: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+/usr/local/lib/python3.11/dist-packages/torch/functional.py:513: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3609.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/workspace/rb-kitti/raft/core/raft.py:127: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+Run: raft-kitti · raft-things → raft-sintel · mean endpoint error (px), lower is better · 115.264s
+200 cases (200 with ground truth) · mean 5.40 → 1.52 px · 1 regressions · 0 unstable (0 pass on error)
+Trajectories: recorded. Recorded once per refinement iteration.
+Verdict: Not ready: 1 error regression. Start with 000145_10.
+Run written to rb-runs/20260918-1810-raft-sintel/ (bundle.json, record.json, findings.json, report.md)
+
+Next: rb findings 20260918-1810-raft-sintel --top 5  ·  rb case 20260918-1810-raft-sintel 000145_10
+
+real	1m56.494s
+user	13m56.506s
+sys	0m10.856s
+== run: raft-things -> raft-kitti (12 iterations)
+/usr/local/lib/python3.11/dist-packages/rabbit_brain/adapters/raft.py:94: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state = torch.load(str(checkpoint), map_location="cpu")
+/workspace/rb-kitti/raft/core/raft.py:99: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+/workspace/rb-kitti/raft/core/raft.py:110: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+/usr/local/lib/python3.11/dist-packages/torch/functional.py:513: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3609.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/workspace/rb-kitti/raft/core/raft.py:127: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+Run: raft-kitti · raft-things → raft-kitti · mean endpoint error (px), lower is better · 112.1s
+200 cases (200 with ground truth) · mean 5.40 → 0.61 px · 0 regressions · 1 unstable (1 pass on error)
+Trajectories: recorded. Recorded once per refinement iteration.
+Verdict: Not ready: 1 unstable case that passes on error. Start with 000079_10.
+Run written to rb-runs/20260918-1812-raft-kitti/ (bundle.json, record.json, findings.json, report.md)
+
+Next: rb findings 20260918-1812-raft-kitti --top 5  ·  rb case 20260918-1812-raft-kitti 000079_10
+
+real	1m53.056s
+user	13m38.986s
+sys	0m9.330s
+== run: raft-things -> raft-small (12 iterations)
+/usr/local/lib/python3.11/dist-packages/rabbit_brain/adapters/raft.py:94: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state = torch.load(str(checkpoint), map_location="cpu")
+/workspace/rb-kitti/raft/core/raft.py:99: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+/workspace/rb-kitti/raft/core/raft.py:110: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+/usr/local/lib/python3.11/dist-packages/torch/functional.py:513: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3609.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/workspace/rb-kitti/raft/core/raft.py:127: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=self.args.mixed_precision):
+Run: raft-kitti · raft-things → raft-small · mean endpoint error (px), lower is better · 109.298s
+200 cases (200 with ground truth) · mean 5.40 → 8.46 px · 155 regressions · 0 unstable (0 pass on error)
+Trajectories: recorded. Recorded once per refinement iteration.
+Verdict: Not ready: 155 error regressions. Start with 000103_10.
+Run written to rb-runs/20260918-1814-raft-small/ (bundle.json, record.json, findings.json, report.md)
+
+Next: rb findings 20260918-1814-raft-small --top 5  ·  rb case 20260918-1814-raft-small 000103_10
+
+real	1m50.433s
+user	13m15.747s
+sys	0m13.036s
+== runs
+20260918-1810-raft-sintel
+20260918-1812-raft-kitti
+20260918-1814-raft-small
+
+Next: rb findings 20260918-1814-raft-small
+--- rb-runs/20260918-1810-raft-sintel/
+raft-kitti · raft-things → raft-sintel · mean endpoint error (px), lower is better
+Limits: +0.3 px · 25% late · 2 reversals
+Verdict: Not ready: 1 error regression. Start with 000145_10.
+200 cases · 1 regressions · 0 unstable (0 pass on error) · 1 settled regressions · 1 flagged
+
+  #  case                        change   late rev  flags
+  1  000145_10                  +0.41 px    4%   0  regression, settled_regression
+
+1 of 200 cases shown (filter: flagged, sort: priority).
+
+Next: rb case 20260918-1810-raft-sintel 000145_10  ·  rb check save 20260918-1810-raft-sintel 000145_10  ·  rb report 20260918-1810-raft-sintel
+--- rb-runs/20260918-1812-raft-kitti/
+raft-kitti · raft-things → raft-kitti · mean endpoint error (px), lower is better
+Limits: +0.3 px · 25% late · 2 reversals
+Verdict: Not ready: 1 unstable case that passes on error. Start with 000079_10.
+200 cases · 0 regressions · 1 unstable (1 pass on error) · 0 settled regressions · 1 flagged
+
+  #  case                        change   late rev  flags
+  1  000079_10                  -3.90 px    4%   3  improved, unstable, improved_unstable
+
+1 of 200 cases shown (filter: flagged, sort: priority).
+
+Next: rb case 20260918-1812-raft-kitti 000079_10  ·  rb check save 20260918-1812-raft-kitti 000079_10  ·  rb report 20260918-1812-raft-kitti
+--- rb-runs/20260918-1814-raft-small/
+raft-kitti · raft-things → raft-small · mean endpoint error (px), lower is better
+Limits: +0.3 px · 25% late · 2 reversals
+Verdict: Not ready: 155 error regressions. Start with 000103_10.
+200 cases · 155 regressions · 0 unstable (0 pass on error) · 155 settled regressions · 155 flagged
+
+  #  case                        change   late rev  flags
+  1  000103_10                 +24.41 px   11%   0  regression, settled_regression
+  2  000095_10                 +22.21 px   19%   1  regression, settled_regression
+  3  000190_10                 +18.74 px   15%   0  regression, settled_regression
+  4  000090_10                 +14.32 px   12%   0  regression, settled_regression
+  5  000148_10                 +14.05 px   15%   0  regression, settled_regression
+
+5 of 200 cases shown (filter: flagged, sort: priority).
+
+Next: rb case 20260918-1814-raft-small 000103_10  ·  rb check save 20260918-1814-raft-small 000103_10  ·  rb report 20260918-1814-raft-small
+== serving /workspace/rb-kitti on port 8000 (results under rb-runs/)
+== done 2026-09-18T18:14:45Z

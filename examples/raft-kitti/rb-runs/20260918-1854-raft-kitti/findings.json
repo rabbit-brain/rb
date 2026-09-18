@@ -1,0 +1,4234 @@
+{
+ "run_id": "20260918-1854-raft-kitti",
+ "project": "raft-kitti",
+ "metric": {
+  "id": "mean_endpoint_error",
+  "name": "mean endpoint error",
+  "unit": "px",
+  "lower_is_better": true
+ },
+ "limits": {
+  "max_regression": 0.3,
+  "max_late_share": 0.25,
+  "max_reversals": 2
+ },
+ "summary": {
+  "cases": 200,
+  "with_gt": 200,
+  "with_trajectories": 200,
+  "mean_error": {
+   "baseline": 5.403328458070755,
+   "candidate": 0.6098525930568576,
+   "change_pct": -88.7133903150762
+  },
+  "regressions": 0,
+  "improved": 192,
+  "stable": 8,
+  "unstable": 1,
+  "improved_unstable": 1,
+  "settled_regressions": 0,
+  "flagged": 1,
+  "checks": {
+   "saved": 0,
+   "passing": 0,
+   "failing": 0,
+   "missing": 0,
+   "other_project": 0
+  }
+ },
+ "verdict": {
+  "status": "investigate",
+  "ready": false,
+  "line": "Not ready: 1 unstable case that passes on error. Start with 000079_10.",
+  "start": "000079_10",
+  "start_name": "000079_10"
+ },
+ "queue": [
+  {
+   "rank": 1,
+   "id": "000079_10",
+   "name": "000079_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved",
+    "unstable",
+    "improved_unstable"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "unstable",
+   "baseline_error": 4.6808319091796875,
+   "candidate_error": 0.7828323841094971,
+   "error_change": -3.8979995250701904,
+   "baseline_late_share": 0.05806402028974369,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.036484759019250586,
+   "candidate_reversals": 3,
+   "why": "Error fell by 3.90 px on this case. The candidate made 4% of its refinement in the last third of its iterations and reversed direction 3 times, above your 25% / 2 limits. The current model settled at 6%. The error looks fine; the answer is not settled."
+  },
+  {
+   "rank": 2,
+   "id": "000138_10",
+   "name": "000138_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.27865493297576904,
+   "candidate_error": 0.09785643965005875,
+   "error_change": -0.1807984933257103,
+   "baseline_late_share": 0.05707790362521821,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04843291127052139,
+   "candidate_reversals": 0,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 5% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 3,
+   "id": "000139_10",
+   "name": "000139_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.2540994882583618,
+   "candidate_error": 0.062338024377822876,
+   "error_change": -0.19176146388053894,
+   "baseline_late_share": 0.044863851555301364,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03721269609631522,
+   "candidate_reversals": 0,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 4,
+   "id": "000092_10",
+   "name": "000092_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.2511661946773529,
+   "candidate_error": 0.027842668816447258,
+   "error_change": -0.22332352586090565,
+   "baseline_late_share": 0.07888530287984111,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04991334488734835,
+   "candidate_reversals": 0,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 5% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 5,
+   "id": "000156_10",
+   "name": "000156_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.27732160687446594,
+   "candidate_error": 0.022515343502163887,
+   "error_change": -0.25480626337230206,
+   "baseline_late_share": 0.13859175890614828,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06347746090156395,
+   "candidate_reversals": 0,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 6% late revision, 0 reversals. Current model: 14%."
+  },
+  {
+   "rank": 6,
+   "id": "000082_10",
+   "name": "000082_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.364607572555542,
+   "candidate_error": 0.09347046911716461,
+   "error_change": -0.2711371034383774,
+   "baseline_late_share": 0.022485207100591716,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.020619050469975454,
+   "candidate_reversals": 0,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 2% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 7,
+   "id": "000016_10",
+   "name": "000016_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.3601427376270294,
+   "candidate_error": 0.06604230403900146,
+   "error_change": -0.29410043358802795,
+   "baseline_late_share": 0.07322681445669475,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04117626142303452,
+   "candidate_reversals": 0,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 8,
+   "id": "000165_10",
+   "name": "000165_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4156869947910309,
+   "candidate_error": 0.12118226289749146,
+   "error_change": -0.29450473189353943,
+   "baseline_late_share": 0.01524988258695472,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.00789901996406369,
+   "candidate_reversals": 0,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 1% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 9,
+   "id": "000135_10",
+   "name": "000135_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.42120644450187683,
+   "candidate_error": 0.12529154121875763,
+   "error_change": -0.2959149032831192,
+   "baseline_late_share": 0.025506018650282104,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010215774071854172,
+   "candidate_reversals": 0,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 10,
+   "id": "000097_10",
+   "name": "000097_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4609763026237488,
+   "candidate_error": 0.13042879104614258,
+   "error_change": -0.3305475115776062,
+   "baseline_late_share": 0.07186530388757072,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.027883143674718846,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.33 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 11,
+   "id": "000140_10",
+   "name": "000140_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4571196734905243,
+   "candidate_error": 0.12361270934343338,
+   "error_change": -0.3335069641470909,
+   "baseline_late_share": 0.010363291805849724,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.004536963962070346,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.33 px on this case. The candidate settled: 0% late revision, 0 reversals. Current model: 1%."
+  },
+  {
+   "rank": 12,
+   "id": "000011_10",
+   "name": "000011_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4441675543785095,
+   "candidate_error": 0.10465690493583679,
+   "error_change": -0.33951064944267273,
+   "baseline_late_share": 0.03860280196895115,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.027047994464596485,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.34 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 13,
+   "id": "000050_10",
+   "name": "000050_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.3934894800186157,
+   "candidate_error": 0.05261030048131943,
+   "error_change": -0.3408791795372963,
+   "baseline_late_share": 0.03453163081487761,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0653727750141142,
+   "candidate_reversals": 2,
+   "why": "Error fell by 0.34 px on this case. The candidate settled: 7% late revision, 2 reversals. Current model: 3%."
+  },
+  {
+   "rank": 14,
+   "id": "000151_10",
+   "name": "000151_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5277673602104187,
+   "candidate_error": 0.1621190309524536,
+   "error_change": -0.3656483292579651,
+   "baseline_late_share": 0.028613233620549506,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009952799601888015,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.37 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 15,
+   "id": "000155_10",
+   "name": "000155_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4707569181919098,
+   "candidate_error": 0.10280069708824158,
+   "error_change": -0.3679562211036682,
+   "baseline_late_share": 0.08458815448829717,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03381073834281603,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.37 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 16,
+   "id": "000130_10",
+   "name": "000130_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6172136664390564,
+   "candidate_error": 0.24397426843643188,
+   "error_change": -0.3732393980026245,
+   "baseline_late_share": 0.02029970051378762,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009449126271556177,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.37 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 17,
+   "id": "000115_10",
+   "name": "000115_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5100314617156982,
+   "candidate_error": 0.13354234397411346,
+   "error_change": -0.3764891177415848,
+   "baseline_late_share": 0.045483323625497,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.027597989699078406,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.38 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 18,
+   "id": "000096_10",
+   "name": "000096_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.46629488468170166,
+   "candidate_error": 0.07083471119403839,
+   "error_change": -0.39546017348766327,
+   "baseline_late_share": 0.061354248851348235,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02943420216147488,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.40 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 19,
+   "id": "000087_10",
+   "name": "000087_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6889777183532715,
+   "candidate_error": 0.2635739743709564,
+   "error_change": -0.42540374398231506,
+   "baseline_late_share": 0.025638025404006913,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.013692978158281544,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.43 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 20,
+   "id": "000152_10",
+   "name": "000152_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6814767718315125,
+   "candidate_error": 0.2520173490047455,
+   "error_change": -0.42945942282676697,
+   "baseline_late_share": 0.025802564462539188,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009810484522517947,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.43 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 21,
+   "id": "000166_10",
+   "name": "000166_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6141530871391296,
+   "candidate_error": 0.17859986424446106,
+   "error_change": -0.4355532228946686,
+   "baseline_late_share": 0.028765249330060152,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009303894855764073,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.44 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 22,
+   "id": "000014_10",
+   "name": "000014_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5634921789169312,
+   "candidate_error": 0.126082643866539,
+   "error_change": -0.43740953505039215,
+   "baseline_late_share": 0.044859275097140265,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.026258910094274543,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.44 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 23,
+   "id": "000057_10",
+   "name": "000057_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.7186505794525146,
+   "candidate_error": 0.28067561984062195,
+   "error_change": -0.4379749596118927,
+   "baseline_late_share": 0.023309221508422278,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009946622973231069,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.44 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 24,
+   "id": "000053_10",
+   "name": "000053_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4958721697330475,
+   "candidate_error": 0.05133020505309105,
+   "error_change": -0.44454196467995644,
+   "baseline_late_share": 0.06652524395417904,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03170295850155537,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.44 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 25,
+   "id": "000144_10",
+   "name": "000144_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6083119511604309,
+   "candidate_error": 0.16100315749645233,
+   "error_change": -0.4473087936639786,
+   "baseline_late_share": 0.0385415266366706,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02767990491431827,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.45 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 26,
+   "id": "000083_10",
+   "name": "000083_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.7158676981925964,
+   "candidate_error": 0.2519409954547882,
+   "error_change": -0.4639267027378082,
+   "baseline_late_share": 0.02527159784363627,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011089576448825742,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.46 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 27,
+   "id": "000002_10",
+   "name": "000002_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6374667286872864,
+   "candidate_error": 0.16449445486068726,
+   "error_change": -0.4729722738265991,
+   "baseline_late_share": 0.02783320659351968,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.013116495971193295,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.47 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 28,
+   "id": "000051_10",
+   "name": "000051_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5652160048484802,
+   "candidate_error": 0.0819869190454483,
+   "error_change": -0.4832290858030319,
+   "baseline_late_share": 0.04149933065595717,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.026840578385910408,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.48 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 29,
+   "id": "000059_10",
+   "name": "000059_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.7532885074615479,
+   "candidate_error": 0.2628747224807739,
+   "error_change": -0.4904137849807739,
+   "baseline_late_share": 0.02623786893710288,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.012000938795733695,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.49 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 30,
+   "id": "000089_10",
+   "name": "000089_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5971589088439941,
+   "candidate_error": 0.10473684221506119,
+   "error_change": -0.49242206662893295,
+   "baseline_late_share": 0.06777837547068319,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.030366653011061038,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.49 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 31,
+   "id": "000118_10",
+   "name": "000118_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.7521072030067444,
+   "candidate_error": 0.2536683976650238,
+   "error_change": -0.4984388053417206,
+   "baseline_late_share": 0.03152244949038475,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014909708915355918,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.50 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 32,
+   "id": "000012_10",
+   "name": "000012_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5629684329032898,
+   "candidate_error": 0.03616956248879433,
+   "error_change": -0.5267988704144955,
+   "baseline_late_share": 0.09271364317841078,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03584359160028964,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.53 px on this case. The candidate settled: 4% late revision, 0 reversals. Current model: 9%."
+  },
+  {
+   "rank": 33,
+   "id": "000048_10",
+   "name": "000048_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6329500675201416,
+   "candidate_error": 0.08314421772956848,
+   "error_change": -0.5498058497905731,
+   "baseline_late_share": 0.05558402411454407,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.029014574140927934,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.55 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 34,
+   "id": "000171_10",
+   "name": "000171_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.787571370601654,
+   "candidate_error": 0.22338765859603882,
+   "error_change": -0.5641837120056152,
+   "baseline_late_share": 0.01827261160439441,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.005609198749901986,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.56 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 35,
+   "id": "000007_10",
+   "name": "000007_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9405195116996765,
+   "candidate_error": 0.35303741693496704,
+   "error_change": -0.5874820947647095,
+   "baseline_late_share": 0.02711665082696896,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0168225601365592,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.59 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 36,
+   "id": "000015_10",
+   "name": "000015_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6774478554725647,
+   "candidate_error": 0.08413368463516235,
+   "error_change": -0.5933141708374023,
+   "baseline_late_share": 0.0490980737694887,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03463128876636803,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.59 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 37,
+   "id": "000009_10",
+   "name": "000009_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.8459864258766174,
+   "candidate_error": 0.23471705615520477,
+   "error_change": -0.6112693697214127,
+   "baseline_late_share": 0.030855160011067032,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.018523854608323384,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.61 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 38,
+   "id": "000170_10",
+   "name": "000170_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.818678081035614,
+   "candidate_error": 0.18011276423931122,
+   "error_change": -0.6385653167963028,
+   "baseline_late_share": 0.02784031117209042,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011884102986556106,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.64 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 39,
+   "id": "000119_10",
+   "name": "000119_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.908906102180481,
+   "candidate_error": 0.25424692034721375,
+   "error_change": -0.6546591818332672,
+   "baseline_late_share": 0.028007241598426998,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.018077097181521458,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.65 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 40,
+   "id": "000098_10",
+   "name": "000098_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.8509472012519836,
+   "candidate_error": 0.19388452172279358,
+   "error_change": -0.6570626795291901,
+   "baseline_late_share": 0.024507188944774685,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01276743502764497,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.66 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 41,
+   "id": "000153_10",
+   "name": "000153_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9175340533256531,
+   "candidate_error": 0.2181284874677658,
+   "error_change": -0.6994055658578873,
+   "baseline_late_share": 0.03701193522211824,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0146895360008394,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.70 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 42,
+   "id": "000168_10",
+   "name": "000168_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9916449785232544,
+   "candidate_error": 0.2640330493450165,
+   "error_change": -0.7276119291782379,
+   "baseline_late_share": 0.03264201062525541,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.016834404147011758,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.73 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 43,
+   "id": "000167_10",
+   "name": "000167_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.8933414220809937,
+   "candidate_error": 0.16042359173297882,
+   "error_change": -0.7329178303480148,
+   "baseline_late_share": 0.033546867320826346,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.016036860844328756,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.73 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 44,
+   "id": "000008_10",
+   "name": "000008_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.0277788639068604,
+   "candidate_error": 0.29035133123397827,
+   "error_change": -0.7374275326728821,
+   "baseline_late_share": 0.05590884129599121,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.016556800833165675,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.74 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 45,
+   "id": "000013_10",
+   "name": "000013_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9119293689727783,
+   "candidate_error": 0.17063438892364502,
+   "error_change": -0.7412949800491333,
+   "baseline_late_share": 0.030308253117432637,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01611280745640195,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.74 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 46,
+   "id": "000112_10",
+   "name": "000112_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.1388205289840698,
+   "candidate_error": 0.39741137623786926,
+   "error_change": -0.7414091527462006,
+   "baseline_late_share": 0.05629992270033495,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03250081797360673,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.74 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 47,
+   "id": "000122_10",
+   "name": "000122_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.8894026279449463,
+   "candidate_error": 0.13689695298671722,
+   "error_change": -0.7525056749582291,
+   "baseline_late_share": 0.03658238030287134,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.026211384273169436,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.75 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 48,
+   "id": "000125_10",
+   "name": "000125_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.0126912593841553,
+   "candidate_error": 0.24994021654129028,
+   "error_change": -0.762751042842865,
+   "baseline_late_share": 0.02599007496240222,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011892504946831613,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.76 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 49,
+   "id": "000024_10",
+   "name": "000024_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.1380980014801025,
+   "candidate_error": 0.37142089009284973,
+   "error_change": -0.7666771113872528,
+   "baseline_late_share": 0.03765210112171438,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010341409218417192,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.77 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 50,
+   "id": "000154_10",
+   "name": "000154_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.0391024351119995,
+   "candidate_error": 0.270454466342926,
+   "error_change": -0.7686479687690735,
+   "baseline_late_share": 0.030998586839417384,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010231618156961426,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.77 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 51,
+   "id": "000047_10",
+   "name": "000047_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9046086072921753,
+   "candidate_error": 0.11826673895120621,
+   "error_change": -0.7863418683409691,
+   "baseline_late_share": 0.03676872331383937,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02028397565922921,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.79 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 52,
+   "id": "000124_10",
+   "name": "000124_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.0751181840896606,
+   "candidate_error": 0.27730852365493774,
+   "error_change": -0.7978096604347229,
+   "baseline_late_share": 0.031735025642543366,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01125550162656786,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.80 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 53,
+   "id": "000137_10",
+   "name": "000137_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9084939956665039,
+   "candidate_error": 0.10952414572238922,
+   "error_change": -0.7989698499441147,
+   "baseline_late_share": 0.029166413880968266,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.024354008595532443,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.80 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 54,
+   "id": "000052_10",
+   "name": "000052_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9629974365234375,
+   "candidate_error": 0.11751044541597366,
+   "error_change": -0.8454869911074638,
+   "baseline_late_share": 0.03503258225465651,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.019539298529922446,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.85 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 55,
+   "id": "000003_10",
+   "name": "000003_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.2051037549972534,
+   "candidate_error": 0.3486011028289795,
+   "error_change": -0.8565026521682739,
+   "baseline_late_share": 0.029261291177603174,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014864580515225297,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.86 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 56,
+   "id": "000022_10",
+   "name": "000022_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.3178163766860962,
+   "candidate_error": 0.44570067524909973,
+   "error_change": -0.8721157014369965,
+   "baseline_late_share": 0.01873756430409645,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009813977466785523,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.87 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 57,
+   "id": "000116_10",
+   "name": "000116_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.2178882360458374,
+   "candidate_error": 0.3121231198310852,
+   "error_change": -0.9057651162147522,
+   "baseline_late_share": 0.03279553740347687,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.015359112954715802,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.91 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 58,
+   "id": "000160_10",
+   "name": "000160_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.5450992584228516,
+   "candidate_error": 0.6297607421875,
+   "error_change": -0.9153385162353516,
+   "baseline_late_share": 0.04074192792180764,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009637653055570941,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.92 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 59,
+   "id": "000123_10",
+   "name": "000123_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.1638680696487427,
+   "candidate_error": 0.23988448083400726,
+   "error_change": -0.9239835888147354,
+   "baseline_late_share": 0.028199806560812446,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.013878160295622038,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.92 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 60,
+   "id": "000162_10",
+   "name": "000162_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4117830991744995,
+   "candidate_error": 0.4855165183544159,
+   "error_change": -0.9262665808200836,
+   "baseline_late_share": 0.03176512675186936,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01123627960716349,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.93 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 61,
+   "id": "000043_10",
+   "name": "000043_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.0447193384170532,
+   "candidate_error": 0.07503405213356018,
+   "error_change": -0.969685286283493,
+   "baseline_late_share": 0.06826792728283916,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.030136986301369868,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.97 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 62,
+   "id": "000010_10",
+   "name": "000010_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.107707142829895,
+   "candidate_error": 0.13232772052288055,
+   "error_change": -0.9753794223070145,
+   "baseline_late_share": 0.032171452651857196,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0169765267337794,
+   "candidate_reversals": 0,
+   "why": "Error fell by 0.98 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 63,
+   "id": "000117_10",
+   "name": "000117_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.3892015218734741,
+   "candidate_error": 0.32553064823150635,
+   "error_change": -1.0636708736419678,
+   "baseline_late_share": 0.03493657029231014,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01577409540767318,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.06 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 64,
+   "id": "000199_10",
+   "name": "000199_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8810368776321411,
+   "candidate_error": 0.777774453163147,
+   "error_change": -1.1032624244689941,
+   "baseline_late_share": 0.02961481458229166,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011612556725737409,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.10 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 65,
+   "id": "000121_10",
+   "name": "000121_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4430609941482544,
+   "candidate_error": 0.32919445633888245,
+   "error_change": -1.113866537809372,
+   "baseline_late_share": 0.028118912782672634,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.007174521698553431,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.11 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 66,
+   "id": "000161_10",
+   "name": "000161_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4057362079620361,
+   "candidate_error": 0.28192779421806335,
+   "error_change": -1.1238084137439728,
+   "baseline_late_share": 0.03413290136893182,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.017824926517787762,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.12 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 67,
+   "id": "000127_10",
+   "name": "000127_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4428589344024658,
+   "candidate_error": 0.3094281852245331,
+   "error_change": -1.1334307491779327,
+   "baseline_late_share": 0.029878490226387777,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010956973591055423,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.13 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 68,
+   "id": "000017_10",
+   "name": "000017_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.2747883796691895,
+   "candidate_error": 0.12417205423116684,
+   "error_change": -1.1506163254380226,
+   "baseline_late_share": 0.046979260595130745,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02019126013799782,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.15 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 69,
+   "id": "000085_10",
+   "name": "000085_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.409423828125,
+   "candidate_error": 0.24111883342266083,
+   "error_change": -1.1683049947023392,
+   "baseline_late_share": 0.03924406941774215,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008192702597079616,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.17 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 70,
+   "id": "000172_10",
+   "name": "000172_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.5809483528137207,
+   "candidate_error": 0.36166220903396606,
+   "error_change": -1.2192861437797546,
+   "baseline_late_share": 0.026699904960840813,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009322701678764696,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.22 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 71,
+   "id": "000049_10",
+   "name": "000049_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.390907645225525,
+   "candidate_error": 0.16466858983039856,
+   "error_change": -1.2262390553951263,
+   "baseline_late_share": 0.040264435079590176,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03647632534796496,
+   "candidate_reversals": 1,
+   "why": "Error fell by 1.23 px on this case. The candidate settled: 4% late revision, 1 reversal. Current model: 4%."
+  },
+  {
+   "rank": 72,
+   "id": "000044_10",
+   "name": "000044_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.3169456720352173,
+   "candidate_error": 0.08758709579706192,
+   "error_change": -1.2293585762381554,
+   "baseline_late_share": 0.06272053914867916,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.024197465447962203,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.23 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 73,
+   "id": "000164_10",
+   "name": "000164_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4900599718093872,
+   "candidate_error": 0.21874889731407166,
+   "error_change": -1.2713110744953156,
+   "baseline_late_share": 0.03127852449535595,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.015562146700779619,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.27 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 74,
+   "id": "000026_10",
+   "name": "000026_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8256725072860718,
+   "candidate_error": 0.5039119124412537,
+   "error_change": -1.3217605948448181,
+   "baseline_late_share": 0.029538509519796797,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009584271552687134,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.32 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 75,
+   "id": "000113_10",
+   "name": "000113_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.5564247369766235,
+   "candidate_error": 0.14668744802474976,
+   "error_change": -1.4097372889518738,
+   "baseline_late_share": 0.05964374544632313,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.033497027655724994,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.41 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 76,
+   "id": "000075_10",
+   "name": "000075_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8744161128997803,
+   "candidate_error": 0.45990443229675293,
+   "error_change": -1.4145116806030273,
+   "baseline_late_share": 0.047371097159419985,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008583764716661323,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.41 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 77,
+   "id": "000025_10",
+   "name": "000025_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.012204647064209,
+   "candidate_error": 0.5695245265960693,
+   "error_change": -1.4426801204681396,
+   "baseline_late_share": 0.025828907840034533,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009993039926436591,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.44 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 78,
+   "id": "000150_10",
+   "name": "000150_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.7895854711532593,
+   "candidate_error": 0.3119134306907654,
+   "error_change": -1.477672040462494,
+   "baseline_late_share": 0.030182087997677246,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008682205734228034,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.48 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 79,
+   "id": "000004_10",
+   "name": "000004_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.7816829681396484,
+   "candidate_error": 0.28390517830848694,
+   "error_change": -1.4977777898311615,
+   "baseline_late_share": 0.037446799789590174,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011725812836341462,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.50 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 80,
+   "id": "000034_10",
+   "name": "000034_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.11971378326416,
+   "candidate_error": 0.5641672015190125,
+   "error_change": -1.5555465817451477,
+   "baseline_late_share": 0.031184277531151196,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009754956397233326,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.56 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 81,
+   "id": "000163_10",
+   "name": "000163_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.7985776662826538,
+   "candidate_error": 0.19982782006263733,
+   "error_change": -1.5987498462200165,
+   "baseline_late_share": 0.03854394241627879,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.020257155524902707,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.60 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 82,
+   "id": "000076_10",
+   "name": "000076_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.9495556354522705,
+   "candidate_error": 0.33834153413772583,
+   "error_change": -1.6112141013145447,
+   "baseline_late_share": 0.03528926472104775,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009995374666554185,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.61 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 83,
+   "id": "000133_10",
+   "name": "000133_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8496730327606201,
+   "candidate_error": 0.23648162186145782,
+   "error_change": -1.6131914108991623,
+   "baseline_late_share": 0.010848154775179995,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.004751972942502819,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.61 px on this case. The candidate settled: 0% late revision, 0 reversals. Current model: 1%."
+  },
+  {
+   "rank": 84,
+   "id": "000035_10",
+   "name": "000035_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.296489953994751,
+   "candidate_error": 0.6217936873435974,
+   "error_change": -1.6746962666511536,
+   "baseline_late_share": 0.037857717875056866,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008801038811138365,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.67 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 85,
+   "id": "000005_10",
+   "name": "000005_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.0367445945739746,
+   "candidate_error": 0.3295534551143646,
+   "error_change": -1.70719113945961,
+   "baseline_late_share": 0.03501509220738537,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.00809107655665614,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.71 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 86,
+   "id": "000159_10",
+   "name": "000159_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.333141803741455,
+   "candidate_error": 0.623699963092804,
+   "error_change": -1.7094418406486511,
+   "baseline_late_share": 0.03526226292351009,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.007999261606620928,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.71 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 87,
+   "id": "000149_10",
+   "name": "000149_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.127542495727539,
+   "candidate_error": 0.4077339172363281,
+   "error_change": -1.719808578491211,
+   "baseline_late_share": 0.030716377847743316,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009316527049244499,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.72 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 88,
+   "id": "000131_10",
+   "name": "000131_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.130542516708374,
+   "candidate_error": 0.3918741047382355,
+   "error_change": -1.7386684119701385,
+   "baseline_late_share": 0.0346989086851519,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0074978718526239364,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.74 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 89,
+   "id": "000114_10",
+   "name": "000114_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8837924003601074,
+   "candidate_error": 0.13540489971637726,
+   "error_change": -1.7483875006437302,
+   "baseline_late_share": 0.07877637438855224,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.047020879307418106,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.75 px on this case. The candidate settled: 5% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 90,
+   "id": "000128_10",
+   "name": "000128_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.2717485427856445,
+   "candidate_error": 0.49684539437294006,
+   "error_change": -1.7749031484127045,
+   "baseline_late_share": 0.02389838113484371,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.006749916900855167,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.77 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 91,
+   "id": "000036_10",
+   "name": "000036_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.582005500793457,
+   "candidate_error": 0.7769084572792053,
+   "error_change": -1.8050970435142517,
+   "baseline_late_share": 0.035715408177820325,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009078284253347925,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.81 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 92,
+   "id": "000086_10",
+   "name": "000086_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.184298515319824,
+   "candidate_error": 0.2138984054327011,
+   "error_change": -1.970400109887123,
+   "baseline_late_share": 0.02080824010033154,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.006796748572385185,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.97 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 93,
+   "id": "000126_10",
+   "name": "000126_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.4480812549591064,
+   "candidate_error": 0.4751208424568176,
+   "error_change": -1.9729604125022888,
+   "baseline_late_share": 0.04511282489085837,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010204792074874928,
+   "candidate_reversals": 0,
+   "why": "Error fell by 1.97 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 94,
+   "id": "000142_10",
+   "name": "000142_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.545491933822632,
+   "candidate_error": 0.5002842545509338,
+   "error_change": -2.045207679271698,
+   "baseline_late_share": 0.03843247066574941,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008500795787532166,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.05 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 95,
+   "id": "000169_10",
+   "name": "000169_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.3181071281433105,
+   "candidate_error": 0.26180529594421387,
+   "error_change": -2.0563018321990967,
+   "baseline_late_share": 0.04289256616567987,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02826197727191932,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.06 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 96,
+   "id": "000094_10",
+   "name": "000094_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.2732486724853516,
+   "candidate_error": 0.12463391572237015,
+   "error_change": -2.1486147567629814,
+   "baseline_late_share": 0.03796965317919075,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010780257560748208,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.15 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 97,
+   "id": "000134_10",
+   "name": "000134_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.4919795989990234,
+   "candidate_error": 0.29601216316223145,
+   "error_change": -2.195967435836792,
+   "baseline_late_share": 0.025271370420624148,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.007394803792073604,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.20 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 98,
+   "id": "000178_10",
+   "name": "000178_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.119663953781128,
+   "candidate_error": 0.6029042601585388,
+   "error_change": -2.516759693622589,
+   "baseline_late_share": 0.03839694480870545,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009232187511829713,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.52 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 99,
+   "id": "000158_10",
+   "name": "000158_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3734045028686523,
+   "candidate_error": 0.7622349262237549,
+   "error_change": -2.6111695766448975,
+   "baseline_late_share": 0.03786268925669765,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.016981170817847686,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.61 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 100,
+   "id": "000084_10",
+   "name": "000084_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3685998916625977,
+   "candidate_error": 0.7255101203918457,
+   "error_change": -2.643089771270752,
+   "baseline_late_share": 0.06431375201601397,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.010753419995916422,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.64 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 101,
+   "id": "000110_10",
+   "name": "000110_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.2479896545410156,
+   "candidate_error": 0.5187518000602722,
+   "error_change": -2.7292378544807434,
+   "baseline_late_share": 0.054953780595128586,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.00697306661601448,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.73 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 102,
+   "id": "000095_10",
+   "name": "000095_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.969816207885742,
+   "candidate_error": 0.20520420372486115,
+   "error_change": -2.764612004160881,
+   "baseline_late_share": 0.05848588572774768,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.012202844760651331,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.76 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 103,
+   "id": "000023_10",
+   "name": "000023_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3978989124298096,
+   "candidate_error": 0.6021765470504761,
+   "error_change": -2.7957223653793335,
+   "baseline_late_share": 0.02749754878807522,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008412193608439342,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.80 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 104,
+   "id": "000132_10",
+   "name": "000132_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.5379562377929688,
+   "candidate_error": 0.6944627165794373,
+   "error_change": -2.8434935212135315,
+   "baseline_late_share": 0.040378426123139,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010823746485185843,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.84 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 105,
+   "id": "000071_10",
+   "name": "000071_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3351755142211914,
+   "candidate_error": 0.41102102398872375,
+   "error_change": -2.9241544902324677,
+   "baseline_late_share": 0.07008107863163253,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011129201245204228,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.92 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 106,
+   "id": "000037_10",
+   "name": "000037_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.6672728061676025,
+   "candidate_error": 0.7308692336082458,
+   "error_change": -2.9364035725593567,
+   "baseline_late_share": 0.02928370815226057,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0076906621255541366,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.94 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 107,
+   "id": "000077_10",
+   "name": "000077_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.440099000930786,
+   "candidate_error": 0.48795071244239807,
+   "error_change": -2.952148288488388,
+   "baseline_late_share": 0.04795822056875908,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.012719058656784731,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.95 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 108,
+   "id": "000019_10",
+   "name": "000019_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.5546438694000244,
+   "candidate_error": 0.5894264578819275,
+   "error_change": -2.965217411518097,
+   "baseline_late_share": 0.03911609946754868,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011996560091794766,
+   "candidate_reversals": 0,
+   "why": "Error fell by 2.97 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 109,
+   "id": "000088_10",
+   "name": "000088_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.7325971126556396,
+   "candidate_error": 0.7043471932411194,
+   "error_change": -3.0282499194145203,
+   "baseline_late_share": 0.04464372232544225,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009219757350242587,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.03 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 110,
+   "id": "000038_10",
+   "name": "000038_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.8015835285186768,
+   "candidate_error": 0.7293478846549988,
+   "error_change": -3.072235643863678,
+   "baseline_late_share": 0.04007249252473891,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009502944111670714,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.07 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 111,
+   "id": "000143_10",
+   "name": "000143_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.6187334060668945,
+   "candidate_error": 0.456491619348526,
+   "error_change": -3.1622417867183685,
+   "baseline_late_share": 0.054162301041372464,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011418078872347167,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.16 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 112,
+   "id": "000141_10",
+   "name": "000141_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3422954082489014,
+   "candidate_error": 0.17462149262428284,
+   "error_change": -3.1676739156246185,
+   "baseline_late_share": 0.025113571147051303,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014920565902521119,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.17 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 113,
+   "id": "000093_10",
+   "name": "000093_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3378467559814453,
+   "candidate_error": 0.15745030343532562,
+   "error_change": -3.1803964525461197,
+   "baseline_late_share": 0.02572932582123759,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.013128669957826399,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.18 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 114,
+   "id": "000186_10",
+   "name": "000186_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.768380641937256,
+   "candidate_error": 0.5821804404258728,
+   "error_change": -3.186200201511383,
+   "baseline_late_share": 0.044025951289147464,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014497705299511509,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.19 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 115,
+   "id": "000106_10",
+   "name": "000106_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.789095401763916,
+   "candidate_error": 0.5933749079704285,
+   "error_change": -3.1957204937934875,
+   "baseline_late_share": 0.06375847872368787,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008693997868436288,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.20 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 116,
+   "id": "000109_10",
+   "name": "000109_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.8813014030456543,
+   "candidate_error": 0.5591347217559814,
+   "error_change": -3.322166681289673,
+   "baseline_late_share": 0.04416186019291836,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009411764705882352,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.32 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 117,
+   "id": "000039_10",
+   "name": "000039_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.179149150848389,
+   "candidate_error": 0.7433863878250122,
+   "error_change": -3.4357627630233765,
+   "baseline_late_share": 0.048446888451232524,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01786578232070443,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.44 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 118,
+   "id": "000054_10",
+   "name": "000054_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.068434715270996,
+   "candidate_error": 0.6140819787979126,
+   "error_change": -3.4543527364730835,
+   "baseline_late_share": 0.036827481106994214,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.007935882855153599,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.45 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 119,
+   "id": "000177_10",
+   "name": "000177_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.103287220001221,
+   "candidate_error": 0.588478684425354,
+   "error_change": -3.5148085355758667,
+   "baseline_late_share": 0.03238966230305338,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010527393403743451,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.51 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 120,
+   "id": "000040_10",
+   "name": "000040_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.472812652587891,
+   "candidate_error": 0.8144643306732178,
+   "error_change": -3.658348321914673,
+   "baseline_late_share": 0.04857096208350254,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.012632701363653602,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.66 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 121,
+   "id": "000173_10",
+   "name": "000173_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.103301048278809,
+   "candidate_error": 0.4372706413269043,
+   "error_change": -3.6660304069519043,
+   "baseline_late_share": 0.038963456048883176,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01150101384638676,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.67 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 122,
+   "id": "000198_10",
+   "name": "000198_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.004069805145264,
+   "candidate_error": 0.3187801241874695,
+   "error_change": -3.685289680957794,
+   "baseline_late_share": 0.08047551191274889,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.009112241708807905,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.69 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 123,
+   "id": "000120_10",
+   "name": "000120_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.565627574920654,
+   "candidate_error": 0.7999053001403809,
+   "error_change": -3.7657222747802734,
+   "baseline_late_share": 0.054774644055500143,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014538462768423915,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.77 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 124,
+   "id": "000108_10",
+   "name": "000108_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.600449562072754,
+   "candidate_error": 0.7578798532485962,
+   "error_change": -3.8425697088241577,
+   "baseline_late_share": 0.057849599280952735,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.00865278094555407,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.84 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 125,
+   "id": "000020_10",
+   "name": "000020_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.332778453826904,
+   "candidate_error": 0.46898847818374634,
+   "error_change": -3.863789975643158,
+   "baseline_late_share": 0.04049477056883457,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.016393399031021147,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.86 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 126,
+   "id": "000046_10",
+   "name": "000046_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.969198226928711,
+   "candidate_error": 0.07531137764453888,
+   "error_change": -3.893886849284172,
+   "baseline_late_share": 0.05705780767133249,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.019166693110779676,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.89 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 127,
+   "id": "000042_10",
+   "name": "000042_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 7.940474033355713,
+   "candidate_error": 4.042154788970947,
+   "error_change": -3.8983192443847656,
+   "baseline_late_share": 0.043543876435742146,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.015433362791800484,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.90 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 128,
+   "id": "000028_10",
+   "name": "000028_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 5.066643714904785,
+   "candidate_error": 1.1285405158996582,
+   "error_change": -3.938103199005127,
+   "baseline_late_share": 0.038910892571952946,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010262966398823398,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.94 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 129,
+   "id": "000107_10",
+   "name": "000107_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.755617141723633,
+   "candidate_error": 0.775936484336853,
+   "error_change": -3.97968065738678,
+   "baseline_late_share": 0.07758383828834282,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014251915759682455,
+   "candidate_reversals": 0,
+   "why": "Error fell by 3.98 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 130,
+   "id": "000027_10",
+   "name": "000027_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 5.004621982574463,
+   "candidate_error": 0.9206775426864624,
+   "error_change": -4.0839444398880005,
+   "baseline_late_share": 0.043424688766822934,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02162897842989119,
+   "candidate_reversals": 0,
+   "why": "Error fell by 4.08 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 131,
+   "id": "000197_10",
+   "name": "000197_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 4.595503330230713,
+   "candidate_error": 0.4059297442436218,
+   "error_change": -4.189573585987091,
+   "baseline_late_share": 0.062207841515584616,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011468713188640997,
+   "candidate_reversals": 0,
+   "why": "Error fell by 4.19 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 132,
+   "id": "000157_10",
+   "name": "000157_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 5.443268299102783,
+   "candidate_error": 0.9259312152862549,
+   "error_change": -4.517337083816528,
+   "baseline_late_share": 0.03702056661544366,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008791288896988474,
+   "candidate_reversals": 0,
+   "why": "Error fell by 4.52 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 133,
+   "id": "000080_10",
+   "name": "000080_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 5.31690788269043,
+   "candidate_error": 0.7696693539619446,
+   "error_change": -4.547238528728485,
+   "baseline_late_share": 0.08367514873968507,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.017395670105923345,
+   "candidate_reversals": 0,
+   "why": "Error fell by 4.55 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 134,
+   "id": "000031_10",
+   "name": "000031_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 5.637719631195068,
+   "candidate_error": 0.8962461352348328,
+   "error_change": -4.741473495960236,
+   "baseline_late_share": 0.05823838787180397,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011739689311891477,
+   "candidate_reversals": 0,
+   "why": "Error fell by 4.74 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 135,
+   "id": "000041_10",
+   "name": "000041_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 5.713191509246826,
+   "candidate_error": 0.8654047846794128,
+   "error_change": -4.847786724567413,
+   "baseline_late_share": 0.05183103698332124,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011665860735009671,
+   "candidate_reversals": 0,
+   "why": "Error fell by 4.85 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 136,
+   "id": "000145_10",
+   "name": "000145_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 5.479552268981934,
+   "candidate_error": 0.5972023010253906,
+   "error_change": -4.882349967956543,
+   "baseline_late_share": 0.0702289749109512,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.018262317458071987,
+   "candidate_reversals": 0,
+   "why": "Error fell by 4.88 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 137,
+   "id": "000055_10",
+   "name": "000055_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 5.877972602844238,
+   "candidate_error": 0.9288976788520813,
+   "error_change": -4.949074923992157,
+   "baseline_late_share": 0.053729811563995526,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009178761316281075,
+   "candidate_reversals": 0,
+   "why": "Error fell by 4.95 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 138,
+   "id": "000129_10",
+   "name": "000129_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.101823329925537,
+   "candidate_error": 1.0756326913833618,
+   "error_change": -5.026190638542175,
+   "baseline_late_share": 0.04562903517992944,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011349482174431874,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.03 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 139,
+   "id": "000001_10",
+   "name": "000001_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 5.747848033905029,
+   "candidate_error": 0.7025852799415588,
+   "error_change": -5.0452627539634705,
+   "baseline_late_share": 0.062195417249423415,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.013809361497931067,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.05 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 140,
+   "id": "000105_10",
+   "name": "000105_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.017764091491699,
+   "candidate_error": 0.7604429721832275,
+   "error_change": -5.257321119308472,
+   "baseline_late_share": 0.051355474615802414,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.00878798446349764,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.26 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 141,
+   "id": "000021_10",
+   "name": "000021_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.2264628410339355,
+   "candidate_error": 0.9392099380493164,
+   "error_change": -5.287252902984619,
+   "baseline_late_share": 0.05239692246991517,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.021676650085860102,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.29 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 142,
+   "id": "000111_10",
+   "name": "000111_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.156408786773682,
+   "candidate_error": 0.8027554750442505,
+   "error_change": -5.353653311729431,
+   "baseline_late_share": 0.06278202374410977,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011209316400747153,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.35 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 143,
+   "id": "000056_10",
+   "name": "000056_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.870842933654785,
+   "candidate_error": 1.3299338817596436,
+   "error_change": -5.540909051895142,
+   "baseline_late_share": 0.0346202134033901,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.007905950198924334,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.54 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 144,
+   "id": "000146_10",
+   "name": "000146_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.634052753448486,
+   "candidate_error": 1.0594369173049927,
+   "error_change": -5.574615836143494,
+   "baseline_late_share": 0.07587657665996315,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009723706857505206,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.57 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 145,
+   "id": "000187_10",
+   "name": "000187_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.365399360656738,
+   "candidate_error": 0.7544106841087341,
+   "error_change": -5.610988676548004,
+   "baseline_late_share": 0.05901193777141036,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.013367343762302997,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.61 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 146,
+   "id": "000064_10",
+   "name": "000064_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 7.498568058013916,
+   "candidate_error": 1.7175787687301636,
+   "error_change": -5.780989289283752,
+   "baseline_late_share": 0.04780820236323009,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010516780808086637,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.78 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 147,
+   "id": "000081_10",
+   "name": "000081_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.679145336151123,
+   "candidate_error": 0.8268322944641113,
+   "error_change": -5.852313041687012,
+   "baseline_late_share": 0.07897005435464481,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.016352508540824394,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.85 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 148,
+   "id": "000033_10",
+   "name": "000033_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.81406831741333,
+   "candidate_error": 0.9404104948043823,
+   "error_change": -5.873657822608948,
+   "baseline_late_share": 0.06964055858125033,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008897316219369896,
+   "candidate_reversals": 0,
+   "why": "Error fell by 5.87 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 149,
+   "id": "000136_10",
+   "name": "000136_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.477309703826904,
+   "candidate_error": 0.4556518793106079,
+   "error_change": -6.021657824516296,
+   "baseline_late_share": 0.030458008113210058,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01186104796875911,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.02 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 150,
+   "id": "000045_10",
+   "name": "000045_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.25727653503418,
+   "candidate_error": 0.18223197758197784,
+   "error_change": -6.075044557452202,
+   "baseline_late_share": 0.05762379764873531,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01512970294288641,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.08 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 151,
+   "id": "000078_10",
+   "name": "000078_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.816032409667969,
+   "candidate_error": 0.6810775399208069,
+   "error_change": -6.134954869747162,
+   "baseline_late_share": 0.05497041825047748,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014199675289448089,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.13 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 152,
+   "id": "000018_10",
+   "name": "000018_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.748140335083008,
+   "candidate_error": 0.5797135829925537,
+   "error_change": -6.168426752090454,
+   "baseline_late_share": 0.04464258752412351,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.015812247413691582,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.17 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 153,
+   "id": "000185_10",
+   "name": "000185_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 7.062140464782715,
+   "candidate_error": 0.8831373453140259,
+   "error_change": -6.179003119468689,
+   "baseline_late_share": 0.060019679370260134,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01567641927773807,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.18 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 154,
+   "id": "000067_10",
+   "name": "000067_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 8.94271183013916,
+   "candidate_error": 2.5874109268188477,
+   "error_change": -6.3553009033203125,
+   "baseline_late_share": 0.04348689214825348,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.015727406359486728,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.36 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 155,
+   "id": "000030_10",
+   "name": "000030_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 7.5607008934021,
+   "candidate_error": 0.9465009570121765,
+   "error_change": -6.614199936389923,
+   "baseline_late_share": 0.12453656242085079,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.01518462668677261,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.61 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 12%."
+  },
+  {
+   "rank": 156,
+   "id": "000091_10",
+   "name": "000091_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 6.9073920249938965,
+   "candidate_error": 0.2374849170446396,
+   "error_change": -6.669907107949257,
+   "baseline_late_share": 0.04417462794503864,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0065416418298256075,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.67 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 157,
+   "id": "000069_10",
+   "name": "000069_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 8.662200927734375,
+   "candidate_error": 1.8923962116241455,
+   "error_change": -6.7698047161102295,
+   "baseline_late_share": 0.04684822206609471,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01322476423922135,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.77 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 158,
+   "id": "000032_10",
+   "name": "000032_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 7.749165058135986,
+   "candidate_error": 0.9577067494392395,
+   "error_change": -6.791458308696747,
+   "baseline_late_share": 0.05128251019415882,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01965670955614914,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.79 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 159,
+   "id": "000184_10",
+   "name": "000184_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 8.34878158569336,
+   "candidate_error": 1.5013419389724731,
+   "error_change": -6.847439646720886,
+   "baseline_late_share": 0.06463518589641508,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01870180355535244,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.85 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 160,
+   "id": "000148_10",
+   "name": "000148_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 7.822656631469727,
+   "candidate_error": 0.8471114039421082,
+   "error_change": -6.975545227527618,
+   "baseline_late_share": 0.1089375021779016,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.012827955337435217,
+   "candidate_reversals": 0,
+   "why": "Error fell by 6.98 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 11%."
+  },
+  {
+   "rank": 161,
+   "id": "000090_10",
+   "name": "000090_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 7.313191890716553,
+   "candidate_error": 0.23612743616104126,
+   "error_change": -7.0770644545555115,
+   "baseline_late_share": 0.0973049619269476,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008779042738369389,
+   "candidate_reversals": 0,
+   "why": "Error fell by 7.08 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 10%."
+  },
+  {
+   "rank": 162,
+   "id": "000066_10",
+   "name": "000066_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 8.731575965881348,
+   "candidate_error": 1.6534790992736816,
+   "error_change": -7.078096866607666,
+   "baseline_late_share": 0.04743213221083778,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014513681425341228,
+   "candidate_reversals": 0,
+   "why": "Error fell by 7.08 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 163,
+   "id": "000060_10",
+   "name": "000060_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 8.739063262939453,
+   "candidate_error": 1.6168612241744995,
+   "error_change": -7.122202038764954,
+   "baseline_late_share": 0.05818505193098527,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014115407998731198,
+   "candidate_reversals": 0,
+   "why": "Error fell by 7.12 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 164,
+   "id": "000068_10",
+   "name": "000068_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 10.171562194824219,
+   "candidate_error": 2.352800130844116,
+   "error_change": -7.8187620639801025,
+   "baseline_late_share": 0.06593210931256666,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.018049543218104595,
+   "candidate_reversals": 0,
+   "why": "Error fell by 7.82 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 165,
+   "id": "000065_10",
+   "name": "000065_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 10.610248565673828,
+   "candidate_error": 2.3811323642730713,
+   "error_change": -8.229116201400757,
+   "baseline_late_share": 0.0640836144202871,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014620947388856534,
+   "candidate_reversals": 0,
+   "why": "Error fell by 8.23 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 166,
+   "id": "000000_10",
+   "name": "000000_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 8.890178680419922,
+   "candidate_error": 0.6298174262046814,
+   "error_change": -8.26036125421524,
+   "baseline_late_share": 0.09651444141689372,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.016308502248587344,
+   "candidate_reversals": 0,
+   "why": "Error fell by 8.26 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 10%."
+  },
+  {
+   "rank": 167,
+   "id": "000063_10",
+   "name": "000063_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 10.111893653869629,
+   "candidate_error": 1.799875259399414,
+   "error_change": -8.312018394470215,
+   "baseline_late_share": 0.053297548747975515,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01399422790006496,
+   "candidate_reversals": 0,
+   "why": "Error fell by 8.31 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 168,
+   "id": "000062_10",
+   "name": "000062_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 10.415212631225586,
+   "candidate_error": 1.793910264968872,
+   "error_change": -8.621302366256714,
+   "baseline_late_share": 0.0720593043859885,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011711054946409765,
+   "candidate_reversals": 0,
+   "why": "Error fell by 8.62 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 169,
+   "id": "000073_10",
+   "name": "000073_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 9.759512901306152,
+   "candidate_error": 0.8834089636802673,
+   "error_change": -8.876103937625885,
+   "baseline_late_share": 0.0565024692373281,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.012679479226168907,
+   "candidate_reversals": 0,
+   "why": "Error fell by 8.88 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 170,
+   "id": "000029_10",
+   "name": "000029_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 10.16806411743164,
+   "candidate_error": 1.0788843631744385,
+   "error_change": -9.089179754257202,
+   "baseline_late_share": 0.06972343355331506,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01349108383100371,
+   "candidate_reversals": 0,
+   "why": "Error fell by 9.09 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 171,
+   "id": "000074_10",
+   "name": "000074_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 10.565873146057129,
+   "candidate_error": 0.914432942867279,
+   "error_change": -9.65144020318985,
+   "baseline_late_share": 0.06264041302073806,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.016117791024131894,
+   "candidate_reversals": 0,
+   "why": "Error fell by 9.65 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 172,
+   "id": "000183_10",
+   "name": "000183_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 11.038320541381836,
+   "candidate_error": 1.1464698314666748,
+   "error_change": -9.891850709915161,
+   "baseline_late_share": 0.07183150228932579,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.013257898503800143,
+   "candidate_reversals": 0,
+   "why": "Error fell by 9.89 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 173,
+   "id": "000175_10",
+   "name": "000175_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 11.553800582885742,
+   "candidate_error": 1.2527868747711182,
+   "error_change": -10.301013708114624,
+   "baseline_late_share": 0.08364072840722803,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.022293034238215072,
+   "candidate_reversals": 0,
+   "why": "Error fell by 10.30 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 174,
+   "id": "000179_10",
+   "name": "000179_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 11.611355781555176,
+   "candidate_error": 1.2211419343948364,
+   "error_change": -10.39021384716034,
+   "baseline_late_share": 0.06296501193566936,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009877172514556122,
+   "candidate_reversals": 0,
+   "why": "Error fell by 10.39 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 175,
+   "id": "000101_10",
+   "name": "000101_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 11.570025444030762,
+   "candidate_error": 1.0557310581207275,
+   "error_change": -10.514294385910034,
+   "baseline_late_share": 0.06600015785734957,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.007788305860109314,
+   "candidate_reversals": 0,
+   "why": "Error fell by 10.51 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 176,
+   "id": "000006_10",
+   "name": "000006_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 11.250314712524414,
+   "candidate_error": 0.502617597579956,
+   "error_change": -10.747697114944458,
+   "baseline_late_share": 0.04884568417611368,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008933294410216001,
+   "candidate_reversals": 0,
+   "why": "Error fell by 10.75 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 177,
+   "id": "000070_10",
+   "name": "000070_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 11.908393859863281,
+   "candidate_error": 1.1285345554351807,
+   "error_change": -10.7798593044281,
+   "baseline_late_share": 0.06458484026174867,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01099425455253676,
+   "candidate_reversals": 0,
+   "why": "Error fell by 10.78 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 178,
+   "id": "000194_10",
+   "name": "000194_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 11.967692375183105,
+   "candidate_error": 0.8647422194480896,
+   "error_change": -11.102950155735016,
+   "baseline_late_share": 0.08619150226716492,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008862873034254924,
+   "candidate_reversals": 0,
+   "why": "Error fell by 11.10 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 9%."
+  },
+  {
+   "rank": 179,
+   "id": "000147_10",
+   "name": "000147_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 12.036588668823242,
+   "candidate_error": 0.800700306892395,
+   "error_change": -11.235888361930847,
+   "baseline_late_share": 0.06314031068000364,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009157234930206287,
+   "candidate_reversals": 0,
+   "why": "Error fell by 11.24 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 180,
+   "id": "000174_10",
+   "name": "000174_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 12.903615951538086,
+   "candidate_error": 1.2601432800292969,
+   "error_change": -11.643472671508789,
+   "baseline_late_share": 0.0511810057121889,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010966580597934102,
+   "candidate_reversals": 0,
+   "why": "Error fell by 11.64 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 181,
+   "id": "000099_10",
+   "name": "000099_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 13.4274263381958,
+   "candidate_error": 1.0713481903076172,
+   "error_change": -12.356078147888184,
+   "baseline_late_share": 0.061522870268447924,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011058034789550001,
+   "candidate_reversals": 0,
+   "why": "Error fell by 12.36 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 182,
+   "id": "000181_10",
+   "name": "000181_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 13.904749870300293,
+   "candidate_error": 1.1006112098693848,
+   "error_change": -12.804138660430908,
+   "baseline_late_share": 0.07529751093217815,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.012575768883139712,
+   "candidate_reversals": 0,
+   "why": "Error fell by 12.80 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 183,
+   "id": "000192_10",
+   "name": "000192_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 14.420272827148438,
+   "candidate_error": 0.9935967922210693,
+   "error_change": -13.426676034927368,
+   "baseline_late_share": 0.06218959295486366,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009616010184959582,
+   "candidate_reversals": 0,
+   "why": "Error fell by 13.43 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 184,
+   "id": "000189_10",
+   "name": "000189_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 14.342205047607422,
+   "candidate_error": 0.887128472328186,
+   "error_change": -13.455076575279236,
+   "baseline_late_share": 0.06813057543378102,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01098735531836999,
+   "candidate_reversals": 0,
+   "why": "Error fell by 13.46 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 185,
+   "id": "000182_10",
+   "name": "000182_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 14.922689437866211,
+   "candidate_error": 1.2910057306289673,
+   "error_change": -13.631683707237244,
+   "baseline_late_share": 0.09751957611256852,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011996006698441322,
+   "candidate_reversals": 0,
+   "why": "Error fell by 13.63 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 10%."
+  },
+  {
+   "rank": 186,
+   "id": "000061_10",
+   "name": "000061_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 15.94506549835205,
+   "candidate_error": 2.233471155166626,
+   "error_change": -13.711594343185425,
+   "baseline_late_share": 0.05673753494187992,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01628486866609719,
+   "candidate_reversals": 0,
+   "why": "Error fell by 13.71 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 187,
+   "id": "000190_10",
+   "name": "000190_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 15.03296947479248,
+   "candidate_error": 1.0955145359039307,
+   "error_change": -13.93745493888855,
+   "baseline_late_share": 0.0812764822071426,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009612078452834901,
+   "candidate_reversals": 0,
+   "why": "Error fell by 13.94 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 188,
+   "id": "000180_10",
+   "name": "000180_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 15.673873901367188,
+   "candidate_error": 1.219778060913086,
+   "error_change": -14.454095840454102,
+   "baseline_late_share": 0.09675477701587516,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.023273826117601253,
+   "candidate_reversals": 0,
+   "why": "Error fell by 14.45 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 10%."
+  },
+  {
+   "rank": 189,
+   "id": "000196_10",
+   "name": "000196_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 16.629596710205078,
+   "candidate_error": 0.9341626763343811,
+   "error_change": -15.695434033870697,
+   "baseline_late_share": 0.05100408167674147,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.014305000344896677,
+   "candidate_reversals": 0,
+   "why": "Error fell by 15.70 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 190,
+   "id": "000100_10",
+   "name": "000100_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 16.692935943603516,
+   "candidate_error": 0.8360193967819214,
+   "error_change": -15.856916546821594,
+   "baseline_late_share": 0.07843506681792735,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010405828742317512,
+   "candidate_reversals": 0,
+   "why": "Error fell by 15.86 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 191,
+   "id": "000103_10",
+   "name": "000103_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 17.44735336303711,
+   "candidate_error": 0.9007026553153992,
+   "error_change": -16.54665070772171,
+   "baseline_late_share": 0.08059214330987706,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009479182366472381,
+   "candidate_reversals": 0,
+   "why": "Error fell by 16.55 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 192,
+   "id": "000191_10",
+   "name": "000191_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 18.669818878173828,
+   "candidate_error": 1.308615803718567,
+   "error_change": -17.36120307445526,
+   "baseline_late_share": 0.0903712891121741,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.00882157103574033,
+   "candidate_reversals": 0,
+   "why": "Error fell by 17.36 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 9%."
+  },
+  {
+   "rank": 193,
+   "id": "000072_10",
+   "name": "000072_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 19.76302146911621,
+   "candidate_error": 1.8036317825317383,
+   "error_change": -17.959389686584473,
+   "baseline_late_share": 0.11768208765615078,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.027018156826917532,
+   "candidate_reversals": 0,
+   "why": "Error fell by 17.96 px on this case. The candidate settled: 3% late revision, 0 reversals. Current model: 12%."
+  },
+  {
+   "rank": 194,
+   "id": "000102_10",
+   "name": "000102_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 19.936403274536133,
+   "candidate_error": 0.7883967161178589,
+   "error_change": -19.148006558418274,
+   "baseline_late_share": 0.10159022139016481,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.008407247466514072,
+   "candidate_reversals": 0,
+   "why": "Error fell by 19.15 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 10%."
+  },
+  {
+   "rank": 195,
+   "id": "000193_10",
+   "name": "000193_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 20.64100456237793,
+   "candidate_error": 0.8168753981590271,
+   "error_change": -19.824129164218903,
+   "baseline_late_share": 0.10282353875206282,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.012700197985288632,
+   "candidate_reversals": 0,
+   "why": "Error fell by 19.82 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 10%."
+  },
+  {
+   "rank": 196,
+   "id": "000195_10",
+   "name": "000195_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 22.959903717041016,
+   "candidate_error": 1.0328021049499512,
+   "error_change": -21.927101612091064,
+   "baseline_late_share": 0.0904477770160306,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009624572780430746,
+   "candidate_reversals": 0,
+   "why": "Error fell by 21.93 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 9%."
+  },
+  {
+   "rank": 197,
+   "id": "000058_10",
+   "name": "000058_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 24.61489486694336,
+   "candidate_error": 0.4938519299030304,
+   "error_change": -24.12104293704033,
+   "baseline_late_share": 0.04149296595688925,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.00926676946571236,
+   "candidate_reversals": 0,
+   "why": "Error fell by 24.12 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 198,
+   "id": "000176_10",
+   "name": "000176_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 31.11260414123535,
+   "candidate_error": 0.9942002296447754,
+   "error_change": -30.118403911590576,
+   "baseline_late_share": 0.08233594391460873,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011191024119635695,
+   "candidate_reversals": 0,
+   "why": "Error fell by 30.12 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 199,
+   "id": "000188_10",
+   "name": "000188_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 34.532108306884766,
+   "candidate_error": 0.8267982006072998,
+   "error_change": -33.705310106277466,
+   "baseline_late_share": 0.14305705251499107,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.010407581935386974,
+   "candidate_reversals": 0,
+   "why": "Error fell by 33.71 px on this case. The candidate settled: 1% late revision, 0 reversals. Current model: 14%."
+  },
+  {
+   "rank": 200,
+   "id": "000104_10",
+   "name": "000104_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 61.29769515991211,
+   "candidate_error": 1.0317471027374268,
+   "error_change": -60.26594805717468,
+   "baseline_late_share": 0.2265065889006931,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.022405032329839317,
+   "candidate_reversals": 0,
+   "why": "Error fell by 60.27 px on this case. The candidate settled: 2% late revision, 0 reversals. Current model: 23%."
+  }
+ ]
+}

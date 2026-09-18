@@ -1,0 +1,27 @@
+# Rabbit Brain runner configuration. Docs: rb docs
+[project]
+name = "raft-kitti"
+task = "flow"
+
+[adapter]
+id = "raft"                     # built-in: raft | synthetic
+model_code = "./raft"        # the model repository (RAFT: its core/ is put on sys.path)
+iterations = 12                  # refinement iterations per case; the trajectory has this many values
+device = "cuda"
+small = false                     # RAFT: random-weight checks only; real checkpoints are read as raft or raft-small from their keys
+mixed_precision = false
+
+[dataset]
+name = "kitti2015-train"
+kind = "kitti"
+path = "./data/kitti2015/training"
+cases = "all"                     # "all", a file with one case id per line, or a number (first N)
+
+[limits]
+max_regression = 0.3             # in the metric's unit
+max_late_share = 0.25
+max_reversals = 2
+
+[evidence]
+level = "none"                    # none | standard | full (rendering arrives in 0.2)
+top = 20

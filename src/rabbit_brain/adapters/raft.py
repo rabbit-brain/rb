@@ -32,6 +32,7 @@ class RaftAdapter:
     task = "flow"
     metric = Metric(id="mean_endpoint_error", name="mean endpoint error", unit="px")
     synthetic = False
+    trajectory_scale = 8.0  # update_block's delta_flow is at 1/8 resolution; times 8 it is in image pixels, like the error
 
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
@@ -75,7 +76,7 @@ class RaftAdapter:
         d = {
             "id": "raft", "version": __version__, "model_code": str(self.model_code), "git_sha": git_sha(self.model_code),
             "iterations": self.iterations, "small": self.small, "mixed_precision": self.mixed_precision, "alternate_corr": self.alternate_corr,
-            "hook": "forward hook on model.update_block (output index 2 = delta_flow)",
+            "hook": "forward hook on model.update_block (output index 2 = delta_flow, scaled by 8 to image pixels)",
         }
         if self.architectures:
             d["architectures"] = dict(self.architectures)  # detected per checkpoint; `small` above only sets random-weight models

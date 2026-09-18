@@ -77,8 +77,9 @@ def checkpoint_ref(path: Path, name: Optional[str] = None) -> ModelRef:
 def evaluate_model(adapter: Any, model: Any, cases: list[Case], *, record_trajectories: bool, role: str, progress: Progress = None) -> dict[str, dict]:
     results: dict[str, dict] = {}
     t0 = time.time()
+    scale = float(getattr(adapter, "trajectory_scale", 1.0) or 1.0)
     for i, case in enumerate(cases, start=1):
-        rec = TrajectoryRecorder()
+        rec = TrajectoryRecorder(scale=scale)
         try:
             pred = adapter.infer(model, case, rec)
             error = adapter.metric_value(pred, case)
@@ -230,7 +231,7 @@ def verify_hook(cfg: Config, checkpoint: Optional[Path], device: Optional[str] =
         case = Case(id="sample", name="synthetic sample input (no dataset found)", inputs=adapter.sample_inputs(), gt=None)
     if case is None:
         raise RBError("E_DATASET_EMPTY", message=f"No case to run{f' with id {case_id}' if case_id else ''}.")
-    rec = TrajectoryRecorder()
+    rec = TrajectoryRecorder(scale=float(getattr(adapter, "trajectory_scale", 1.0) or 1.0))
     t0 = time.time()
     adapter.infer(model, case, rec)
     values = list(rec.values)

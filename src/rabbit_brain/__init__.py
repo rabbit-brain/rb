@@ -1,0 +1,12 @@
+"""Rabbit Brain: release review for iterative perception models.
+
+Rank the cases that regressed or never settled, keep checks for the next checkpoint.
+CLI: `rb`. Docs for agents and humans: `rb docs` (AGENTS.md).
+"""
+from __future__ import annotations
+
+__version__ = "0.2.0.dev1"
+
+from .recorder import TrajectoryRecorder  # noqa: E402
+
+__all__ = ["__version__", "TrajectoryRecorder"]

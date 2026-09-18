@@ -195,6 +195,30 @@ class RaftAdapter:
     def expected_iterations(self) -> Optional[int]:
         return self.iterations
 
+    # ---- evidence (optional adapter methods)
+
+    def read_images(self, case: Case) -> Optional[list]:
+        if not (isinstance(case.inputs, tuple) and isinstance(case.inputs[0], str)):
+            return None
+        self._import()
+        import numpy as np
+        out = []
+        for path in case.inputs:
+            img = np.array(self._frame_utils.read_gen(path)).astype(np.uint8)
+            if img.ndim == 2:
+                img = np.tile(img[..., None], (1, 1, 3))
+            out.append(img[..., :3])
+        return out
+
+    def read_gt(self, case: Case):
+        """(flow HxWx2 float32, valid HxW bool) from a KITTI flow_occ png, or None."""
+        if case.gt is None:
+            return None
+        self._import()
+        import numpy as np
+        flow_gt, valid = self._frame_utils.readFlowKITTI(case.gt)
+        return np.array(flow_gt).astype(np.float32), np.array(valid) >= 0.5
+
 
 def is_small_state_dict(state: dict) -> bool:
     """raft-small has no learned upsampling mask; full RAFT has `update_block.mask.*`."""

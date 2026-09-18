@@ -35,7 +35,7 @@ rb doctor [--checkpoint <ckpt>]                        # environment, adapter, m
 rb verify-hook --checkpoint <ckpt>                     # one case: the recorder must fire once per iteration
 rb run --baseline <ckpt-A> --candidate <ckpt-B> --json # the review → rb-runs/<run_id>/
 rb findings <run_id> --top 5                           # the ranked queue, the summary, the verdict
-rb case <run_id> <case_id>                             # one case: numbers, trajectory statistics, the reasoning
+rb case <run_id> <case_id> [--render]                  # one case: numbers, trajectory statistics, the reasoning; --render writes its evidence PNGs
 rb check save <run_id> <case_id>                       # keep this case for the next checkpoint
 rb check run <run_id> --checks checks.json             # next time: exit 1 if a saved check fails or a case is flagged
 rb report <run_id> --print                             # the receipt a human reads
@@ -72,6 +72,10 @@ max_late_share = 0.25
 max_reversals = 2
 max_trajectory_regression = 0.3   # candidate late movement above the current model's on the same case, trajectory unit; label-free
 # max_last_update = 0.3           # off unless set: a final update larger than this (trajectory unit) = not settled
+
+[evidence]
+level = "standard"                # none | standard (the top flagged cases) | full (every case): PNGs under rb-runs/<run>/evidence/
+top = 10                          # how many flagged cases get evidence at level standard
 ```
 
 Case ids come from the data (KITTI: the frame stem, e.g. `000012_10`) and must stay the same across checkpoints. Unlabeled cases (no ground truth) get stability findings and "error not measured"; they never count as regressions or as passing on error.
@@ -133,6 +137,8 @@ Every command accepts `--json` and prints exactly one JSON object on stdout; pro
 
 Definitions `rb` applies, and restates in every report: a case is a **regression** when the candidate's error exceeds the current model's by more than `max_regression`; **late share** is the fraction of all refinement that happened in the last third of the iterations; a **reversal** is an iteration where the update grew by more than 5% over the previous one; a case is **unstable** when late share exceeds `max_late_share` or reversals exceed `max_reversals`, when it is a trajectory regression, or, only when `max_last_update` is set, when the **last update** (the size of the final refinement step, in the trajectory's unit) exceeds it. A **trajectory regression** is paired and label-free: the candidate's **late movement** (mean update over the last quarter of iterations, in the trajectory's unit) exceeds the current model's on the same case by more than `max_trajectory_regression`. It is the same test as the error regression, applied to the refinement instead of the answer, so it also works on cases without ground truth; on labeled cases it mostly coincides with error regressions and ranks the worst of them first (flag `trajectory_regression`). Cases are ranked regression+unstable, then regression, then **improved but unstable** (they pass on error and still need a look), then the rest, by error change; unlabeled cases rank after labeled ones within a group. A **saved check** is an absolute limit for a case id in a project: candidate error ≤ `max_error`, optionally late share ≤ `max_late_share` and reversals ≤ `max_reversals`; a saved case missing from a later run fails the check.
 
+**Evidence.** `rb run` renders the top flagged cases (`[evidence] level = "standard"`, `top`; `--evidence none|standard|full` overrides) and `rb case <run> <id> --render` renders any case: it re-runs both checkpoints on that case and writes `rb-runs/<run>/evidence/<case>/` with `inputs.png`, `flow.png` (current | candidate | ground truth on one colour scale), `error.png` (per-pixel error maps, when ground truth exists), `filmstrip.png` (one tile per refinement iteration for the candidate, then the current model), `trajectory.png` and `case.png` (all of it stacked, with the finding as caption), plus a README. The caption and the JSON `evidence.check` say whether the re-run reproduced the run's error and trajectory for that case. Evidence directories are gitignored (large); `bundle.json` and the report list which cases have them. Rendering needs numpy and pillow (`E_EVIDENCE_DEPS` otherwise); a run never fails because a rendering did. Custom adapters opt in with `read_images(case)` and `read_gt(case)`; without them only the trajectory plot is drawn. Show the human `case.png` for the case the verdict names; do not describe images you have not opened.
+
 Every trajectory also yields the absolute convergence statistics (`stability.candidate` in bundle.json and `rb case`): `last_update`, `late_update` and `early_update` (mean update over the last and first quarter of iterations), `late_to_early`. A run with an instrumented model adds, from the update fields themselves: `sign_reversal_rate` (share of consecutive updates pointing in opposite directions, cosine below zero), `mean_cos`, `displacement_mean` / `displacement_max` / `displacement_initial` (distance of the intermediate estimates from the final one) and `update_energy`. A run's report ends with the median / p90 / max of these per model, so you can see where the limits sit against the case set. Do not derive verdicts from these numbers yourself; they are there to be read, compared across checkpoints and, with consent, shared for calibration.
 
 ## Exit codes
@@ -166,6 +172,7 @@ Every trajectory also yields the absolute convergence statistics (`stability.can
 | `E_LIMITS_INVALID` | a limit is out of range | `--max-regression ≥ 0`, `0 ≤ --max-late-share ≤ 1`, `0 ≤ --max-reversals ≤ 64`, `--max-trajectory-regression ≥ 0`, `--max-last-update ≥ 0` |
 | `E_NOT_AVAILABLE` | the command is planned, not in this version | `rb rerun`, `rb open`, `rb mcp` are not here yet; use the commands above |
 | `E_WRITE_FAILED` | a file could not be written | check permissions, or `--runs-dir` |
+| `E_EVIDENCE_DEPS` | evidence rendering needs numpy and pillow | `pip install numpy pillow` (included in `rabbit-brain[raft]`) |
 | `E_INTERNAL` | unexpected failure | re-run with `--json` and report it |
 
 ## Worked example

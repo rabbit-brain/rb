@@ -192,7 +192,8 @@ class CaseStability(BaseModel):
 
 class Evidence(BaseModel):
     model_config = ConfigDict(extra="allow")
-    dir: str
+    dir: str                                   # relative to the run directory
+    files: list[str] = Field(default_factory=list)
 
 
 ErrorOutcome = Literal["regression", "improved", "stable", "not_measured"]

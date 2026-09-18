@@ -147,6 +147,24 @@ def test_raft_adapter_mechanics(workdir, capsys):
     # rb case prints the absolute statistics
     code, env, text = run_json(capsys, "case", env.run_id, "000000_10")
     assert code == 0 and env.data["stability"]["candidate"]["displacement_max"] is not None
+    # evidence: rb case --render re-runs the case, reproduces the numbers and writes the PNGs
+    run_id = env.run_id
+    code, env, text = run_json(capsys, "case", run_id, "000000_10", "--render", "--device", "cpu")
+    assert code == 0, env.errors
+    ev = env.data["evidence"]; ev_dir = Path(ev["dir"])
+    assert ev["check"]["errors_match"] and ev["check"]["candidate_trajectory_matches"], ev["check"]
+    for name in ("inputs.png", "flow.png", "error.png", "filmstrip.png", "trajectory.png", "case.png"):
+        assert (ev_dir / name).exists(), name
+    # an unlabeled case has no error map
+    code, env, _ = run_json(capsys, "case", run_id, "000002_10", "--render", "--device", "cpu")
+    assert code == 0 and "error.png" not in env.data["evidence"]["files"] and "flow.png" in env.data["evidence"]["files"]
+    # rb run --evidence full renders every case and lists them in bundle, record and report
+    code, env, _ = run_json(capsys, "run", "--baseline", "ckpt/raft-a.pth", "--candidate", "ckpt/raft-b.pth", "--device", "cpu", "--quiet", "--evidence", "full")
+    assert code == 0 and sorted(env.data["evidence"]["cases"]) == ["000000_10", "000001_10", "000002_10"], env.data.get("evidence")
+    bundle = json.loads((workdir / "rb-runs" / env.run_id / "bundle.json").read_text())
+    assert all(c["evidence"]["dir"] == f"evidence/{c['id']}" for c in bundle["cases"])
+    report = (workdir / "rb-runs" / env.run_id / "report.md").read_text()
+    assert "## Evidence" in report and "evidence/000000_10/case.png" in report
     # the architecture is read from the checkpoint, so a wrong `small` flag in rb.toml does not matter
     Path("rb.toml").write_text(Path("rb.toml").read_text().replace("small = true", "small = false"))
     code, env, _ = run_json(capsys, "verify-hook", "--checkpoint", "ckpt/raft-a.pth", "--device", "cpu")

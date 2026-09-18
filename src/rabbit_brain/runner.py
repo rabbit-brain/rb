@@ -17,7 +17,7 @@ from .adapters.base import Case
 from .checks import evaluate_all
 from .config import Config
 from .errors import RBError
-from .models import Bundle, CaseV2, ChecksV2, DatasetRef, Limits, ModelRef, Record
+from .models import Bundle, CaseV2, ChecksV2, DatasetRef, Evidence, Limits, ModelRef, Record
 from .recorder import TrajectoryRecorder
 from .runs import case_list_hash, compute_findings, derive_case, file_sha256, new_run_id, write_run
 from .report import report_markdown
@@ -133,7 +133,7 @@ def hook_status(results: dict[str, dict], expected: Optional[int], record_trajec
 def run(cfg: Config, baseline: Path, candidate: Path, *, limits: Optional[Limits] = None, runs_dir: Path, command: str,
         device: Optional[str] = None, seed: int = 0, no_trajectories: bool = False, limit: Optional[int] = None,
         baseline_name: Optional[str] = None, candidate_name: Optional[str] = None, checks: Optional[ChecksV2] = None,
-        progress: Progress = None) -> tuple[Path, Bundle, Record, Any, str]:
+        progress: Progress = None, evidence: Optional[str] = None) -> tuple[Path, Bundle, Record, Any, str]:
     started = datetime.now().astimezone()
     t0 = time.time()
     limits = limits or cfg.limits
@@ -200,6 +200,37 @@ def run(cfg: Config, baseline: Path, candidate: Path, *, limits: Optional[Limits
               + (f"{len(skipped)} case(s) skipped after inference errors; see skipped." if skipped else ""),
     )
     findings = compute_findings(bundle, limits, checks)
+    evidence_level = evidence or cfg.evidence.level
+    if evidence_level != "none" and findings.queue:
+        top_n = cfg.evidence.top if evidence_level == "standard" else len(findings.queue)
+        targets = [q.id for q in findings.queue if "regression" in q.flags or "unstable" in q.flags][:top_n] if evidence_level == "standard" else [q.id for q in findings.queue]
+        if targets:
+            from .evidence import render_case
+            run_dir_planned = runs_dir / run_id
+            loaded = {"baseline": adapter.load(baseline, device), "candidate": adapter.load(candidate, device)}
+            rendered = {}
+            for cid in targets:
+                try:
+                    rendered[cid] = render_case(cfg, bundle, cid, run_dir_planned, device=device, models=loaded)
+                except RBError as exc:
+                    if exc.code == "E_EVIDENCE_DEPS":
+                        if progress:
+                            progress(f"evidence skipped: {exc.message}")
+                        break
+                    raise
+                except Exception as exc:  # noqa: BLE001  (a rendering failure must not lose the run; the numbers are already computed)
+                    if progress:
+                        progress(f"evidence for {cid} failed ({type(exc).__name__}: {str(exc)[:120]}); the run continues")
+                    continue
+                if progress:
+                    progress(f"evidence: {cid} → {rendered[cid]['dir']}")
+            del loaded
+            if rendered:
+                by_id = {c.id: c for c in bundle.cases}
+                for cid, info in rendered.items():
+                    by_id[cid].evidence = Evidence(dir=str(Path(info["dir"]).relative_to(run_dir_planned)), files=info["files"])
+                record.evidence = {"level": evidence_level, "cases": list(rendered), "checks": {cid: info["check"] for cid, info in rendered.items()}}
+                findings = compute_findings(bundle, limits, checks)
     md = report_markdown(bundle, record, findings, checks.checks if checks else ())
     if getattr(adapter, "synthetic", False):
         md = md.replace("\n\n## Verdict", "\n\n**Synthetic adapter: a test double, not a real model. The numbers are illustrative.**\n\n## Verdict", 1)

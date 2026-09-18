@@ -162,7 +162,9 @@ def import_record(bundle: Bundle, cmp: ComparisonV1, input_path: Optional[Path],
 def write_run(base: Path, bundle: Bundle, record: Record, findings: Findings, report_md: str) -> Path:
     run_dir = base / bundle.run_id
     try:
-        run_dir.mkdir(parents=True, exist_ok=False)
+        if (run_dir / "bundle.json").exists():
+            raise RBError("E_WRITE_FAILED", message=f"{run_dir} already holds a run.")
+        run_dir.mkdir(parents=True, exist_ok=True)  # evidence rendering may have created it already
         (run_dir / "bundle.json").write_text(json.dumps(bundle.model_dump(exclude_none=True), indent=1) + "\n", encoding="utf-8")
         (run_dir / "record.json").write_text(json.dumps(record.model_dump(exclude_none=True), indent=1) + "\n", encoding="utf-8")
         (run_dir / "findings.json").write_text(json.dumps(findings.model_dump(exclude_none=True), indent=1) + "\n", encoding="utf-8")

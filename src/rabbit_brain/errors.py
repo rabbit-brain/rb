@@ -51,6 +51,7 @@ ERRORS: dict[str, tuple[str, str]] = {
     "E_DEVICE": ("The requested device is not available.", "Set [adapter] device = \"cpu\" (slow) or pass --device cpu, or run on a machine with CUDA."),
     "E_INFERENCE_FAILED": ("Inference failed on every case.", "Run `rb verify-hook --checkpoint <path>` to see the first error; check checkpoint/architecture and the dataset."),
     "E_WRITE_FAILED": ("A file could not be written.", "Check permissions on the current directory or pass --runs-dir."),
+    "E_EVIDENCE_DEPS": ("Evidence rendering needs numpy and pillow.", "pip install numpy pillow (both come with pip install 'rabbit-brain[raft]')."),
     "E_INTERNAL": ("Unexpected failure.", "Re-run with --json and report the output at https://github.com/rabbit-brain/rb/issues."),
 }
 

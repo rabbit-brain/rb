@@ -42,6 +42,9 @@ class Adapter(Protocol):
     def infer(self, model: Any, case: Case, rec: TrajectoryRecorder) -> Prediction: ...   # records one value per iteration
     def metric_value(self, pred: Prediction, case: Case) -> Optional[float]: ...          # None when case.gt is None
     def expected_iterations(self) -> Optional[int]: ...               # for rb verify-hook; None if unknown
+    # optional, for evidence rendering (rb case --render, rb run --evidence):
+    #   read_images(case) -> list of HxWx3 uint8 arrays | None
+    #   read_gt(case) -> (field HxWxC float32, valid HxW bool) | None     the prediction's output must be the same field shape
 
 
 TASK_METRICS: dict[str, Metric] = {

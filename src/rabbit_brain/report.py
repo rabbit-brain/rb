@@ -153,4 +153,8 @@ def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings
         "- Definitions: `rb docs`. Schemas: `rb schema bundle|findings|checks|record`.\n"
     )
     convergence = convergence_section(bundle, findings.limits) if bundle.source == "run" else ""
-    return f"{title}\n\n" + "\n".join(prov) + "\n\n" + verdict + "\n" + body + "\n" + convergence + reproduce
+    with_evidence = [c for c in bundle.cases if c.evidence]
+    evidence = ""
+    if with_evidence:
+        evidence = "## Evidence\n\n" + "\n".join(f"- {c.id}: `{c.evidence.dir}/case.png`" for c in with_evidence) + "\n\nEach case.png stacks the inputs, both flow fields with ground truth when present, the error maps, the per-iteration filmstrips and the trajectory plot; the caption says whether re-running the case reproduced the run's numbers. `rb case <run> <case_id> --render` makes one for any case.\n\n"
+    return f"{title}\n\n" + "\n".join(prov) + "\n\n" + verdict + "\n" + body + "\n" + convergence + evidence + reproduce

@@ -47,8 +47,8 @@ class DatasetSection(BaseModel):
 
 class EvidenceSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    level: Literal["none", "standard", "full"] = "none"
-    top: int = Field(20, ge=0, le=500)
+    level: Literal["none", "standard", "full"] = "standard"
+    top: int = Field(10, ge=0, le=500)
 
 
 class Config(BaseModel):
@@ -119,8 +119,8 @@ def render_config(cfg: Config) -> str:
         (f"max_last_update = {lim.max_last_update}" if lim.max_last_update is not None else "# max_last_update = 0.3           # off unless set: a final update larger than this (trajectory unit) = not settled"),
         "",
         "[evidence]",
-        f"level = {_toml_str(e.level)}                    # none | standard | full (rendering arrives in 0.2)",
-        f"top = {e.top}",
+        f"level = {_toml_str(e.level)}                # none | standard (the top flagged cases) | full (every case): PNGs under rb-runs/<run>/evidence/",
+        f"top = {e.top}                          # how many flagged cases get evidence at level standard",
         "",
     ]
     return "\n".join(lines)

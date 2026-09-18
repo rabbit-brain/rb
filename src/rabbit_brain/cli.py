@@ -259,10 +259,25 @@ def cmd_case(args: argparse.Namespace, out: Out) -> int:
         out.say(f"Notes: {q.notes}")
     if q.tags:
         out.say(f"Tags: {', '.join(q.tags)}")
+    rendered = None
+    if getattr(args, "render", False):
+        from .evidence import render_case
+        run_dir = resolve_run(args.run, runs_dir(args.runs_dir))[1]
+        if run_dir is None or not run_dir.is_dir():
+            raise RBError("E_RUN_NOT_FOUND", message="Evidence needs a run directory (rb-runs/<run_id>), not a loose comparison file.")
+        cfg = load_config()
+        rendered = render_case(cfg, bundle, q.id, run_dir, device=getattr(args, "device", None))
+        chk = rendered["check"]
+        out.say(f"Evidence written to {rendered['dir']}/ ({', '.join(rendered['files'])}).",
+                f"Re-run on this case {'reproduced' if chk['errors_match'] and chk['candidate_trajectory_matches'] else 'DIFFERS FROM'} the run's numbers: "
+                f"current {chk['baseline_error']['now']} vs {chk['baseline_error']['run']}, candidate {chk['candidate_error']['now']} vs {chk['candidate_error']['run']}.")
+    elif c.evidence:
+        out.say(f"Evidence: {c.evidence.dir}/ ({', '.join(c.evidence.files) if c.evidence.files else 'see directory'}).")
     out.data = {**q.model_dump(), "stability": st.model_dump(), "baseline_trajectory": c.baseline_trajectory, "candidate_trajectory": c.candidate_trajectory,
-                "baseline_frames": c.baseline_frames, "candidate_frames": c.candidate_frames, "limits": limits.model_dump(), "metric": bundle.metric.model_dump()}
+                "baseline_frames": c.baseline_frames, "candidate_frames": c.candidate_frames, "limits": limits.model_dump(), "metric": bundle.metric.model_dump(),
+                "evidence": rendered or (c.evidence.model_dump() if c.evidence else None)}
     ref = out.ref or bundle.run_id
-    out.next = [f"rb check save {ref} {q.id}", f"rb findings {ref}"]
+    out.next = [f"rb check save {ref} {q.id}", f"rb findings {ref}"] + ([] if rendered or c.evidence else [f"rb case {ref} {q.id} --render"])
     return EXIT_OK
 
 
@@ -463,6 +478,7 @@ def cmd_run(args: argparse.Namespace, out: Out) -> int:
         cfg, Path(args.baseline), Path(args.candidate), limits=limits, runs_dir=base, command=out.command_line,
         device=args.device, seed=args.seed, no_trajectories=args.no_trajectories, limit=args.limit,
         baseline_name=args.baseline_name, candidate_name=args.candidate_name, checks=checks, progress=progress,
+        evidence=getattr(args, "evidence", None),
     )
     out.run_id = bundle.run_id
     s = findings.summary
@@ -476,13 +492,17 @@ def cmd_run(args: argparse.Namespace, out: Out) -> int:
         f"Verdict: {findings.verdict.line}",
         f"Run written to {run_dir}/ (bundle.json, record.json, findings.json, report.md)",
     )
+    ev = getattr(record, "evidence", None) or {}
+    if ev.get("cases"):
+        out.say(f"Evidence rendered for {len(ev['cases'])} case(s) under {run_dir}/evidence/ (case.png per case).")
     skipped = getattr(record, "skipped", None) or {}
     if skipped:
         out.say(f"{len(skipped)} case(s) skipped after inference errors: {', '.join(list(skipped)[:5])}{' …' if len(skipped) > 5 else ''}")
     flagged = [q for q in findings.queue if "regression" in q.flags or "unstable" in q.flags]
     failed = {"none": False, "regressions": s.regressions > 0, "flags": bool(flagged), "checks": s.checks.failing + s.checks.missing > 0}[args.fail_on]
     out.data = {"run_dir": str(run_dir), "summary": s.model_dump(), "verdict": findings.verdict.model_dump(), "limits": limits.model_dump(), "metric": bundle.metric.model_dump(),
-                "hook": record.hook, "checkpoints": {k: v.model_dump() for k, v in record.checkpoints.items()}, "skipped": skipped, "fail_on": args.fail_on, "failed": failed}
+                "hook": record.hook, "checkpoints": {k: v.model_dump() for k, v in record.checkpoints.items()}, "skipped": skipped, "fail_on": args.fail_on, "failed": failed,
+                "evidence": ev}
     out.next = [f"rb findings {bundle.run_id} --top 5", f"rb case {bundle.run_id} {findings.verdict.start}" if findings.verdict.start else f"rb report {bundle.run_id} --print"]
     return EXIT_CHECK_FAILED if failed else EXIT_OK
 
@@ -583,6 +603,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("case", parents=[common, lim, chk], help="one case: numbers, trajectory statistics, reasoning")
     s.add_argument("run")
     s.add_argument("case_id")
+    s.add_argument("--render", action="store_true", help="re-run both checkpoints on this case and write evidence PNGs under the run's evidence/ directory (needs rb.toml and the checkpoints)")
+    s.add_argument("--device", default=None)
     s.set_defaults(func=cmd_case)
 
     c = sub.add_parser("check", help="saved checks: save, run, list, rm")
@@ -650,6 +672,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--fail-on", choices=["none", "regressions", "flags", "checks"], default="none", help="exit 1 when… (default none: findings are data)")
     s.add_argument("--quiet", action="store_true", help="no progress on stderr")
+    s.add_argument("--evidence", choices=["none", "standard", "full"], default=None, help="render evidence PNGs for the top flagged cases (standard, rb.toml [evidence] top) or every case (full); default from rb.toml")
     s.set_defaults(func=cmd_run)
 
     s = sub.add_parser("docs", parents=[common], help="print AGENTS.md (or --errors for the error table)")

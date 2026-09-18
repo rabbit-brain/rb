@@ -99,7 +99,7 @@ def render_config(cfg: Config) -> str:
     lines += [
         f"iterations = {a.iterations}                  # refinement iterations per case; the trajectory has this many values",
         f"device = {_toml_str(a.device)}",
-        f"small = {'true' if a.small else 'false'}                     # RAFT: raft-small checkpoints",
+        f"small = {'true' if a.small else 'false'}                     # RAFT: random-weight checks only; real checkpoints are read as raft or raft-small from their keys",
         f"mixed_precision = {'true' if a.mixed_precision else 'false'}",
         "",
         "[dataset]",

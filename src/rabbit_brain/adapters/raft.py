@@ -2,8 +2,11 @@
 
 Model code: a checkout of the RAFT repository (`[adapter] model_code = "./raft"`); its `core/` directory is put on
 sys.path because RAFT's modules import each other by bare name. Checkpoints: RAFT's `.pth` files (DataParallel
-state dicts are accepted). Dataset: KITTI-style directories, `image_2/*_10.png` + `*_11.png`, and optionally
-`flow_occ/*_10.png` for ground truth; without `flow_occ` the cases are unlabeled and only stability is assessed.
+state dicts are accepted). Whether a checkpoint is raft-small or full RAFT is read from the state dict itself
+(`update_block.mask.*` exists only in the full model), so one run can compare raft-things with raft-small; the
+receipt records the architecture of each checkpoint. Dataset: KITTI-style directories, `image_2/*_10.png` +
+`*_11.png`, and optionally `flow_occ/*_10.png` for ground truth; without `flow_occ` the cases are unlabeled and
+only stability is assessed.
 
 The trajectory is recorded without touching RAFT's code: a forward hook on `model.update_block`, whose output is
 `(net, up_mask, delta_flow)`. Per-case error is RAFT's own KITTI evaluation: mean endpoint error over valid pixels.
@@ -43,6 +46,7 @@ class RaftAdapter:
         self._utils = None
         self._frame_utils = None
         self._torch = None
+        self.architectures: dict[str, str] = {}  # checkpoint path -> "raft" or "raft-small", filled by load()
 
     # ---- imports
 
@@ -68,11 +72,14 @@ class RaftAdapter:
         self._torch, self._raft, self._utils, self._frame_utils = torch, raft_module, raft_utils, frame_utils
 
     def describe(self) -> dict:
-        return {
+        d = {
             "id": "raft", "version": __version__, "model_code": str(self.model_code), "git_sha": git_sha(self.model_code),
             "iterations": self.iterations, "small": self.small, "mixed_precision": self.mixed_precision, "alternate_corr": self.alternate_corr,
             "hook": "forward hook on model.update_block (output index 2 = delta_flow)",
         }
+        if self.architectures:
+            d["architectures"] = dict(self.architectures)  # detected per checkpoint; `small` above only sets random-weight models
+        return d
 
     # ---- model
 
@@ -83,17 +90,24 @@ class RaftAdapter:
             raise RBError("E_CHECKPOINT_NOT_FOUND", message=f"No such checkpoint: {checkpoint}")
         if device.startswith("cuda") and not torch.cuda.is_available():
             raise RBError("E_DEVICE", message="CUDA is not available in this environment.")
-        args = argparse.Namespace(small=self.small, mixed_precision=self.mixed_precision, alternate_corr=self.alternate_corr, dropout=0)
-        model = self._raft.RAFT(args)
-        state = torch.load(str(checkpoint), map_location="cpu")
+        try:
+            state = torch.load(str(checkpoint), map_location="cpu")
+        except Exception as exc:  # noqa: BLE001  (torch raises several types for a corrupt or foreign file)
+            raise RBError("E_CHECKPOINT_NOT_FOUND", message=f"{checkpoint} is not a torch checkpoint: {str(exc)[:200]}")
         if isinstance(state, dict) and "state_dict" in state and isinstance(state["state_dict"], dict):
             state = state["state_dict"]
+        if not isinstance(state, dict) or not state:
+            raise RBError("E_CHECKPOINT_NOT_FOUND", message=f"{checkpoint} does not contain a state dict.")
         state = {k[7:] if k.startswith("module.") else k: v for k, v in state.items()}
+        small = is_small_state_dict(state)
+        args = argparse.Namespace(small=small, mixed_precision=self.mixed_precision, alternate_corr=self.alternate_corr, dropout=0)
+        model = self._raft.RAFT(args)
         try:
             model.load_state_dict(state)
         except RuntimeError as exc:
-            hint = " (is this a raft-small checkpoint? set [adapter] small = true)" if not self.small else " (set [adapter] small = false for a full-size checkpoint)"
-            raise RBError("E_CHECKPOINT_NOT_FOUND", message=f"{checkpoint} does not match the configured architecture{hint}: {str(exc)[:200]}")
+            arch = "raft-small" if small else "raft"
+            raise RBError("E_CHECKPOINT_NOT_FOUND", message=f"{checkpoint} does not match RAFT's architecture (read as {arch} from its keys): {str(exc)[:200]}")
+        self.architectures[str(checkpoint)] = "raft-small" if small else "raft"
         model.to(device).eval()
         return model
 
@@ -176,6 +190,11 @@ class RaftAdapter:
 
     def expected_iterations(self) -> Optional[int]:
         return self.iterations
+
+
+def is_small_state_dict(state: dict) -> bool:
+    """raft-small has no learned upsampling mask; full RAFT has `update_block.mask.*`."""
+    return not any(k.startswith("update_block.mask.") for k in state)
 
 
 def git_sha(path: Path) -> Optional[dict]:

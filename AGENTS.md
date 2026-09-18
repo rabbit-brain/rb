@@ -30,7 +30,7 @@ Do not use it for training, hyperparameter search, certifying a model, or metric
 ## The runner workflow
 
 ```sh
-rb init --project <name> --adapter raft --model-code ./raft --dataset ./data/kitti2015/training [--small] [--device cpu]
+rb init --project <name> --adapter raft --model-code ./raft --dataset ./data/kitti2015/training [--device cpu]
 rb doctor [--checkpoint <ckpt>]                        # environment, adapter, model code, dataset, checkpoints
 rb verify-hook --checkpoint <ckpt>                     # one case: the recorder must fire once per iteration
 rb run --baseline <ckpt-A> --candidate <ckpt-B> --json # the review → rb-runs/<run_id>/
@@ -57,7 +57,7 @@ id = "raft"                       # raft | synthetic, or: module = "package.modu
 model_code = "./raft"             # RAFT checkout; its core/ is put on sys.path
 iterations = 12                   # refinement iterations per case = trajectory length
 device = "cuda"
-small = false                     # true for raft-small checkpoints
+small = false                     # only for random-weight checks; real checkpoints are read as raft or raft-small from their keys
 mixed_precision = false
 
 [dataset]
@@ -143,7 +143,7 @@ Definitions `rb` applies, and restates in every report: a case is a **regression
 | `E_CONFIG_INVALID` | `rb.toml` has a bad field, or an unknown adapter id | fix the named field; `rb init --force` rewrites the file |
 | `E_ADAPTER_IMPORT` | the adapter or the model's dependencies did not import | `rb doctor`; install the model's requirements here (`pip install "rabbit-brain[raft]"` for RAFT) |
 | `E_MODEL_CODE_MISSING` | `model_code` is not a RAFT checkout | point it at the repository (must contain `core/raft.py`) |
-| `E_CHECKPOINT_NOT_FOUND` | a checkpoint is missing or does not match the architecture | check the path; raft-small weights need `small = true`; do not download weights without asking the human |
+| `E_CHECKPOINT_NOT_FOUND` | a checkpoint is missing, is not a torch state dict, or does not match RAFT's layers | check the path and that it is a RAFT checkpoint (raft-small is detected from the file); do not download weights without asking the human |
 | `E_DATASET_EMPTY` | no cases found | check `[dataset] path` and `kind`, or the cases file |
 | `E_HOOK_NOT_REACHABLE` | the recorder never fired | custom adapter: call `rec.step(delta)` per iteration or use `rec.attached(...)`; or run with `--no-trajectories` and say so to the human |
 | `E_HOOK_LENGTH` | fired a different number of times than `iterations` | the hook must fire once per refinement iteration; align `[adapter] iterations` |
@@ -169,7 +169,7 @@ Definitions `rb` applies, and restates in every report: a case is a **regression
 Prompt from the human: *"Review candidate checkpoint ckpt/raft-small.pth against ckpt/raft-things.pth on the KITTI cases with Rabbit Brain and tell me what to look at."*
 
 ```sh
-rb doctor --checkpoint ckpt/raft-things.pth --checkpoint ckpt/raft-small.pth --json    # if there is no rb.toml: rb init first (raft-small needs --small)
+rb doctor --checkpoint ckpt/raft-things.pth --checkpoint ckpt/raft-small.pth --json    # if there is no rb.toml: rb init first
 rb verify-hook --checkpoint ckpt/raft-small.pth --json
 rb run --baseline ckpt/raft-things.pth --candidate ckpt/raft-small.pth --json           # add --limit 20 for a pilot
 rb findings <run_id> --top 5 --json

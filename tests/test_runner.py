@@ -112,9 +112,9 @@ def test_raft_adapter_mechanics(workdir, capsys):
     sys.path.insert(0, str(Path(RAFT_PATH) / "core"))
     from raft import RAFT  # type: ignore[import-not-found]
     Path("ckpt").mkdir()
-    for name, seed in (("raft-a", 1), ("raft-b", 2)):
+    for name, seed, small in (("raft-a", 1, True), ("raft-b", 2, False)):  # a raft-small and a full RAFT, compared in one run
         torch.manual_seed(seed)
-        m = RAFT(argparse.Namespace(small=True, mixed_precision=False, alternate_corr=False, dropout=0))
+        m = RAFT(argparse.Namespace(small=small, mixed_precision=False, alternate_corr=False, dropout=0))
         torch.save({"module." + k: v for k, v in m.state_dict().items()}, f"ckpt/{name}.pth")
 
     code, env, _ = run_json(capsys, "init", "--project", "raft-mechanics", "--adapter", "raft", "--model-code", RAFT_PATH, "--dataset", str(root), "--device", "cpu", "--small")
@@ -129,12 +129,17 @@ def test_raft_adapter_mechanics(workdir, capsys):
     assert s["cases"] == 3 and s["with_gt"] == 2 and s["with_trajectories"] == 3 and env.data["hook"]["verified"] is True
     record = json.loads((workdir / "rb-runs" / env.run_id / "record.json").read_text())
     assert record["adapter"]["id"] == "raft" and record["model_code"]["sha"] and record["environment"]["torch"]
+    assert record["adapter"]["architectures"] == {"ckpt/raft-a.pth": "raft-small", "ckpt/raft-b.pth": "raft"}
     bundle = json.loads((workdir / "rb-runs" / env.run_id / "bundle.json").read_text())
     unlabeled = next(c for c in bundle["cases"] if c["id"] == "000002_10")
     assert unlabeled["has_gt"] is False and unlabeled.get("candidate_error") is None and len(unlabeled["candidate_trajectory"]) == 12
     labeled = next(c for c in bundle["cases"] if c["id"] == "000000_10")
     assert labeled["candidate_error"] > 0 and labeled["error_outcome"] in ("regression", "improved", "stable")
-    # wrong architecture flag → a clear error, not a stack trace
+    # the architecture is read from the checkpoint, so a wrong `small` flag in rb.toml does not matter
     Path("rb.toml").write_text(Path("rb.toml").read_text().replace("small = true", "small = false"))
     code, env, _ = run_json(capsys, "verify-hook", "--checkpoint", "ckpt/raft-a.pth", "--device", "cpu")
-    assert code == 2 and env.errors[0].code == "E_CHECKPOINT_NOT_FOUND" and "small" in env.errors[0].message
+    assert code == 0 and env.data["fired"] == 12, env.errors
+    # a file that is not a RAFT checkpoint → a clear error, not a stack trace
+    Path("ckpt/other.pth").write_bytes(b"not a checkpoint")
+    code, env, _ = run_json(capsys, "verify-hook", "--checkpoint", "ckpt/other.pth", "--device", "cpu")
+    assert code == 2 and env.errors[0].code == "E_CHECKPOINT_NOT_FOUND", env.errors

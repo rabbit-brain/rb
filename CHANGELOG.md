@@ -6,6 +6,7 @@
 - `record.json` for runs: checkpoint sha256s, model-code git SHA, dataset hash, seeds, environment (torch/cuda/gpu), hook status, skipped cases.
 - Unlabeled cases: error "not measured", stability still assessed; never counted as regressions or as passing on error.
 - `TrajectoryRecorder.attach()` / `attached()` forward-hook helpers.
+- The raft adapter reads each checkpoint's architecture (raft or raft-small) from its keys, so one run can compare raft-things with raft-small; the receipt lists the architecture per checkpoint. `examples/raft-kitti/runpod.sh` runs the official RAFT checkpoints on KITTI-2015 on a GPU pod.
 - Not yet: evidence rendering (flow images, error maps, filmstrip), `rb rerun`, `rb open`, MCP.
 
 ## 0.1.1 (2026-09-19)

@@ -606,7 +606,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--kind", default=None, help="dataset kind for the adapter (raft: kitti)")
     s.add_argument("--iterations", type=int, default=None, help="refinement iterations per case (default 12)")
     s.add_argument("--device", default=None, help="cuda (default) or cpu")
-    s.add_argument("--small", action="store_true", help="RAFT: raft-small checkpoints")
+    s.add_argument("--small", action="store_true", help="RAFT: build random-weight models as raft-small (real checkpoints are detected)")
     s.add_argument("--demo", action="store_true", help="synthetic project with two demo checkpoints; runs on any machine")
     s.add_argument("--force", action="store_true")
     s.set_defaults(func=cmd_init)

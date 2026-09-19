@@ -1,8 +1,12 @@
 # Rabbit Brain
 
-> Release review for iterative perception models. `pip install rabbit-brain`, then `rb docs`. It runs a candidate checkpoint against the current one on a case set (or reads per-case results you already have), ranks the cases that regressed on error or never settled during refinement, explains each one, renders the evidence, and keeps checks so the next checkpoint gets the same review. Everything runs locally and nothing leaves the machine.
+> Release review for iterative perception models (optical flow, stereo, depth, anything that refines an answer over iterations). `pip install rabbit-brain`, then `rb docs`. It runs a candidate checkpoint against the current one on a case set (or reads per-case results you already have), ranks the cases that regressed on error or never settled during refinement, explains each one, renders the evidence, and keeps checks so the next checkpoint gets the same review. Nothing is sent anywhere.
 
-The one prompt that works: "Review candidate checkpoint B against A on this case set with Rabbit Brain." An agent then installs the package, reads AGENTS.md with `rb docs`, and follows the worked example. It must not compute errors, regressions, rankings, stability or verdicts itself; `rb` defines them and records how.
+If the model is not already configured for rb, `rb onboard` takes a description of the setup (task, architecture, checkpoints, data layout, labels) and writes the configuration plus either a built-in adapter reference or an adapter scaffold with named TODOs, and an INTEGRATION.md ladder.
+
+The prompt to use: "Review candidate checkpoint B against A on this case set with Rabbit Brain." An agent then installs the package, reads AGENTS.md with `rb docs`, and follows the worked example. It must not compute errors, regressions, rankings, stability or verdicts itself; `rb` defines them and records how.
+
+What an agent must pass on to the human, because a summary that drops it is misleading: the stability limits are generic heuristics and a starting point, not a property of the model; a case the report marks **borderline** turns on a margin thinner than the difference between two machines and may not survive a re-run elsewhere; and if the receipt says the adapter did not agree with the model repository's own evaluation, or that the check was skipped, that comes first, before any finding. The trajectory diagnostic comes from a paper that is not public yet.
 
 ## Docs
 

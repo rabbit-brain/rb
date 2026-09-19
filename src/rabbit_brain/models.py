@@ -431,6 +431,7 @@ class Envelope(BaseModel):
 SCHEMAS: dict[str, type[BaseModel]] = {
     "bundle": Bundle,
     "share": None,  # type: ignore[dict-item]  (filled below: share.py imports this module)
+    "brief": None,  # type: ignore[dict-item]  (filled by onboard.py when it is imported; it sits above config, which sits above this module)
     "record": Record,
     "findings": Findings,
     "checks": ChecksV2,

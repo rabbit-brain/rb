@@ -21,6 +21,7 @@ from .example import MINIMAL_EXAMPLE, example_comparison
 from .fmt import pct, plain, signed, to_fixed
 from .importer import CSV_EXAMPLE, csv_to_comparison, load_comparison, parse_column_map
 from .models import SCHEMAS, Bundle, ChecksV2, Envelope, Findings, Limits
+from .onboard import BRIEF_NAME, BriefV1, EXAMPLE_BRIEF, write_package   # also registers the brief schema
 from .report import agreement_line, report_markdown
 from .adapters.base import task_metric as adapters_task_metric
 from .runs import (bundle_from_comparison, compute_findings, import_record, list_runs, new_run_id, rederive, resolve_run, runs_dir, write_run)
@@ -30,6 +31,7 @@ from . import runner as runner_mod
 PLANNED = {"rerun", "open", "serve", "mcp"}
 FILTERS = ["flagged", "all", "regressions", "unstable", "improved-unstable", "settled-regressions", "improved", "stable"]
 SORTS = ["priority", "error-change", "candidate-error", "current-error", "late-share", "name"]
+INTEGRATION_HINT = "INTEGRATION.md has the ladder that turns this into a trusted run: doctor, the hook, the adapter check, a five-case run, then the review."
 
 # ---------------------------------------------------------------- output
 
@@ -493,6 +495,44 @@ def cmd_init(args: argparse.Namespace, out: Out) -> int:
     return EXIT_OK
 
 
+def cmd_onboard(args: argparse.Namespace, out: Out) -> int:
+    root = Path(args.dir or ".")
+    if not args.brief:
+        path = root / BRIEF_NAME
+        if path.exists() and not args.force:
+            raise RBError("E_CONFIG_INVALID", message=f"{path} already exists; fill it in and run `rb onboard --brief {path}`, or pass --force to replace it with a fresh template.")
+        root.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(EXAMPLE_BRIEF.model_dump(exclude_none=True), indent=1) + "\n", encoding="utf-8")
+        out.say(f"Wrote {path}: a filled example, so you can see the shape. Replace the values with yours.",
+                "It asks for your task, architecture, framework, where your model code and checkpoints are, how one case is stored, whether you have ground truth, and what decision this review has to support.",
+                "Nothing is sent anywhere, now or later. `rb schema brief` prints the full schema.")
+        out.data = {"brief_path": str(path), "brief": EXAMPLE_BRIEF.model_dump(exclude_none=True)}
+        out.next = [f"rb onboard --brief {path}"]
+        return EXIT_OK
+    src = Path(args.brief)
+    if not src.exists():
+        raise RBError("E_FILE_NOT_FOUND", message=f"No such brief: {src}")
+    try:
+        brief = BriefV1.model_validate(json.loads(src.read_text(encoding="utf-8")))
+    except json.JSONDecodeError as exc:
+        raise RBError("E_IMPORT_NOT_JSON", message=f"{src}: {exc}")
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        loc = ".".join(str(p) for p in first.get("loc", ()))
+        raise RBError("E_CONFIG_INVALID", message=f"{src}: {loc}: {first.get('msg', 'invalid')}. `rb schema brief` prints what each field expects.")
+    result = write_package(brief, root, force=args.force, source=src)
+    out.say(f"Wrote {', '.join(result['files'])} in {result['dir']}.")
+    if result["built_in"]:
+        out.say(f"{brief.architecture} is covered by the built-in `{result['adapter']}` adapter, so there is nothing to write.")
+    else:
+        out.say(f"There is no built-in adapter for {brief.architecture}, so rb_adapter.py is the shape of one: {result['todos']} TODOs, each saying what it must return.",
+                "That is the honest state, not a limitation being hidden: nothing can guess your loader, your valid mask or your metric formula.")
+    out.say(f"{INTEGRATION_HINT}")
+    out.data = result
+    out.next = ["rb doctor"] if result["built_in"] else [f"open {result['dir']}/INTEGRATION.md", "rb docs"]
+    return EXIT_OK
+
+
 def cmd_doctor(args: argparse.Namespace, out: Out) -> int:
     cfg = load_config() if Path(CONFIG_NAME).exists() else None
     checks = runner_mod.doctor(cfg, [Path(c) for c in (args.checkpoint or [])], args.device)
@@ -757,6 +797,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--force", action="store_true")
     s.set_defaults(func=cmd_init)
 
+    s = sub.add_parser("onboard", parents=[common], help="turn a described setup into a configured project, or into the honest shape of one")
+    s.add_argument("--brief", default=None, help="a brief.json; without it, writes a template to fill in")
+    s.add_argument("--dir", default=None, help="where to write (default: here)")
+    s.add_argument("--force", action="store_true", help="overwrite files that are already there")
+    s.set_defaults(func=cmd_onboard)
+
     s = sub.add_parser("doctor", parents=[common], help="check the environment, adapter, model code, dataset and checkpoints")
     s.add_argument("--checkpoint", action="append", default=None, help="checkpoint path to check (repeatable)")
     s.add_argument("--device", default=None)
@@ -810,7 +856,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-COMMANDS = ["init", "doctor", "verify-hook", "verify-adapter", "run", "import", "example", "findings", "case", "check save", "check run", "check list", "check rm", "report", "share", "docs", "schema", "runs", "version"]
+COMMANDS = ["init", "onboard", "doctor", "verify-hook", "verify-adapter", "run", "import", "example", "findings", "case", "check save", "check run", "check list", "check rm", "report", "share", "docs", "schema", "runs", "version"]
 
 
 def main(argv: Optional[list[str]] = None) -> int:

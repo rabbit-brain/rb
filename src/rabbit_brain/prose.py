@@ -49,12 +49,12 @@ def stability_sentence(case: CaseV1, limits: Limits) -> str:
             share = share_text(stats.late_share, limits.max_late_share)
             times = f"{stats.reversals} time{'' if stats.reversals == 1 else 's'}"
             if over_late and over_rev:
-                text = f"The candidate made {share} of its refinement in the last third of its iterations and reversed direction {times}, above your {pct(limits.max_late_share)} and {limits.max_reversals}-reversal limits."
+                text = f"The candidate made {share} of its refinement in the last third of its iterations and its update grew again {times}, above your {pct(limits.max_late_share)} and {limits.max_reversals}-reversal limits."
             elif over_late:
                 text = f"The candidate made {share} of its refinement in the last third of its iterations, above your {pct(limits.max_late_share)} limit"
-                text += f", and reversed direction {times} (within your limit of {limits.max_reversals})." if stats.reversals > 0 else "."
+                text += f", and its update grew again {times} (within your limit of {limits.max_reversals})." if stats.reversals > 0 else "."
             else:
-                text = f"The candidate reversed direction {times}, above your limit of {limits.max_reversals} reversals, and made {share} of its refinement in the last third of its iterations (limit {pct(limits.max_late_share)})."
+                text = f"The candidate's update grew again {times}, above your limit of {limits.max_reversals} reversals, and it made {share} of its refinement in the last third of its iterations (limit {pct(limits.max_late_share)})."
             text += " " + current_model_sentence(base, limits)
         if error_outcome(case, limits.max_regression) == "not_measured":
             text += " No ground truth here, so the trajectory is the only signal for this case."

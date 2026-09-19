@@ -123,9 +123,10 @@ def convergence_section(bundle: Bundle, limits: Limits) -> str:
     limit_line = f"Limits in force: late share ≤ {pct(limits.max_late_share)}, reversals ≤ {limits.max_reversals}, trajectory regression " + (f"> {plain(limits.max_trajectory_regression)} {unit} late movement over the current model" if limits.max_trajectory_regression is not None else "off (`max_trajectory_regression` in rb.toml)") + ", last update " + (f"≤ {plain(limits.max_last_update)} {unit}" if limits.max_last_update is not None else "not limited") + "."
     return (
         "## Convergence on this case set\n\n"
-        "Median / 90th percentile / max per model. Late share and reversals are what the stability limits read; last update, "
-        "late-to-early ratio, direction reversals (share of consecutive updates pointing in opposite directions) and the mean "
-        "distance of intermediate estimates from the final one are the absolute statistics from the update fields, in the trajectory's unit.\n\n"
+        "Median / 90th percentile / max per model. Late share and reversals are what the stability limits read; a reversal is an "
+        "iteration whose update grew by more than 5% over the previous one, which is a size, not a direction. Last update, "
+        "late-to-early ratio, direction reversals (the separate measure: share of consecutive updates pointing in opposite ways) "
+        "and the mean distance of intermediate estimates from the final one are the absolute statistics from the update fields, in the trajectory's unit.\n\n"
         f"| Model | Cases | Late share | Reversals | Last update ({unit}) | Late/early | Direction reversals | Distance from final ({unit}) |\n"
         "|---|---:|---|---|---|---|---|---|\n" + "\n".join(rows) + f"\n\n{limit_line}\n\n"
     )

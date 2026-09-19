@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rabbit-brain"
-version = "0.2.1"
+version = "0.2.2"
 description = "Release review for iterative perception models: rank the cases that regressed or never settled, keep checks for the next checkpoint."
 readme = "README.md"
 license = "Apache-2.0"

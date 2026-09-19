@@ -1,7 +1,7 @@
 # raft-kitti: model comparison
 
 Run: 20260918-1856-raft-small · rb 0.2.0.dev1 · finished 2026-09-18T18:56:44+00:00
-Report rendered by rb 0.2.1 from this run's bundle.json and record.json; the numbers are the run's, the wording and any later annotations are this version's.
+Report rendered by rb 0.2.2 from this run's bundle.json and record.json; the numbers are the run's, the wording and any later annotations are this version's.
 Command: `rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-small.pth --quiet`
 Baseline checkpoint: raft/models/raft-things.pth (sha256 fcfa4125d6418f4d…)
 Candidate checkpoint: raft/models/raft-small.pth (sha256 c7d41b9cc88442bb…)
@@ -193,7 +193,7 @@ The check runner evaluates these supplied metrics and trajectories against the l
 
 ## Convergence on this case set
 
-Median / 90th percentile / max per model. Late share and reversals are what the stability limits read; last update, late-to-early ratio, direction reversals (share of consecutive updates pointing in opposite directions) and the mean distance of intermediate estimates from the final one are the absolute statistics from the update fields, in the trajectory's unit.
+Median / 90th percentile / max per model. Late share and reversals are what the stability limits read; a reversal is an iteration whose update grew by more than 5% over the previous one, which is a size, not a direction. Last update, late-to-early ratio, direction reversals (the separate measure: share of consecutive updates pointing in opposite ways) and the mean distance of intermediate estimates from the final one are the absolute statistics from the update fields, in the trajectory's unit.
 
 | Model | Cases | Late share | Reversals | Last update (px) | Late/early | Direction reversals | Distance from final (px) |
 |---|---:|---|---|---|---|---|---|

@@ -199,3 +199,21 @@ def test_borderline_marks_the_outcomes_a_second_machine_moved():
     # nothing above changed an outcome
     for c in (near, under, far, quiet, edge, both, rev):
         assert stability_outcome(c, lim) == stability_outcome(c, lim) and error_outcome(c, lim.max_regression) == error_outcome(c, lim.max_regression)
+
+
+def test_a_reversal_is_a_size_not_a_direction():
+    """A reversal is an iteration whose update grew by more than 5%. The direction measure is a separate
+    statistic (sign_reversal_rate, from the update fields). The finding text must not confuse the two."""
+    from rabbit_brain.models import CaseV1, Limits
+    from rabbit_brain.prose import stability_sentence, definitions
+
+    # updates that only ever grow in size, every step pointing the same way: three reversals, no direction change
+    growing = [0.2, 0.3, 0.45, 0.7, 0.2, 0.15, 0.1, 0.08, 0.06, 0.05, 0.04, 0.03]
+    assert trajectory_stats(growing).reversals == 3
+    case = CaseV1(id="grow", name="Grow", baseline_error=1.0, candidate_error=1.0,
+                  baseline_trajectory=[2.0, 1.0, 0.5, 0.3, 0.2, 0.15, 0.1, 0.08, 0.06, 0.05, 0.04, 0.03],
+                  candidate_trajectory=growing)
+    text = stability_sentence(case, Limits())
+    assert "update grew again 3 times" in text
+    assert "reversed direction" not in text, "a reversal is a size, not a direction"
+    assert "grew by more than 5%" in definitions(Limits(), "px")

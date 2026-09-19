@@ -119,6 +119,16 @@ def render_config(cfg: Config) -> str:
     lines += [
         f"cases = {_toml_str(d.cases)}                     # \"all\", a file with one case id per line, or a number (first N)",
         "",
+    ]
+    if cfg.metric is not None:   # a metric the team named themselves; without this the task default silently replaces it
+        lines += [
+            "[metric]",
+            f"id = {_toml_str(cfg.metric.id)}",
+            f"name = {_toml_str(cfg.metric.name)}",
+            f"unit = {_toml_str(cfg.metric.unit)}                        # lower is better; every number and limit is in this unit",
+            "",
+        ]
+    lines += [
         "[limits]",
         f"max_regression = {lim.max_regression}             # in the metric's unit",
         f"max_late_share = {lim.max_late_share}",

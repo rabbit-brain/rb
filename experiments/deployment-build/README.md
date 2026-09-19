@@ -63,6 +63,35 @@ Choose B1's selection threshold and the `[limits]` values from the configuration
 
 The same three commands with `--cases holdout-cases.txt` and `.holdout.` in the output names. Then `rb import` each, and analyse once.
 
+
+### 5. Recorder ablation (amendment 2)
+
+Pre-registered in section 12 of the protocol **before** it was run. Read that first: it states what the corrected channel is, what it does not license, and why the data underneath is not fresh.
+
+`dual_recorder.py` records a second trajectory channel alongside the shipped one, in the same inference pass. The shipped channel is `delta_flow` at one eighth resolution, times 8. The corrected channel is the movement of the model's own full-resolution output, taken by wrapping `RAFT.upsample_flow`, unpadded, differenced in FP32 from a flow of exactly zero.
+
+Check the machinery before running anything, on real weights at real KITTI geometry:
+
+```sh
+python3 verify_channels.py            # reference precision
+python3 verify_channels.py --mixed    # only meaningful on a GPU; autocast is a no-op on CPU
+```
+
+It asserts four things and fails loudly on any of them: the output is bitwise unchanged by instrumentation, the corrected channel's last cumulative state is that output, the differences sum back to it, and each channel holds exactly one value per iteration.
+
+Then add `--corrected` to any `build_compare.py` command in section 2 or 4 above. It writes a second comparison beside `--out` with `.corrected` in the name: same cases, same errors, same B1 tags, different trajectory. Import both and compare the rankings.
+
+```sh
+python3 build_compare.py --config rb.toml --checkpoint ckpt/raft-things.pth \
+  --cases holdout-cases.txt --label truncated-8 --corrected \
+  --reference iterations=12,mixed_precision=false \
+  --build     iterations=8,mixed_precision=false \
+  --out ref-vs-trunc.holdout.json
+# -> ref-vs-trunc.holdout.json  and  ref-vs-trunc.holdout.corrected.json
+```
+
+Two things to keep straight. The coarse channel is recorded by the adapter itself, so the dual recorder borrows that recorder rather than attaching its own hook; attaching twice records every update twice and halves the apparent reversal rate. And `max_trajectory_regression` is in absolute trajectory units, which the corrected channel does not share, so it must be re-derived on the configuration half before any flag rate is compared.
+
 ## What the receipt does and does not pin
 
 `rb import` records the source file by sha256, and the source file carries both build configurations, per-build hook status, device, seed, environment and the smallest update magnitude. The chain is auditable but indirect.
@@ -71,6 +100,8 @@ What it does **not** carry: `checkpoints.baseline.sha256` is null for imported r
 
 ## Files
 
-- `build_compare.py` — the driver
-- `make_splits.py` — the split generator, deterministic
-- `config-cases.txt`, `holdout-cases.txt` — the frozen splits
+- `build_compare.py` - the driver
+- `make_splits.py` - the split generator, deterministic
+- `config-cases.txt`, `holdout-cases.txt` - the frozen splits
+- `dual_recorder.py` - the corrected trajectory channel (amendment 2)
+- `verify_channels.py` - its four correctness checks, on real weights

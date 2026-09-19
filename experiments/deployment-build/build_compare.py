@@ -27,6 +27,7 @@ import sys
 import time
 from pathlib import Path
 
+from dual_recorder import DualChannelRecorder
 from rabbit_brain import __version__
 from rabbit_brain.config import load_config
 from rabbit_brain.runner import environment_info, evaluate_model, hook_status, set_seeds
@@ -70,7 +71,8 @@ def _as_array(x):
 
 
 def evaluate_build(cfg_path: Path, spec: dict, checkpoint: Path, case_ids: list[str] | None,
-                   device: str | None, role: str, seed: int, capture: dict | None = None) -> tuple[dict, dict, dict]:
+                   device: str | None, role: str, seed: int, capture: dict | None = None,
+                   corrected: dict | None = None) -> tuple[dict, dict, dict]:
     set_seeds(seed)
     cfg, adapter = build_adapter(cfg_path, spec, device)
     cases = list(adapter.cases())
@@ -81,11 +83,34 @@ def evaluate_build(cfg_path: Path, spec: dict, checkpoint: Path, case_ids: list[
         if missing:
             raise SystemExit(f"{len(missing)} case id(s) in the list are not in the dataset, e.g. {sorted(missing)[:3]}")
     print(f"  {role}: {spec}, {len(cases)} cases", file=sys.stderr)
-    if capture is not None:            # B1 needs the two builds' OUTPUTS, which are label-free;
-        _inner = adapter.infer         # the per-case error uses ground truth and is NOT B1.
-        def _infer(m, case, rec, __inner=_inner, __cap=capture):
-            pred = __inner(m, case, rec)
-            __cap[case.id] = _as_array(pred.output)
+    # Two observers ride along with the product's own inference. Neither changes it.
+    #   capture:   the build's OUTPUT, label-free, for B1.
+    #   corrected: the full-resolution movement of that output per iteration (dual_recorder.py),
+    #              the ablation's second trajectory channel. The coarse channel is `rec`, untouched,
+    #              recorded by the adapter exactly as it ships.
+    if capture is not None or corrected is not None:
+        _inner = adapter.infer
+        _iters = adapter.expected_iterations()
+        _scale = float(getattr(adapter, "trajectory_scale", 1.0) or 1.0)
+
+        def _infer(m, case, rec, __inner=_inner, __cap=capture, __cor=corrected):
+            if __cor is None:
+                pred = __inner(m, case, rec)
+            else:
+                dual = DualChannelRecorder(coarse_scale=_scale, coarse=rec)  # borrowed: infer attaches it
+                with dual.attached(m):
+                    pred = __inner(m, case, rec)
+                adapter._import()
+                padder = adapter._utils.InputPadder((1, 3, *tuple(pred.output.shape[-2:])), mode="kitti")
+                dual.finish(padder, expect=_iters)
+                final = dual.final_output(padder)
+                if final is None or not final.equal(pred.output.to(final.dtype)):
+                    raise SystemExit(f"{case.id}: the corrected channel's last state is not the model's output; "
+                                     "the wrapper is not seeing the tensor the adapter returns")
+                __cor[case.id] = [float(v) for v in dual.fine.values]
+                dual.reset()
+            if __cap is not None:
+                __cap[case.id] = _as_array(pred.output)
             return pred
         adapter.infer = _infer
     t0 = time.time()
@@ -115,6 +140,9 @@ def main() -> int:
     ap.add_argument("--device", default=None)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--corrected", action="store_true",
+                    help="also record the full-resolution output-movement channel and write a second "
+                         "comparison beside --out with .corrected in its name (recorder ablation)")
     a = ap.parse_args()
 
     if not a.checkpoint.exists():
@@ -130,8 +158,10 @@ def main() -> int:
 
     ref_out: dict = {}
     bld_out: dict = {}
-    ref, ref_meta, shared = evaluate_build(a.config, ref_spec, a.checkpoint, case_ids, a.device, "reference", a.seed, ref_out)
-    bld, bld_meta, _ = evaluate_build(a.config, build_spec, a.checkpoint, case_ids, a.device, a.label, a.seed, bld_out)
+    ref_cor: dict | None = {} if a.corrected else None
+    bld_cor: dict | None = {} if a.corrected else None
+    ref, ref_meta, shared = evaluate_build(a.config, ref_spec, a.checkpoint, case_ids, a.device, "reference", a.seed, ref_out, ref_cor)
+    bld, bld_meta, _ = evaluate_build(a.config, build_spec, a.checkpoint, case_ids, a.device, a.label, a.seed, bld_out, bld_cor)
 
     # B1: mean endpoint difference between the two builds' outputs. No ground truth, no valid mask:
     # this is what a plain output comparison gives you, and the baseline the trajectory rule must beat.
@@ -146,44 +176,74 @@ def main() -> int:
             d = np.sqrt((d ** 2).sum(axis=0))
         b1[cid] = float(np.abs(d).mean())
 
-    cases, skipped = [], []
-    for cid in sorted(set(ref) | set(bld)):
-        r, b = ref.get(cid), bld.get(cid)
-        if not r or not b or r.get("error") is None or b.get("error") is None:
-            skipped.append(cid)
-            continue
-        entry = {"id": cid, "name": cid,
-                 "baseline_error": float(r["error"]), "candidate_error": float(b["error"])}
-        if cid in b1:
-            entry["tags"] = [f"b1={b1[cid]:.6g}"]      # carried through import; the analysis reads it back
-        if r.get("trajectory"):
-            entry["baseline_trajectory"] = [float(v) for v in r["trajectory"]]
-        if b.get("trajectory"):
-            entry["candidate_trajectory"] = [float(v) for v in b["trajectory"]]
-        cases.append(entry)
-
     metric = shared["metric"] or {}
-    doc = {
-        "version": 1,
-        "project": f"{a.checkpoint.stem}-builds",
-        "baseline": f"reference ({a.reference})",
-        "candidate": f"{a.label} ({a.build})",
-        "dataset": shared["dataset"],
-        "metric": metric.get("id", "mean_endpoint_error"),
-        "unit": metric.get("unit", "px"),
-        "cases": cases,
-        "notes": {
-            "produced_by": f"build_compare.py via rabbit_brain {__version__} evaluate_model",
-            "same_checkpoint": str(a.checkpoint),
-            "checkpoint_is_identical_on_both_sides": True,
-            "reference_build": ref_meta, "test_build": bld_meta,
-            "case_list": str(a.cases) if a.cases else "all",
-            "seed": a.seed, "skipped": skipped,
-            "environment": environment_info(a.device), "host": platform.platform(),
-        },
-    }
+    skipped: list[str] = []
+
+    def document(channel: str) -> dict:
+        """One comparison document. `channel` picks which trajectory the cases carry.
+
+        Everything else is identical between the two documents: the same cases, the same per-case
+        errors from the product's own metric, the same B1 tags. That is what makes this an ablation
+        of the recorder rather than a second experiment.
+        """
+        entries = []
+        skipped.clear()
+        for cid in sorted(set(ref) | set(bld)):
+            r, b = ref.get(cid), bld.get(cid)
+            if not r or not b or r.get("error") is None or b.get("error") is None:
+                skipped.append(cid)
+                continue
+            entry = {"id": cid, "name": cid,
+                     "baseline_error": float(r["error"]), "candidate_error": float(b["error"])}
+            if cid in b1:
+                entry["tags"] = [f"b1={b1[cid]:.6g}"]  # carried through import; the analysis reads it back
+            if channel == "coarse":
+                rt, bt = r.get("trajectory"), b.get("trajectory")
+            else:
+                rt, bt = (ref_cor or {}).get(cid), (bld_cor or {}).get(cid)
+            if rt:
+                entry["baseline_trajectory"] = [float(v) for v in rt]
+            if bt:
+                entry["candidate_trajectory"] = [float(v) for v in bt]
+            entries.append(entry)
+        return {
+            "version": 1,
+            "project": f"{a.checkpoint.stem}-builds" + ("" if channel == "coarse" else "-corrected"),
+            "baseline": f"reference ({a.reference})",
+            "candidate": f"{a.label} ({a.build})",
+            "dataset": shared["dataset"],
+            "metric": metric.get("id", "mean_endpoint_error"),
+            "unit": metric.get("unit", "px"),
+            "cases": entries,
+            "notes": {
+                "produced_by": f"build_compare.py via rabbit_brain {__version__} evaluate_model",
+                "trajectory_channel": (
+                    "coarse: mean |delta_flow| per iteration at 1/8 resolution, times 8. The shipped "
+                    "recorder, a forward hook on update_block at output index 2."
+                    if channel == "coarse" else
+                    "corrected: mean magnitude of the change in the model's own full-resolution output "
+                    "per iteration, unpadded, differenced in FP32 from a zero start, scale 1. Recorded by "
+                    "wrapping RAFT.upsample_flow in the same inference pass as the coarse channel."
+                ),
+                "same_checkpoint": str(a.checkpoint),
+                "checkpoint_is_identical_on_both_sides": True,
+                "reference_build": ref_meta, "test_build": bld_meta,
+                "case_list": str(a.cases) if a.cases else "all",
+                "seed": a.seed, "skipped": list(skipped),
+                "environment": environment_info(a.device), "host": platform.platform(),
+            },
+        }
+
+    doc = document("coarse")
+    cases = doc["cases"]
     a.out.write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
     print(f"\nwrote {a.out}: {len(cases)} cases, {len(skipped)} skipped", file=sys.stderr)
+    if a.corrected:
+        cor_path = a.out.parent / (a.out.stem + ".corrected" + a.out.suffix)  # .with_suffix would eat ".config"
+        cdoc = document("corrected")
+        cor_path.write_text(json.dumps(cdoc, indent=1) + "\n", encoding="utf-8")
+        have = sum(1 for c in cdoc["cases"] if c.get("candidate_trajectory"))
+        print(f"wrote {cor_path}: corrected channel present on {have}/{len(cdoc['cases'])} cases", file=sys.stderr)
     print(f"  reference hook: {ref_meta['hook']['status']}, {ref_meta['hook']['iterations']} iterations", file=sys.stderr)
     print(f"  {a.label} hook: {bld_meta['hook']['status']}, {bld_meta['hook']['iterations']} iterations", file=sys.stderr)
     print(f"  smallest update magnitude seen: reference {ref_meta['min_update_magnitude']}, "

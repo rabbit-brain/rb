@@ -198,3 +198,62 @@ The fix described in amendment 1 was applied on the pod and the experiment ran w
 Corrected here. The committed driver now captures each build's output by wrapping `adapter.infer`, leaving `evaluate_model` and the evaluation path untouched, and writes the per-case mean endpoint difference between the two builds' flow fields onto each case as a `b1=` tag.
 
 **Honest limit on this artifact.** The committed version is a deterministic replay of the two string patches applied on the pod, from the same `1af9d03` starting point. It was not byte-compared against the copy that produced the results, which remains at `/workspace/exp/build_compare.py` on the pod volume. Anyone reproducing this should compare the two before relying on exact agreement.
+
+### Amendment 2: recorder ablation, pre-registered before the rerun
+
+**Status: pre-registration. Written and committed before the corrected channel was run on either split.** The data underneath is not fresh: both splits have already been examined and the holdout results above are public. Section 9's licensing therefore does not apply to anything below, and the decision rule at the end says what does.
+
+#### What prompted it
+
+The recorder attaches a forward hook to `model.update_block` and keeps output index 2, `delta_flow`. RAFT's update block returns three things, `(net, up_mask, delta_flow)`, and the second one is never read. `up_mask` is what decides how each coarse update is spread over the 8x8 block of output pixels it covers, so the amount the model's output actually moves in an iteration is not `delta_flow` scaled by 8. It is a quantity neither recorded field gives alone. `convergence()` computes every direction and displacement statistic from the same fields, so it inherits this.
+
+The asymmetry matters here specifically. **B1 was computed from `pred.output`, the final full-resolution flow. The trajectory was computed from the coarse channel.** The two methods compared in the held-out table above were therefore not looking at the same thing, and the one that lost was the one looking at the lower-resolution signal. That is a defect in the comparison, not a finding about trajectories.
+
+#### What changes, and what does not
+
+Only which numbers fill `baseline_trajectory` and `candidate_trajectory`. The corrected channel is the mean magnitude of the change in the model's own full-resolution output per iteration: `upsample_flow` wrapped as a bound method, its cumulative outputs unpadded, differenced in FP32 from a flow of exactly zero, scale 1. RAFT initialises `coords1` equal to `coords0` and the adapter passes no `flow_init`, so T iterations give exactly T updates and there is no starting convention to choose.
+
+Both channels are recorded in the same inference pass. The per-case errors, the B1 tags, the splits, the checkpoint, the limits and the analysis code are the same objects in both documents. Every decision rule the product applies to an imported comparison reads the scalar magnitude sequence alone, so this is a one-list-per-case substitution and nothing else.
+
+#### Verified before any number was produced
+
+On real weights (`raft-things.pth`) at true KITTI geometry, 1242 by 375, which pads by 6 and 1 so the crop is not a no-op:
+
+| Check | Result |
+|---|---|
+| Output unchanged by instrumentation | Bitwise identical, by sha256 of the tensor bytes, not by aggregate EPE |
+| The corrected channel's last cumulative state is that output | Bitwise identical |
+| Differences sum back to the output | max abs error 7.5e-09 px on an 8 px field |
+| One value per iteration, per channel | 12 and 12 |
+
+Two defects in the harness were found by those checks rather than by inspection. The adapter's `infer` already attaches the coarse recorder, so attaching it again in the wrapper put two hooks on one module and recorded every coarse update twice, which depresses the reversal rate and inflates mean cosine. And the driver lent its recorder to the dual recorder, whose `reset()` then emptied it before `evaluate_model` read it, producing empty trajectories with no error raised anywhere. Both are fixed, and the count assert that caught the first is permanent.
+
+The mixed-precision arm cannot be validated off the GPU: `torch.cuda.amp.autocast` is a no-op on CPU, confirmed by byte-identical output digests with it enabled and disabled. Local validation covers the machinery and the truncation arm only.
+
+#### One threshold does not transfer
+
+`max_late_share` and `max_reversals` are scale-free, a ratio and a relative growth count, and carry over unchanged. `max_trajectory_regression` and `max_last_update` are in absolute trajectory units, and the corrected channel's magnitudes are systematically smaller than the coarse channel's. Reusing 0.3 would silently make the corrected channel a stricter test and confound the comparison.
+
+The headline measure, precision at 10 and at 20, is a ranking measure and does not depend on any threshold. Where flag rates are reported, the absolute threshold is re-derived on the **configuration half only**, by the identical procedure used for the coarse channel, and labelled as re-derived.
+
+#### Predictions, recorded before the run
+
+1. The corrected channel's per-iteration magnitudes are smaller than the coarse channel's on the same case, by a roughly constant within-case factor.
+2. Spearman rho between the two channels' `late_update` scores, across held-out cases, exceeds 0.8.
+3. **The corrected channel does not overturn the verdict.** On the restricted comparison, in both arms, corrected-RB AUROC does not exceed B1's by more than 0.02.
+
+Prediction 3 is the one that makes this worth running. It predicts that the fix fails to rescue the result.
+
+#### Decision rule
+
+If prediction 3 holds, the recorder gap is closed as a correctness matter and nothing else changes: the deployment wedge stays off the plan, and section 12's verdict stands with the defect named and measured rather than merely suspected.
+
+If prediction 3 fails, that is **hypothesis-generating only**. The splits have been examined and the outcome is known, so a corrected channel that wins here cannot be reported as a confirmation of H1. It licenses exactly one thing: a fresh pre-registered test on data not yet touched, with the corrected channel fixed in advance.
+
+#### Unconditional consequence
+
+Whatever the ablation returns, the recorder's documentation is wrong today. `recorder.py` and the adapter both describe the trajectory as the model's refinement, and for RAFT it is the movement of an internal field at one eighth resolution. That is a product correctness issue independent of whether the channel changes any ranking, and it is tracked in `claude/recorder-upsampling-gap.md`.
+
+#### Machine change
+
+The pod lost its GPUs between the frozen run and this one and its data was migrated, so the corrected channel will not be measured on the hardware that produced the table above. Gate 4's exactly-zero repeat variance was a property of that machine. The original coarse configuration is therefore re-run first on the new hardware and compared against the saved numbers. Exact reproduction strengthens gate 4; any difference is itself a finding and bears on `claude/cross-machine-reproduction.md`.

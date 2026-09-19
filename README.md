@@ -23,7 +23,11 @@ Everything runs locally and nothing leaves your machine. Every run leaves a rece
 
 **What it needs.** Either a checkpoint pair and a case set for a supported adapter (RAFT-family optical flow today; other models through a small custom adapter), or one lower-is-better error per case for both models from your own evaluator (any metric with a unit: endpoint error in px, depth error in cm, …), computed against the same ground truth and valid mask. Trajectories are recorded by the adapter with a forward hook, or by the one-line `TrajectoryRecorder` in your loop.
 
-**What it doesn't do.** Train anything, or certify a model. The stability limits are generic heuristics; a scorer fitted to your model is a separate, paid evaluation. For the cases it flags it renders the evidence (inputs, both flow fields, error maps, the per-iteration filmstrip) so the decision is a look, not a number.
+**What it doesn't do.** Train anything, or certify a model. The stability limits are generic heuristics; a scorer fitted to your model is a separate, paid evaluation. For the cases it flags it renders the evidence (inputs, where the two models disagree, both flow fields, error maps and the change in error, the per-iteration filmstrips) so the decision is a look, not a number.
+
+**What a flagged case looks like.** The one regression in a real review of raft-sintel against raft-things on KITTI-2015 ([examples/raft-kitti](examples/raft-kitti)): +0.41 px on this case, and the sheet shows it is one object, the pole nearest the camera, which both checkpoints keep moving through all twelve iterations.
+
+![Evidence sheet for case 000145_10: inputs, disagreement, flow fields, error maps, filmstrips, trajectory plot](examples/raft-kitti/rb-runs/20260918-1852-raft-sintel/evidence/000145_10/case-1400.jpg)
 
 **For coding agents.** `rb docs` prints [AGENTS.md](AGENTS.md): the workflow, the file format, the JSON output (`--json` on every command), exit codes and every error code with its fix. Tell your agent: *"Review candidate checkpoint B against A on this case set with Rabbit Brain."*
 

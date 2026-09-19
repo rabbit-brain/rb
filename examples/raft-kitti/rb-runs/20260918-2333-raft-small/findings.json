@@ -1,0 +1,4979 @@
+{
+ "run_id": "20260918-2333-raft-small",
+ "project": "raft-kitti",
+ "metric": {
+  "id": "mean_endpoint_error",
+  "name": "mean endpoint error",
+  "unit": "px",
+  "lower_is_better": true
+ },
+ "limits": {
+  "max_regression": 0.3,
+  "max_late_share": 0.25,
+  "max_reversals": 2,
+  "max_trajectory_regression": 0.3
+ },
+ "summary": {
+  "cases": 200,
+  "with_gt": 200,
+  "with_trajectories": 200,
+  "mean_error": {
+   "baseline": 5.403328458070755,
+   "candidate": 8.457151574641466,
+   "change_pct": 56.51744365103934
+  },
+  "regressions": 155,
+  "improved": 3,
+  "stable": 42,
+  "unstable": 39,
+  "improved_unstable": 0,
+  "settled_regressions": 116,
+  "flagged": 155,
+  "checks": {
+   "saved": 0,
+   "passing": 0,
+   "failing": 0,
+   "missing": 0,
+   "other_project": 0
+  }
+ },
+ "verdict": {
+  "status": "investigate",
+  "ready": false,
+  "line": "Not ready: 155 error regressions, 39 unstable cases. Start with 000095_10.",
+  "start": "000095_10",
+  "start_name": "000095_10"
+ },
+ "queue": [
+  {
+   "rank": 1,
+   "id": "000095_10",
+   "name": "000095_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 2.969816207885742,
+   "candidate_error": 25.176170349121094,
+   "error_change": 22.20635414123535,
+   "baseline_late_share": 0.05848588572774768,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.18791941775443688,
+   "candidate_reversals": 1,
+   "baseline_late_update": 0.4164333333333334,
+   "candidate_late_update": 1.3711666666666666,
+   "late_update_change": 0.9547333333333332,
+   "why": "Error increased by 22.21 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.371 per iteration at the end, 0.955 more than the current model on this case (0.416), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000095_10"
+  },
+  {
+   "rank": 2,
+   "id": "000190_10",
+   "name": "000190_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 15.03296947479248,
+   "candidate_error": 33.77643966674805,
+   "error_change": 18.743470191955566,
+   "baseline_late_share": 0.0812764822071426,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.14645272997052322,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.8182333333333334,
+   "candidate_late_update": 2.9431666666666665,
+   "late_update_change": 1.1249333333333331,
+   "why": "Error increased by 18.74 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.943 per iteration at the end, 1.125 more than the current model on this case (1.818), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000190_10"
+  },
+  {
+   "rank": 3,
+   "id": "000148_10",
+   "name": "000148_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 7.822656631469727,
+   "candidate_error": 21.868972778320312,
+   "error_change": 14.046316146850586,
+   "baseline_late_share": 0.1089375021779016,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.14703667030576928,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.7197333333333333,
+   "candidate_late_update": 2.081666666666667,
+   "late_update_change": 0.36193333333333366,
+   "why": "Error increased by 14.05 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.082 per iteration at the end, 0.362 more than the current model on this case (1.720), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000148_10"
+  },
+  {
+   "rank": 4,
+   "id": "000181_10",
+   "name": "000181_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 13.904749870300293,
+   "candidate_error": 25.59618377685547,
+   "error_change": 11.691433906555176,
+   "baseline_late_share": 0.07529751093217815,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.11365078086453939,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.2173999999999998,
+   "candidate_late_update": 1.5221,
+   "late_update_change": 0.3047000000000002,
+   "why": "Error increased by 11.69 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.522 per iteration at the end, 0.305 more than the current model on this case (1.217), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000181_10"
+  },
+  {
+   "rank": 5,
+   "id": "000185_10",
+   "name": "000185_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 7.062140464782715,
+   "candidate_error": 18.18599510192871,
+   "error_change": 11.123854637145996,
+   "baseline_late_share": 0.060019679370260134,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08926738892370843,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.1380333333333332,
+   "candidate_late_update": 1.5110000000000001,
+   "late_update_change": 0.3729666666666669,
+   "why": "Error increased by 11.12 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.511 per iteration at the end, 0.373 more than the current model on this case (1.138), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000185_10"
+  },
+  {
+   "rank": 6,
+   "id": "000179_10",
+   "name": "000179_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 11.611355781555176,
+   "candidate_error": 22.364046096801758,
+   "error_change": 10.752690315246582,
+   "baseline_late_share": 0.06296501193566936,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.1000423859283871,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.3266,
+   "candidate_late_update": 1.838566666666667,
+   "late_update_change": 0.5119666666666669,
+   "why": "Error increased by 10.75 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.839 per iteration at the end, 0.512 more than the current model on this case (1.327), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000179_10"
+  },
+  {
+   "rank": 7,
+   "id": "000192_10",
+   "name": "000192_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 14.420272827148438,
+   "candidate_error": 24.967790603637695,
+   "error_change": 10.547517776489258,
+   "baseline_late_share": 0.06218959295486366,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08834940779983573,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.1082,
+   "candidate_late_update": 1.5520333333333334,
+   "late_update_change": 0.4438333333333333,
+   "why": "Error increased by 10.55 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.552 per iteration at the end, 0.444 more than the current model on this case (1.108), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000192_10"
+  },
+  {
+   "rank": 8,
+   "id": "000081_10",
+   "name": "000081_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 6.679145336151123,
+   "candidate_error": 16.922082901000977,
+   "error_change": 10.242937564849854,
+   "baseline_late_share": 0.07897005435464481,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.11524925452658931,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.8689333333333332,
+   "candidate_late_update": 1.1701666666666666,
+   "late_update_change": 0.30123333333333335,
+   "why": "Error increased by 10.24 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.170 per iteration at the end, 0.301 more than the current model on this case (0.869), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000081_10"
+  },
+  {
+   "rank": 9,
+   "id": "000111_10",
+   "name": "000111_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 6.156408786773682,
+   "candidate_error": 16.052104949951172,
+   "error_change": 9.89569616317749,
+   "baseline_late_share": 0.06278202374410977,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.10697617144774935,
+   "candidate_reversals": 1,
+   "baseline_late_update": 0.6707666666666666,
+   "candidate_late_update": 1.0897,
+   "late_update_change": 0.41893333333333327,
+   "why": "Error increased by 9.90 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.090 per iteration at the end, 0.419 more than the current model on this case (0.671), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000111_10"
+  },
+  {
+   "rank": 10,
+   "id": "000194_10",
+   "name": "000194_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 11.967692375183105,
+   "candidate_error": 20.444576263427734,
+   "error_change": 8.476883888244629,
+   "baseline_late_share": 0.08619150226716492,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.13869948007279984,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.8255,
+   "candidate_late_update": 2.5386666666666664,
+   "late_update_change": 0.7131666666666665,
+   "why": "Error increased by 8.48 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.539 per iteration at the end, 0.713 more than the current model on this case (1.825), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000194_10"
+  },
+  {
+   "rank": 11,
+   "id": "000091_10",
+   "name": "000091_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 6.9073920249938965,
+   "candidate_error": 15.073295593261719,
+   "error_change": 8.165903568267822,
+   "baseline_late_share": 0.04417462794503864,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09720366464588465,
+   "candidate_reversals": 1,
+   "baseline_late_update": 0.27553333333333335,
+   "candidate_late_update": 0.5839333333333334,
+   "late_update_change": 0.30840000000000006,
+   "why": "Error increased by 8.17 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 0.584 per iteration at the end, 0.308 more than the current model on this case (0.276), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000091_10"
+  },
+  {
+   "rank": 12,
+   "id": "000101_10",
+   "name": "000101_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 11.570025444030762,
+   "candidate_error": 18.921321868896484,
+   "error_change": 7.351296424865723,
+   "baseline_late_share": 0.06600015785734957,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.11294047189400955,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.134566666666667,
+   "candidate_late_update": 1.8576333333333335,
+   "late_update_change": 0.7230666666666665,
+   "why": "Error increased by 7.35 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.858 per iteration at the end, 0.723 more than the current model on this case (1.135), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000101_10"
+  },
+  {
+   "rank": 13,
+   "id": "000039_10",
+   "name": "000039_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 4.179149150848389,
+   "candidate_error": 11.148223876953125,
+   "error_change": 6.969074726104736,
+   "baseline_late_share": 0.048446888451232524,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09770610340747378,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.5114333333333333,
+   "candidate_late_update": 1.0010333333333332,
+   "late_update_change": 0.4895999999999999,
+   "why": "Error increased by 6.97 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.001 per iteration at the end, 0.490 more than the current model on this case (0.511), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000039_10"
+  },
+  {
+   "rank": 14,
+   "id": "000078_10",
+   "name": "000078_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 6.816032409667969,
+   "candidate_error": 13.473527908325195,
+   "error_change": 6.657495498657227,
+   "baseline_late_share": 0.05497041825047748,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.10309497642429184,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6120333333333333,
+   "candidate_late_update": 1.1055333333333335,
+   "late_update_change": 0.49350000000000016,
+   "why": "Error increased by 6.66 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.106 per iteration at the end, 0.494 more than the current model on this case (0.612), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000078_10"
+  },
+  {
+   "rank": 15,
+   "id": "000195_10",
+   "name": "000195_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 22.959903717041016,
+   "candidate_error": 29.42088508605957,
+   "error_change": 6.460981369018555,
+   "baseline_late_share": 0.0904477770160306,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.16599135333290166,
+   "candidate_reversals": 0,
+   "baseline_late_update": 2.3635,
+   "candidate_late_update": 3.1496999999999997,
+   "late_update_change": 0.7861999999999996,
+   "why": "Error increased by 6.46 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 3.150 per iteration at the end, 0.786 more than the current model on this case (2.364), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000195_10"
+  },
+  {
+   "rank": 16,
+   "id": "000070_10",
+   "name": "000070_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 11.908393859863281,
+   "candidate_error": 18.304378509521484,
+   "error_change": 6.395984649658203,
+   "baseline_late_share": 0.06458484026174867,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.10129755306073869,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.9356,
+   "candidate_late_update": 1.4044333333333334,
+   "late_update_change": 0.46883333333333344,
+   "why": "Error increased by 6.40 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.404 per iteration at the end, 0.469 more than the current model on this case (0.936), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000070_10"
+  },
+  {
+   "rank": 17,
+   "id": "000068_10",
+   "name": "000068_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 10.171562194824219,
+   "candidate_error": 16.266677856445312,
+   "error_change": 6.095115661621094,
+   "baseline_late_share": 0.06593210931256666,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.1109888051895786,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.7609000000000001,
+   "candidate_late_update": 2.734766666666667,
+   "late_update_change": 0.9738666666666667,
+   "why": "Error increased by 6.10 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.735 per iteration at the end, 0.974 more than the current model on this case (1.761), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000068_10"
+  },
+  {
+   "rank": 18,
+   "id": "000182_10",
+   "name": "000182_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 14.922689437866211,
+   "candidate_error": 20.987775802612305,
+   "error_change": 6.065086364746094,
+   "baseline_late_share": 0.09751957611256852,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.1381590870223318,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.8871000000000002,
+   "candidate_late_update": 2.5174,
+   "late_update_change": 0.6302999999999996,
+   "why": "Error increased by 6.07 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.517 per iteration at the end, 0.630 more than the current model on this case (1.887), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000182_10"
+  },
+  {
+   "rank": 19,
+   "id": "000040_10",
+   "name": "000040_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 4.472812652587891,
+   "candidate_error": 10.313076972961426,
+   "error_change": 5.840264320373535,
+   "baseline_late_share": 0.04857096208350254,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09260203726800229,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.526,
+   "candidate_late_update": 0.9270666666666667,
+   "late_update_change": 0.4010666666666667,
+   "why": "Error increased by 5.84 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 0.927 per iteration at the end, 0.401 more than the current model on this case (0.526), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000040_10"
+  },
+  {
+   "rank": 20,
+   "id": "000129_10",
+   "name": "000129_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 6.101823329925537,
+   "candidate_error": 11.930994987487793,
+   "error_change": 5.829171657562256,
+   "baseline_late_share": 0.04562903517992944,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06671456042175311,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.8337,
+   "candidate_late_update": 1.1404666666666665,
+   "late_update_change": 0.3067666666666665,
+   "why": "Error increased by 5.83 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.140 per iteration at the end, 0.307 more than the current model on this case (0.834), above your 0.3 limit. The error regressed as well.",
+   "evidence": "evidence/000129_10"
+  },
+  {
+   "rank": 21,
+   "id": "000100_10",
+   "name": "000100_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 16.692935943603516,
+   "candidate_error": 22.454784393310547,
+   "error_change": 5.761848449707031,
+   "baseline_late_share": 0.07843506681792735,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.1253700818075575,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.3083,
+   "candidate_late_update": 1.8025,
+   "late_update_change": 0.4942,
+   "why": "Error increased by 5.76 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.802 per iteration at the end, 0.494 more than the current model on this case (1.308), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 22,
+   "id": "000041_10",
+   "name": "000041_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 5.713191509246826,
+   "candidate_error": 11.270061492919922,
+   "error_change": 5.556869983673096,
+   "baseline_late_share": 0.05183103698332124,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09884375204801005,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6702333333333333,
+   "candidate_late_update": 1.2337333333333333,
+   "late_update_change": 0.5635,
+   "why": "Error increased by 5.56 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.234 per iteration at the end, 0.564 more than the current model on this case (0.670), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 23,
+   "id": "000189_10",
+   "name": "000189_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 14.342205047607422,
+   "candidate_error": 19.414142608642578,
+   "error_change": 5.071937561035156,
+   "baseline_late_share": 0.06813057543378102,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09572670810808621,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.2521666666666667,
+   "candidate_late_update": 1.7506333333333333,
+   "late_update_change": 0.4984666666666666,
+   "why": "Error increased by 5.07 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.751 per iteration at the end, 0.498 more than the current model on this case (1.252), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 24,
+   "id": "000079_10",
+   "name": "000079_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 4.6808319091796875,
+   "candidate_error": 9.30372142791748,
+   "error_change": 4.622889518737793,
+   "baseline_late_share": 0.05806402028974369,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.11076591981760261,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6997,
+   "candidate_late_update": 1.2054333333333334,
+   "late_update_change": 0.5057333333333334,
+   "why": "Error increased by 4.62 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.205 per iteration at the end, 0.506 more than the current model on this case (0.700), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 25,
+   "id": "000175_10",
+   "name": "000175_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 11.553800582885742,
+   "candidate_error": 15.913412094116211,
+   "error_change": 4.359611511230469,
+   "baseline_late_share": 0.08364072840722803,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.11233943657548445,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.9838000000000002,
+   "candidate_late_update": 2.4437666666666664,
+   "late_update_change": 0.4599666666666662,
+   "why": "Error increased by 4.36 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.444 per iteration at the end, 0.460 more than the current model on this case (1.984), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 26,
+   "id": "000042_10",
+   "name": "000042_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 7.940474033355713,
+   "candidate_error": 12.151949882507324,
+   "error_change": 4.211475849151611,
+   "baseline_late_share": 0.043543876435742146,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09703418421899496,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.5016666666666666,
+   "candidate_late_update": 1.0556333333333334,
+   "late_update_change": 0.5539666666666668,
+   "why": "Error increased by 4.21 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.056 per iteration at the end, 0.554 more than the current model on this case (0.502), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 27,
+   "id": "000036_10",
+   "name": "000036_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 2.582005500793457,
+   "candidate_error": 6.664639472961426,
+   "error_change": 4.082633972167969,
+   "baseline_late_share": 0.035715408177820325,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0749005539239377,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.33263333333333334,
+   "candidate_late_update": 0.7338999999999999,
+   "late_update_change": 0.40126666666666655,
+   "why": "Error increased by 4.08 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 0.734 per iteration at the end, 0.401 more than the current model on this case (0.333), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 28,
+   "id": "000038_10",
+   "name": "000038_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 3.8015835285186768,
+   "candidate_error": 7.371984958648682,
+   "error_change": 3.570401430130005,
+   "baseline_late_share": 0.04007249252473891,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07690103471557097,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.4365666666666666,
+   "candidate_late_update": 0.8968666666666666,
+   "late_update_change": 0.4603,
+   "why": "Error increased by 3.57 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 0.897 per iteration at the end, 0.460 more than the current model on this case (0.437), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 29,
+   "id": "000069_10",
+   "name": "000069_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 8.662200927734375,
+   "candidate_error": 12.210087776184082,
+   "error_change": 3.547886848449707,
+   "baseline_late_share": 0.04684822206609471,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07230067213418019,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.1001,
+   "candidate_late_update": 1.4783666666666668,
+   "late_update_change": 0.37826666666666675,
+   "why": "Error increased by 3.55 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.478 per iteration at the end, 0.378 more than the current model on this case (1.100), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 30,
+   "id": "000055_10",
+   "name": "000055_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 5.877972602844238,
+   "candidate_error": 9.358919143676758,
+   "error_change": 3.4809465408325195,
+   "baseline_late_share": 0.053729811563995526,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09305914575793908,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.1105,
+   "candidate_late_update": 2.0482333333333336,
+   "late_update_change": 0.9377333333333335,
+   "why": "Error increased by 3.48 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.048 per iteration at the end, 0.938 more than the current model on this case (1.111), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 31,
+   "id": "000193_10",
+   "name": "000193_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 20.64100456237793,
+   "candidate_error": 23.975156784057617,
+   "error_change": 3.3341522216796875,
+   "baseline_late_share": 0.10282353875206282,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.14476923076923073,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.8756000000000002,
+   "candidate_late_update": 2.5719333333333334,
+   "late_update_change": 0.6963333333333332,
+   "why": "Error increased by 3.33 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.572 per iteration at the end, 0.696 more than the current model on this case (1.876), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 32,
+   "id": "000061_10",
+   "name": "000061_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 15.94506549835205,
+   "candidate_error": 19.21702003479004,
+   "error_change": 3.2719545364379883,
+   "baseline_late_share": 0.05673753494187992,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09381344040315064,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.4342666666666666,
+   "candidate_late_update": 2.1819,
+   "late_update_change": 0.7476333333333336,
+   "why": "Error increased by 3.27 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.182 per iteration at the end, 0.748 more than the current model on this case (1.434), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 33,
+   "id": "000056_10",
+   "name": "000056_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 6.870842933654785,
+   "candidate_error": 9.777726173400879,
+   "error_change": 2.9068832397460938,
+   "baseline_late_share": 0.0346202134033901,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06213441496277728,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.8259333333333334,
+   "candidate_late_update": 1.3072333333333332,
+   "late_update_change": 0.48129999999999984,
+   "why": "Error increased by 2.91 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.307 per iteration at the end, 0.481 more than the current model on this case (0.826), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 34,
+   "id": "000177_10",
+   "name": "000177_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 4.103287220001221,
+   "candidate_error": 6.6275248527526855,
+   "error_change": 2.524237632751465,
+   "baseline_late_share": 0.03238966230305338,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06334641617089971,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.33873333333333333,
+   "candidate_late_update": 0.6562666666666667,
+   "late_update_change": 0.31753333333333333,
+   "why": "Error increased by 2.52 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 0.656 per iteration at the end, 0.318 more than the current model on this case (0.339), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 35,
+   "id": "000037_10",
+   "name": "000037_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 3.6672728061676025,
+   "candidate_error": 5.424849987030029,
+   "error_change": 1.7575771808624268,
+   "baseline_late_share": 0.02928370815226057,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06416639542219704,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.32103333333333334,
+   "candidate_late_update": 0.7208666666666667,
+   "late_update_change": 0.3998333333333333,
+   "why": "Error increased by 1.76 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 0.721 per iteration at the end, 0.400 more than the current model on this case (0.321), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 36,
+   "id": "000105_10",
+   "name": "000105_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 6.017764091491699,
+   "candidate_error": 7.481773853302002,
+   "error_change": 1.4640097618103027,
+   "baseline_late_share": 0.051355474615802414,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.10057149526852063,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.5734,
+   "candidate_late_update": 1.1058000000000001,
+   "late_update_change": 0.5324000000000001,
+   "why": "Error increased by 1.46 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 1.106 per iteration at the end, 0.532 more than the current model on this case (0.573), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 37,
+   "id": "000145_10",
+   "name": "000145_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 5.479552268981934,
+   "candidate_error": 6.783190727233887,
+   "error_change": 1.3036384582519531,
+   "baseline_late_share": 0.0702289749109512,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.1353014063145351,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.1822000000000001,
+   "candidate_late_update": 2.0993,
+   "late_update_change": 0.9170999999999998,
+   "why": "Error increased by 1.30 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 2.099 per iteration at the end, 0.917 more than the current model on this case (1.182), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 38,
+   "id": "000085_10",
+   "name": "000085_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 1.409423828125,
+   "candidate_error": 2.365980386734009,
+   "error_change": 0.9565565586090088,
+   "baseline_late_share": 0.03924406941774215,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08287317447203085,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.28376666666666667,
+   "candidate_late_update": 0.6394333333333333,
+   "late_update_change": 0.35566666666666663,
+   "why": "Error increased by 0.96 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 0.639 per iteration at the end, 0.356 more than the current model on this case (0.284), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 39,
+   "id": "000008_10",
+   "name": "000008_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "unstable",
+    "trajectory_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "unstable",
+   "baseline_error": 1.0277788639068604,
+   "candidate_error": 1.3322786092758179,
+   "error_change": 0.3044997453689575,
+   "baseline_late_share": 0.05590884129599121,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.12443672294912865,
+   "candidate_reversals": 2,
+   "baseline_late_update": 0.4756666666666667,
+   "candidate_late_update": 0.9704333333333334,
+   "late_update_change": 0.4947666666666667,
+   "why": "Error increased by 0.30 px, exceeding your 0.3 px limit. The candidate was still moving its answer by 0.970 per iteration at the end, 0.495 more than the current model on this case (0.476), above your 0.3 limit. The error regressed as well."
+  },
+  {
+   "rank": 40,
+   "id": "000103_10",
+   "name": "000103_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 17.44735336303711,
+   "candidate_error": 41.855892181396484,
+   "error_change": 24.408538818359375,
+   "baseline_late_share": 0.08059214330987706,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.10734738181682074,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.5691999999999997,
+   "candidate_late_update": 1.7088,
+   "late_update_change": 0.1396000000000004,
+   "why": "Error increased by 24.41 px, exceeding your 0.3 px limit. The candidate settled: 11% late revision, 0 reversals. Current model: 8%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 41,
+   "id": "000090_10",
+   "name": "000090_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 7.313191890716553,
+   "candidate_error": 21.632213592529297,
+   "error_change": 14.319021701812744,
+   "baseline_late_share": 0.0973049619269476,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.1191072073540646,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.7468666666666667,
+   "candidate_late_update": 0.7719333333333332,
+   "late_update_change": 0.02506666666666657,
+   "why": "Error increased by 14.32 px, exceeding your 0.3 px limit. The candidate settled: 12% late revision, 0 reversals. Current model: 10%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 42,
+   "id": "000062_10",
+   "name": "000062_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 10.415212631225586,
+   "candidate_error": 22.02665138244629,
+   "error_change": 11.611438751220703,
+   "baseline_late_share": 0.0720593043859885,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.11137249108609429,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.8779666666666663,
+   "candidate_late_update": 2.1571666666666665,
+   "late_update_change": 0.2792000000000001,
+   "why": "Error increased by 11.61 px, exceeding your 0.3 px limit. The candidate settled: 11% late revision, 0 reversals. Current model: 7%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 43,
+   "id": "000102_10",
+   "name": "000102_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 19.936403274536133,
+   "candidate_error": 30.951786041259766,
+   "error_change": 11.015382766723633,
+   "baseline_late_share": 0.10159022139016481,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08352307621606042,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.2565666666666668,
+   "candidate_late_update": 0.9432,
+   "late_update_change": -0.3133666666666668,
+   "why": "Error increased by 11.02 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 0 reversals. Current model: 10%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 44,
+   "id": "000146_10",
+   "name": "000146_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 6.634052753448486,
+   "candidate_error": 16.25168228149414,
+   "error_change": 9.617629528045654,
+   "baseline_late_share": 0.07587657665996315,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09079477884490567,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.0053666666666665,
+   "candidate_late_update": 1.0781,
+   "late_update_change": 0.07273333333333354,
+   "why": "Error increased by 9.62 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 8%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 45,
+   "id": "000180_10",
+   "name": "000180_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 15.673873901367188,
+   "candidate_error": 25.28683853149414,
+   "error_change": 9.612964630126953,
+   "baseline_late_share": 0.09675477701587516,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.10110631848915833,
+   "candidate_reversals": 0,
+   "baseline_late_update": 2.1873666666666662,
+   "candidate_late_update": 2.0302000000000002,
+   "late_update_change": -0.157166666666666,
+   "why": "Error increased by 9.61 px, exceeding your 0.3 px limit. The candidate settled: 10% late revision, 0 reversals. Current model: 10%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 46,
+   "id": "000147_10",
+   "name": "000147_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 12.036588668823242,
+   "candidate_error": 21.4328670501709,
+   "error_change": 9.396278381347656,
+   "baseline_late_share": 0.06314031068000364,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08616806247959471,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.8522666666666666,
+   "candidate_late_update": 1.1158000000000001,
+   "late_update_change": 0.2635333333333335,
+   "why": "Error increased by 9.40 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 47,
+   "id": "000184_10",
+   "name": "000184_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 8.34878158569336,
+   "candidate_error": 17.458154678344727,
+   "error_change": 9.109373092651367,
+   "baseline_late_share": 0.06463518589641508,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08544086314979353,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.3497666666666666,
+   "candidate_late_update": 1.6472,
+   "late_update_change": 0.29743333333333344,
+   "why": "Error increased by 9.11 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 48,
+   "id": "000073_10",
+   "name": "000073_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 9.759512901306152,
+   "candidate_error": 18.798934936523438,
+   "error_change": 9.039422035217285,
+   "baseline_late_share": 0.0565024692373281,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07359498004558168,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.5915333333333334,
+   "candidate_late_update": 0.6945333333333332,
+   "late_update_change": 0.10299999999999987,
+   "why": "Error increased by 9.04 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 49,
+   "id": "000188_10",
+   "name": "000188_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 34.532108306884766,
+   "candidate_error": 43.53651428222656,
+   "error_change": 9.004405975341797,
+   "baseline_late_share": 0.14305705251499107,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.1470881482387794,
+   "candidate_reversals": 1,
+   "baseline_late_update": 1.7238666666666667,
+   "candidate_late_update": 1.3699000000000001,
+   "late_update_change": -0.35396666666666654,
+   "why": "Error increased by 9.00 px, exceeding your 0.3 px limit. The candidate settled: 15% late revision, 1 reversal. Current model: 14%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 50,
+   "id": "000110_10",
+   "name": "000110_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.2479896545410156,
+   "candidate_error": 11.436135292053223,
+   "error_change": 8.188145637512207,
+   "baseline_late_share": 0.054953780595128586,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07646768979317141,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.5436,
+   "candidate_late_update": 0.7157999999999999,
+   "late_update_change": 0.1721999999999999,
+   "why": "Error increased by 8.19 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 51,
+   "id": "000080_10",
+   "name": "000080_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 5.31690788269043,
+   "candidate_error": 13.41322135925293,
+   "error_change": 8.0963134765625,
+   "baseline_late_share": 0.08367514873968507,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09568309304609043,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.9085666666666667,
+   "candidate_late_update": 0.9408,
+   "late_update_change": 0.032233333333333225,
+   "why": "Error increased by 8.10 px, exceeding your 0.3 px limit. The candidate settled: 10% late revision, 0 reversals. Current model: 8%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 52,
+   "id": "000191_10",
+   "name": "000191_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 18.669818878173828,
+   "candidate_error": 25.539613723754883,
+   "error_change": 6.869794845581055,
+   "baseline_late_share": 0.0903712891121741,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08726093484798136,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.7709666666666666,
+   "candidate_late_update": 1.4432666666666665,
+   "late_update_change": -0.3277000000000001,
+   "why": "Error increased by 6.87 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 9%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 53,
+   "id": "000174_10",
+   "name": "000174_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 12.903615951538086,
+   "candidate_error": 19.654735565185547,
+   "error_change": 6.751119613647461,
+   "baseline_late_share": 0.0511810057121889,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.057703322891106176,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.9111000000000001,
+   "candidate_late_update": 0.9278000000000001,
+   "late_update_change": 0.016699999999999937,
+   "why": "Error increased by 6.75 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 54,
+   "id": "000183_10",
+   "name": "000183_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 11.038320541381836,
+   "candidate_error": 17.707008361816406,
+   "error_change": 6.66868782043457,
+   "baseline_late_share": 0.07183150228932579,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0836892090713043,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.6725666666666665,
+   "candidate_late_update": 1.7449666666666668,
+   "late_update_change": 0.07240000000000024,
+   "why": "Error increased by 6.67 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 0 reversals. Current model: 7%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 55,
+   "id": "000072_10",
+   "name": "000072_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 19.76302146911621,
+   "candidate_error": 26.276729583740234,
+   "error_change": 6.513708114624023,
+   "baseline_late_share": 0.11768208765615078,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.12038187044685926,
+   "candidate_reversals": 0,
+   "baseline_late_update": 2.8378666666666668,
+   "candidate_late_update": 2.2662666666666667,
+   "late_update_change": -0.5716000000000001,
+   "why": "Error increased by 6.51 px, exceeding your 0.3 px limit. The candidate settled: 12% late revision, 0 reversals. Current model: 12%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 56,
+   "id": "000196_10",
+   "name": "000196_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 16.629596710205078,
+   "candidate_error": 23.054323196411133,
+   "error_change": 6.424726486206055,
+   "baseline_late_share": 0.05100408167674147,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05893142239831085,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.8459666666666665,
+   "candidate_late_update": 0.9591000000000002,
+   "late_update_change": 0.11313333333333364,
+   "why": "Error increased by 6.42 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 57,
+   "id": "000107_10",
+   "name": "000107_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 4.755617141723633,
+   "candidate_error": 10.823690414428711,
+   "error_change": 6.068073272705078,
+   "baseline_late_share": 0.07758383828834282,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08753984054134893,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.1703999999999999,
+   "candidate_late_update": 1.252033333333333,
+   "late_update_change": 0.08163333333333322,
+   "why": "Error increased by 6.07 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 8%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 58,
+   "id": "000074_10",
+   "name": "000074_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 10.565873146057129,
+   "candidate_error": 16.519243240356445,
+   "error_change": 5.953370094299316,
+   "baseline_late_share": 0.06264041302073806,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07449388640106103,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.8018666666666666,
+   "candidate_late_update": 0.9122333333333333,
+   "late_update_change": 0.11036666666666672,
+   "why": "Error increased by 5.95 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 59,
+   "id": "000108_10",
+   "name": "000108_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 4.600449562072754,
+   "candidate_error": 10.199773788452148,
+   "error_change": 5.5993242263793945,
+   "baseline_late_share": 0.057849599280952735,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08354443069259213,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.7377666666666666,
+   "candidate_late_update": 1.0009000000000001,
+   "late_update_change": 0.26313333333333355,
+   "why": "Error increased by 5.60 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 60,
+   "id": "000063_10",
+   "name": "000063_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 10.111893653869629,
+   "candidate_error": 15.679174423217773,
+   "error_change": 5.5672807693481445,
+   "baseline_late_share": 0.053297548747975515,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06999157102295589,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.0188,
+   "candidate_late_update": 1.1412333333333333,
+   "late_update_change": 0.1224333333333334,
+   "why": "Error increased by 5.57 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 61,
+   "id": "000109_10",
+   "name": "000109_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.8813014030456543,
+   "candidate_error": 9.412028312683105,
+   "error_change": 5.530726909637451,
+   "baseline_late_share": 0.04416186019291836,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06982299617261757,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.48836666666666667,
+   "candidate_late_update": 0.7682666666666668,
+   "late_update_change": 0.2799000000000001,
+   "why": "Error increased by 5.53 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 62,
+   "id": "000197_10",
+   "name": "000197_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 4.595503330230713,
+   "candidate_error": 10.083843231201172,
+   "error_change": 5.488339900970459,
+   "baseline_late_share": 0.062207841515584616,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09790985091377623,
+   "candidate_reversals": 1,
+   "baseline_late_update": 0.5915333333333334,
+   "candidate_late_update": 0.8526333333333334,
+   "late_update_change": 0.2611,
+   "why": "Error increased by 5.49 px, exceeding your 0.3 px limit. The candidate settled: 10% late revision, 1 reversal. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 63,
+   "id": "000064_10",
+   "name": "000064_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 7.498568058013916,
+   "candidate_error": 12.776016235351562,
+   "error_change": 5.2774481773376465,
+   "baseline_late_share": 0.04780820236323009,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05852083068034489,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.1711333333333334,
+   "candidate_late_update": 1.3201,
+   "late_update_change": 0.1489666666666667,
+   "why": "Error increased by 5.28 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 64,
+   "id": "000198_10",
+   "name": "000198_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 4.004069805145264,
+   "candidate_error": 9.1074857711792,
+   "error_change": 5.1034159660339355,
+   "baseline_late_share": 0.08047551191274889,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.09754676470673918,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6351666666666667,
+   "candidate_late_update": 0.7967333333333334,
+   "late_update_change": 0.16156666666666675,
+   "why": "Error increased by 5.10 px, exceeding your 0.3 px limit. The candidate settled: 10% late revision, 0 reversals. Current model: 8%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 65,
+   "id": "000178_10",
+   "name": "000178_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.119663953781128,
+   "candidate_error": 7.785512924194336,
+   "error_change": 4.665848970413208,
+   "baseline_late_share": 0.03839694480870545,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06561551526301543,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.41913333333333336,
+   "candidate_late_update": 0.6314666666666667,
+   "late_update_change": 0.21233333333333337,
+   "why": "Error increased by 4.67 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 66,
+   "id": "000106_10",
+   "name": "000106_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.789095401763916,
+   "candidate_error": 8.397415161132812,
+   "error_change": 4.6083197593688965,
+   "baseline_late_share": 0.06375847872368787,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08595224128203499,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.7650333333333333,
+   "candidate_late_update": 1.0203333333333333,
+   "late_update_change": 0.25529999999999997,
+   "why": "Error increased by 4.61 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 67,
+   "id": "000066_10",
+   "name": "000066_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 8.731575965881348,
+   "candidate_error": 12.939570426940918,
+   "error_change": 4.20799446105957,
+   "baseline_late_share": 0.04743213221083778,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05767180031294878,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.8677666666666667,
+   "candidate_late_update": 1.0351,
+   "late_update_change": 0.16733333333333322,
+   "why": "Error increased by 4.21 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 68,
+   "id": "000033_10",
+   "name": "000033_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 6.81406831741333,
+   "candidate_error": 11.007067680358887,
+   "error_change": 4.192999362945557,
+   "baseline_late_share": 0.06964055858125033,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08001458824206885,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.9948666666666667,
+   "candidate_late_update": 1.1113000000000002,
+   "late_update_change": 0.1164333333333335,
+   "why": "Error increased by 4.19 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 0 reversals. Current model: 7%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 69,
+   "id": "000186_10",
+   "name": "000186_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.768380641937256,
+   "candidate_error": 7.8801093101501465,
+   "error_change": 4.111728668212891,
+   "baseline_late_share": 0.044025951289147464,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06166595659882082,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.5996333333333334,
+   "candidate_late_update": 0.8486333333333334,
+   "late_update_change": 0.249,
+   "why": "Error increased by 4.11 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 70,
+   "id": "000099_10",
+   "name": "000099_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 13.4274263381958,
+   "candidate_error": 17.457639694213867,
+   "error_change": 4.030213356018066,
+   "baseline_late_share": 0.061522870268447924,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07242433334367934,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.4100666666666666,
+   "candidate_late_update": 1.4145666666666667,
+   "late_update_change": 0.0045000000000001705,
+   "why": "Error increased by 4.03 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 71,
+   "id": "000176_10",
+   "name": "000176_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 31.11260414123535,
+   "candidate_error": 34.956573486328125,
+   "error_change": 3.8439693450927734,
+   "baseline_late_share": 0.08233594391460873,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.11684071112016711,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.9875333333333334,
+   "candidate_late_update": 1.1132,
+   "late_update_change": 0.1256666666666666,
+   "why": "Error increased by 3.84 px, exceeding your 0.3 px limit. The candidate settled: 12% late revision, 0 reversals. Current model: 8%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 72,
+   "id": "000032_10",
+   "name": "000032_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 7.749165058135986,
+   "candidate_error": 11.320103645324707,
+   "error_change": 3.5709385871887207,
+   "baseline_late_share": 0.05128251019415882,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07280146279171303,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.7681666666666667,
+   "candidate_late_update": 0.9928333333333335,
+   "late_update_change": 0.2246666666666668,
+   "why": "Error increased by 3.57 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 73,
+   "id": "000045_10",
+   "name": "000045_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 6.25727653503418,
+   "candidate_error": 9.8273344039917,
+   "error_change": 3.5700578689575195,
+   "baseline_late_share": 0.05762379764873531,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09504463129136341,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.12113333333333336,
+   "candidate_late_update": 0.19510000000000002,
+   "late_update_change": 0.07396666666666667,
+   "why": "Error increased by 3.57 px, exceeding your 0.3 px limit. The candidate settled: 10% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 74,
+   "id": "000029_10",
+   "name": "000029_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 10.16806411743164,
+   "candidate_error": 13.70083236694336,
+   "error_change": 3.5327682495117188,
+   "baseline_late_share": 0.06972343355331506,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0924487518335159,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.9933333333333332,
+   "candidate_late_update": 1.2929333333333333,
+   "late_update_change": 0.2996000000000001,
+   "why": "Error increased by 3.53 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 7%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 75,
+   "id": "000077_10",
+   "name": "000077_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.440099000930786,
+   "candidate_error": 6.886861324310303,
+   "error_change": 3.4467623233795166,
+   "baseline_late_share": 0.04795822056875908,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06852476208087098,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.4597666666666667,
+   "candidate_late_update": 0.6338666666666667,
+   "late_update_change": 0.17409999999999998,
+   "why": "Error increased by 3.45 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 76,
+   "id": "000187_10",
+   "name": "000187_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 6.365399360656738,
+   "candidate_error": 9.665152549743652,
+   "error_change": 3.299753189086914,
+   "baseline_late_share": 0.05901193777141036,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07278679450845485,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.7907666666666667,
+   "candidate_late_update": 0.9536000000000001,
+   "late_update_change": 0.16283333333333339,
+   "why": "Error increased by 3.30 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 77,
+   "id": "000167_10",
+   "name": "000167_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.8933414220809937,
+   "candidate_error": 4.04173469543457,
+   "error_change": 3.1483932733535767,
+   "baseline_late_share": 0.033546867320826346,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07645519254445683,
+   "candidate_reversals": 2,
+   "baseline_late_update": 0.08946666666666665,
+   "candidate_late_update": 0.24339999999999998,
+   "late_update_change": 0.1539333333333333,
+   "why": "Error increased by 3.15 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 2 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 78,
+   "id": "000006_10",
+   "name": "000006_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 11.250314712524414,
+   "candidate_error": 14.31790828704834,
+   "error_change": 3.067593574523926,
+   "baseline_late_share": 0.04884568417611368,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05318599873046506,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.5694333333333333,
+   "candidate_late_update": 0.6230666666666667,
+   "late_update_change": 0.05363333333333331,
+   "why": "Error increased by 3.07 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 79,
+   "id": "000060_10",
+   "name": "000060_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 8.739063262939453,
+   "candidate_error": 11.775466918945312,
+   "error_change": 3.0364036560058594,
+   "baseline_late_share": 0.05818505193098527,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07361330304279208,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.1531333333333333,
+   "candidate_late_update": 1.3501666666666665,
+   "late_update_change": 0.19703333333333317,
+   "why": "Error increased by 3.04 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 80,
+   "id": "000000_10",
+   "name": "000000_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 8.890178680419922,
+   "candidate_error": 11.607627868652344,
+   "error_change": 2.717449188232422,
+   "baseline_late_share": 0.09651444141689372,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.1149199865534279,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.9966333333333335,
+   "candidate_late_update": 2.0936,
+   "late_update_change": 0.09696666666666642,
+   "why": "Error increased by 2.72 px, exceeding your 0.3 px limit. The candidate settled: 11% late revision, 0 reversals. Current model: 10%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 81,
+   "id": "000158_10",
+   "name": "000158_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3734045028686523,
+   "candidate_error": 5.837948322296143,
+   "error_change": 2.4645438194274902,
+   "baseline_late_share": 0.03786268925669765,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.050318665910242276,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.5006666666666666,
+   "candidate_late_update": 0.5840666666666666,
+   "late_update_change": 0.08340000000000003,
+   "why": "Error increased by 2.46 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 82,
+   "id": "000120_10",
+   "name": "000120_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 4.565627574920654,
+   "candidate_error": 7.027122497558594,
+   "error_change": 2.4614949226379395,
+   "baseline_late_share": 0.054774644055500143,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06925743121776934,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6534666666666666,
+   "candidate_late_update": 0.84,
+   "late_update_change": 0.18653333333333333,
+   "why": "Error increased by 2.46 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 83,
+   "id": "000076_10",
+   "name": "000076_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.9495556354522705,
+   "candidate_error": 4.250463485717773,
+   "error_change": 2.300907850265503,
+   "baseline_late_share": 0.03528926472104775,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06780693639009862,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.2795,
+   "candidate_late_update": 0.5338666666666666,
+   "late_update_change": 0.2543666666666666,
+   "why": "Error increased by 2.30 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 84,
+   "id": "000075_10",
+   "name": "000075_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8744161128997803,
+   "candidate_error": 4.129085540771484,
+   "error_change": 2.254669427871704,
+   "baseline_late_share": 0.047371097159419985,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07545096276645304,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.3991,
+   "candidate_late_update": 0.6524,
+   "late_update_change": 0.25329999999999997,
+   "why": "Error increased by 2.25 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 85,
+   "id": "000093_10",
+   "name": "000093_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3378467559814453,
+   "candidate_error": 5.590907573699951,
+   "error_change": 2.253060817718506,
+   "baseline_late_share": 0.02572932582123759,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0675775842335321,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.0974,
+   "candidate_late_update": 0.26526666666666665,
+   "late_update_change": 0.16786666666666666,
+   "why": "Error increased by 2.25 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 86,
+   "id": "000035_10",
+   "name": "000035_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.296489953994751,
+   "candidate_error": 4.543915271759033,
+   "error_change": 2.2474253177642822,
+   "baseline_late_share": 0.037857717875056866,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05209399002939218,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.3307666666666667,
+   "candidate_late_update": 0.44353333333333333,
+   "late_update_change": 0.11276666666666663,
+   "why": "Error increased by 2.25 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 87,
+   "id": "000028_10",
+   "name": "000028_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 5.066643714904785,
+   "candidate_error": 7.294051170349121,
+   "error_change": 2.227407455444336,
+   "baseline_late_share": 0.038910892571952946,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05449792554959599,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6446000000000001,
+   "candidate_late_update": 0.9177,
+   "late_update_change": 0.2730999999999999,
+   "why": "Error increased by 2.23 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 88,
+   "id": "000071_10",
+   "name": "000071_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3351755142211914,
+   "candidate_error": 5.548601150512695,
+   "error_change": 2.213425636291504,
+   "baseline_late_share": 0.07008107863163253,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07575139042340032,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.45693333333333325,
+   "candidate_late_update": 0.4709666666666667,
+   "late_update_change": 0.014033333333333453,
+   "why": "Error increased by 2.21 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 0 reversals. Current model: 7%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 89,
+   "id": "000128_10",
+   "name": "000128_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.2717485427856445,
+   "candidate_error": 4.451934814453125,
+   "error_change": 2.1801862716674805,
+   "baseline_late_share": 0.02389838113484371,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03823219175406384,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.3016333333333333,
+   "candidate_late_update": 0.49069999999999997,
+   "late_update_change": 0.18906666666666666,
+   "why": "Error increased by 2.18 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 2%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 90,
+   "id": "000054_10",
+   "name": "000054_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 4.068434715270996,
+   "candidate_error": 6.180168151855469,
+   "error_change": 2.1117334365844727,
+   "baseline_late_share": 0.036827481106994214,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04648819639002436,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6627666666666667,
+   "candidate_late_update": 0.7277999999999999,
+   "late_update_change": 0.06503333333333317,
+   "why": "Error increased by 2.11 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 91,
+   "id": "000157_10",
+   "name": "000157_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 5.443268299102783,
+   "candidate_error": 7.489826679229736,
+   "error_change": 2.046558380126953,
+   "baseline_late_share": 0.03702056661544366,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04756098439548722,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.49843333333333334,
+   "candidate_late_update": 0.6153666666666666,
+   "late_update_change": 0.11693333333333328,
+   "why": "Error increased by 2.05 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 92,
+   "id": "000001_10",
+   "name": "000001_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 5.747848033905029,
+   "candidate_error": 7.7060136795043945,
+   "error_change": 1.9581656455993652,
+   "baseline_late_share": 0.062195417249423415,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06146759897391779,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.0699666666666667,
+   "candidate_late_update": 0.9104666666666666,
+   "late_update_change": -0.1595000000000001,
+   "why": "Error increased by 1.96 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 93,
+   "id": "000067_10",
+   "name": "000067_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 8.94271183013916,
+   "candidate_error": 10.836525917053223,
+   "error_change": 1.8938140869140625,
+   "baseline_late_share": 0.04348689214825348,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0632937026545255,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.9737999999999999,
+   "candidate_late_update": 1.2659333333333331,
+   "late_update_change": 0.29213333333333324,
+   "why": "Error increased by 1.89 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 94,
+   "id": "000172_10",
+   "name": "000172_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.5809483528137207,
+   "candidate_error": 3.4513254165649414,
+   "error_change": 1.8703770637512207,
+   "baseline_late_share": 0.026699904960840813,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04246425590594041,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.22663333333333333,
+   "candidate_late_update": 0.4061666666666666,
+   "late_update_change": 0.1795333333333333,
+   "why": "Error increased by 1.87 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 95,
+   "id": "000020_10",
+   "name": "000020_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 4.332778453826904,
+   "candidate_error": 6.17415189743042,
+   "error_change": 1.8413734436035156,
+   "baseline_late_share": 0.04049477056883457,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.0607984358284554,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.3435333333333333,
+   "candidate_late_update": 0.5982333333333333,
+   "late_update_change": 0.2547,
+   "why": "Error increased by 1.84 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 96,
+   "id": "000030_10",
+   "name": "000030_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 7.5607008934021,
+   "candidate_error": 9.398462295532227,
+   "error_change": 1.837761402130127,
+   "baseline_late_share": 0.12453656242085079,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.12025085303126204,
+   "candidate_reversals": 0,
+   "baseline_late_update": 2.5946666666666665,
+   "candidate_late_update": 1.8334333333333335,
+   "late_update_change": -0.761233333333333,
+   "why": "Error increased by 1.84 px, exceeding your 0.3 px limit. The candidate settled: 12% late revision, 0 reversals. Current model: 12%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 97,
+   "id": "000143_10",
+   "name": "000143_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.6187334060668945,
+   "candidate_error": 5.396611213684082,
+   "error_change": 1.7778778076171875,
+   "baseline_late_share": 0.054162301041372464,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06109439213021389,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6837666666666666,
+   "candidate_late_update": 0.6993333333333333,
+   "late_update_change": 0.015566666666666618,
+   "why": "Error increased by 1.78 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 98,
+   "id": "000031_10",
+   "name": "000031_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 5.637719631195068,
+   "candidate_error": 7.37445068359375,
+   "error_change": 1.7367310523986816,
+   "baseline_late_share": 0.05823838787180397,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08725977604712089,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.8269333333333333,
+   "candidate_late_update": 1.1188,
+   "late_update_change": 0.2918666666666667,
+   "why": "Error increased by 1.74 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 99,
+   "id": "000136_10",
+   "name": "000136_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 6.477309703826904,
+   "candidate_error": 8.211824417114258,
+   "error_change": 1.7345147132873535,
+   "baseline_late_share": 0.030458008113210058,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05117169608114187,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.15506666666666669,
+   "candidate_late_update": 0.29033333333333333,
+   "late_update_change": 0.13526666666666665,
+   "why": "Error increased by 1.73 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 100,
+   "id": "000034_10",
+   "name": "000034_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.11971378326416,
+   "candidate_error": 3.831871509552002,
+   "error_change": 1.7121577262878418,
+   "baseline_late_share": 0.031184277531151196,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05734323952722732,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.24146666666666664,
+   "candidate_late_update": 0.5346000000000001,
+   "late_update_change": 0.29313333333333347,
+   "why": "Error increased by 1.71 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 101,
+   "id": "000027_10",
+   "name": "000027_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 5.004621982574463,
+   "candidate_error": 6.703351974487305,
+   "error_change": 1.6987299919128418,
+   "baseline_late_share": 0.043424688766822934,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05285267317352879,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6015,
+   "candidate_late_update": 0.7573333333333334,
+   "late_update_change": 0.15583333333333338,
+   "why": "Error increased by 1.70 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 102,
+   "id": "000142_10",
+   "name": "000142_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.545491933822632,
+   "candidate_error": 4.235548973083496,
+   "error_change": 1.6900570392608643,
+   "baseline_late_share": 0.03843247066574941,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.042167310059108024,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.36746666666666666,
+   "candidate_late_update": 0.41440000000000005,
+   "late_update_change": 0.04693333333333338,
+   "why": "Error increased by 1.69 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 103,
+   "id": "000088_10",
+   "name": "000088_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.7325971126556396,
+   "candidate_error": 5.23591947555542,
+   "error_change": 1.5033223628997803,
+   "baseline_late_share": 0.04464372232544225,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06485437979316118,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.4935666666666667,
+   "candidate_late_update": 0.7593333333333333,
+   "late_update_change": 0.2657666666666666,
+   "why": "Error increased by 1.50 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 104,
+   "id": "000160_10",
+   "name": "000160_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.5450992584228516,
+   "candidate_error": 2.9459750652313232,
+   "error_change": 1.4008758068084717,
+   "baseline_late_share": 0.04074192792180764,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04268795291679085,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.3807666666666667,
+   "candidate_late_update": 0.37400000000000005,
+   "late_update_change": -0.006766666666666643,
+   "why": "Error increased by 1.40 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 105,
+   "id": "000058_10",
+   "name": "000058_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 24.61489486694336,
+   "candidate_error": 26.009180068969727,
+   "error_change": 1.3942852020263672,
+   "baseline_late_share": 0.04149296595688925,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0796417910447761,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.3694,
+   "candidate_late_update": 0.6657666666666667,
+   "late_update_change": 0.2963666666666667,
+   "why": "Error increased by 1.39 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 106,
+   "id": "000173_10",
+   "name": "000173_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 4.103301048278809,
+   "candidate_error": 5.49268102645874,
+   "error_change": 1.3893799781799316,
+   "baseline_late_share": 0.038963456048883176,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0517146844194688,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.36030000000000006,
+   "candidate_late_update": 0.5178333333333334,
+   "late_update_change": 0.1575333333333333,
+   "why": "Error increased by 1.39 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 107,
+   "id": "000026_10",
+   "name": "000026_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8256725072860718,
+   "candidate_error": 3.2002463340759277,
+   "error_change": 1.374573826789856,
+   "baseline_late_share": 0.029538509519796797,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04240697475639637,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.22830000000000003,
+   "candidate_late_update": 0.33559999999999995,
+   "late_update_change": 0.10729999999999992,
+   "why": "Error increased by 1.37 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 108,
+   "id": "000132_10",
+   "name": "000132_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.5379562377929688,
+   "candidate_error": 4.898540496826172,
+   "error_change": 1.3605842590332031,
+   "baseline_late_share": 0.040378426123139,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.053233633906947894,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.5939333333333333,
+   "candidate_late_update": 0.7455666666666666,
+   "late_update_change": 0.1516333333333333,
+   "why": "Error increased by 1.36 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 109,
+   "id": "000169_10",
+   "name": "000169_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.3181071281433105,
+   "candidate_error": 3.674119710922241,
+   "error_change": 1.3560125827789307,
+   "baseline_late_share": 0.04289256616567987,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05566755246036839,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.09686666666666667,
+   "candidate_late_update": 0.1379,
+   "late_update_change": 0.041033333333333324,
+   "why": "Error increased by 1.36 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 110,
+   "id": "000019_10",
+   "name": "000019_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.5546438694000244,
+   "candidate_error": 4.842806339263916,
+   "error_change": 1.2881624698638916,
+   "baseline_late_share": 0.03911609946754868,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.046969226729056755,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.3422,
+   "candidate_late_update": 0.4387666666666667,
+   "late_update_change": 0.09656666666666669,
+   "why": "Error increased by 1.29 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 111,
+   "id": "000065_10",
+   "name": "000065_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 10.610248565673828,
+   "candidate_error": 11.812164306640625,
+   "error_change": 1.2019157409667969,
+   "baseline_late_share": 0.0640836144202871,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07495209572690174,
+   "candidate_reversals": 0,
+   "baseline_late_update": 1.3215666666666668,
+   "candidate_late_update": 1.3988666666666667,
+   "late_update_change": 0.07729999999999992,
+   "why": "Error increased by 1.20 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 112,
+   "id": "000121_10",
+   "name": "000121_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4430609941482544,
+   "candidate_error": 2.630030632019043,
+   "error_change": 1.1869696378707886,
+   "baseline_late_share": 0.028118912782672634,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.041076701749072464,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.19616666666666668,
+   "candidate_late_update": 0.3041,
+   "late_update_change": 0.1079333333333333,
+   "why": "Error increased by 1.19 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 113,
+   "id": "000131_10",
+   "name": "000131_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.130542516708374,
+   "candidate_error": 3.2639119625091553,
+   "error_change": 1.1333694458007812,
+   "baseline_late_share": 0.0346989086851519,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04908160367242609,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.4013,
+   "candidate_late_update": 0.5384000000000001,
+   "late_update_change": 0.1371000000000001,
+   "why": "Error increased by 1.13 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 114,
+   "id": "000127_10",
+   "name": "000127_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4428589344024658,
+   "candidate_error": 2.551112651824951,
+   "error_change": 1.1082537174224854,
+   "baseline_late_share": 0.029878490226387777,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.031777319038423124,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.2049,
+   "candidate_late_update": 0.2077,
+   "late_update_change": 0.002799999999999997,
+   "why": "Error increased by 1.11 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 115,
+   "id": "000199_10",
+   "name": "000199_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8810368776321411,
+   "candidate_error": 2.9310827255249023,
+   "error_change": 1.0500458478927612,
+   "baseline_late_share": 0.02961481458229166,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.037506398700229246,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.30693333333333334,
+   "candidate_late_update": 0.37070000000000003,
+   "late_update_change": 0.0637666666666667,
+   "why": "Error increased by 1.05 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 116,
+   "id": "000018_10",
+   "name": "000018_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 6.748140335083008,
+   "candidate_error": 7.765809059143066,
+   "error_change": 1.0176687240600586,
+   "baseline_late_share": 0.04464258752412351,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05720934769582364,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.3661666666666667,
+   "candidate_late_update": 0.46973333333333334,
+   "late_update_change": 0.10356666666666664,
+   "why": "Error increased by 1.02 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 117,
+   "id": "000159_10",
+   "name": "000159_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.333141803741455,
+   "candidate_error": 3.349933385848999,
+   "error_change": 1.016791582107544,
+   "baseline_late_share": 0.03526226292351009,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.036884120461147855,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.33923333333333333,
+   "candidate_late_update": 0.3549333333333333,
+   "late_update_change": 0.015699999999999992,
+   "why": "Error increased by 1.02 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 118,
+   "id": "000025_10",
+   "name": "000025_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.012204647064209,
+   "candidate_error": 2.994079351425171,
+   "error_change": 0.9818747043609619,
+   "baseline_late_share": 0.025828907840034533,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.025671104520855637,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.2169333333333333,
+   "candidate_late_update": 0.24023333333333333,
+   "late_update_change": 0.023300000000000015,
+   "why": "Error increased by 0.98 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 119,
+   "id": "000117_10",
+   "name": "000117_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.3892015218734741,
+   "candidate_error": 2.3303725719451904,
+   "error_change": 0.9411710500717163,
+   "baseline_late_share": 0.03493657029231014,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.036897538059366936,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.23516666666666666,
+   "candidate_late_update": 0.25706666666666667,
+   "late_update_change": 0.021900000000000003,
+   "why": "Error increased by 0.94 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 120,
+   "id": "000084_10",
+   "name": "000084_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3685998916625977,
+   "candidate_error": 4.262843132019043,
+   "error_change": 0.8942432403564453,
+   "baseline_late_share": 0.06431375201601397,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.06092099986632804,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.7306666666666667,
+   "candidate_late_update": 0.5749,
+   "late_update_change": -0.15576666666666672,
+   "why": "Error increased by 0.89 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 121,
+   "id": "000124_10",
+   "name": "000124_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.0751181840896606,
+   "candidate_error": 1.9595447778701782,
+   "error_change": 0.8844265937805176,
+   "baseline_late_share": 0.031735025642543366,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04082487299711163,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.17143333333333333,
+   "candidate_late_update": 0.2423666666666667,
+   "late_update_change": 0.07093333333333338,
+   "why": "Error increased by 0.88 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 122,
+   "id": "000125_10",
+   "name": "000125_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.0126912593841553,
+   "candidate_error": 1.7313355207443237,
+   "error_change": 0.7186442613601685,
+   "baseline_late_share": 0.02599007496240222,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.033608197303715344,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.15386666666666668,
+   "candidate_late_update": 0.20453333333333334,
+   "late_update_change": 0.050666666666666665,
+   "why": "Error increased by 0.72 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 123,
+   "id": "000155_10",
+   "name": "000155_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4707569181919098,
+   "candidate_error": 1.138899564743042,
+   "error_change": 0.6681426465511322,
+   "baseline_late_share": 0.08458815448829717,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.11141211034377503,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.038566666666666666,
+   "candidate_late_update": 0.0678,
+   "late_update_change": 0.029233333333333333,
+   "why": "Error increased by 0.67 px, exceeding your 0.3 px limit. The candidate settled: 11% late revision, 0 reversals. Current model: 8%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 124,
+   "id": "000126_10",
+   "name": "000126_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.4480812549591064,
+   "candidate_error": 3.088543176651001,
+   "error_change": 0.6404619216918945,
+   "baseline_late_share": 0.04511282489085837,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04818614168003097,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.34306666666666663,
+   "candidate_late_update": 0.4022333333333334,
+   "late_update_change": 0.059166666666666756,
+   "why": "Error increased by 0.64 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 125,
+   "id": "000010_10",
+   "name": "000010_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.107707142829895,
+   "candidate_error": 1.7436728477478027,
+   "error_change": 0.6359657049179077,
+   "baseline_late_share": 0.032171452651857196,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03357330669514197,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.06186666666666666,
+   "candidate_late_update": 0.067,
+   "late_update_change": 0.005133333333333344,
+   "why": "Error increased by 0.64 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 126,
+   "id": "000007_10",
+   "name": "000007_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9405195116996765,
+   "candidate_error": 1.5538663864135742,
+   "error_change": 0.6133468747138977,
+   "baseline_late_share": 0.02711665082696896,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04756818849160893,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.18026666666666666,
+   "candidate_late_update": 0.3565666666666667,
+   "late_update_change": 0.17630000000000004,
+   "why": "Error increased by 0.61 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 127,
+   "id": "000133_10",
+   "name": "000133_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8496730327606201,
+   "candidate_error": 2.4585585594177246,
+   "error_change": 0.6088855266571045,
+   "baseline_late_share": 0.010848154775179995,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.01861700115741616,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.1447,
+   "candidate_late_update": 0.26113333333333333,
+   "late_update_change": 0.11643333333333333,
+   "why": "Error increased by 0.61 px, exceeding your 0.3 px limit. The candidate settled: 2% late revision, 0 reversals. Current model: 1%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 128,
+   "id": "000119_10",
+   "name": "000119_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.908906102180481,
+   "candidate_error": 1.4713239669799805,
+   "error_change": 0.5624178647994995,
+   "baseline_late_share": 0.028007241598426998,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04309801677446952,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.10726666666666666,
+   "candidate_late_update": 0.17023333333333332,
+   "late_update_change": 0.06296666666666666,
+   "why": "Error increased by 0.56 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 129,
+   "id": "000022_10",
+   "name": "000022_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.3178163766860962,
+   "candidate_error": 1.8795634508132935,
+   "error_change": 0.5617470741271973,
+   "baseline_late_share": 0.01873756430409645,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.027415111383145195,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.15853333333333333,
+   "candidate_late_update": 0.25920000000000004,
+   "late_update_change": 0.10066666666666671,
+   "why": "Error increased by 0.56 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 2%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 130,
+   "id": "000162_10",
+   "name": "000162_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4117830991744995,
+   "candidate_error": 1.9466001987457275,
+   "error_change": 0.534817099571228,
+   "baseline_late_share": 0.03176512675186936,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03484929825906895,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.2173333333333333,
+   "candidate_late_update": 0.20756666666666668,
+   "late_update_change": -0.009766666666666618,
+   "why": "Error increased by 0.53 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 131,
+   "id": "000116_10",
+   "name": "000116_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.2178882360458374,
+   "candidate_error": 1.708794116973877,
+   "error_change": 0.49090588092803955,
+   "baseline_late_share": 0.03279553740347687,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04129206547472077,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.18473333333333333,
+   "candidate_late_update": 0.2612333333333334,
+   "late_update_change": 0.07650000000000004,
+   "why": "Error increased by 0.49 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 132,
+   "id": "000161_10",
+   "name": "000161_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4057362079620361,
+   "candidate_error": 1.888013243675232,
+   "error_change": 0.4822770357131958,
+   "baseline_late_share": 0.03413290136893182,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03254846678856058,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.10816666666666667,
+   "candidate_late_update": 0.10776666666666668,
+   "late_update_change": -0.0003999999999999976,
+   "why": "Error increased by 0.48 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 133,
+   "id": "000149_10",
+   "name": "000149_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.127542495727539,
+   "candidate_error": 2.6080613136291504,
+   "error_change": 0.48051881790161133,
+   "baseline_late_share": 0.030716377847743316,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05038961452861157,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.24580000000000002,
+   "candidate_late_update": 0.44,
+   "late_update_change": 0.19419999999999998,
+   "why": "Error increased by 0.48 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 134,
+   "id": "000043_10",
+   "name": "000043_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.0447193384170532,
+   "candidate_error": 1.518642544746399,
+   "error_change": 0.4739232063293457,
+   "baseline_late_share": 0.06826792728283916,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09695693898399528,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.047499999999999994,
+   "candidate_late_update": 0.074,
+   "late_update_change": 0.026500000000000003,
+   "why": "Error increased by 0.47 px, exceeding your 0.3 px limit. The candidate settled: 10% late revision, 0 reversals. Current model: 7%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 135,
+   "id": "000097_10",
+   "name": "000097_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4609763026237488,
+   "candidate_error": 0.9190139174461365,
+   "error_change": 0.4580376148223877,
+   "baseline_late_share": 0.07186530388757072,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09221334324475004,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.03743333333333333,
+   "candidate_late_update": 0.05803333333333333,
+   "late_update_change": 0.0206,
+   "why": "Error increased by 0.46 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 7%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 136,
+   "id": "000113_10",
+   "name": "000113_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.5564247369766235,
+   "candidate_error": 2.0105137825012207,
+   "error_change": 0.45408904552459717,
+   "baseline_late_share": 0.05964374544632313,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08044377440179365,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.055766666666666666,
+   "candidate_late_update": 0.09836666666666667,
+   "late_update_change": 0.042600000000000006,
+   "why": "Error increased by 0.45 px, exceeding your 0.3 px limit. The candidate settled: 8% late revision, 0 reversals. Current model: 6%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 137,
+   "id": "000098_10",
+   "name": "000098_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.8509472012519836,
+   "candidate_error": 1.2802093029022217,
+   "error_change": 0.42926210165023804,
+   "baseline_late_share": 0.024507188944774685,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02299793933739955,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.0897,
+   "candidate_late_update": 0.08803333333333334,
+   "late_update_change": -0.0016666666666666635,
+   "why": "Error increased by 0.43 px, exceeding your 0.3 px limit. The candidate settled: 2% late revision, 0 reversals. Current model: 2%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 138,
+   "id": "000024_10",
+   "name": "000024_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.1380980014801025,
+   "candidate_error": 1.565345048904419,
+   "error_change": 0.4272470474243164,
+   "baseline_late_share": 0.03765210112171438,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.050206881913589754,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6497,
+   "candidate_late_update": 0.9317666666666667,
+   "late_update_change": 0.2820666666666667,
+   "why": "Error increased by 0.43 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 139,
+   "id": "000130_10",
+   "name": "000130_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6172136664390564,
+   "candidate_error": 1.0330098867416382,
+   "error_change": 0.4157962203025818,
+   "baseline_late_share": 0.02029970051378762,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.023249421746481206,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.08683333333333332,
+   "candidate_late_update": 0.09843333333333333,
+   "late_update_change": 0.011600000000000013,
+   "why": "Error increased by 0.42 px, exceeding your 0.3 px limit. The candidate settled: 2% late revision, 0 reversals. Current model: 2%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 140,
+   "id": "000171_10",
+   "name": "000171_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.787571370601654,
+   "candidate_error": 1.1962735652923584,
+   "error_change": 0.40870219469070435,
+   "baseline_late_share": 0.01827261160439441,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02055192634123758,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.1514,
+   "candidate_late_update": 0.18299999999999997,
+   "late_update_change": 0.03159999999999996,
+   "why": "Error increased by 0.41 px, exceeding your 0.3 px limit. The candidate settled: 2% late revision, 0 reversals. Current model: 2%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 141,
+   "id": "000134_10",
+   "name": "000134_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.4919795989990234,
+   "candidate_error": 2.89689302444458,
+   "error_change": 0.40491342544555664,
+   "baseline_late_share": 0.025271370420624148,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04569138928499781,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.21306666666666665,
+   "candidate_late_update": 0.37796666666666673,
+   "late_update_change": 0.16490000000000007,
+   "why": "Error increased by 0.40 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 142,
+   "id": "000154_10",
+   "name": "000154_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.0391024351119995,
+   "candidate_error": 1.4434632062911987,
+   "error_change": 0.4043607711791992,
+   "baseline_late_share": 0.030998586839417384,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.028686830799793006,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.19986666666666666,
+   "candidate_late_update": 0.18789999999999998,
+   "late_update_change": -0.011966666666666681,
+   "why": "Error increased by 0.40 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 143,
+   "id": "000123_10",
+   "name": "000123_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.1638680696487427,
+   "candidate_error": 1.5664397478103638,
+   "error_change": 0.4025716781616211,
+   "baseline_late_share": 0.028199806560812446,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.027191294223869608,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.13186666666666666,
+   "candidate_late_update": 0.12773333333333334,
+   "late_update_change": -0.004133333333333322,
+   "why": "Error increased by 0.40 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 144,
+   "id": "000015_10",
+   "name": "000015_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6774478554725647,
+   "candidate_error": 1.0649760961532593,
+   "error_change": 0.3875282406806946,
+   "baseline_late_share": 0.0490980737694887,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0641799502328217,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.045933333333333326,
+   "candidate_late_update": 0.06156666666666666,
+   "late_update_change": 0.015633333333333332,
+   "why": "Error increased by 0.39 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 5%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 145,
+   "id": "000003_10",
+   "name": "000003_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.2051037549972534,
+   "candidate_error": 1.5786978006362915,
+   "error_change": 0.3735940456390381,
+   "baseline_late_share": 0.029261291177603174,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04212900274051104,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.1348,
+   "candidate_late_update": 0.21576666666666666,
+   "late_update_change": 0.08096666666666666,
+   "why": "Error increased by 0.37 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 146,
+   "id": "000016_10",
+   "name": "000016_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.3601427376270294,
+   "candidate_error": 0.7316662073135376,
+   "error_change": 0.3715234696865082,
+   "baseline_late_share": 0.07322681445669475,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06746149729440447,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.060533333333333335,
+   "candidate_late_update": 0.0521,
+   "late_update_change": -0.008433333333333334,
+   "why": "Error increased by 0.37 px, exceeding your 0.3 px limit. The candidate settled: 7% late revision, 0 reversals. Current model: 7%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 147,
+   "id": "000014_10",
+   "name": "000014_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5634921789169312,
+   "candidate_error": 0.9321234226226807,
+   "error_change": 0.3686312437057495,
+   "baseline_late_share": 0.044859275097140265,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04002911208151383,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.05123333333333333,
+   "candidate_late_update": 0.045000000000000005,
+   "late_update_change": -0.006233333333333327,
+   "why": "Error increased by 0.37 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 148,
+   "id": "000005_10",
+   "name": "000005_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 2.0367445945739746,
+   "candidate_error": 2.3987438678741455,
+   "error_change": 0.3619992733001709,
+   "baseline_late_share": 0.03501509220738537,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.036311678111633536,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.27699999999999997,
+   "candidate_late_update": 0.3158666666666667,
+   "late_update_change": 0.038866666666666716,
+   "why": "Error increased by 0.36 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 149,
+   "id": "000163_10",
+   "name": "000163_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.7985776662826538,
+   "candidate_error": 2.1429312229156494,
+   "error_change": 0.3443535566329956,
+   "baseline_late_share": 0.03854394241627879,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03588048829837459,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.08483333333333333,
+   "candidate_late_update": 0.08756666666666667,
+   "late_update_change": 0.0027333333333333376,
+   "why": "Error increased by 0.34 px, exceeding your 0.3 px limit. The candidate settled: 4% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 150,
+   "id": "000170_10",
+   "name": "000170_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.818678081035614,
+   "candidate_error": 1.161346197128296,
+   "error_change": 0.3426681160926819,
+   "baseline_late_share": 0.02784031117209042,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02593405500183422,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.09746666666666666,
+   "candidate_late_update": 0.0961,
+   "late_update_change": -0.001366666666666655,
+   "why": "Error increased by 0.34 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 151,
+   "id": "000150_10",
+   "name": "000150_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 1.7895854711532593,
+   "candidate_error": 2.1241183280944824,
+   "error_change": 0.33453285694122314,
+   "baseline_late_share": 0.030182087997677246,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04740023313065668,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.14996666666666666,
+   "candidate_late_update": 0.24223333333333333,
+   "late_update_change": 0.09226666666666666,
+   "why": "Error increased by 0.33 px, exceeding your 0.3 px limit. The candidate settled: 5% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 152,
+   "id": "000023_10",
+   "name": "000023_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3978989124298096,
+   "candidate_error": 3.7295548915863037,
+   "error_change": 0.33165597915649414,
+   "baseline_late_share": 0.02749754878807522,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0322138461514846,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.3995333333333333,
+   "candidate_late_update": 0.47170000000000006,
+   "late_update_change": 0.07216666666666677,
+   "why": "Error increased by 0.33 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 153,
+   "id": "000089_10",
+   "name": "000089_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5971589088439941,
+   "candidate_error": 0.927918553352356,
+   "error_change": 0.3307596445083618,
+   "baseline_late_share": 0.06777837547068319,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.0938210248795418,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.04426666666666667,
+   "candidate_late_update": 0.07316666666666667,
+   "late_update_change": 0.028900000000000002,
+   "why": "Error increased by 0.33 px, exceeding your 0.3 px limit. The candidate settled: 9% late revision, 0 reversals. Current model: 7%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 154,
+   "id": "000083_10",
+   "name": "000083_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.7158676981925964,
+   "candidate_error": 1.0354162454605103,
+   "error_change": 0.3195485472679138,
+   "baseline_late_share": 0.02527159784363627,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.032830778188259316,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.12666666666666668,
+   "candidate_late_update": 0.16646666666666668,
+   "late_update_change": 0.0398,
+   "why": "Error increased by 0.32 px, exceeding your 0.3 px limit. The candidate settled: 3% late revision, 0 reversals. Current model: 3%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 155,
+   "id": "000144_10",
+   "name": "000144_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "regression",
+    "settled_regression"
+   ],
+   "error_outcome": "regression",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6083119511604309,
+   "candidate_error": 0.9275729656219482,
+   "error_change": 0.31926101446151733,
+   "baseline_late_share": 0.0385415266366706,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05594007605339052,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.33516666666666667,
+   "candidate_late_update": 0.49013333333333337,
+   "late_update_change": 0.1549666666666667,
+   "why": "Error increased by 0.32 px, exceeding your 0.3 px limit. The candidate settled: 6% late revision, 0 reversals. Current model: 4%. It converged to a worse answer: a data or training gap rather than instability."
+  },
+  {
+   "rank": 156,
+   "id": "000118_10",
+   "name": "000118_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.7521072030067444,
+   "candidate_error": 1.0413516759872437,
+   "error_change": 0.28924447298049927,
+   "baseline_late_share": 0.03152244949038475,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.026616857342983892,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.1067,
+   "candidate_late_update": 0.09156666666666667,
+   "late_update_change": -0.015133333333333332,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 3% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 157,
+   "id": "000151_10",
+   "name": "000151_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5277673602104187,
+   "candidate_error": 0.7913592457771301,
+   "error_change": 0.2635918855667114,
+   "baseline_late_share": 0.028613233620549506,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.023690439291047923,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.08789999999999999,
+   "candidate_late_update": 0.07533333333333332,
+   "late_update_change": -0.01256666666666667,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 158,
+   "id": "000087_10",
+   "name": "000087_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6889777183532715,
+   "candidate_error": 0.9455549120903015,
+   "error_change": 0.25657719373703003,
+   "baseline_late_share": 0.025638025404006913,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.027798825248073904,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.0919,
+   "candidate_late_update": 0.10453333333333333,
+   "late_update_change": 0.01263333333333333,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 3% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 159,
+   "id": "000057_10",
+   "name": "000057_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.7186505794525146,
+   "candidate_error": 0.9738954305648804,
+   "error_change": 0.2552448511123657,
+   "baseline_late_share": 0.023309221508422278,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02198059832878446,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.10543333333333334,
+   "candidate_late_update": 0.11056666666666666,
+   "late_update_change": 0.005133333333333323,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 2% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 160,
+   "id": "000114_10",
+   "name": "000114_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 1.8837924003601074,
+   "candidate_error": 2.137282133102417,
+   "error_change": 0.25348973274230957,
+   "baseline_late_share": 0.07877637438855224,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.11767632790148029,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.05079999999999999,
+   "candidate_late_update": 0.11209999999999999,
+   "late_update_change": 0.0613,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 12% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 161,
+   "id": "000166_10",
+   "name": "000166_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6141530871391296,
+   "candidate_error": 0.8645120859146118,
+   "error_change": 0.2503589987754822,
+   "baseline_late_share": 0.028765249330060152,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.024741304846016884,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.1431,
+   "candidate_late_update": 0.12426666666666665,
+   "late_update_change": -0.018833333333333355,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 162,
+   "id": "000137_10",
+   "name": "000137_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9084939956665039,
+   "candidate_error": 1.1506667137145996,
+   "error_change": 0.2421727180480957,
+   "baseline_late_share": 0.029166413880968266,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03597914483197792,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.044366666666666665,
+   "candidate_late_update": 0.0625,
+   "late_update_change": 0.018133333333333335,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 163,
+   "id": "000009_10",
+   "name": "000009_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.8459864258766174,
+   "candidate_error": 1.0858596563339233,
+   "error_change": 0.2398732304573059,
+   "baseline_late_share": 0.030855160011067032,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.026191332090139078,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.12369999999999999,
+   "candidate_late_update": 0.1034,
+   "late_update_change": -0.020299999999999985,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 3% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 164,
+   "id": "000059_10",
+   "name": "000059_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.7532885074615479,
+   "candidate_error": 0.9861868619918823,
+   "error_change": 0.23289835453033447,
+   "baseline_late_share": 0.02623786893710288,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03329794093833481,
+   "candidate_reversals": 1,
+   "baseline_late_update": 0.11333333333333334,
+   "candidate_late_update": 0.17063333333333333,
+   "late_update_change": 0.05729999999999999,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 3% late revision, 1 reversal. Current model: 3%."
+  },
+  {
+   "rank": 165,
+   "id": "000047_10",
+   "name": "000047_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9046086072921753,
+   "candidate_error": 1.1336441040039062,
+   "error_change": 0.22903549671173096,
+   "baseline_late_share": 0.03676872331383937,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05865288887363108,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.04306666666666667,
+   "candidate_late_update": 0.0814,
+   "late_update_change": 0.03833333333333333,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 6% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 166,
+   "id": "000135_10",
+   "name": "000135_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.42120644450187683,
+   "candidate_error": 0.6412010192871094,
+   "error_change": 0.21999457478523254,
+   "baseline_late_share": 0.025506018650282104,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.021589603190698303,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.07080000000000002,
+   "candidate_late_update": 0.057966666666666666,
+   "late_update_change": -0.01283333333333335,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 167,
+   "id": "000096_10",
+   "name": "000096_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.46629488468170166,
+   "candidate_error": 0.6630940437316895,
+   "error_change": 0.1967991590499878,
+   "baseline_late_share": 0.061354248851348235,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08973160173160175,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.0307,
+   "candidate_late_update": 0.06086666666666667,
+   "late_update_change": 0.03016666666666667,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 9% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 168,
+   "id": "000049_10",
+   "name": "000049_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 1.390907645225525,
+   "candidate_error": 1.5868537425994873,
+   "error_change": 0.1959460973739624,
+   "baseline_late_share": 0.040264435079590176,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09366227351762722,
+   "candidate_reversals": 2,
+   "baseline_late_update": 0.16690000000000002,
+   "candidate_late_update": 0.43240000000000006,
+   "late_update_change": 0.26550000000000007,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 9% late revision, 2 reversals. Current model: 4%."
+  },
+  {
+   "rank": 169,
+   "id": "000168_10",
+   "name": "000168_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9916449785232544,
+   "candidate_error": 1.1822466850280762,
+   "error_change": 0.19060170650482178,
+   "baseline_late_share": 0.03264201062525541,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.029068487117375027,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.14713333333333334,
+   "candidate_late_update": 0.13249999999999998,
+   "late_update_change": -0.01463333333333336,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 3% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 170,
+   "id": "000115_10",
+   "name": "000115_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5100314617156982,
+   "candidate_error": 0.6994650363922119,
+   "error_change": 0.18943357467651367,
+   "baseline_late_share": 0.045483323625497,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04568951142237787,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.08510000000000001,
+   "candidate_late_update": 0.08889999999999999,
+   "late_update_change": 0.003799999999999984,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 5% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 171,
+   "id": "000044_10",
+   "name": "000044_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 1.3169456720352173,
+   "candidate_error": 1.4960341453552246,
+   "error_change": 0.17908847332000732,
+   "baseline_late_share": 0.06272053914867916,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09590469916556874,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.04663333333333333,
+   "candidate_late_update": 0.0825,
+   "late_update_change": 0.03586666666666667,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 10% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 172,
+   "id": "000002_10",
+   "name": "000002_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6374667286872864,
+   "candidate_error": 0.8127350211143494,
+   "error_change": 0.175268292427063,
+   "baseline_late_share": 0.02783320659351968,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.026022973043493384,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.11216666666666668,
+   "candidate_late_update": 0.10056666666666665,
+   "late_update_change": -0.011600000000000027,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 3% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 173,
+   "id": "000012_10",
+   "name": "000012_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5629684329032898,
+   "candidate_error": 0.7362393140792847,
+   "error_change": 0.17327088117599487,
+   "baseline_late_share": 0.09271364317841078,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09445484532406168,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.037533333333333335,
+   "candidate_late_update": 0.051,
+   "late_update_change": 0.013466666666666662,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 9% late revision, 0 reversals. Current model: 9%."
+  },
+  {
+   "rank": 174,
+   "id": "000153_10",
+   "name": "000153_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9175340533256531,
+   "candidate_error": 1.0899356603622437,
+   "error_change": 0.17240160703659058,
+   "baseline_late_share": 0.03701193522211824,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04157657178641901,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.2726,
+   "candidate_late_update": 0.31223333333333336,
+   "late_update_change": 0.039633333333333354,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 175,
+   "id": "000013_10",
+   "name": "000013_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9119293689727783,
+   "candidate_error": 1.0835163593292236,
+   "error_change": 0.1715869903564453,
+   "baseline_late_share": 0.030308253117432637,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03257211636875762,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.08143333333333333,
+   "candidate_late_update": 0.08996666666666668,
+   "late_update_change": 0.008533333333333351,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 3% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 176,
+   "id": "000051_10",
+   "name": "000051_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.5652160048484802,
+   "candidate_error": 0.7322713732719421,
+   "error_change": 0.16705536842346191,
+   "baseline_late_share": 0.04149933065595717,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06131235634974589,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.0497,
+   "candidate_late_update": 0.08850000000000001,
+   "late_update_change": 0.03880000000000001,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 6% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 177,
+   "id": "000152_10",
+   "name": "000152_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6814767718315125,
+   "candidate_error": 0.8464210033416748,
+   "error_change": 0.16494423151016235,
+   "baseline_late_share": 0.025802564462539188,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.023524351508734775,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.10163333333333334,
+   "candidate_late_update": 0.09463333333333335,
+   "late_update_change": -0.006999999999999992,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 2% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 178,
+   "id": "000048_10",
+   "name": "000048_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.6329500675201416,
+   "candidate_error": 0.7772794365882874,
+   "error_change": 0.14432936906814575,
+   "baseline_late_share": 0.05558402411454407,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.07949596280890628,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.044333333333333336,
+   "candidate_late_update": 0.07733333333333334,
+   "late_update_change": 0.033,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 8% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 179,
+   "id": "000053_10",
+   "name": "000053_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4958721697330475,
+   "candidate_error": 0.6219834089279175,
+   "error_change": 0.12611123919487,
+   "baseline_late_share": 0.06652524395417904,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09457210522946938,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.03783333333333334,
+   "candidate_late_update": 0.07166666666666667,
+   "late_update_change": 0.03383333333333333,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 9% late revision, 0 reversals. Current model: 7%."
+  },
+  {
+   "rank": 180,
+   "id": "000140_10",
+   "name": "000140_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4571196734905243,
+   "candidate_error": 0.5700052380561829,
+   "error_change": 0.11288556456565857,
+   "baseline_late_share": 0.010363291805849724,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.009569712210114559,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.06286666666666667,
+   "candidate_late_update": 0.058066666666666676,
+   "late_update_change": -0.004799999999999992,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 1% late revision, 0 reversals. Current model: 1%."
+  },
+  {
+   "rank": 181,
+   "id": "000011_10",
+   "name": "000011_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4441675543785095,
+   "candidate_error": 0.5481840372085571,
+   "error_change": 0.10401648283004761,
+   "baseline_late_share": 0.03860280196895115,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.040464946064165355,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.0476,
+   "candidate_late_update": 0.0531,
+   "late_update_change": 0.005499999999999998,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 182,
+   "id": "000004_10",
+   "name": "000004_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 1.7816829681396484,
+   "candidate_error": 1.8788093328475952,
+   "error_change": 0.09712636470794678,
+   "baseline_late_share": 0.037446799789590174,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03531205213488007,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.26120000000000004,
+   "candidate_late_update": 0.241,
+   "late_update_change": -0.02020000000000005,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 183,
+   "id": "000082_10",
+   "name": "000082_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.364607572555542,
+   "candidate_error": 0.44683900475502014,
+   "error_change": 0.08223143219947815,
+   "baseline_late_share": 0.022485207100591716,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.02653894472361809,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.03503333333333333,
+   "candidate_late_update": 0.0461,
+   "late_update_change": 0.011066666666666669,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 3% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 184,
+   "id": "000092_10",
+   "name": "000092_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.2511661946773529,
+   "candidate_error": 0.32182562351226807,
+   "error_change": 0.07065942883491516,
+   "baseline_late_share": 0.07888530287984111,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.10363511382475436,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.029700000000000004,
+   "candidate_late_update": 0.06043333333333334,
+   "late_update_change": 0.030733333333333335,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 10% late revision, 0 reversals. Current model: 8%."
+  },
+  {
+   "rank": 185,
+   "id": "000139_10",
+   "name": "000139_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.2540994882583618,
+   "candidate_error": 0.3099343776702881,
+   "error_change": 0.05583488941192627,
+   "baseline_late_share": 0.044863851555301364,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.044573170731707315,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.033433333333333336,
+   "candidate_late_update": 0.0337,
+   "late_update_change": 0.00026666666666666505,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 186,
+   "id": "000050_10",
+   "name": "000050_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.3934894800186157,
+   "candidate_error": 0.4472959637641907,
+   "error_change": 0.05380648374557495,
+   "baseline_late_share": 0.03453163081487761,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05667616113468583,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.06133333333333333,
+   "candidate_late_update": 0.11109999999999999,
+   "late_update_change": 0.04976666666666666,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 6% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 187,
+   "id": "000112_10",
+   "name": "000112_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 1.1388205289840698,
+   "candidate_error": 1.1924234628677368,
+   "error_change": 0.05360293388366699,
+   "baseline_late_share": 0.05629992270033495,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.08213090040527048,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.050499999999999996,
+   "candidate_late_update": 0.09863333333333334,
+   "late_update_change": 0.04813333333333334,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 8% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 188,
+   "id": "000165_10",
+   "name": "000165_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.4156869947910309,
+   "candidate_error": 0.4597460627555847,
+   "error_change": 0.04405906796455383,
+   "baseline_late_share": 0.01524988258695472,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.011107584893684543,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.0773,
+   "candidate_late_update": 0.055266666666666665,
+   "late_update_change": -0.02203333333333333,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 1% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 189,
+   "id": "000138_10",
+   "name": "000138_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.27865493297576904,
+   "candidate_error": 0.32025083899497986,
+   "error_change": 0.041595906019210815,
+   "baseline_late_share": 0.05707790362521821,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06466284358315207,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.0333,
+   "candidate_late_update": 0.038733333333333335,
+   "late_update_change": 0.005433333333333332,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 6% late revision, 0 reversals. Current model: 6%."
+  },
+  {
+   "rank": 190,
+   "id": "000122_10",
+   "name": "000122_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.8894026279449463,
+   "candidate_error": 0.9219257235527039,
+   "error_change": 0.03252309560775757,
+   "baseline_late_share": 0.03658238030287134,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.03903913992944734,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.048999999999999995,
+   "candidate_late_update": 0.05243333333333333,
+   "late_update_change": 0.003433333333333337,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 191,
+   "id": "000086_10",
+   "name": "000086_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 2.184298515319824,
+   "candidate_error": 2.202686309814453,
+   "error_change": 0.018387794494628906,
+   "baseline_late_share": 0.02080824010033154,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.025893372145497803,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.15033333333333335,
+   "candidate_late_update": 0.18560000000000001,
+   "late_update_change": 0.03526666666666667,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 3% late revision, 0 reversals. Current model: 2%."
+  },
+  {
+   "rank": 192,
+   "id": "000052_10",
+   "name": "000052_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.9629974365234375,
+   "candidate_error": 0.9727798700332642,
+   "error_change": 0.00978243350982666,
+   "baseline_late_share": 0.03503258225465651,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05406613047363718,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.04663333333333333,
+   "candidate_late_update": 0.082,
+   "late_update_change": 0.03536666666666667,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 5% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 193,
+   "id": "000164_10",
+   "name": "000164_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 1.4900599718093872,
+   "candidate_error": 1.4939316511154175,
+   "error_change": 0.0038716793060302734,
+   "baseline_late_share": 0.03127852449535595,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.038195685119700354,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.10426666666666667,
+   "candidate_late_update": 0.14323333333333332,
+   "late_update_change": 0.03896666666666665,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 194,
+   "id": "000021_10",
+   "name": "000021_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 6.2264628410339355,
+   "candidate_error": 6.22681999206543,
+   "error_change": 0.0003571510314941406,
+   "baseline_late_share": 0.05239692246991517,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.047541554833545226,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.6488,
+   "candidate_late_update": 0.5767666666666666,
+   "late_update_change": -0.0720333333333334,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 5% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 195,
+   "id": "000156_10",
+   "name": "000156_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 0.27732160687446594,
+   "candidate_error": 0.2685544788837433,
+   "error_change": -0.008767127990722656,
+   "baseline_late_share": 0.13859175890614828,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.14005277044854883,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.03623333333333333,
+   "candidate_late_update": 0.06406666666666667,
+   "late_update_change": 0.027833333333333342,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 14% late revision, 0 reversals. Current model: 14%."
+  },
+  {
+   "rank": 196,
+   "id": "000017_10",
+   "name": "000017_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 1.2747883796691895,
+   "candidate_error": 1.2504478693008423,
+   "error_change": -0.024340510368347168,
+   "baseline_late_share": 0.046979260595130745,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.06507283580243095,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.06269999999999999,
+   "candidate_late_update": 0.10173333333333334,
+   "late_update_change": 0.03903333333333335,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 7% late revision, 0 reversals. Current model: 5%."
+  },
+  {
+   "rank": 197,
+   "id": "000141_10",
+   "name": "000141_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [],
+   "error_outcome": "stable",
+   "stability_outcome": "settled",
+   "baseline_error": 3.3422954082489014,
+   "candidate_error": 3.1352667808532715,
+   "error_change": -0.20702862739562988,
+   "baseline_late_share": 0.025113571147051303,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.04325123216855154,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.08456666666666666,
+   "candidate_late_update": 0.15163333333333331,
+   "late_update_change": 0.06706666666666665,
+   "why": "The change stays within your 0.3 px tolerance. The candidate settled: 4% late revision, 0 reversals. Current model: 3%."
+  },
+  {
+   "rank": 198,
+   "id": "000094_10",
+   "name": "000094_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 2.2732486724853516,
+   "candidate_error": 1.8736498355865479,
+   "error_change": -0.3995988368988037,
+   "baseline_late_share": 0.03796965317919075,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.05568670944572077,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.1503,
+   "candidate_late_update": 0.21760000000000002,
+   "late_update_change": 0.06730000000000003,
+   "why": "Error fell by 0.40 px on this case. The candidate settled: 6% late revision, 0 reversals. Current model: 4%."
+  },
+  {
+   "rank": 199,
+   "id": "000104_10",
+   "name": "000104_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 61.29769515991211,
+   "candidate_error": 60.843482971191406,
+   "error_change": -0.4542121887207031,
+   "baseline_late_share": 0.2265065889006931,
+   "baseline_reversals": 1,
+   "candidate_late_share": 0.20003599212589446,
+   "candidate_reversals": 1,
+   "baseline_late_update": 31.096666666666664,
+   "candidate_late_update": 12.870899999999999,
+   "late_update_change": -18.225766666666665,
+   "why": "Error fell by 0.45 px on this case. The candidate settled: 20% late revision, 1 reversal. Current model: 23%."
+  },
+  {
+   "rank": 200,
+   "id": "000046_10",
+   "name": "000046_10",
+   "tags": [
+    "kitti"
+   ],
+   "flags": [
+    "improved"
+   ],
+   "error_outcome": "improved",
+   "stability_outcome": "settled",
+   "baseline_error": 3.969198226928711,
+   "candidate_error": 1.674054741859436,
+   "error_change": -2.295143485069275,
+   "baseline_late_share": 0.05705780767133249,
+   "baseline_reversals": 0,
+   "candidate_late_share": 0.09511519338065054,
+   "candidate_reversals": 0,
+   "baseline_late_update": 0.05943333333333333,
+   "candidate_late_update": 0.11356666666666666,
+   "late_update_change": 0.05413333333333333,
+   "why": "Error fell by 2.30 px on this case. The candidate settled: 10% late revision, 0 reversals. Current model: 6%."
+  }
+ ]
+}

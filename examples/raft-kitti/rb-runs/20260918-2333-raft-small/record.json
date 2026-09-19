@@ -1,0 +1,353 @@
+{
+ "rb_version": "0.2.0.dev1",
+ "run_id": "20260918-2333-raft-small",
+ "command": "rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-small.pth --quiet --evidence standard --max-trajectory-regression 0.3 --runs-dir rb-runs-ev --json",
+ "started": "2026-09-18T23:32:33+00:00",
+ "finished": "2026-09-18T23:33:57+00:00",
+ "wall_seconds": 83.702,
+ "source": "run",
+ "checkpoints": {
+  "baseline": {
+   "name": "raft-things",
+   "checkpoint": "raft/models/raft-things.pth",
+   "sha256": "fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1"
+  },
+  "candidate": {
+   "name": "raft-small",
+   "checkpoint": "raft/models/raft-small.pth",
+   "sha256": "c7d41b9cc88442bb8aa911dbb33086dac55a226394b142937ff22d5578717332"
+  }
+ },
+ "dataset": {
+  "name": "kitti2015-train",
+  "count": 200,
+  "case_list_hash": "f3eebc6dbd5b8a55"
+ },
+ "environment": {
+  "python": "3.11.10",
+  "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.35",
+  "rb_version": "0.2.0.dev1",
+  "torch": "2.4.1+cu124",
+  "cuda": "12.4",
+  "cuda_available": true,
+  "gpu": "NVIDIA RTX A5000",
+  "device": "cuda"
+ },
+ "hook": {
+  "status": "recorded",
+  "verified": true,
+  "iterations": 12,
+  "expected": 12,
+  "note": "Recorded once per refinement iteration."
+ },
+ "limits": {
+  "max_regression": 0.3,
+  "max_late_share": 0.25,
+  "max_reversals": 2,
+  "max_trajectory_regression": 0.3
+ },
+ "input": {
+  "format": "run",
+  "dataset_path": "./data/kitti2015/training",
+  "cases_selector": "all",
+  "limit": null
+ },
+ "adapter": {
+  "id": "raft",
+  "version": "0.2.0.dev1",
+  "model_code": "raft",
+  "git_sha": {
+   "sha": "2888e15a51fa41140771d3f498ed8023cff098d1",
+   "dirty": false
+  },
+  "iterations": 12,
+  "small": false,
+  "mixed_precision": false,
+  "alternate_corr": false,
+  "hook": "forward hook on model.update_block (output index 2 = delta_flow, scaled by 8 to image pixels)",
+  "architectures": {
+   "raft/models/raft-things.pth": "raft",
+   "raft/models/raft-small.pth": "raft-small"
+  }
+ },
+ "model_code": {
+  "path": "raft",
+  "sha": "2888e15a51fa41140771d3f498ed8023cff098d1",
+  "dirty": false
+ },
+ "seeds": {
+  "python": 0,
+  "numpy": 0,
+  "torch": 0
+ },
+ "deterministic_algorithms": false,
+ "notes": "",
+ "skipped": {},
+ "evidence": {
+  "level": "standard",
+  "cases": [
+   "000095_10",
+   "000190_10",
+   "000148_10",
+   "000181_10",
+   "000185_10",
+   "000179_10",
+   "000192_10",
+   "000081_10",
+   "000111_10",
+   "000194_10",
+   "000091_10",
+   "000101_10",
+   "000039_10",
+   "000078_10",
+   "000195_10",
+   "000070_10",
+   "000068_10",
+   "000182_10",
+   "000040_10",
+   "000129_10"
+  ],
+  "checks": {
+   "000095_10": {
+    "baseline_error": {
+     "run": 2.969816207885742,
+     "now": 2.969816207885742
+    },
+    "candidate_error": {
+     "run": 25.176170349121094,
+     "now": 25.176170349121094
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000190_10": {
+    "baseline_error": {
+     "run": 15.03296947479248,
+     "now": 15.03296947479248
+    },
+    "candidate_error": {
+     "run": 33.77643966674805,
+     "now": 33.77643966674805
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000148_10": {
+    "baseline_error": {
+     "run": 7.822656631469727,
+     "now": 7.822656631469727
+    },
+    "candidate_error": {
+     "run": 21.868972778320312,
+     "now": 21.868972778320312
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000181_10": {
+    "baseline_error": {
+     "run": 13.904749870300293,
+     "now": 13.904749870300293
+    },
+    "candidate_error": {
+     "run": 25.59618377685547,
+     "now": 25.59618377685547
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000185_10": {
+    "baseline_error": {
+     "run": 7.062140464782715,
+     "now": 7.062140464782715
+    },
+    "candidate_error": {
+     "run": 18.18599510192871,
+     "now": 18.18599510192871
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000179_10": {
+    "baseline_error": {
+     "run": 11.611355781555176,
+     "now": 11.611355781555176
+    },
+    "candidate_error": {
+     "run": 22.364046096801758,
+     "now": 22.364046096801758
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000192_10": {
+    "baseline_error": {
+     "run": 14.420272827148438,
+     "now": 14.420272827148438
+    },
+    "candidate_error": {
+     "run": 24.967790603637695,
+     "now": 24.967790603637695
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000081_10": {
+    "baseline_error": {
+     "run": 6.679145336151123,
+     "now": 6.679145336151123
+    },
+    "candidate_error": {
+     "run": 16.922082901000977,
+     "now": 16.922082901000977
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000111_10": {
+    "baseline_error": {
+     "run": 6.156408786773682,
+     "now": 6.156408786773682
+    },
+    "candidate_error": {
+     "run": 16.052104949951172,
+     "now": 16.052104949951172
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000194_10": {
+    "baseline_error": {
+     "run": 11.967692375183105,
+     "now": 11.967692375183105
+    },
+    "candidate_error": {
+     "run": 20.444576263427734,
+     "now": 20.444576263427734
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000091_10": {
+    "baseline_error": {
+     "run": 6.9073920249938965,
+     "now": 6.9073920249938965
+    },
+    "candidate_error": {
+     "run": 15.073295593261719,
+     "now": 15.073295593261719
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000101_10": {
+    "baseline_error": {
+     "run": 11.570025444030762,
+     "now": 11.570025444030762
+    },
+    "candidate_error": {
+     "run": 18.921321868896484,
+     "now": 18.921321868896484
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000039_10": {
+    "baseline_error": {
+     "run": 4.179149150848389,
+     "now": 4.179149150848389
+    },
+    "candidate_error": {
+     "run": 11.148223876953125,
+     "now": 11.148223876953125
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000078_10": {
+    "baseline_error": {
+     "run": 6.816032409667969,
+     "now": 6.816032409667969
+    },
+    "candidate_error": {
+     "run": 13.473527908325195,
+     "now": 13.473527908325195
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000195_10": {
+    "baseline_error": {
+     "run": 22.959903717041016,
+     "now": 22.959903717041016
+    },
+    "candidate_error": {
+     "run": 29.42088508605957,
+     "now": 29.42088508605957
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000070_10": {
+    "baseline_error": {
+     "run": 11.908393859863281,
+     "now": 11.908393859863281
+    },
+    "candidate_error": {
+     "run": 18.304378509521484,
+     "now": 18.304378509521484
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000068_10": {
+    "baseline_error": {
+     "run": 10.171562194824219,
+     "now": 10.171562194824219
+    },
+    "candidate_error": {
+     "run": 16.266677856445312,
+     "now": 16.266677856445312
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000182_10": {
+    "baseline_error": {
+     "run": 14.922689437866211,
+     "now": 14.922689437866211
+    },
+    "candidate_error": {
+     "run": 20.987775802612305,
+     "now": 20.987775802612305
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000040_10": {
+    "baseline_error": {
+     "run": 4.472812652587891,
+     "now": 4.472812652587891
+    },
+    "candidate_error": {
+     "run": 10.313076972961426,
+     "now": 10.313076972961426
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   },
+   "000129_10": {
+    "baseline_error": {
+     "run": 6.101823329925537,
+     "now": 6.101823329925537
+    },
+    "candidate_error": {
+     "run": 11.930994987487793,
+     "now": 11.930994987487793
+    },
+    "candidate_trajectory_matches": true,
+    "errors_match": true
+   }
+  }
+ }
+}

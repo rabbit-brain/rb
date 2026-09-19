@@ -8,3 +8,6 @@ dist/
 .venv/
 releases/
 *.tar.gz
+
+# full-size evidence PNGs of the example runs (the 1400 px JPEG copies are kept)
+examples/raft-kitti/rb-runs/*/evidence/*/*.png

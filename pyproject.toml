@@ -50,7 +50,7 @@ packages = ["src/rabbit_brain"]
 "AGENTS.md" = "rabbit_brain/docs/AGENTS.md"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/rabbit_brain", "tests", "AGENTS.md", "README.md", "LICENSE", "CHANGELOG.md", "llms.txt", "pyproject.toml"]
+include = ["src/rabbit_brain", "tests", "docs", "AGENTS.md", "README.md", "LICENSE", "CHANGELOG.md", "llms.txt", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

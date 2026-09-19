@@ -108,3 +108,7 @@ What it does **not** carry: `checkpoints.baseline.sha256` is null for imported r
 - `analyze_ablation.py` - the ablation analysis that produced the published table
 - `compare_runs.py` - per-case comparison of two comparison documents, used for the machine check
 
+
+- `iteration_sweep.py` - per-case error and trajectory at 8 to 12 iterations
+- `oracle.py` - the oracle iteration-allocation curve against fixed and random baselines
+- `step8.py` - whether step-8 trajectory information captures the oracle room

@@ -105,3 +105,6 @@ What it does **not** carry: `checkpoints.baseline.sha256` is null for imported r
 - `config-cases.txt`, `holdout-cases.txt` - the frozen splits
 - `dual_recorder.py` - the corrected trajectory channel (amendment 2)
 - `verify_channels.py` - its four correctness checks, on real weights
+- `analyze_ablation.py` - the ablation analysis that produced the published table
+- `compare_runs.py` - per-case comparison of two comparison documents, used for the machine check
+

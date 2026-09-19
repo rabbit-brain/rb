@@ -37,13 +37,14 @@ def main() -> int:
     if mixed:
         cfg.adapter.mixed_precision = True
     adapter = load_adapter(cfg)
+    dev = cfg.adapter.device or "cpu"          # the pod runs this on the GPU; autocast is a no-op on CPU
     ckpt = Path("ckpt/raft-things.pth")
     set_seeds(0)
-    model = adapter.load(ckpt, "cpu")
+    model = adapter.load(ckpt, dev)
     iters = adapter.expected_iterations()
     cases = list(adapter.cases())[:2]
-    print(f"checkpoint {ckpt}, {iters} iterations, mixed_precision={cfg.adapter.mixed_precision}, "
-          f"{len(cases)} case(s)\n")
+    print(f"checkpoint {ckpt} on {dev}, {iters} iterations, "
+          f"mixed_precision={cfg.adapter.mixed_precision}, {len(cases)} case(s)\n")
 
     ok = True
     for case in cases:
@@ -55,7 +56,7 @@ def main() -> int:
         # --- pass 2: the same inference with both channels attached
         set_seeds(0)
         dual = DualChannelRecorder(coarse_scale=adapter.trajectory_scale)
-        im1, _ = adapter._load_pair(case, "cpu")
+        im1, _ = adapter._load_pair(case, dev)
         padder = adapter._utils.InputPadder(im1.shape, mode="kitti")
         with dual.attached(model):
             pred_dual = adapter.infer(model, case, dual.coarse)

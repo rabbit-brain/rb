@@ -333,6 +333,20 @@ The corrected channel is very nearly a rank-preserving rescaling of the coarse o
 
 That is worth stating plainly because it cuts both ways. It means the published table was not distorted by the defect. It also means that for RAFT specifically the coarse channel is an adequate proxy, so the fix is a correctness and documentation matter rather than an accuracy improvement, and the case for recording the output channel rests on models where the upsampling is not close to an average.
 
+#### Provenance of this artifact
+
+Amendment 1a happened because the repository described a fix it did not contain. The copies below were
+pulled back off the pod after the run and byte-compared, so the repository carries what executed rather
+than a replay of it. `RESULTS-ablation.md` on the pod volume lists the same hashes beside the outputs.
+
+| File | sha256 |
+|---|---|
+| `dual_recorder.py` | `f83dd0b807b9bef8ad508d70148bc99fd73bb74a4262370f27646a8da12f4d0b` |
+| `verify_channels.py` | `045a799540fe7a6ac4e64dcecddf149108330f8a813c8d1388bbd9faaebb45ba` |
+| `build_compare.py` | `ef7e0c0bfec4c637daa8955d660a35b506cb2cc03bab363f49a77b513bf5bfc8` |
+| `analyze_ablation.py` | `1a141c7470a7dabe47ad41085ca44bd018f64395b6330df1e9a9c91a2f3fb85b` |
+| `compare_runs.py` | `855f16310f792230cfcbf16c7cb01d72e6b04741be01a6339e0e04909f89bbbe` |
+
 #### What remains true regardless
 
 The recorder's documentation still describes the trajectory as the model's refinement when for RAFT it is the movement of an internal field at one eighth resolution. That is unchanged by this result and is tracked in `claude/recorder-upsampling-gap.md`.

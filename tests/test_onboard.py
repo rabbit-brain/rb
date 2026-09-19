@@ -125,3 +125,26 @@ def test_doctor_reads_the_generated_project_and_names_what_is_left(workdir):
     assert checks["adapter"]["status"] == "ok", "an unwritten adapter must still import: that is what makes the checklist usable"
     assert checks["dataset"]["status"] == "fail", "and the things genuinely missing are named"
     assert any("verify-hook" in (c.get("fix") or "") for c in data["checks"])
+
+
+def test_the_first_line_of_output_does_not_point_at_the_parent_directory(tmp_path, capsys):
+    """`in .` plus the sentence's full stop renders as `in ..`, in the first line a new user ever sees."""
+    from rabbit_brain.cli import main
+    brief = tmp_path / "brief.json"
+    brief.write_text(json.dumps(EXAMPLE_BRIEF.model_dump(exclude_none=True)), encoding="utf-8")
+    assert main(["onboard", "--brief", str(brief), "--dir", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    assert " in .." not in out
+    assert str(tmp_path) in out or " here." in out
+
+
+def test_the_decision_sentence_is_closed_whatever_the_user_typed():
+    """Briefs come from a web form, where nobody types the full stop."""
+    from rabbit_brain.onboard import integration_md
+    from rabbit_brain.adapters.base import TASK_METRICS
+    b = EXAMPLE_BRIEF.model_copy(update={"compare": "whether B is safe to ship"})
+    md = integration_md(b, None, TASK_METRICS["stereo"], "rb.toml")
+    assert "whether B is safe to ship.\n" in md
+    b2 = EXAMPLE_BRIEF.model_copy(update={"compare": "is B safe to ship?"})
+    md2 = integration_md(b2, None, TASK_METRICS["stereo"], "rb.toml")
+    assert "is B safe to ship?\n" in md2 and "ship?." not in md2

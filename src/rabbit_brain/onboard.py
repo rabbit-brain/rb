@@ -223,6 +223,12 @@ class {cls}:
 '''
 
 
+def _sentence(text: str) -> str:
+    """Users type a phrase, not a sentence; close it so the paragraph does not run on."""
+    text = text.strip()
+    return text if not text or text[-1] in ".!?" else text + "."
+
+
 def integration_md(brief: BriefV1, adapter_id: Optional[str], metric: Metric, cfg_path: str) -> str:
     cls = class_name(brief)
     iters = brief.iterations or 12
@@ -235,7 +241,7 @@ def integration_md(brief: BriefV1, adapter_id: Optional[str], metric: Metric, cf
         f"**What you told us.** A {brief.task} model, {brief.architecture}, on {brief.framework}. "
         f"Cases in `{brief.data.path}` ({brief.data.kind} layout, ground truth: {brief.data.labels}). "
         f"{iters} refinement iterations per case. Error measured as {metric.name} in {metric.unit}."
-        + (f" The decision this has to support: {brief.compare}\n\n" if brief.compare else "\n\n")
+        + (f" The decision this has to support: {_sentence(brief.compare)}\n\n" if brief.compare else "\n\n")
     )
     if built_in:
         body = (

@@ -521,7 +521,10 @@ def cmd_onboard(args: argparse.Namespace, out: Out) -> int:
         loc = ".".join(str(p) for p in first.get("loc", ()))
         raise RBError("E_CONFIG_INVALID", message=f"{src}: {loc}: {first.get('msg', 'invalid')}. `rb schema brief` prints what each field expects.")
     result = write_package(brief, root, force=args.force, source=src)
-    out.say(f"Wrote {', '.join(result['files'])} in {result['dir']}.")
+    # "in ." followed by the full stop renders as "in ..", which reads as the parent directory
+    # in the first line of output a new user ever sees. Name the directory only when it is not this one.
+    where = "here" if result["dir"] in (".", "") else f"in {result['dir']}"
+    out.say(f"Wrote {', '.join(result['files'])} {where}.")
     if result["built_in"]:
         out.say(f"{brief.architecture} is covered by the built-in `{result['adapter']}` adapter, so there is nothing to write.")
     else:

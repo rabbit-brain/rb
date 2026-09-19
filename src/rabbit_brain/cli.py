@@ -213,11 +213,13 @@ def cmd_findings(args: argparse.Namespace, out: Out) -> int:
         f"Limits: +{plain(limits.max_regression)} {unit} · {pct(limits.max_late_share)} late · {limits.max_reversals} reversals" + (f" · +{plain(limits.max_trajectory_regression)} late movement" if limits.max_trajectory_regression is not None else ""),
         f"Verdict: {findings.verdict.line}",
         f"{s.cases} cases · mean {to_fixed(s.mean_error.baseline)} → {to_fixed(s.mean_error.candidate)} {unit} · {s.regressions} regressions · {s.unstable} unstable ({s.improved_unstable} pass on error) · {s.settled_regressions} settled regressions · {s.flagged} flagged"
+        + (f" · {s.borderline} borderline" if s.borderline else "")
         + (f" · checks {s.checks.passing} pass / {s.checks.failing} fail / {s.checks.missing} missing" if s.checks.saved else ""),
         "",
         f"{'rank':>4}  {'case':<24} {'current':>9} {'candidate':>9} {'change':>9}  {'late':>5} {'move':>7} {'rev':>3}  flags",
     )
     any_move = False
+    any_near = False
     for q in shown:
         late = pct(q.candidate_late_share) if q.candidate_late_share is not None else "n/a"
         move = signed(q.late_update_change) if q.late_update_change is not None else "-"
@@ -226,10 +228,15 @@ def cmd_findings(args: argparse.Namespace, out: Out) -> int:
         change = f"{signed(q.error_change)} {unit}" if q.error_change is not None else "no gt"
         cur = to_fixed(q.baseline_error) if q.baseline_error is not None else "-"
         cand = to_fixed(q.candidate_error) if q.candidate_error is not None else "-"
-        out.say(f"{q.rank:>4}  {q.id:<24} {cur:>9} {cand:>9} {change:>9}  {late:>5} {move:>7} {rev:>3}  {', '.join(q.flags) or '-'}")
+        any_near = any_near or bool(q.borderline)
+        flags = ", ".join(q.flags) or "-"
+        out.say(f"{q.rank:>4}  {q.id:<24} {cur:>9} {cand:>9} {change:>9}  {late:>5} {move:>7} {rev:>3}  {flags}{' (borderline)' if q.borderline else ''}")
     out.say("", f"{len(shown)} of {s.cases} cases shown (filter: {args.filter}, sort: {args.sort}); rank is the queue position under these limits.",
             f"late = candidate's share of refinement in the last third of its iterations; rev = its reversals"
             + (f"; move = candidate late movement minus the current model's, {unit} per iteration" if any_move else "") + ".")
+    if any_near:
+        out.say("borderline = the case turns on a margin of less than a tenth of a limit (one reversal, for the reversal limit), which is about "
+                "what the same checkpoints differ by on another GPU or torch build: a re-run elsewhere may sort it the other way.")
     out.data = {**findings.model_dump(exclude={"queue"}), "queue": [q.model_dump() for q in shown], "shown": len(shown), "filter": args.filter, "sort": args.sort}
     ref = out.ref or bundle.run_id
     if shown:

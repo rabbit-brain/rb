@@ -1,6 +1,7 @@
 # raft-kitti: model comparison
 
 Run: 20260918-1854-raft-kitti · rb 0.2.0.dev1 · finished 2026-09-18T18:54:47+00:00
+Report rendered by rb 0.2.1.dev1 from this run's bundle.json and record.json; the numbers are the run's, the wording and any later annotations are this version's.
 Command: `rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-kitti.pth --quiet`
 Baseline checkpoint: raft/models/raft-things.pth (sha256 fcfa4125d6418f4d…)
 Candidate checkpoint: raft/models/raft-kitti.pth (sha256 b9d170362415e1a2…)
@@ -23,22 +24,23 @@ Mean of case errors: 5.40 → 0.61 px. Cases are weighted equally; this is not a
 Regression threshold: increase greater than 0.3 px.
 0 of 200 cases regress on error.
 Stability limits: late revision ≤ 25%, reversals ≤ 2. 1 of 200 cases with trajectories are unstable; 1 of those pass on error.
+Borderline: 6 cases (000079_10, 000082_10, 000016_10, 000165_10, 000135_10, 000050_10), 1 of them flagged, turn on a margin of less than a tenth of a limit (one reversal, for the reversal limit). The same checkpoints on another GPU or torch build give per-case values that differ by about that much, so a re-run elsewhere may sort these cases the other way; the environment line above says which machine this was.
 
 | Case | Current (px) | Candidate (px) | Change (px) | Error | Candidate late revision | Stability |
 |---|---:|---:|---:|---|---|---|
-| 000079_10 | 4.68 | 0.78 | -3.90 | improved | 4% · 3 rev. | unstable |
+| 000079_10 | 4.68 | 0.78 | -3.90 | improved | 4% · 3 rev. | unstable (borderline) |
 | 000138_10 | 0.28 | 0.10 | -0.18 | stable | 5% · 0 rev. | settled |
 | 000139_10 | 0.25 | 0.06 | -0.19 | stable | 4% · 0 rev. | settled |
 | 000092_10 | 0.25 | 0.03 | -0.22 | stable | 5% · 0 rev. | settled |
 | 000156_10 | 0.28 | 0.02 | -0.25 | stable | 6% · 0 rev. | settled |
-| 000082_10 | 0.36 | 0.09 | -0.27 | stable | 2% · 0 rev. | settled |
-| 000016_10 | 0.36 | 0.07 | -0.29 | stable | 4% · 0 rev. | settled |
-| 000165_10 | 0.42 | 0.12 | -0.29 | stable | 1% · 0 rev. | settled |
-| 000135_10 | 0.42 | 0.13 | -0.30 | stable | 1% · 0 rev. | settled |
+| 000082_10 | 0.36 | 0.09 | -0.27 | stable | 2% · 0 rev. | settled (borderline) |
+| 000016_10 | 0.36 | 0.07 | -0.29 | stable | 4% · 0 rev. | settled (borderline) |
+| 000165_10 | 0.42 | 0.12 | -0.29 | stable | 1% · 0 rev. | settled (borderline) |
+| 000135_10 | 0.42 | 0.13 | -0.30 | stable | 1% · 0 rev. | settled (borderline) |
 | 000097_10 | 0.46 | 0.13 | -0.33 | improved | 3% · 0 rev. | settled |
 | 000140_10 | 0.46 | 0.12 | -0.33 | improved | 0% · 0 rev. | settled |
 | 000011_10 | 0.44 | 0.10 | -0.34 | improved | 3% · 0 rev. | settled |
-| 000050_10 | 0.39 | 0.05 | -0.34 | improved | 7% · 2 rev. | settled |
+| 000050_10 | 0.39 | 0.05 | -0.34 | improved | 7% · 2 rev. | settled (borderline) |
 | 000151_10 | 0.53 | 0.16 | -0.37 | improved | 1% · 0 rev. | settled |
 | 000155_10 | 0.47 | 0.10 | -0.37 | improved | 3% · 0 rev. | settled |
 | 000130_10 | 0.62 | 0.24 | -0.37 | improved | 1% · 0 rev. | settled |
@@ -83,7 +85,7 @@ Median / 90th percentile / max per model. Late share and reversals are what the 
 | raft-things | 200 | 5% / 8% / 23% | 0 / 0 / 1 | 0.302 / 1.152 / 26.888 | 0.040 / 0.083 / 0.481 | 44% / 54% / 61% | 2.598 / 8.447 / 63.417 |
 | raft-kitti | 200 | 1% / 3% / 7% | 0 / 0 / 3 | 0.074 / 0.183 / 0.662 | 0.009 / 0.022 / 0.061 | 42% / 47% / 53% | 0.958 / 2.139 / 4.333 |
 
-Limits in force: late share ≤ 25%, reversals ≤ 2, last update not limited (set `max_last_update` in rb.toml or `--max-last-update`).
+Limits in force: late share ≤ 25%, reversals ≤ 2, trajectory regression off (`max_trajectory_regression` in rb.toml), last update not limited.
 
 ## Reproduce
 

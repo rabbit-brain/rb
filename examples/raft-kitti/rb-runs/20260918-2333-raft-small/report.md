@@ -1,6 +1,7 @@
 # raft-kitti: model comparison
 
 Run: 20260918-2333-raft-small · rb 0.2.0.dev1 · finished 2026-09-18T23:33:57+00:00
+Report rendered by rb 0.2.1.dev1 from this run's bundle.json and record.json; the numbers are the run's, the wording and any later annotations are this version's.
 Command: `rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-small.pth --quiet --evidence standard --max-trajectory-regression 0.3 --runs-dir rb-runs-ev --json`
 Baseline checkpoint: raft/models/raft-things.pth (sha256 fcfa4125d6418f4d…)
 Candidate checkpoint: raft/models/raft-small.pth (sha256 c7d41b9cc88442bb…)
@@ -23,20 +24,21 @@ Mean of case errors: 5.40 → 8.46 px. Cases are weighted equally; this is not a
 Regression threshold: increase greater than 0.3 px.
 155 of 200 cases regress on error.
 Stability limits: late revision ≤ 25%, reversals ≤ 2, late movement above the current model's by more than 0.3 px (trajectory regression). 39 of 200 cases with trajectories are unstable; 0 of those pass on error.
+Borderline: 21 cases (000181_10, 000081_10, 000091_10, 000129_10, 000177_10, 000008_10, 000062_10, 000184_10, 000109_10, 000029_10, 000167_10, 000028_10 and 9 more), 19 of them flagged, turn on a margin of less than a tenth of a limit (one reversal, for the reversal limit). The same checkpoints on another GPU or torch build give per-case values that differ by about that much, so a re-run elsewhere may sort these cases the other way; the environment line above says which machine this was.
 
 | Case | Current (px) | Candidate (px) | Change (px) | Error | Candidate late revision | Stability |
 |---|---:|---:|---:|---|---|---|
 | 000095_10 | 2.97 | 25.18 | 22.21 | regression | 19% · 1 rev. | unstable |
 | 000190_10 | 15.03 | 33.78 | 18.74 | regression | 15% · 0 rev. | unstable |
 | 000148_10 | 7.82 | 21.87 | 14.05 | regression | 15% · 0 rev. | unstable |
-| 000181_10 | 13.90 | 25.60 | 11.69 | regression | 11% · 0 rev. | unstable |
+| 000181_10 | 13.90 | 25.60 | 11.69 | regression | 11% · 0 rev. | unstable (borderline) |
 | 000185_10 | 7.06 | 18.19 | 11.12 | regression | 9% · 0 rev. | unstable |
 | 000179_10 | 11.61 | 22.36 | 10.75 | regression | 10% · 0 rev. | unstable |
 | 000192_10 | 14.42 | 24.97 | 10.55 | regression | 9% · 0 rev. | unstable |
-| 000081_10 | 6.68 | 16.92 | 10.24 | regression | 12% · 0 rev. | unstable |
+| 000081_10 | 6.68 | 16.92 | 10.24 | regression | 12% · 0 rev. | unstable (borderline) |
 | 000111_10 | 6.16 | 16.05 | 9.90 | regression | 11% · 1 rev. | unstable |
 | 000194_10 | 11.97 | 20.44 | 8.48 | regression | 14% · 0 rev. | unstable |
-| 000091_10 | 6.91 | 15.07 | 8.17 | regression | 10% · 1 rev. | unstable |
+| 000091_10 | 6.91 | 15.07 | 8.17 | regression | 10% · 1 rev. | unstable (borderline) |
 | 000101_10 | 11.57 | 18.92 | 7.35 | regression | 11% · 0 rev. | unstable |
 | 000039_10 | 4.18 | 11.15 | 6.97 | regression | 10% · 0 rev. | unstable |
 | 000078_10 | 6.82 | 13.47 | 6.66 | regression | 10% · 0 rev. | unstable |
@@ -45,7 +47,7 @@ Stability limits: late revision ≤ 25%, reversals ≤ 2, late movement above th
 | 000068_10 | 10.17 | 16.27 | 6.10 | regression | 11% · 0 rev. | unstable |
 | 000182_10 | 14.92 | 20.99 | 6.07 | regression | 14% · 0 rev. | unstable |
 | 000040_10 | 4.47 | 10.31 | 5.84 | regression | 9% · 0 rev. | unstable |
-| 000129_10 | 6.10 | 11.93 | 5.83 | regression | 7% · 0 rev. | unstable |
+| 000129_10 | 6.10 | 11.93 | 5.83 | regression | 7% · 0 rev. | unstable (borderline) |
 | 000100_10 | 16.69 | 22.45 | 5.76 | regression | 13% · 0 rev. | unstable |
 | 000041_10 | 5.71 | 11.27 | 5.56 | regression | 10% · 0 rev. | unstable |
 | 000189_10 | 14.34 | 19.41 | 5.07 | regression | 10% · 0 rev. | unstable |
@@ -59,20 +61,20 @@ Stability limits: late revision ≤ 25%, reversals ≤ 2, late movement above th
 | 000193_10 | 20.64 | 23.98 | 3.33 | regression | 14% · 0 rev. | unstable |
 | 000061_10 | 15.95 | 19.22 | 3.27 | regression | 9% · 0 rev. | unstable |
 | 000056_10 | 6.87 | 9.78 | 2.91 | regression | 6% · 0 rev. | unstable |
-| 000177_10 | 4.10 | 6.63 | 2.52 | regression | 6% · 0 rev. | unstable |
+| 000177_10 | 4.10 | 6.63 | 2.52 | regression | 6% · 0 rev. | unstable (borderline) |
 | 000037_10 | 3.67 | 5.42 | 1.76 | regression | 6% · 0 rev. | unstable |
 | 000105_10 | 6.02 | 7.48 | 1.46 | regression | 10% · 0 rev. | unstable |
 | 000145_10 | 5.48 | 6.78 | 1.30 | regression | 14% · 0 rev. | unstable |
 | 000085_10 | 1.41 | 2.37 | 0.96 | regression | 8% · 0 rev. | unstable |
-| 000008_10 | 1.03 | 1.33 | 0.30 | regression | 12% · 2 rev. | unstable |
+| 000008_10 | 1.03 | 1.33 | 0.30 | regression | 12% · 2 rev. | unstable (borderline) |
 | 000103_10 | 17.45 | 41.86 | 24.41 | regression | 11% · 0 rev. | settled |
 | 000090_10 | 7.31 | 21.63 | 14.32 | regression | 12% · 0 rev. | settled |
-| 000062_10 | 10.42 | 22.03 | 11.61 | regression | 11% · 0 rev. | settled |
+| 000062_10 | 10.42 | 22.03 | 11.61 | regression | 11% · 0 rev. | settled (borderline) |
 | 000102_10 | 19.94 | 30.95 | 11.02 | regression | 8% · 0 rev. | settled |
 | 000146_10 | 6.63 | 16.25 | 9.62 | regression | 9% · 0 rev. | settled |
 | 000180_10 | 15.67 | 25.29 | 9.61 | regression | 10% · 0 rev. | settled |
 | 000147_10 | 12.04 | 21.43 | 9.40 | regression | 9% · 0 rev. | settled |
-| 000184_10 | 8.35 | 17.46 | 9.11 | regression | 9% · 0 rev. | settled |
+| 000184_10 | 8.35 | 17.46 | 9.11 | regression | 9% · 0 rev. | settled (borderline) |
 | 000073_10 | 9.76 | 18.80 | 9.04 | regression | 7% · 0 rev. | settled |
 | 000188_10 | 34.53 | 43.54 | 9.00 | regression | 15% · 1 rev. | settled |
 | 000110_10 | 3.25 | 11.44 | 8.19 | regression | 8% · 0 rev. | settled |
@@ -86,7 +88,7 @@ Stability limits: late revision ≤ 25%, reversals ≤ 2, late movement above th
 | 000074_10 | 10.57 | 16.52 | 5.95 | regression | 7% · 0 rev. | settled |
 | 000108_10 | 4.60 | 10.20 | 5.60 | regression | 8% · 0 rev. | settled |
 | 000063_10 | 10.11 | 15.68 | 5.57 | regression | 7% · 0 rev. | settled |
-| 000109_10 | 3.88 | 9.41 | 5.53 | regression | 7% · 0 rev. | settled |
+| 000109_10 | 3.88 | 9.41 | 5.53 | regression | 7% · 0 rev. | settled (borderline) |
 | 000197_10 | 4.60 | 10.08 | 5.49 | regression | 10% · 1 rev. | settled |
 | 000064_10 | 7.50 | 12.78 | 5.28 | regression | 6% · 0 rev. | settled |
 | 000198_10 | 4.00 | 9.11 | 5.10 | regression | 10% · 0 rev. | settled |
@@ -99,10 +101,10 @@ Stability limits: late revision ≤ 25%, reversals ≤ 2, late movement above th
 | 000176_10 | 31.11 | 34.96 | 3.84 | regression | 12% · 0 rev. | settled |
 | 000032_10 | 7.75 | 11.32 | 3.57 | regression | 7% · 0 rev. | settled |
 | 000045_10 | 6.26 | 9.83 | 3.57 | regression | 10% · 0 rev. | settled |
-| 000029_10 | 10.17 | 13.70 | 3.53 | regression | 9% · 0 rev. | settled |
+| 000029_10 | 10.17 | 13.70 | 3.53 | regression | 9% · 0 rev. | settled (borderline) |
 | 000077_10 | 3.44 | 6.89 | 3.45 | regression | 7% · 0 rev. | settled |
 | 000187_10 | 6.37 | 9.67 | 3.30 | regression | 7% · 0 rev. | settled |
-| 000167_10 | 0.89 | 4.04 | 3.15 | regression | 8% · 2 rev. | settled |
+| 000167_10 | 0.89 | 4.04 | 3.15 | regression | 8% · 2 rev. | settled (borderline) |
 | 000006_10 | 11.25 | 14.32 | 3.07 | regression | 5% · 0 rev. | settled |
 | 000060_10 | 8.74 | 11.78 | 3.04 | regression | 7% · 0 rev. | settled |
 | 000000_10 | 8.89 | 11.61 | 2.72 | regression | 11% · 0 rev. | settled |
@@ -112,25 +114,25 @@ Stability limits: late revision ≤ 25%, reversals ≤ 2, late movement above th
 | 000075_10 | 1.87 | 4.13 | 2.25 | regression | 8% · 0 rev. | settled |
 | 000093_10 | 3.34 | 5.59 | 2.25 | regression | 7% · 0 rev. | settled |
 | 000035_10 | 2.30 | 4.54 | 2.25 | regression | 5% · 0 rev. | settled |
-| 000028_10 | 5.07 | 7.29 | 2.23 | regression | 5% · 0 rev. | settled |
+| 000028_10 | 5.07 | 7.29 | 2.23 | regression | 5% · 0 rev. | settled (borderline) |
 | 000071_10 | 3.34 | 5.55 | 2.21 | regression | 8% · 0 rev. | settled |
 | 000128_10 | 2.27 | 4.45 | 2.18 | regression | 4% · 0 rev. | settled |
 | 000054_10 | 4.07 | 6.18 | 2.11 | regression | 5% · 0 rev. | settled |
 | 000157_10 | 5.44 | 7.49 | 2.05 | regression | 5% · 0 rev. | settled |
 | 000001_10 | 5.75 | 7.71 | 1.96 | regression | 6% · 0 rev. | settled |
-| 000067_10 | 8.94 | 10.84 | 1.89 | regression | 6% · 0 rev. | settled |
+| 000067_10 | 8.94 | 10.84 | 1.89 | regression | 6% · 0 rev. | settled (borderline) |
 | 000172_10 | 1.58 | 3.45 | 1.87 | regression | 4% · 0 rev. | settled |
 | 000020_10 | 4.33 | 6.17 | 1.84 | regression | 6% · 0 rev. | settled |
 | 000030_10 | 7.56 | 9.40 | 1.84 | regression | 12% · 0 rev. | settled |
 | 000143_10 | 3.62 | 5.40 | 1.78 | regression | 6% · 0 rev. | settled |
-| 000031_10 | 5.64 | 7.37 | 1.74 | regression | 9% · 0 rev. | settled |
+| 000031_10 | 5.64 | 7.37 | 1.74 | regression | 9% · 0 rev. | settled (borderline) |
 | 000136_10 | 6.48 | 8.21 | 1.73 | regression | 5% · 0 rev. | settled |
-| 000034_10 | 2.12 | 3.83 | 1.71 | regression | 6% · 0 rev. | settled |
+| 000034_10 | 2.12 | 3.83 | 1.71 | regression | 6% · 0 rev. | settled (borderline) |
 | 000027_10 | 5.00 | 6.70 | 1.70 | regression | 5% · 0 rev. | settled |
 | 000142_10 | 2.55 | 4.24 | 1.69 | regression | 4% · 0 rev. | settled |
 | 000088_10 | 3.73 | 5.24 | 1.50 | regression | 6% · 0 rev. | settled |
 | 000160_10 | 1.55 | 2.95 | 1.40 | regression | 4% · 0 rev. | settled |
-| 000058_10 | 24.61 | 26.01 | 1.39 | regression | 8% · 0 rev. | settled |
+| 000058_10 | 24.61 | 26.01 | 1.39 | regression | 8% · 0 rev. | settled (borderline) |
 | 000173_10 | 4.10 | 5.49 | 1.39 | regression | 5% · 0 rev. | settled |
 | 000026_10 | 1.83 | 3.20 | 1.37 | regression | 4% · 0 rev. | settled |
 | 000132_10 | 3.54 | 4.90 | 1.36 | regression | 5% · 0 rev. | settled |
@@ -163,7 +165,7 @@ Stability limits: late revision ≤ 25%, reversals ≤ 2, late movement above th
 | 000097_10 | 0.46 | 0.92 | 0.46 | regression | 9% · 0 rev. | settled |
 | 000113_10 | 1.56 | 2.01 | 0.45 | regression | 8% · 0 rev. | settled |
 | 000098_10 | 0.85 | 1.28 | 0.43 | regression | 2% · 0 rev. | settled |
-| 000024_10 | 1.14 | 1.57 | 0.43 | regression | 5% · 0 rev. | settled |
+| 000024_10 | 1.14 | 1.57 | 0.43 | regression | 5% · 0 rev. | settled (borderline) |
 | 000130_10 | 0.62 | 1.03 | 0.42 | regression | 2% · 0 rev. | settled |
 | 000171_10 | 0.79 | 1.20 | 0.41 | regression | 2% · 0 rev. | settled |
 | 000134_10 | 2.49 | 2.90 | 0.40 | regression | 5% · 0 rev. | settled |
@@ -179,8 +181,8 @@ Stability limits: late revision ≤ 25%, reversals ≤ 2, late movement above th
 | 000150_10 | 1.79 | 2.12 | 0.33 | regression | 5% · 0 rev. | settled |
 | 000023_10 | 3.40 | 3.73 | 0.33 | regression | 3% · 0 rev. | settled |
 | 000089_10 | 0.60 | 0.93 | 0.33 | regression | 9% · 0 rev. | settled |
-| 000083_10 | 0.72 | 1.04 | 0.32 | regression | 3% · 0 rev. | settled |
-| 000144_10 | 0.61 | 0.93 | 0.32 | regression | 6% · 0 rev. | settled |
+| 000083_10 | 0.72 | 1.04 | 0.32 | regression | 3% · 0 rev. | settled (borderline) |
+| 000144_10 | 0.61 | 0.93 | 0.32 | regression | 6% · 0 rev. | settled (borderline) |
 
 45 more cases, none of them flagged: all cases are in bundle.json and `rb findings <run> --filter all`.
 
@@ -227,7 +229,7 @@ Each case.png stacks the inputs, both flow fields with ground truth when present
 
 ## Reproduce
 
-- Ranked queue under the same limits: `rb findings 20260918-2333-raft-small --max-regression 0.3 --max-late-share 0.25 --max-reversals 2`
+- Ranked queue under the same limits: `rb findings 20260918-2333-raft-small --max-regression 0.3 --max-late-share 0.25 --max-reversals 2 --max-trajectory-regression 0.3`
 - One case with its evidence and reasoning: `rb case 20260918-2333-raft-small <case_id>`
 - Saved checks against this run: `rb check run 20260918-2333-raft-small --checks checks.json`
 - Definitions: `rb docs`. Schemas: `rb schema bundle|findings|checks|record`.

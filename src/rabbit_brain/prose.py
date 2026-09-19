@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from .fmt import pct, plain, to_fixed
 from .models import CaseV1, Limits
-from .stability import EPS, delta, error_outcome, is_settled, side_stats, trajectory_change, trajectory_regressed
+from .stability import EPS, borderline_scan, delta, error_outcome, is_flagged, is_settled, side_stats, stability_outcome, trajectory_change, trajectory_regressed
 
 
 def error_sentence(case: CaseV1, limits: Limits, unit: str) -> str:
@@ -86,8 +86,34 @@ def current_model_sentence(base, limits: Limits, short: bool = False) -> str:
     return f"Current model: {detail}, not settled either." if short else f"The current model is not settled on this case either ({detail})."
 
 
+OUTCOME_WORDS = {"regression": "a regression", "improved": "improved", "stable": "within tolerance", "settled": "settled", "unstable": "unstable"}
+LIMIT_WORDS = {
+    "max_regression": "the error limit",
+    "max_late_share": "the late-revision limit",
+    "max_reversals": "the reversal limit",
+    "max_trajectory_regression": "the late-movement limit",
+    "max_last_update": "the last-update limit",
+}
+
+
+def borderline_sentence(case: CaseV1, limits: Limits) -> str:
+    """Said only when it is true, and about the thing that actually moves: an error regression stays flagged
+    whatever its trajectory does, so for that case the fragile part is the stability wording, not the flag."""
+    names, moves, alts = borderline_scan(case, limits)
+    if not names:
+        return ""
+    which = " and ".join(LIMIT_WORDS[n] for n in names)
+    margin = "One reversal" if names == ["max_reversals"] else "A tenth of the limit"
+    if "flag" in moves:
+        tail = "may not flag it" if is_flagged(case, limits) else "may flag it"
+    else:
+        key = "stability" if "stability" in moves else "error"
+        tail = f"may call it {OUTCOME_WORDS.get(alts[key], alts[key])} instead"
+    return f"Borderline: {margin} either way on {which} changes this, so the same checkpoints on another GPU or torch build {tail}."
+
+
 def why(case: CaseV1, limits: Limits, unit: str) -> str:
-    return f"{error_sentence(case, limits, unit)} {stability_sentence(case, limits)}"
+    return " ".join(s for s in (error_sentence(case, limits, unit), stability_sentence(case, limits), borderline_sentence(case, limits)) if s)
 
 
 DEFINITIONS = (

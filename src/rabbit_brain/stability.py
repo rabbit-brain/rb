@@ -143,6 +143,65 @@ def is_flagged(case: CaseV1, limits: Limits) -> bool:
     return error_outcome(case, limits.max_regression) == "regression" or stability_outcome(case, limits) == "unstable"
 
 
+NEAR_LIMIT = 0.1          # a tenth of the limit, either way
+NEAR_REVERSALS = 1        # reversals are counted, so the step is one
+
+
+def _outcomes(case: CaseV1, limits: Limits) -> tuple[str, str]:
+    return error_outcome(case, limits.max_regression), stability_outcome(case, limits)
+
+
+def borderline_scan(case: CaseV1, limits: Limits) -> tuple[list[str], set[str], dict[str, str]]:
+    """The limits this case turns on, what moves when they do ("flag", "error", "stability"), and what the
+    case would be called instead."""
+    now = _outcomes(case, limits)
+    now_flagged = is_flagged(case, limits)
+    names: list[str] = []
+    moves: set[str] = set()
+    alts: dict[str, str] = {}
+    for name, step in (("max_regression", None), ("max_late_share", None), ("max_reversals", NEAR_REVERSALS),
+                       ("max_trajectory_regression", None), ("max_last_update", None)):
+        limit = getattr(limits, name, None)
+        if limit is None:
+            continue
+        span = step if step is not None else abs(limit) * NEAR_LIMIT
+        if span <= 0:
+            continue
+        hit = False
+        for d in (-span, span):
+            shifted = limits.model_copy(update={name: limit + d})
+            alt = _outcomes(case, shifted)
+            if alt == now:
+                continue
+            hit = True
+            if alt[0] != now[0]:
+                moves.add("error")
+                alts.setdefault("error", alt[0])
+            if alt[1] != now[1]:
+                moves.add("stability")
+                alts.setdefault("stability", alt[1])
+            if is_flagged(case, shifted) != now_flagged:
+                moves.add("flag")
+        if hit:
+            names.append(name)
+    return names, moves, alts
+
+
+def borderline(case: CaseV1, limits: Limits) -> list[str]:
+    """The limits that decide this case by less than a whisker: moving one of them a tenth either way
+    (one reversal, for the counted limit) changes what this case is called.
+
+    Any reported outcome counts, not only whether the case is flagged: a case that regressed on error is
+    flagged whatever its trajectory does, and its stability wording still moves between settled and unstable,
+    which is what a reader comparing two receipts sees.
+
+    It is a property of the margin, not of the model: the same checkpoints on another GPU or torch build give
+    per-case values that differ by about this much, so a borderline outcome is the one a re-run may not
+    reproduce. Nothing here changes an outcome; every flag stands as computed.
+    """
+    return borderline_scan(case, limits)[0]
+
+
 def priority(case: CaseV1, limits: Limits) -> int:
     """Cases that need a decision first: regression+unstable (3), regression (2), unstable (1), rest (0)."""
     regression = error_outcome(case, limits.max_regression) == "regression"
@@ -180,6 +239,9 @@ class SummaryNumbers:
         self.settled_regressions = sum(1 for o, s in zip(outcomes, stabilities) if o == "regression" and s == "settled")
         self.with_trajectories = sum(1 for c in cases if c.candidate_trajectory)
         self.flagged = sum(1 for c in cases if is_flagged(c, limits))
+        near = [c for c in cases if borderline(c, limits)]
+        self.borderline = len(near)
+        self.borderline_flagged = sum(1 for c in near if is_flagged(c, limits))
 
 
 def verdict_text(cases: Sequence[CaseV1], limits: Limits) -> dict:

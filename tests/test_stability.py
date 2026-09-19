@@ -150,3 +150,52 @@ def test_trajectory_regression_is_paired_and_off_for_import():
     # a candidate that moves less than the current model is never a trajectory regression
     quiet = CaseV1(id="c-3", name="Aisle", baseline_error=1.0, candidate_error=1.0, baseline_trajectory=moving, candidate_trajectory=settled)
     assert stability_outcome(quiet, lim) == "settled"
+
+
+def test_borderline_marks_the_outcomes_a_second_machine_moved():
+    """The rule exists because of a measured fact: the same checkpoints, data and code on another GPU and torch
+    build move per-case values enough to change an outcome. It must mark a case decided by that much, leave
+    a case decided by a wide margin alone, and never change an outcome itself."""
+    from rabbit_brain.models import CaseV1, Limits
+    from rabbit_brain.prose import why
+    from rabbit_brain.stability import borderline, flags_for, stability_outcome
+
+    settled = [2.0, 1.0, 0.5, 0.3, 0.2, 0.15, 0.1, 0.08, 0.06, 0.05, 0.04, 0.03]
+    lim = Limits(max_trajectory_regression=0.3)
+
+    def moving(late):   # a candidate whose last quarter sits at `late`, settled by the v1 rules
+        return [2.0, 1.0, 0.5, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, late, late, late]
+
+    # late movement 0.02 over the limit: flagged, and a tenth of the limit either way would unflag it
+    near = CaseV1(id="near", name="Near", baseline_error=1.0, candidate_error=1.0, baseline_trajectory=settled, candidate_trajectory=moving(0.35))
+    assert stability_outcome(near, lim) == "unstable" and "trajectory_regression" in flags_for(near, lim)
+    assert borderline(near, lim) == ["max_trajectory_regression"]
+    assert "Borderline" in why(near, lim, "px") and "may not flag it" in why(near, lim, "px")
+
+    # the other side of the line: not flagged, and just as fragile
+    under = CaseV1(id="under", name="Under", baseline_error=1.0, candidate_error=1.0, baseline_trajectory=settled, candidate_trajectory=moving(0.32))
+    assert stability_outcome(under, lim) == "settled"
+    assert borderline(under, lim) == ["max_trajectory_regression"] and "may flag it" in why(under, lim, "px")
+
+    # decided by a wide margin: not borderline on either side
+    far = CaseV1(id="far", name="Far", baseline_error=1.0, candidate_error=1.0, baseline_trajectory=settled, candidate_trajectory=moving(1.2))
+    assert stability_outcome(far, lim) == "unstable" and borderline(far, lim) == []
+    quiet = CaseV1(id="quiet", name="Quiet", baseline_error=1.0, candidate_error=1.0, baseline_trajectory=settled, candidate_trajectory=settled)
+    assert borderline(quiet, lim) == [] and "Borderline" not in why(quiet, lim, "px")
+
+    # the error limit counts too, and an error regression whose trajectory is borderline is still marked:
+    # it is flagged either way, but the receipt's stability column is what moves between two machines
+    edge = CaseV1(id="edge", name="Edge", baseline_error=1.0, candidate_error=1.31, baseline_trajectory=settled, candidate_trajectory=settled)
+    assert borderline(edge, lim) == ["max_regression"]
+    both = CaseV1(id="both", name="Both", baseline_error=1.0, candidate_error=3.0, baseline_trajectory=settled, candidate_trajectory=moving(0.35))
+    assert stability_outcome(both, lim) == "unstable" and borderline(both, lim) == ["max_trajectory_regression"]
+
+    # reversals are counted, so the step is one reversal, not a tenth
+    rev = CaseV1(id="rev", name="Rev", baseline_error=1.0, candidate_error=1.0, baseline_trajectory=settled,
+                 candidate_trajectory=[2.0, 1.0, 1.2, 0.5, 0.6, 0.3, 0.2, 0.15, 0.1, 0.08, 0.06, 0.05])
+    assert trajectory_stats(rev.candidate_trajectory).reversals == 2 == Limits().max_reversals
+    assert borderline(rev, lim) == ["max_reversals"] and "One reversal either way" in why(rev, lim, "px")
+
+    # nothing above changed an outcome
+    for c in (near, under, far, quiet, edge, both, rev):
+        assert stability_outcome(c, lim) == stability_outcome(c, lim) and error_outcome(c, lim.max_regression) == error_outcome(c, lim.max_regression)

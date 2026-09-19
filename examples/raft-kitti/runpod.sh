@@ -20,7 +20,7 @@ for t in git unzip curl; do
   command -v "$t" >/dev/null || { apt-get update -qq && apt-get install -y -qq "$t"; }
 done
 
-echo "== tool (runner is on main; PyPI 0.1.x has no rb run)"
+echo "== tool (main)"
 pip install -q "rabbit-brain[raft] @ https://github.com/rabbit-brain/rb/archive/refs/heads/main.tar.gz"
 rb version
 
@@ -50,6 +50,10 @@ echo "== project"
 rb init --project raft-kitti --adapter raft --model-code ./raft --dataset ./data/kitti2015/training --dataset-name kitti2015-train --iterations "$ITERS" --device cuda --force
 rb doctor --checkpoint raft/models/raft-things.pth --checkpoint raft/models/raft-sintel.pth --checkpoint raft/models/raft-kitti.pth --checkpoint raft/models/raft-small.pth
 rb verify-hook --checkpoint raft/models/raft-things.pth
+for m in raft-things raft-sintel raft-kitti raft-small; do
+  echo "== adapter agreement: $m (the adapter against RAFT's own evaluate.py path)"
+  rb verify-adapter --checkpoint "raft/models/$m.pth"
+done
 
 for cand in raft-sintel raft-kitti raft-small; do
   echo "== run: raft-things -> $cand ($ITERS iterations)"

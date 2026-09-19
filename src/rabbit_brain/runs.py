@@ -18,7 +18,7 @@ from .errors import RBError
 from .importer import parse_comparison_value
 from .models import (Bundle, CaseV2, CheckCounts, ChecksV2, ComparisonV1, DatasetRef, Findings, Limits, MeanError, ModelRef, QueueItem, Record, Summary, Verdict)
 from .prose import why
-from .stability import SummaryNumbers, case_stability, delta, error_outcome, flags_for, rank, stability_outcome, trajectory_change, trajectory_stats, verdict_text
+from .stability import SummaryNumbers, borderline, case_stability, delta, error_outcome, flags_for, rank, stability_outcome, trajectory_change, trajectory_stats, verdict_text
 
 DEFAULT_RUNS_DIR = "rb-runs"
 
@@ -86,6 +86,7 @@ def derive_case(case, limits: Limits) -> CaseV2:
         error_outcome=error_outcome(case, limits.max_regression),
         stability_outcome=stability_outcome(case, limits),
         flags=flags_for(case, limits),
+        borderline=borderline(case, limits),
         evidence=getattr(case, "evidence", None),
     )
 
@@ -143,14 +144,15 @@ def compute_findings(bundle: Bundle, limits: Optional[Limits] = None, checks: Op
             baseline_late_share=st.baseline.late_share if st.baseline else None, baseline_reversals=st.baseline.reversals if st.baseline else None,
             candidate_late_share=st.candidate.late_share if st.candidate else None, candidate_reversals=st.candidate.reversals if st.candidate else None,
             baseline_late_update=st.baseline.late_update if st.baseline else None, candidate_late_update=st.candidate.late_update if st.candidate else None,
-            late_update_change=trajectory_change(c),
+            late_update_change=trajectory_change(c), borderline=borderline(c, limits),
             why=why(c, limits, unit), notes=c.notes, evidence=(c.evidence.dir if c.evidence else None), rerun=None,
         ))
     summary = Summary(
         cases=s.cases, with_gt=s.with_gt, with_trajectories=s.with_trajectories,
         mean_error=MeanError(baseline=s.baseline, candidate=s.candidate, change_pct=s.change),
         regressions=s.regressions, improved=s.improved, stable=s.stable, unstable=s.unstable,
-        improved_unstable=s.unstable_passing, settled_regressions=s.settled_regressions, flagged=s.flagged, checks=counts,
+        improved_unstable=s.unstable_passing, settled_regressions=s.settled_regressions, flagged=s.flagged,
+        borderline=s.borderline, borderline_flagged=s.borderline_flagged, checks=counts,
     )
     return Findings(run_id=bundle.run_id, project=bundle.project, metric=bundle.metric, limits=limits, summary=summary,
                     verdict=Verdict(status=status, ready=v["ready"], line=line, start=v["start"], start_name=v["start_name"]), queue=queue)  # type: ignore[arg-type]

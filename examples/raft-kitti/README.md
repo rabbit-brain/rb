@@ -9,6 +9,24 @@ The receipts in `rb-runs/` are real runs of `rb run` on the official princeton-v
 | `20260918-1856-raft-small` | raft-things | raft-small | 5.40 → 8.46 px | Not ready: 155 error regressions |
 | `20260918-2333-raft-small` | raft-things | raft-small | 5.40 → 8.46 px | The same review rerun the next night with the trajectory-regression limit on (`--max-trajectory-regression 0.3`) and `--evidence standard`: Not ready: 155 error regressions, 39 unstable cases; 20 evidence sheets, all reproducing the run's numbers (`record.json` → `evidence.checks`) |
 
+## Run on a second machine
+
+All three reviews were run again on a different box (RTX 4090, torch 2.8 / CUDA 12.8, against the A5000 and torch 2.4 of the receipts above), from the same `runpod.sh`, same checkpoints, same 200 pairs.
+
+What reproduced: the adapter agreed with RAFT's own `evaluate.py` path to the last digit on all four checkpoints, both times. The error side of every review came out the same case for case: 1 regression for raft-sintel (000145_10), 0 for raft-kitti, 155 for raft-small, the same top of the queue, mean EPE within 0.003 px.
+
+What did not: per-case numbers are not bit-identical across hardware. 53 of the 200 cases differed by more than 0.01 px, 8 by more than 0.1 px, the largest 61.30 → 62.47 px on the hardest case in the set. That is enough to move a case across a limit, and six did. On raft-small, three cases became unstable and two settled (their late movement sits at 0.279 to 0.305 against a 0.3 px limit), so the count went 39 → 40; on raft-kitti, 000079_10 had 3 reversals on the A5000 and 2 on the 4090, so the one case that review named disappeared and the verdict went from "1 case improved but did not settle" to "nothing flagged".
+
+This is what the borderline marker is for, and these runs are the evidence for it: all six cases that moved are marked borderline by the A5000 numbers alone, without knowing the 4090's.
+
+`20260918-2333-raft-small/report.md` marks all five raft-small cases, and `20260918-1854-raft-kitti/report.md` marks 000079_10, on the line under the stability limits and in the table's stability column.
+
+```sh
+rb case rb-runs/20260918-1854-raft-kitti 000079_10        # "One reversal either way on the reversal limit changes this"
+```
+
+The four `report.md` files were re-rendered by 0.2.1 so the marks are readable here without installing anything, and each says so in its header; `bundle.json`, `record.json` and `findings.json` are untouched, so `rb report <run>` on them reproduces exactly the committed report. Read together: the review's verdict travels between machines, and the individual cases sitting on a threshold do not, which the tool now says on the case rather than leaving a colleague to discover it.
+
 raft-things is the checkpoint trained on synthetic data only; raft-sintel and raft-kitti are fine-tuned on real data (raft-kitti on this very training set, so its numbers are in-sample); raft-small is the smaller architecture, read from the checkpoint by the adapter. The out-of-sample review, raft-things → raft-sintel, is the honest headline: a candidate that improves the mean by 72% still regresses on one case, and the receipt names it.
 
 Read them with the tool:

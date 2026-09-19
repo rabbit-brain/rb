@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from typing import Optional, Sequence, Union
 
+from . import __version__
 from .checks import evaluate_check
 from .fmt import pct, plain, to_fixed
 from .models import Bundle, CheckV2, ComparisonV1, Findings, Limits, Record
-from .stability import SummaryNumbers, delta, error_outcome, rank, side_stats, stability_outcome, trajectory_stats
+from .stability import SummaryNumbers, borderline, delta, error_outcome, is_flagged, rank, side_stats, stability_outcome, trajectory_stats
 
 
 def _metric_parts(run: Union[ComparisonV1, Bundle]) -> tuple[str, str]:
@@ -39,7 +40,7 @@ def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequen
             return base
         so = stability_outcome(c, limits)
         so_text = "not assessed" if so == "not_assessed" else so
-        return f"{base} {f'{pct(stab.late_share)} · {stab.reversals} rev.' if stab else 'n/a'} | {so_text} |"
+        return f"{base} {f'{pct(stab.late_share)} · {stab.reversals} rev.' if stab else 'n/a'} | {so_text}{' (borderline)' if borderline(c, limits) else ''} |"
 
     if run.source == "example":
         source_line = "Illustrative example data. No model inference was performed.\n\n"
@@ -59,6 +60,19 @@ def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequen
     header = f"| Case | Current ({unit}) | Candidate ({unit}) | Change ({unit}) | Error |{' Candidate late revision | Stability |' if with_traj else ''}"
     divider = f"|---|---:|---:|---:|---|{'---|---|' if with_traj else ''}"
     ranked = rank(run.cases, limits)
+    near = [c for c in ranked if borderline(c, limits)]
+    borderline_line = ""
+    if near:
+        listed = ", ".join(c.id for c in near[:12]) + (f" and {len(near) - 12} more" if len(near) > 12 else "")
+        n_flagged = sum(1 for c in near if is_flagged(c, limits))
+        one = len(near) == 1
+        count = f"1 case ({listed}), {'flagged' if n_flagged else 'not flagged'}, turns" if one else f"{len(near)} cases ({listed}), {n_flagged} of them flagged, turn"
+        borderline_line = (
+            f"Borderline: {count} "
+            "on a margin of less than a tenth of a limit (one reversal, for the reversal limit). "
+            "The same checkpoints on another GPU or torch build give per-case values that differ by about that much, "
+            "so a re-run elsewhere may sort these cases the other way; the environment line above says which machine this was.\n"
+        )
     shown = ranked if len(ranked) <= max_rows else ranked[:max(max_rows, s.flagged)]  # every flagged case, then the top of the rest
     rows = "\n".join(row(c) for c in shown)
     if len(shown) < len(ranked):
@@ -70,7 +84,7 @@ def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequen
     return (
         f"# {run.project}: model comparison\n\n{source_line}Current: {baseline}\nCandidate: {candidate}\nDataset: {dataset}\nMetric: {metric_name} ({unit}), lower is better.\n\n"
         f"Mean of case errors: {to_fixed(s.baseline)} → {to_fixed(s.candidate)} {unit}. Cases are weighted equally; this is not a pooled per-pixel mean.\n"
-        f"Regression threshold: increase greater than {plain(limits.max_regression)} {unit}.\n{s.regressions} of {len(run.cases)} cases regress on error.\n{f'{s.not_measured} of {len(run.cases)} cases have no ground truth; their error was not measured.' + chr(10) if s.not_measured else ''}{stability_line}\n"
+        f"Regression threshold: increase greater than {plain(limits.max_regression)} {unit}.\n{s.regressions} of {len(run.cases)} cases regress on error.\n{f'{s.not_measured} of {len(run.cases)} cases have no ground truth; their error was not measured.' + chr(10) if s.not_measured else ''}{stability_line}{borderline_line}\n"
         f"{header}\n{divider}\n{rows}\n\n## Saved checks\n{check_lines}\n\n"
         "The check runner evaluates these supplied metrics and trajectories against the limits. It does not run inference or certify a model for deployment.\n"
     )
@@ -142,6 +156,8 @@ def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings
     prov: list[str] = []
     if record is not None:
         prov.append(f"Run: {record.run_id} · rb {record.rb_version} · finished {record.finished}")
+        if record.rb_version != __version__:
+            prov.append(f"Report rendered by rb {__version__} from this run's bundle.json and record.json; the numbers are the run's, the wording and any later annotations are this version's.")
         prov.append(f"Command: `{record.command}`")
         if record.input and record.input.get("path"):
             sha = record.input.get("sha256") or ""

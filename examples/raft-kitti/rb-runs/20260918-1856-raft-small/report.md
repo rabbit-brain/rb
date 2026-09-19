@@ -1,6 +1,7 @@
 # raft-kitti: model comparison
 
 Run: 20260918-1856-raft-small · rb 0.2.0.dev1 · finished 2026-09-18T18:56:44+00:00
+Report rendered by rb 0.2.1.dev1 from this run's bundle.json and record.json; the numbers are the run's, the wording and any later annotations are this version's.
 Command: `rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-small.pth --quiet`
 Baseline checkpoint: raft/models/raft-things.pth (sha256 fcfa4125d6418f4d…)
 Candidate checkpoint: raft/models/raft-small.pth (sha256 c7d41b9cc88442bb…)
@@ -23,6 +24,7 @@ Mean of case errors: 5.40 → 8.46 px. Cases are weighted equally; this is not a
 Regression threshold: increase greater than 0.3 px.
 155 of 200 cases regress on error.
 Stability limits: late revision ≤ 25%, reversals ≤ 2. 0 of 200 cases with trajectories are unstable; 0 of those pass on error.
+Borderline: 6 cases (000167_10, 000083_10, 000144_10, 000008_10, 000118_10, 000049_10), 4 of them flagged, turn on a margin of less than a tenth of a limit (one reversal, for the reversal limit). The same checkpoints on another GPU or torch build give per-case values that differ by about that much, so a re-run elsewhere may sort these cases the other way; the environment line above says which machine this was.
 
 | Case | Current (px) | Candidate (px) | Change (px) | Error | Candidate late revision | Stability |
 |---|---:|---:|---:|---|---|---|
@@ -95,7 +97,7 @@ Stability limits: late revision ≤ 25%, reversals ≤ 2. 0 of 200 cases with tr
 | 000193_10 | 20.64 | 23.98 | 3.33 | regression | 14% · 0 rev. | settled |
 | 000187_10 | 6.37 | 9.67 | 3.30 | regression | 7% · 0 rev. | settled |
 | 000061_10 | 15.95 | 19.22 | 3.27 | regression | 9% · 0 rev. | settled |
-| 000167_10 | 0.89 | 4.04 | 3.15 | regression | 8% · 2 rev. | settled |
+| 000167_10 | 0.89 | 4.04 | 3.15 | regression | 8% · 2 rev. | settled (borderline) |
 | 000006_10 | 11.25 | 14.32 | 3.07 | regression | 5% · 0 rev. | settled |
 | 000060_10 | 8.74 | 11.78 | 3.04 | regression | 7% · 0 rev. | settled |
 | 000056_10 | 6.87 | 9.78 | 2.91 | regression | 6% · 0 rev. | settled |
@@ -178,9 +180,9 @@ Stability limits: late revision ≤ 25%, reversals ≤ 2. 0 of 200 cases with tr
 | 000150_10 | 1.79 | 2.12 | 0.33 | regression | 5% · 0 rev. | settled |
 | 000023_10 | 3.40 | 3.73 | 0.33 | regression | 3% · 0 rev. | settled |
 | 000089_10 | 0.60 | 0.93 | 0.33 | regression | 9% · 0 rev. | settled |
-| 000083_10 | 0.72 | 1.04 | 0.32 | regression | 3% · 0 rev. | settled |
-| 000144_10 | 0.61 | 0.93 | 0.32 | regression | 6% · 0 rev. | settled |
-| 000008_10 | 1.03 | 1.33 | 0.30 | regression | 12% · 2 rev. | settled |
+| 000083_10 | 0.72 | 1.04 | 0.32 | regression | 3% · 0 rev. | settled (borderline) |
+| 000144_10 | 0.61 | 0.93 | 0.32 | regression | 6% · 0 rev. | settled (borderline) |
+| 000008_10 | 1.03 | 1.33 | 0.30 | regression | 12% · 2 rev. | settled (borderline) |
 
 45 more cases, none of them flagged: all cases are in bundle.json and `rb findings <run> --filter all`.
 
@@ -198,7 +200,7 @@ Median / 90th percentile / max per model. Late share and reversals are what the 
 | raft-things | 200 | 5% / 8% / 23% | 0 / 0 / 1 | 0.302 / 1.152 / 26.888 | 0.040 / 0.083 / 0.481 | 44% / 54% / 61% | 2.598 / 8.447 / 63.417 |
 | raft-small | 200 | 6% / 11% / 20% | 0 / 0 / 2 | 0.464 / 1.496 / 11.836 | 0.065 / 0.136 / 0.388 | 41% / 63% / 72% | 4.120 / 9.533 / 31.622 |
 
-Limits in force: late share ≤ 25%, reversals ≤ 2, last update not limited (set `max_last_update` in rb.toml or `--max-last-update`).
+Limits in force: late share ≤ 25%, reversals ≤ 2, trajectory regression off (`max_trajectory_regression` in rb.toml), last update not limited.
 
 ## Reproduce
 

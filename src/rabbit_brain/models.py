@@ -217,6 +217,7 @@ class CaseV2(CaseV1):
     error_outcome: ErrorOutcome = "stable"
     stability_outcome: StabilityOutcome = "not_assessed"
     flags: list[str] = Field(default_factory=list)
+    borderline: list[str] = Field(default_factory=list)   # limits this case turns on by less than a tenth of the limit
     evidence: Optional[Evidence] = None
 
 
@@ -302,6 +303,8 @@ class Summary(BaseModel):
     improved_unstable: int
     settled_regressions: int
     flagged: int
+    borderline: int = 0            # cases whose flag (or lack of one) turns on a margin of less than a tenth of a limit
+    borderline_flagged: int = 0    # of those, the ones that are flagged
     checks: CheckCounts = Field(default_factory=CheckCounts)
 
 
@@ -333,6 +336,7 @@ class QueueItem(BaseModel):
     baseline_late_update: Optional[float] = None
     candidate_late_update: Optional[float] = None
     late_update_change: Optional[float] = None
+    borderline: list[str] = Field(default_factory=list)   # limits this case turns on by less than a tenth of the limit
     why: str
     notes: Optional[str] = None
     evidence: Optional[str] = None

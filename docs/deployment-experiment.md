@@ -190,3 +190,11 @@ So the trajectory statistic correctly detects that a build did not settle, and a
 This does not refute the product's core claim, which concerns two genuinely different checkpoints on cases with no label, where `claude/real-weights-run.md` found rho about 0.9 between last-update magnitude and per-case error. The plausible reading is that trajectory carries information about model quality but not about numerical perturbation, which are different mechanisms.
 
 The open question it leaves, which should be answered before anything is sold: if an output difference ranks regressions as well as the trajectory does in the setting where ground truth is available to check, what is the argument for trusting the trajectory where it is not? Arm 3 (TensorRT, INT8) is not the next step. That question is.
+
+### Amendment 1a: the driver in the repository
+
+The fix described in amendment 1 was applied on the pod and the experiment ran with it, but the version committed at `1af9d03` did not carry it. The repository therefore described a fix it did not contain, which would have stopped anyone reproducing this from computing B1 at all.
+
+Corrected here. The committed driver now captures each build's output by wrapping `adapter.infer`, leaving `evaluate_model` and the evaluation path untouched, and writes the per-case mean endpoint difference between the two builds' flow fields onto each case as a `b1=` tag.
+
+**Honest limit on this artifact.** The committed version is a deterministic replay of the two string patches applied on the pod, from the same `1af9d03` starting point. It was not byte-compared against the copy that produced the results, which remains at `/workspace/exp/build_compare.py` on the pod volume. Anyone reproducing this should compare the two before relying on exact agreement.

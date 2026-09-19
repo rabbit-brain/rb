@@ -60,8 +60,17 @@ def build_adapter(cfg_path: Path, spec: dict, device: str | None):
     return cfg, load_adapter(cfg)
 
 
+def _as_array(x):
+    """A prediction's output as a plain float32 numpy array, batch dimension dropped."""
+    import numpy as np
+    if hasattr(x, "detach"):
+        x = x.detach().float().cpu().numpy()
+    a = np.asarray(x, dtype="float32")
+    return a[0] if a.ndim == 4 and a.shape[0] == 1 else a
+
+
 def evaluate_build(cfg_path: Path, spec: dict, checkpoint: Path, case_ids: list[str] | None,
-                   device: str | None, role: str, seed: int) -> tuple[dict, dict, dict]:
+                   device: str | None, role: str, seed: int, capture: dict | None = None) -> tuple[dict, dict, dict]:
     set_seeds(seed)
     cfg, adapter = build_adapter(cfg_path, spec, device)
     cases = list(adapter.cases())
@@ -72,6 +81,13 @@ def evaluate_build(cfg_path: Path, spec: dict, checkpoint: Path, case_ids: list[
         if missing:
             raise SystemExit(f"{len(missing)} case id(s) in the list are not in the dataset, e.g. {sorted(missing)[:3]}")
     print(f"  {role}: {spec}, {len(cases)} cases", file=sys.stderr)
+    if capture is not None:            # B1 needs the two builds' OUTPUTS, which are label-free;
+        _inner = adapter.infer         # the per-case error uses ground truth and is NOT B1.
+        def _infer(m, case, rec, __inner=_inner, __cap=capture):
+            pred = __inner(m, case, rec)
+            __cap[case.id] = _as_array(pred.output)
+            return pred
+        adapter.infer = _infer
     t0 = time.time()
     device = cfg.adapter.device or "cpu"
     model = adapter.load(checkpoint, device)
@@ -112,8 +128,23 @@ def main() -> int:
     if ref_spec == build_spec:
         raise SystemExit("reference and build are the same configuration; that comparison is empty")
 
-    ref, ref_meta, shared = evaluate_build(a.config, ref_spec, a.checkpoint, case_ids, a.device, "reference", a.seed)
-    bld, bld_meta, _ = evaluate_build(a.config, build_spec, a.checkpoint, case_ids, a.device, a.label, a.seed)
+    ref_out: dict = {}
+    bld_out: dict = {}
+    ref, ref_meta, shared = evaluate_build(a.config, ref_spec, a.checkpoint, case_ids, a.device, "reference", a.seed, ref_out)
+    bld, bld_meta, _ = evaluate_build(a.config, build_spec, a.checkpoint, case_ids, a.device, a.label, a.seed, bld_out)
+
+    # B1: mean endpoint difference between the two builds' outputs. No ground truth, no valid mask:
+    # this is what a plain output comparison gives you, and the baseline the trajectory rule must beat.
+    import numpy as np
+    b1: dict = {}
+    for cid in set(ref_out) & set(bld_out):
+        x, y = ref_out[cid], bld_out[cid]
+        if x.shape != y.shape:
+            continue
+        d = x - y
+        if d.ndim >= 3 and d.shape[0] == 2:          # (2, H, W) flow: L2 over the vector axis
+            d = np.sqrt((d ** 2).sum(axis=0))
+        b1[cid] = float(np.abs(d).mean())
 
     cases, skipped = [], []
     for cid in sorted(set(ref) | set(bld)):
@@ -123,6 +154,8 @@ def main() -> int:
             continue
         entry = {"id": cid, "name": cid,
                  "baseline_error": float(r["error"]), "candidate_error": float(b["error"])}
+        if cid in b1:
+            entry["tags"] = [f"b1={b1[cid]:.6g}"]      # carried through import; the analysis reads it back
         if r.get("trajectory"):
             entry["baseline_trajectory"] = [float(v) for v in r["trajectory"]]
         if b.get("trajectory"):

@@ -276,7 +276,7 @@ The archived driver, unmodified, re-run on the truncation configuration split:
 
 The machines differ: kernel 6.8.0-138 to 6.8.0-134, driver 580.178.04 to 580.159.04, different physical host. Same GPU model, same torch build, same CUDA, same Python.
 
-**Gate 4 is therefore stronger than it was recorded.** It was stated as bounding run-to-run variation on one GPU back to back. It also survives a different host, kernel and driver version. It still does not show cross-architecture reproduction, so `claude/cross-machine-reproduction.md` keeps its scope, but "same process, same allocation, same driver" is no longer an available explanation.
+**Gate 4 is therefore stronger than it was recorded.** It was stated as bounding run-to-run variation on one GPU back to back. It also held across this host, kernel and driver change, on this workload. Stated narrowly, because that is all it supports: it does not show cross-architecture reproduction, and one benign host change does not make host changes generally benign. `claude/cross-machine-reproduction.md` keeps both its scope and its confound. What this rules out is only that gate 4's zero variance was an artifact of the same process, the same allocation and the same driver.
 
 The same comparison against all five archived runs is identical on every field, so the new driver's coarse channel is the old driver's coarse channel. Two identical runs of the corrected channel also differ by exactly zero, so gate 4 covers it too.
 

@@ -9,7 +9,12 @@ receipt records the architecture of each checkpoint. Dataset: KITTI-style direct
 only stability is assessed.
 
 The trajectory is recorded without touching RAFT's code: a forward hook on `model.update_block`, whose output is
-`(net, up_mask, delta_flow)`. Per-case error is RAFT's own KITTI evaluation: mean endpoint error over valid pixels.
+`(net, up_mask, delta_flow)`. Index 2, `delta_flow`, is what gets recorded: the coarse update at 1/8 resolution,
+scaled by 8. Read that as the refinement of RAFT's internal flow field rather than the movement of the upsampled
+output, because full RAFT spreads each coarse update across its 8x8 block using the learned mask at index 1, which
+the hook never reads. For RAFT the two track each other closely: the output moves about three quarters as far, and
+the two rank cases the same to a Spearman correlation of 0.999, measured in `docs/deployment-experiment.md`,
+amendment 2. Per-case error is RAFT's own KITTI evaluation: mean endpoint error over valid pixels.
 """
 from __future__ import annotations
 
@@ -32,7 +37,9 @@ class RaftAdapter:
     task = "flow"
     metric = Metric(id="mean_endpoint_error", name="mean endpoint error", unit="px")
     synthetic = False
-    trajectory_scale = 8.0  # update_block's delta_flow is at 1/8 resolution; times 8 it is in image pixels, like the error
+    # delta_flow is at 1/8 resolution, so times 8 it is in image pixels and comparable to the error. Approximate by
+    # construction: the learned upsampling mask means the output moves a little less than this. See the module docstring.
+    trajectory_scale = 8.0
 
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg

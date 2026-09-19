@@ -16,6 +16,11 @@ per-pixel update vector, averaged over the valid region):
         model(image1, image2, iters=12, test_mode=True)      #     RAFT's update_block returns (net, mask, delta_flow)
     trajectory = rec.values
 
+The trajectory is only as faithful as the field you record, and `convergence()` inherits whatever you give it. If
+your model transforms its update before it reaches the output, by upsampling it with learned weights for instance,
+then record the output's own movement instead, or record both and compare; the RAFT adapter's docstring works
+through one such case.
+
 Works with torch tensors, numpy arrays and nested lists. With tensors or arrays the recorder also keeps the update
 fields for the case and `convergence()` computes the paper's per-case statistics from them: direction reversals
 between consecutive updates (cosine < 0), the distance of every intermediate estimate from the final one, and the

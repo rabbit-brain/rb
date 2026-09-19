@@ -109,3 +109,21 @@ No significance testing at one model, one checkpoint and one build pair. This is
 - RAFT's native mixed precision applies autocast selectively and restores some features to full precision, so it is a mild perturbation next to INT8 or a compiled engine. A null result here does not rule out an effect in harsher builds, and must not be reported as if it did.
 - The repeatability estimate comes from two runs per configuration. Two runs bound run-to-run variation loosely and say nothing about variation across drivers, GPUs or library versions.
 - The outcome measure uses ground truth that a customer in the intended setting may not have. What this experiment establishes about ranking must be re-established against their acceptance tests, not assumed.
+
+## 11. Pre-registration record
+
+Appended before any measured run, which section 1 permits: the file is closed to edits from the first measured run onward, and to amendments only after that.
+
+| Item | Value |
+|---|---|
+| Protocol, first version | `b8aadac` |
+| **Protocol, frozen version (attach this to results)** | **`2bbaaec`** |
+| `rb.toml`, reference precision, 12 iterations | not yet committed |
+| `rb.toml`, RAFT native mixed precision, 12 iterations | not yet committed |
+| `rb.toml`, reference precision, 8 iterations | not yet committed |
+| Split seed and the two case lists | not yet committed |
+| First measured run | not yet performed |
+
+`b8aadac` framed the truncation arm as a positive control, compared the restricted analysis against chance rather than against the output difference's own continuous score, described the repeatability estimate as a noise floor, and recognised only two outcomes. `2bbaaec` corrects all four. Both predate any run, and the difference between them is public so that the tightening cannot be mistaken for post-hoc selection.
+
+The remaining rows are filled in, and this table committed again, at the moment the diagnostics are frozen and before the held-out half is touched.

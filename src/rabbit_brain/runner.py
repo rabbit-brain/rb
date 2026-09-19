@@ -133,7 +133,7 @@ def hook_status(results: dict[str, dict], expected: Optional[int], record_trajec
 def run(cfg: Config, baseline: Path, candidate: Path, *, limits: Optional[Limits] = None, runs_dir: Path, command: str,
         device: Optional[str] = None, seed: int = 0, no_trajectories: bool = False, limit: Optional[int] = None,
         baseline_name: Optional[str] = None, candidate_name: Optional[str] = None, checks: Optional[ChecksV2] = None,
-        progress: Progress = None, evidence: Optional[str] = None) -> tuple[Path, Bundle, Record, Any, str]:
+        progress: Progress = None, evidence: Optional[str] = None, skip_reference: bool = False) -> tuple[Path, Bundle, Record, Any, str]:
     started = datetime.now().astimezone()
     t0 = time.time()
     limits = limits or cfg.limits
@@ -153,12 +153,22 @@ def run(cfg: Config, baseline: Path, candidate: Path, *, limits: Optional[Limits
     if progress:
         progress(f"{len(cases)} cases · adapter {adapter.describe().get('id', '?')} · device {device}")
 
+    # adapter agreement first: findings are only evidence when the adapter reproduces the model repository's own evaluation
+    reference_limit = 0 if skip_reference else cfg.adapter.reference_cases
+    agreement: dict[str, dict] = {}
     model = adapter.load(baseline, device)
+    agreement["baseline"] = adapter_agreement(adapter, model, cases, reference_limit, baseline)
+    _refuse_on_disagreement(agreement["baseline"], "baseline", progress)
     base_results = evaluate_model(adapter, model, cases, record_trajectories=not no_trajectories, role="baseline", progress=progress)
     del model
     model = adapter.load(candidate, device)
+    agreement["candidate"] = adapter_agreement(adapter, model, cases, reference_limit, candidate)
+    _refuse_on_disagreement(agreement["candidate"], "candidate", progress)
     cand_results = evaluate_model(adapter, model, cases, record_trajectories=not no_trajectories, role="candidate", progress=progress)
     del model
+    if skip_reference:
+        for a in agreement.values():
+            a["status"], a["note"] = "skipped", "--skip-reference: the adapter was not checked against the model repository's own evaluation for this run"
 
     skipped = {cid: {"baseline": base_results[cid]["skipped"], "candidate": cand_results[cid]["skipped"]} for cid in ids if base_results[cid]["skipped"] or cand_results[cid]["skipped"]}
     kept = [c for c in cases if c.id not in skipped]
@@ -192,6 +202,7 @@ def run(cfg: Config, baseline: Path, candidate: Path, *, limits: Optional[Limits
         started=started.isoformat(timespec="seconds"), finished=finished.isoformat(timespec="seconds"), wall_seconds=round(time.time() - t0, 3),
         source="run", checkpoints={"baseline": base_ref, "candidate": cand_ref}, dataset=dataset,
         environment=environment_info(device), hook=hook, limits=limits,
+        adapter_agreement=agreement,
         adapter=describe, model_code={"path": describe.get("model_code"), **(describe.get("git_sha") or {})} if describe.get("model_code") else None,
         seeds=seeds, deterministic_algorithms=deterministic,
         input={"format": "run", "dataset_path": cfg.dataset.path, "cases_selector": cfg.dataset.cases, "limit": limit},
@@ -277,6 +288,67 @@ def verify_hook(cfg: Config, checkpoint: Optional[Path], device: Optional[str] =
         problems.append("A trajectory needs at least 2 iterations.")
     return {"ok": not problems, "case": case.id, "fired": len(values), "expected": expected, "values": values, "seconds": round(time.time() - t0, 3), "problems": problems,
             "adapter": adapter.describe(), "device": device}
+
+
+def _refuse_on_disagreement(agreement: dict, role: str, progress: Progress = None) -> None:
+    if agreement.get("status") == "disagree":
+        worst = max(agreement["per_case"], key=lambda r: r["diff"])
+        raise RBError("E_ADAPTER_DISAGREES", message=(
+            f"The {role} checkpoint's adapter results disagree with the model repository's own evaluation on "
+            f"{len(agreement['disagreeing'])} of {agreement['cases']} cases (worst {worst['id']}: adapter {worst['adapter']:.4g} vs reference {worst['reference']:.4g}). "
+            f"Nothing was written."))
+    if progress and agreement.get("status") == "agree":
+        progress(f"{role}: adapter agrees with the reference evaluation on {agreement['cases']} cases (max diff {agreement['max_abs_diff']:.2g})")
+    elif progress and agreement.get("status") == "not_available":
+        progress(f"{role}: adapter agreement not established ({agreement.get('note', '')})")
+
+
+REFERENCE_TOLERANCE = 1e-3   # relative to max(1, |value|); the two paths run the same weights on the same tensors
+
+
+def adapter_agreement(adapter: Any, model: Any, cases: list[Case], limit: int, checkpoint: Optional[Path] = None) -> dict:
+    """Compare the adapter's per-case error (infer + metric_value) with the model repository's own evaluation
+    (adapter.reference_value) on the first `limit` labeled cases. Status: agree | disagree | not_available."""
+    ref_fn = getattr(adapter, "reference_value", None)
+    description = adapter.reference_description() if hasattr(adapter, "reference_description") else None
+    base = {"checkpoint": str(checkpoint) if checkpoint else None, "reference": description, "tolerance": REFERENCE_TOLERANCE}
+    if ref_fn is None:
+        return {**base, "status": "not_available", "cases": 0, "note": "The adapter provides no reference path (reference_value); agreement with the model repository's own evaluation is not established."}
+    if limit <= 0:
+        return {**base, "status": "skipped", "cases": 0, "note": "reference_cases = 0"}
+    scale = float(getattr(adapter, "trajectory_scale", 1.0) or 1.0)
+    rows: list[dict] = []
+    t0 = time.time()
+    for case in cases:
+        if case.gt is None:
+            continue
+        if len(rows) >= limit:
+            break
+        rec = TrajectoryRecorder(scale=scale, keep_fields=False)
+        ours = adapter.metric_value(adapter.infer(model, case, rec), case)
+        theirs = ref_fn(model, case)
+        if ours is None or theirs is None:
+            continue
+        diff = abs(float(ours) - float(theirs))
+        rows.append({"id": case.id, "adapter": float(ours), "reference": float(theirs), "diff": diff,
+                     "agree": diff <= REFERENCE_TOLERANCE * max(1.0, abs(float(theirs)))})
+    if not rows:
+        return {**base, "status": "not_available", "cases": 0, "note": "No labeled case to compare (the reference path needs ground truth)."}
+    max_diff = max(r["diff"] for r in rows)
+    status = "agree" if all(r["agree"] for r in rows) else "disagree"
+    return {**base, "status": status, "cases": len(rows), "max_abs_diff": max_diff, "disagreeing": [r["id"] for r in rows if not r["agree"]],
+            "per_case": rows, "seconds": round(time.time() - t0, 3)}
+
+
+def verify_adapter(cfg: Config, checkpoint: Path, device: Optional[str] = None, limit: int = 5) -> dict:
+    device = device or cfg.adapter.device
+    adapter = load_adapter(cfg)
+    model = adapter.load(checkpoint, device)
+    cases = list(adapter.cases())
+    result = adapter_agreement(adapter, model, cases, limit, checkpoint)
+    result["device"] = device
+    result["adapter"] = adapter.describe()
+    return result
 
 
 def doctor(cfg: Optional[Config], checkpoints: list[Path], device: Optional[str] = None) -> list[dict]:

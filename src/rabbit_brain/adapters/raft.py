@@ -195,6 +195,52 @@ class RaftAdapter:
     def expected_iterations(self) -> Optional[int]:
         return self.iterations
 
+    # ---- reference path: RAFT's own evaluation, sharing no code with infer/metric_value above
+
+    def reference_description(self) -> str:
+        return ("RAFT's own evaluation path: core/datasets.py KITTI loader, InputPadder(mode='kitti'), RAFT.forward(test_mode=True), "
+                "and the per-image EPE over valid pixels from evaluate.py validate_kitti")
+
+    def _reference_dataset(self):
+        if getattr(self, "_ref_ds", None) is not None:
+            return self._ref_ds
+        self._import()
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("rb_raft_reference_datasets", self.model_code / "core" / "datasets.py")  # by path: a `datasets` package on the machine must not shadow RAFT's
+        raft_datasets = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(raft_datasets)
+        except ImportError as exc:  # RAFT's data code needs torchvision (its augmentor); the reference path is RAFT's own loader, so it needs it too
+            raise RBError("E_ADAPTER_IMPORT", message=f"RAFT's core/datasets.py did not import ({exc}); the reference evaluation path needs RAFT's own requirements (pip install torchvision).")
+        root = self.data_path
+        ds = raft_datasets.KITTI(split=root.name, root=str(root.parent))
+        if root.name != "training":  # RAFT only lists flow_occ for a directory called training; list it the same way for any name
+            ds.flow_list = sorted(glob(str(root / "flow_occ" / "*_10.png")))
+        self._ref_index = {Path(info[0]).stem: i for i, info in enumerate(ds.extra_info)}
+        self._ref_ds = ds
+        return ds
+
+    def reference_value(self, model: Any, case: Case) -> Optional[float]:
+        """Per-case EPE through RAFT's own code path (datasets.KITTI, InputPadder, forward, validate_kitti's formula)."""
+        if case.gt is None or not (isinstance(case.inputs, tuple) and isinstance(case.inputs[0], str)):
+            return None
+        torch = self._torch
+        ds = self._reference_dataset()
+        idx = self._ref_index.get(case.id)
+        if idx is None or idx >= len(ds.flow_list):
+            return None
+        device = next(model.parameters()).device
+        image1, image2, flow_gt, valid_gt = ds[idx]
+        image1, image2 = image1[None].to(device), image2[None].to(device)
+        padder = self._utils.InputPadder(image1.shape, mode="kitti")
+        image1, image2 = padder.pad(image1, image2)
+        with torch.no_grad():
+            _, flow_pr = model(image1, image2, iters=self.iterations, test_mode=True)
+        flow = padder.unpad(flow_pr[0]).cpu()
+        epe = torch.sum((flow - flow_gt) ** 2, dim=0).sqrt().view(-1)   # validate_kitti, verbatim
+        val = valid_gt.view(-1) >= 0.5
+        return float(epe[val].mean().item())
+
     # ---- evidence (optional adapter methods)
 
     def read_images(self, case: Case) -> Optional[list]:

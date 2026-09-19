@@ -117,6 +117,24 @@ def convergence_section(bundle: Bundle, limits: Limits) -> str:
     )
 
 
+def agreement_line(agreement: dict, unit: str) -> str:
+    """One line per run: did the adapter reproduce the model repository's own evaluation, on how many cases, how closely."""
+    parts = []
+    for role in ("baseline", "candidate"):
+        a = agreement.get(role) or {}
+        status = a.get("status")
+        if status == "agree":
+            parts.append(f"{role} agrees with the reference evaluation on {a['cases']} cases (max |diff| {a['max_abs_diff']:.2g} {unit})")
+        elif status == "disagree":
+            parts.append(f"{role} DISAGREES with the reference evaluation on {len(a['disagreeing'])} of {a['cases']} cases")
+        elif status == "skipped":
+            parts.append(f"{role} not checked ({a.get('note', 'skipped')})")
+        elif status == "not_available":
+            parts.append(f"{role} not established (no reference path in the adapter)")
+    ref = (agreement.get("baseline") or {}).get("reference") or (agreement.get("candidate") or {}).get("reference")
+    return "; ".join(parts) + (f". Reference: {ref}." if ref else ".")
+
+
 def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings, checks: Sequence[CheckV2] = ()) -> str:
     """The receipt: provenance header, verdict, the workspace-identical core, and how to reproduce."""
     core = report_core(bundle, findings.limits, checks)
@@ -142,6 +160,8 @@ def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings
             prov.append(f"Model code: {mc['path']}" + (f" @ {mc['sha'][:12]}{' (uncommitted changes)' if mc.get('dirty') else ''}" if mc.get("sha") else ""))
         hook = record.hook or {}
         prov.append(f"Trajectories: {hook.get('status', 'unknown')}{'. ' + hook['note'] if hook.get('note') else ''}")
+        if record.adapter_agreement:
+            prov.append("Adapter agreement: " + agreement_line(record.adapter_agreement, bundle.metric.unit))
     else:
         prov.append(f"Run: {bundle.run_id} (read in place, no record)")
     verdict = f"## Verdict\n\n{findings.verdict.line}\n"

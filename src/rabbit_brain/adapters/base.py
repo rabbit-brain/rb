@@ -45,6 +45,11 @@ class Adapter(Protocol):
     # optional, for evidence rendering (rb case --render, rb run --evidence):
     #   read_images(case) -> list of HxWx3 uint8 arrays | None
     #   read_gt(case) -> (field HxWxC float32, valid HxW bool) | None     the prediction's output must be the same field shape
+    # optional, for adapter agreement (rb verify-adapter, and rb run before it evaluates anything):
+    #   reference_value(model, case) -> float | None   the same per-case error computed through the model repository's OWN
+    #       evaluation path (its data loader, its forward, its metric formula), sharing no code with infer/metric_value.
+    #       rb compares the two on a few cases and refuses to build findings on an adapter that disagrees with its reference.
+    #   reference_description() -> str                 what that path is, for the receipt
 
 
 TASK_METRICS: dict[str, Metric] = {

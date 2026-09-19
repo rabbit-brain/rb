@@ -5,7 +5,7 @@ CLI: `rb`. Docs for agents and humans: `rb docs` (AGENTS.md).
 """
 from __future__ import annotations
 
-__version__ = "0.2.0"
+__version__ = "0.2.1.dev1"
 
 from .recorder import TrajectoryRecorder  # noqa: E402
 

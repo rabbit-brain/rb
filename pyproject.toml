@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rabbit-brain"
-version = "0.2.0"
+version = "0.2.1.dev1"
 description = "Release review for iterative perception models: rank the cases that regressed or never settled, keep checks for the next checkpoint."
 readme = "README.md"
 license = "Apache-2.0"
@@ -30,7 +30,7 @@ dependencies = ["pydantic>=2.5,<3", "tomli>=2; python_version < '3.11'"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "build>=1.2", "twine>=5"]
-raft = ["torch", "numpy", "opencv-python-headless", "scipy", "pillow"]
+raft = ["torch", "torchvision", "numpy", "opencv-python-headless", "scipy", "pillow"]
 
 [project.urls]
 Homepage = "https://github.com/rabbit-brain/rb"

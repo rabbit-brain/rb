@@ -28,6 +28,8 @@ def test_synthetic_demo_end_to_end(workdir, capsys):
     assert code == 0 and env.data["ok"] and {c["check"] for c in env.data["checks"]} >= {"config", "adapter", "dataset", "hook"}
     code, env, _ = run_json(capsys, "verify-hook", "--checkpoint", "ckpt/synth-candidate.json")
     assert code == 0 and env.data["ok"] and env.data["fired"] == 12 == env.data["expected"]
+    code, env, _ = run_json(capsys, "verify-adapter", "--checkpoint", "ckpt/synth-candidate.json")
+    assert code == 0 and env.data["status"] == "not_available" and "reference_value" in env.data["note"]
     code, env, _ = run_json(capsys, "run", "--baseline", "ckpt/synth-current.json", "--candidate", "ckpt/synth-candidate.json", "--quiet")
     assert code == 0 and env.ok and env.run_id
     run_id = env.run_id
@@ -123,12 +125,18 @@ def test_raft_adapter_mechanics(workdir, capsys):
     assert code == 0, env.data
     code, env, _ = run_json(capsys, "verify-hook", "--checkpoint", "ckpt/raft-a.pth", "--device", "cpu")
     assert code == 0 and env.data["fired"] == 12 and env.data["case"] == "000000_10", env.data
+    # adapter agreement: the adapter's per-case error must reproduce RAFT's own evaluation path on a few cases
+    code, env, text = run_json(capsys, "verify-adapter", "--checkpoint", "ckpt/raft-a.pth", "--device", "cpu")
+    assert code == 0 and env.data["status"] == "agree" and env.data["cases"] == 2 and env.data["max_abs_diff"] <= 1e-3, env.data
+    assert "datasets.py" in env.data["reference"] and [r["id"] for r in env.data["per_case"]] == ["000000_10", "000001_10"]
     code, env, _ = run_json(capsys, "run", "--baseline", "ckpt/raft-a.pth", "--candidate", "ckpt/raft-b.pth", "--device", "cpu", "--quiet")
     assert code == 0, env.errors
     s = env.data["summary"]
     assert s["cases"] == 3 and s["with_gt"] == 2 and s["with_trajectories"] == 3 and env.data["hook"]["verified"] is True
     record = json.loads((workdir / "rb-runs" / env.run_id / "record.json").read_text())
     assert record["adapter"]["id"] == "raft" and record["model_code"]["sha"] and record["environment"]["torch"]
+    assert {record["adapter_agreement"][r]["status"] for r in ("baseline", "candidate")} == {"agree"} and record["adapter_agreement"]["candidate"]["cases"] == 2
+    assert "Adapter agreement: baseline agrees with the reference evaluation on 2 cases" in (workdir / "rb-runs" / env.run_id / "report.md").read_text()
     assert record["adapter"]["architectures"] == {"ckpt/raft-a.pth": "raft-small", "ckpt/raft-b.pth": "raft"}
     bundle = json.loads((workdir / "rb-runs" / env.run_id / "bundle.json").read_text())
     unlabeled = next(c for c in bundle["cases"] if c["id"] == "000002_10")
@@ -173,3 +181,17 @@ def test_raft_adapter_mechanics(workdir, capsys):
     Path("ckpt/other.pth").write_bytes(b"not a checkpoint")
     code, env, _ = run_json(capsys, "verify-hook", "--checkpoint", "ckpt/other.pth", "--device", "cpu")
     assert code == 2 and env.errors[0].code == "E_CHECKPOINT_NOT_FOUND", env.errors
+    # the paper's bug class: an adapter that feeds the encoder the wrong input range. Shapes fine, numbers finite, all wrong.
+    # rb verify-adapter names the disagreement, rb run refuses to write a run on it, --skip-reference runs and says so.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    Path("rb.toml").write_text(Path("rb.toml").read_text().replace('id = "raft"', 'module = "broken_adapter:HalfRangeRaft"'))
+    code, env, _ = run_json(capsys, "verify-adapter", "--checkpoint", "ckpt/raft-a.pth", "--device", "cpu")
+    assert code == 3 and env.errors[0].code == "E_ADAPTER_DISAGREES" and "adapter" in env.errors[0].message and env.data["status"] == "disagree", env.errors
+    assert env.data["disagreeing"] == ["000000_10", "000001_10"] and all(r["diff"] > 1e-3 for r in env.data["per_case"])
+    before = sorted(p.name for p in (workdir / "rb-runs").iterdir())
+    code, env, _ = run_json(capsys, "run", "--baseline", "ckpt/raft-a.pth", "--candidate", "ckpt/raft-b.pth", "--device", "cpu", "--quiet")
+    assert code == 3 and env.errors[0].code == "E_ADAPTER_DISAGREES" and "Nothing was written" in env.errors[0].message
+    assert sorted(p.name for p in (workdir / "rb-runs").iterdir()) == before
+    code, env, _ = run_json(capsys, "run", "--baseline", "ckpt/raft-a.pth", "--candidate", "ckpt/raft-b.pth", "--device", "cpu", "--quiet", "--skip-reference")
+    assert code == 0 and env.data["adapter_agreement"]["baseline"]["status"] == "skipped", env.errors
+    assert "Adapter agreement: baseline not checked (--skip-reference" in (workdir / "rb-runs" / env.run_id / "report.md").read_text()

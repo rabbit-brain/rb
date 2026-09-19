@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (in development): adapter agreement
+- An adapter must reproduce the model repository's own evaluation before its results count. Adapters may state a reference path (`reference_value(model, case)`: the per-case error through the repository's own loader, forward call and metric formula, sharing no code with `infer` / `metric_value`); `rb verify-adapter --checkpoint <ckpt>` compares the two on a few cases, and `rb run` does the same on `[adapter] reference_cases` (default 5) per checkpoint before evaluating anything. Disagreement beyond 0.001 relative is `E_ADAPTER_DISAGREES` (exit 3) and the run writes nothing; `--skip-reference` runs anyway and the receipt says so. Every receipt now carries `adapter_agreement` (status, cases, largest difference, the reference path) and the report has an "Adapter agreement" line. The `raft` adapter's reference path is RAFT's `core/datasets.py` KITTI loader, `InputPadder`, `RAFT.forward(test_mode=True)` and the per-image EPE from `evaluate.py`; `torchvision` (RAFT's own requirement for that loader) joins the `[raft]` extra. The tests include an adapter with the bug class this exists for (the encoder fed the wrong input range: every number finite and plausible, none of them about the model) and check that it is refused.
+- Environment failures (`E_ADAPTER_IMPORT`, `E_MODEL_CODE_MISSING`, `E_DEVICE`, `E_HOOK_*`, `E_INFERENCE_FAILED`, `E_ADAPTER_DISAGREES`, `E_EVIDENCE_DEPS`) now exit 3 as documented; they exited 2.
+
 ## 0.2.0 (2026-09-19): the runner
 - `rb init` (rb.toml; `--demo` for a synthetic project), `rb doctor`, `rb verify-hook`, `rb run --baseline A --candidate B`.
 - Adapters: `raft` (princeton-vl/RAFT and forks; KITTI-style datasets; trajectory via a forward hook on `update_block`, no code change; per-case EPE over valid pixels; unlabeled cases supported) and `synthetic` (test double); custom adapters as `package.module:Class`.

@@ -19,7 +19,8 @@ from .example import MINIMAL_EXAMPLE, example_comparison
 from .fmt import pct, plain, signed, to_fixed
 from .importer import csv_to_comparison, load_comparison
 from .models import SCHEMAS, Bundle, ChecksV2, Envelope, Findings, Limits
-from .report import report_markdown
+from .report import agreement_line, report_markdown
+from .adapters.base import task_metric as adapters_task_metric
 from .runs import (bundle_from_comparison, compute_findings, import_record, list_runs, new_run_id, rederive, resolve_run, runs_dir, write_run)
 from .stability import case_stability
 from . import runner as runner_mod
@@ -445,7 +446,7 @@ def cmd_doctor(args: argparse.Namespace, out: Out) -> int:
         out.say(f"{mark}  {c['check']:<22} {c['detail']}" + (f"\n      → {c['fix']}" if c.get("fix") else ""))
     out.say("", "Environment problems found." if failed else "Ready to run." if cfg else "Not configured.")
     out.data = {"checks": checks, "ok": not failed}
-    out.next = ["rb verify-hook --checkpoint <path>", "rb run --baseline <ckpt-A> --candidate <ckpt-B>"] if cfg and not failed else ["rb init --project <name> --adapter raft --model-code ./raft --dataset <path>"] if not cfg else []
+    out.next = ["rb verify-hook --checkpoint <path>", "rb verify-adapter --checkpoint <path>", "rb run --baseline <ckpt-A> --candidate <ckpt-B>"] if cfg and not failed else ["rb init --project <name> --adapter raft --model-code ./raft --dataset <path>"] if not cfg else []
     return EXIT_ENVIRONMENT if failed else EXIT_OK
 
 
@@ -460,10 +461,34 @@ def cmd_verify_hook(args: argparse.Namespace, out: Out) -> int:
     for pr in result["problems"]:
         out.say(f"Problem: {pr}")
     out.data = result
-    out.next = ["rb run --baseline <ckpt-A> --candidate <ckpt-B>"] if result["ok"] else ["rb docs"]
+    out.next = ["rb verify-adapter --checkpoint <path>", "rb run --baseline <ckpt-A> --candidate <ckpt-B>"] if result["ok"] else ["rb docs"]
     if not result["ok"]:
         code = "E_HOOK_NOT_REACHABLE" if result["fired"] == 0 else "E_HOOK_LENGTH"
         raise RBError(code, message=result["problems"][0])
+    return EXIT_OK
+
+
+def cmd_verify_adapter(args: argparse.Namespace, out: Out) -> int:
+    cfg = load_config()
+    result = runner_mod.verify_adapter(cfg, Path(args.checkpoint), args.device, args.limit)
+    unit = adapters_task_metric(cfg).unit
+    status = result["status"]
+    if status in ("agree", "disagree"):
+        out.say(f"Adapter vs the model repository's own evaluation, {result['cases']} case(s) on {result['device']} · {result['seconds']}s",
+                f"Reference path: {result.get('reference')}")
+        out.say(f"{'case':<20} {'adapter':>12} {'reference':>12} {'diff':>10}")
+        for r in result["per_case"]:
+            out.say(f"{r['id']:<20} {r['adapter']:>12.5f} {r['reference']:>12.5f} {r['diff']:>10.2g}{'' if r['agree'] else '   DIFFERS'}")
+    if status == "agree":
+        out.say(f"Adapter verified: agrees with the reference evaluation on all {result['cases']} cases (max |diff| {result['max_abs_diff']:.2g} {unit}, tolerance {result['tolerance']:g} relative).")
+        out.next = ["rb run --baseline <ckpt-A> --candidate <ckpt-B>"]
+    elif status == "not_available":
+        out.say(f"Not established: {result.get('note')}", "Add reference_value(model, case) to the adapter: the same per-case error through the model repository's own loader, forward and metric formula.")
+        out.next = ["rb docs"]
+    out.data = result
+    if status == "disagree":
+        worst = max(result["per_case"], key=lambda r: r["diff"])
+        raise RBError("E_ADAPTER_DISAGREES", message=f"The adapter disagrees with the reference evaluation on {len(result['disagreeing'])} of {result['cases']} cases (worst {worst['id']}: adapter {worst['adapter']:.4g} vs reference {worst['reference']:.4g} {unit}).")
     return EXIT_OK
 
 
@@ -478,7 +503,7 @@ def cmd_run(args: argparse.Namespace, out: Out) -> int:
         cfg, Path(args.baseline), Path(args.candidate), limits=limits, runs_dir=base, command=out.command_line,
         device=args.device, seed=args.seed, no_trajectories=args.no_trajectories, limit=args.limit,
         baseline_name=args.baseline_name, candidate_name=args.candidate_name, checks=checks, progress=progress,
-        evidence=getattr(args, "evidence", None),
+        evidence=getattr(args, "evidence", None), skip_reference=getattr(args, "skip_reference", False),
     )
     out.run_id = bundle.run_id
     s = findings.summary
@@ -489,6 +514,7 @@ def cmd_run(args: argparse.Namespace, out: Out) -> int:
         f"Run: {cfg.project.name} · {bundle.baseline.name} → {bundle.candidate.name} · {bundle.metric.name} ({unit}), lower is better · {record.wall_seconds}s",
         f"{s.cases} cases ({s.with_gt} with ground truth) · mean {to_fixed(s.mean_error.baseline)} → {to_fixed(s.mean_error.candidate)} {unit} · {s.regressions} regressions · {s.unstable} unstable ({s.improved_unstable} pass on error)",
         f"Trajectories: {record.hook.get('status')}. {record.hook.get('note', '')}",
+        f"Adapter agreement: {agreement_line(record.adapter_agreement, unit)}" if getattr(record, "adapter_agreement", None) else "",
         f"Verdict: {findings.verdict.line}",
         f"Run written to {run_dir}/ (bundle.json, record.json, findings.json, report.md)",
     )
@@ -501,7 +527,8 @@ def cmd_run(args: argparse.Namespace, out: Out) -> int:
     flagged = [q for q in findings.queue if "regression" in q.flags or "unstable" in q.flags]
     failed = {"none": False, "regressions": s.regressions > 0, "flags": bool(flagged), "checks": s.checks.failing + s.checks.missing > 0}[args.fail_on]
     out.data = {"run_dir": str(run_dir), "summary": s.model_dump(), "verdict": findings.verdict.model_dump(), "limits": limits.model_dump(), "metric": bundle.metric.model_dump(),
-                "hook": record.hook, "checkpoints": {k: v.model_dump() for k, v in record.checkpoints.items()}, "skipped": skipped, "fail_on": args.fail_on, "failed": failed,
+                "hook": record.hook, "adapter_agreement": getattr(record, "adapter_agreement", None),
+                "checkpoints": {k: v.model_dump() for k, v in record.checkpoints.items()}, "skipped": skipped, "fail_on": args.fail_on, "failed": failed,
                 "evidence": ev}
     out.next = [f"rb findings {bundle.run_id} --top 5", f"rb case {bundle.run_id} {findings.verdict.start}" if findings.verdict.start else f"rb report {bundle.run_id} --print"]
     return EXIT_CHECK_FAILED if failed else EXIT_OK
@@ -661,6 +688,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--device", default=None)
     s.set_defaults(func=cmd_verify_hook)
 
+    s = sub.add_parser("verify-adapter", parents=[common], help="compare the adapter's per-case error with the model repository's own evaluation on a few cases")
+    s.add_argument("--checkpoint", required=True, help="checkpoint to load")
+    s.add_argument("--limit", type=int, default=5, help="labeled cases to compare (default 5)")
+    s.add_argument("--device", default=None)
+    s.set_defaults(func=cmd_verify_adapter)
+
     s = sub.add_parser("run", parents=[common, lim, chk], help="evaluate the current and candidate checkpoints on the case set and write a run")
     s.add_argument("--baseline", required=True, help="current model's checkpoint")
     s.add_argument("--candidate", required=True, help="candidate checkpoint")
@@ -673,6 +706,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--fail-on", choices=["none", "regressions", "flags", "checks"], default="none", help="exit 1 when… (default none: findings are data)")
     s.add_argument("--quiet", action="store_true", help="no progress on stderr")
     s.add_argument("--evidence", choices=["none", "standard", "full"], default=None, help="render evidence PNGs for the top flagged cases (standard, rb.toml [evidence] top) or every case (full); default from rb.toml")
+    s.add_argument("--skip-reference", action="store_true", help="do not check the adapter against the model repository's own evaluation first (the receipt says so)")
     s.set_defaults(func=cmd_run)
 
     s = sub.add_parser("docs", parents=[common], help="print AGENTS.md (or --errors for the error table)")
@@ -691,7 +725,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-COMMANDS = ["init", "doctor", "verify-hook", "run", "import", "example", "findings", "case", "check save", "check run", "check list", "check rm", "report", "docs", "schema", "runs", "version"]
+COMMANDS = ["init", "doctor", "verify-hook", "verify-adapter", "run", "import", "example", "findings", "case", "check save", "check run", "check list", "check rm", "report", "docs", "schema", "runs", "version"]
 
 
 def main(argv: Optional[list[str]] = None) -> int:

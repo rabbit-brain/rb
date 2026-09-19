@@ -35,6 +35,7 @@ class AdapterSection(BaseModel):
     small: bool = False
     mixed_precision: bool = False
     alternate_corr: bool = False
+    reference_cases: int = Field(5, ge=0, le=500)  # cases on which rb run checks the adapter against the model repository's own evaluation (0 = off)
 
 
 class DatasetSection(BaseModel):
@@ -101,6 +102,7 @@ def render_config(cfg: Config) -> str:
         f"device = {_toml_str(a.device)}",
         f"small = {'true' if a.small else 'false'}                     # RAFT: random-weight checks only; real checkpoints are read as raft or raft-small from their keys",
         f"mixed_precision = {'true' if a.mixed_precision else 'false'}",
+        f"reference_cases = {a.reference_cases}               # rb run checks the adapter against the model repository's own evaluation on this many cases first (0 = off)",
         "",
         "[dataset]",
         f"name = {_toml_str(d.name)}",

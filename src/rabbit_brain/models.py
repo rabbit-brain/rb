@@ -262,6 +262,7 @@ class Record(BaseModel):
     limits: Limits
     input: Optional[dict] = None
     adapter: Optional[dict] = None
+    adapter_agreement: Optional[dict] = None   # per checkpoint: the adapter's errors against the model repository's own evaluation on a few cases
     model_code: Optional[dict] = None
     seeds: Optional[dict] = None
     deterministic_algorithms: Optional[bool] = None

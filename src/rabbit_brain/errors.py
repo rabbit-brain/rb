@@ -47,6 +47,7 @@ ERRORS: dict[str, tuple[str, str]] = {
     "E_CHECKPOINT_NOT_FOUND": ("A checkpoint is missing or does not match the configured architecture.", "Check the path; for raft-small weights set [adapter] small = true. Do not download weights without asking the human."),
     "E_DATASET_EMPTY": ("No cases were found.", "Check [dataset] path and kind in rb.toml (KITTI: image_2/*_10.png and *_11.png; flow_occ/ optional) or the --cases file."),
     "E_HOOK_NOT_REACHABLE": ("The update loop is not instrumented; no trajectory was recorded.", "For RAFT-family models the built-in adapter hooks model.update_block automatically; for a custom adapter call rec.step(delta) once per iteration inside infer(). Or run with --no-trajectories (stability is then 'not assessed')."),
+    "E_ADAPTER_DISAGREES": ("The adapter's per-case error disagrees with the model repository's own evaluation on the same cases, so its results are not evidence about the model.", "Run `rb verify-adapter --checkpoint <path>` and compare the two columns: the adapter's loading, preprocessing (input range, padding, colour order), forward call or metric formula differs from the reference path. Fix the adapter; `rb run --skip-reference` runs anyway and says so in the receipt."),
     "E_HOOK_LENGTH": ("The recorder fired a different number of times than the configured iterations.", "Check that the hook fires exactly once per refinement iteration, and that [adapter] iterations matches what infer() runs."),
     "E_DEVICE": ("The requested device is not available.", "Set [adapter] device = \"cpu\" (slow) or pass --device cpu, or run on a machine with CUDA."),
     "E_INFERENCE_FAILED": ("Inference failed on every case.", "Run `rb verify-hook --checkpoint <path>` to see the first error; check checkpoint/architecture and the dataset."),
@@ -54,6 +55,9 @@ ERRORS: dict[str, tuple[str, str]] = {
     "E_EVIDENCE_DEPS": ("Evidence rendering needs numpy and pillow.", "pip install numpy pillow (both come with pip install 'rabbit-brain[raft]')."),
     "E_INTERNAL": ("Unexpected failure.", "Re-run with --json and report the output at https://github.com/rabbit-brain/rb/issues."),
 }
+
+
+ENVIRONMENT_CODES = {"E_ADAPTER_IMPORT", "E_MODEL_CODE_MISSING", "E_DEVICE", "E_HOOK_NOT_REACHABLE", "E_HOOK_LENGTH", "E_INFERENCE_FAILED", "E_ADAPTER_DISAGREES", "E_EVIDENCE_DEPS"}  # exit 3
 
 
 @dataclass
@@ -65,6 +69,8 @@ class RBError(Exception):
     problems: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
+        if self.code in ENVIRONMENT_CODES and self.exit_code == EXIT_INVALID:
+            self.exit_code = EXIT_ENVIRONMENT
         meaning, default_fix = ERRORS.get(self.code, ("Unexpected failure.", ERRORS["E_INTERNAL"][1]))
         if self.message is None:
             self.message = meaning

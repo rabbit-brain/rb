@@ -127,3 +127,66 @@ Appended before any measured run, which section 1 permits: the file is closed to
 `b8aadac` framed the truncation arm as a positive control, compared the restricted analysis against chance rather than against the output difference's own continuous score, described the repeatability estimate as a noise floor, and recognised only two outcomes. `2bbaaec` corrects all four. Both predate any run, and the difference between them is public so that the tightening cannot be mistaken for post-hoc selection.
 
 The remaining rows are filled in, and this table committed again, at the moment the diagnostics are frozen and before the held-out half is touched.
+
+## 12. Results and amendments (2026-09-20)
+
+Run on an RTX 4090 (torch 2.8.0+cu128, driver 580.178.04), `rabbit-brain` 0.2.2 from PyPI, driver and splits from `1af9d03`, checkpoint `raft-things.pth`, KITTI-2015 training, seed 20260920. Artifacts on the pod volume at `/workspace/exp/`: `RESULTS.md`, `FROZEN.py`, and five comparison JSONs.
+
+### Amendment 1, before the freeze
+
+The driver as committed at `1af9d03` recorded each build's error against ground truth and both trajectories, but **not the per-case difference between the two builds' outputs**. B1 is defined as exactly that and is required to be label-free, so `|candidate_error - baseline_error|` is not B1: it uses ground truth. As committed, the decisive comparison could not be computed.
+
+Fixed by wrapping `adapter.infer` to capture each prediction's output as a side effect, leaving `evaluate_model` and the evaluation path untouched, and computing the mean endpoint difference between the two builds' flow fields with no valid mask. The configuration half was re-run. This happened **before** the freeze and before any held-out case was evaluated: it is missing instrumentation the protocol always required, not a diagnostic chosen after seeing an outcome.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| 1. Hook fires once per iteration | PASS: 12, 12 and 8 under the three configurations |
+| 2. Adapter agrees with the reference evaluation | PASS: 5 cases, max difference **0 px** against RAFT's own `evaluate.py` |
+| 3. No FP16 underflow | PASS: smallest update magnitude 0.0304, against FP16's smallest normal of about 6e-5 |
+| 4. Repeatability | **Exactly zero.** Two identical runs, 0 of 100 cases differed, both configurations |
+
+Gate 4 is stronger than the protocol anticipated. With a zero repeat band every non-zero build difference is material, and all 100 cases changed under mixed precision against a pre-registered inconclusive threshold of 20 cases. The arm was decisively testable. **This bounds run-to-run variation on one GPU back to back and nothing more**; `claude/cross-machine-reproduction.md` measures a different source and still applies.
+
+### Effect sizes, configuration half
+
+| Build | median abs change | max | worse | better |
+|---|---|---|---|---|
+| RAFT native mixed precision | 0.0041 px | 0.547 px | 53 | 47 |
+| Truncated 12 to 8 iterations | 0.231 px | 3.84 px | 94 | 6 |
+
+The mixed-precision effect is nearly symmetric, so a method ranking by how much the output moved spends about half its budget on improvements. That is the gap H1 proposed to close.
+
+### Frozen diagnostics
+
+RB score: the candidate build's own `late_update`, higher is worse. One score for both arms; choosing per arm would be double dipping. B1 selection threshold: 0.0295 px, the configuration-half median. Recorded in `FROZEN.py` along with the configuration-half predictions, before the held-out half was evaluated.
+
+### Held-out results
+
+AUROC for worse against better, n = 100 per arm.
+
+| | B1 | RB |
+|---|---|---|
+| Mixed precision, unrestricted | 0.525 | 0.520 |
+| **Mixed precision, restricted (n=46)** | **0.437** | **0.444** |
+| Truncation, unrestricted | 0.656 | 0.649 |
+| **Truncation, restricted (n=98)** | **0.641** | **0.635** |
+
+Precision at 10: mixed precision B1 0.40, RB 0.50 against a base rate of 0.55; truncation both 0.90 against a base rate of 0.84.
+
+### Verdict under the pre-registered rule
+
+**RB does not beat B1 on the restricted comparison in either arm. H1 is not supported.** The deployment wedge does not become the first commercial hypothesis; historical replay across checkpoints remains the first engagement, and section 1 of `claude/concierge-engagement.md` reverts.
+
+The configuration-half predictions written into `FROZEN.py` before the holdout ran were both confirmed.
+
+### The finding worth carrying forward
+
+In the truncation arm **all 100 cases were still moving more at the last iteration than the 12-iteration build, and 94 were worse**. The condition fires, and fires correctly. Because it fires on everything it has no discriminating power, and the plain output difference still ranked the damage marginally better.
+
+So the trajectory statistic correctly detects that a build did not settle, and adds nothing over an output diff about which cases that hurt.
+
+This does not refute the product's core claim, which concerns two genuinely different checkpoints on cases with no label, where `claude/real-weights-run.md` found rho about 0.9 between last-update magnitude and per-case error. The plausible reading is that trajectory carries information about model quality but not about numerical perturbation, which are different mechanisms.
+
+The open question it leaves, which should be answered before anything is sold: if an output difference ranks regressions as well as the trajectory does in the setting where ground truth is available to check, what is the argument for trusting the trajectory where it is not? Arm 3 (TensorRT, INT8) is not the next step. That question is.

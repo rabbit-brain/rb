@@ -77,7 +77,9 @@ def test_human_output_and_next(workdir, capsys):
     assert "5 of 12 cases shown" in out and "aisle-042" in out
     code, out, _ = run(capsys, "check", "run", run_id)
     lines = out.strip().splitlines()
-    assert code == 1 and any(l.startswith("OK           pallet-003") for l in lines) and lines[-1].startswith("Next:") and "CHECKS NEED ATTENTION" in out
+    assert code == 1 and not any("pallet-003" in l for l in lines) and "cases within limits and not shown" in out and lines[-1].startswith("Next:") and "CHECKS NEED ATTENTION" in out
+    code, out, _ = run(capsys, "check", "run", run_id, "--all")
+    assert code == 1 and any(l.startswith(("OK", "IMPROVED")) and "pallet-003" in l for l in out.strip().splitlines())
 
 
 def test_v1_file_read_in_place(workdir, capsys):
@@ -147,3 +149,68 @@ def test_runs_dir_env(workdir, capsys, monkeypatch):
     assert code == 0 and (workdir / "elsewhere" / env.run_id / "bundle.json").exists()
     code, env, _ = run_json(capsys, "findings", env.run_id, "--top", "1")
     assert code == 0
+
+
+def test_csv_import_with_column_map_note_and_row_errors(workdir, capsys):
+    """An evaluator's own CSV imports through --columns without a converter; errors name the row and column; the receipt carries the note."""
+    Path("eval.csv").write_text(
+        "frame,epe_a,epe_b,updates_b\n"
+        "f-001,2.10,2.55,4.3 2.2 1.3 0.9 0.7 0.5 0.4 0.35 0.3 0.28 0.25 0.24\n"
+        "f-002,1.40,1.05,3.6;1.7;0.8;0.4;0.25;0.15;0.1;0.07;0.05;0.04;0.03;0.03\n", encoding="utf-8")
+    common = ["--project", "p", "--baseline-name", "a", "--candidate-name", "b", "--dataset", "d", "--metric", "endpoint_error", "--unit", "px"]
+    code, env, _ = run_json(capsys, "import", "eval.csv", *common)
+    assert code == 2 and env.errors[0].code == "E_CSV_INVALID" and "the file has: frame, epe_a, epe_b, updates_b" in env.errors[0].message and "--columns" in env.errors[0].message
+    code, env, _ = run_json(capsys, "import", "eval.csv", *common, "--columns", "case_id=frame,baseline_error=epe_a,candidate_error=epe_b,candidate_trajectory=updates_b", "--note", "from eval.csv")
+    assert code == 0 and env.data["summary"]["cases"] == 2 and env.data["summary"]["with_trajectories"] == 2, env.errors
+    record = json.loads((workdir / "rb-runs" / env.run_id / "record.json").read_text())
+    assert record["notes"] == "from eval.csv" and "--note 'from eval.csv'" in record["command"]   # quoted, so the receipt's command pastes back
+    report = (workdir / "rb-runs" / env.run_id / "report.md").read_text()
+    assert "Notes: from eval.csv" in report and "## Convergence on this case set" in report
+    findings = json.loads((workdir / "rb-runs" / env.run_id / "findings.json").read_text())
+    assert all("baseline_error" in q and "late_update_change" in q for q in findings["queue"])  # nulls written explicitly
+    # rendering an imported run says why it cannot, instead of pointing at rb init for a project that does not exist
+    code, env, _ = run_json(capsys, "case", env.run_id, "f-001", "--render")
+    assert code == 2 and env.errors[0].code == "E_CONFIG_MISSING" and "was imported" in env.errors[0].message
+    code, env, _ = run_json(capsys, "case", record["run_id"], "f-001")
+    assert code == 0 and not any("--render" in n for n in env.next)
+    # a bad series names the row and the column
+    Path("bad.csv").write_text("case_id,baseline_error,candidate_error,candidate_trajectory\nx,1,2,1;2;three\n", encoding="utf-8")
+    code, env, _ = run_json(capsys, "import", "bad.csv", *common)
+    assert code == 2 and "row 2 (x), column candidate_trajectory" in env.errors[0].message and "separate values with ';'" in env.errors[0].message
+    code, env, _ = run_json(capsys, "schema", "csv")
+    assert code == 0 and env.data["csv"].startswith("case_id,name,baseline_error,candidate_error")
+    code, env, _ = run_json(capsys, "runs")
+    assert code == 0 and env.data["details"][0]["verdict"] and env.data["details"][0]["candidate"] == "b"
+
+
+def test_check_defaults_unit_and_flagged_only_output(workdir, capsys):
+    code, env, _ = run_json(capsys, "example")
+    run_id = env.run_id
+    # default max_error: the better of the two models on the case + max_regression, and the unit travels with the check
+    code, env, _ = run_json(capsys, "check", "save", run_id, "aisle-042")     # a regression: current 3.4 → candidate 5.2
+    assert code == 0 and env.data["check"]["max_error"] == 3.7 and env.data["check"]["unit"] == "px"
+    code, env, _ = run_json(capsys, "check", "save", run_id, "pallet-003")    # improved: the candidate's level is kept
+    bundle = json.loads((workdir / "rb-runs" / run_id / "bundle.json").read_text())
+    c = next(c for c in bundle["cases"] if c["id"] == "pallet-003")
+    assert env.data["check"]["max_error"] == round(min(c["baseline_error"], c["candidate_error"]) + 0.3, 2)
+    code, out, _ = run(capsys, "check", "list")
+    assert code == 0 and "px" in out and "units" not in out
+
+
+def test_share_contains_statistics_and_no_identities(workdir, capsys):
+    code, env, _ = run_json(capsys, "example")
+    run_id = env.run_id
+    code, env, _ = run_json(capsys, "share", run_id)
+    assert code == 0 and env.data["sent"] is False and env.data["cases"] == 12, env.errors
+    share = json.loads(Path(env.data["path"]).read_text())
+    text = json.dumps(share)
+    assert share["schema_version"] == "rb-share-1" and len(share["cases"]) == 12 and share["cases"][0]["index"] == 0
+    assert all(k in share["cases"][0] for k in ("baseline_error", "candidate_error", "candidate_trajectory", "candidate_stability", "flags"))
+    bundle = json.loads((workdir / "rb-runs" / run_id / "bundle.json").read_text())
+    for c in bundle["cases"]:
+        assert c["id"] not in text and c["name"] not in text
+    assert bundle["project"] not in text and run_id not in text and "rb example" not in text and "Start with" not in text
+    code, env, _ = run_json(capsys, "schema", "share")
+    assert code == 0 and env.data["properties"]["cases"]
+    code, env, _ = run_json(capsys, "share", run_id, "--print")
+    assert code == 0 and env.data["schema_version"] == "rb-share-1"

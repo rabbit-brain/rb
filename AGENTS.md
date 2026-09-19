@@ -9,6 +9,7 @@ Read this whole file before running anything. **Do not compute errors, regressio
 ```sh
 pip install rabbit-brain            # or: uvx --from rabbit-brain rb
 pip install "rabbit-brain[raft]"    # adds torch, torchvision, numpy, opencv, scipy, pillow for the RAFT adapter
+pip install "rabbit-brain[evidence]" # numpy and pillow only: evidence sheets for a custom adapter (your model's own requirements are yours)
 rb version
 rb docs                             # prints this file
 ```
@@ -40,11 +41,12 @@ rb case <run_id> <case_id> [--render]                  # one case: numbers, traj
 rb check save <run_id> <case_id>                       # keep this case for the next checkpoint
 rb check run <run_id> --checks checks.json             # next time: exit 1 if a saved check fails or a case is flagged
 rb report <run_id> --print                             # the receipt a human reads
+rb share <run_id>                                      # anonymised statistics of the run as share.json, for the human to send if they choose; nothing is sent
 ```
 
 `rb init --demo` writes a synthetic project (two demo checkpoints under `ckpt/`) so the whole workflow can be exercised without a model or a GPU; `rb example` creates a run from built-in example results the same way. `rb runs` lists runs, `rb check list` and `rb check rm <case_id>` manage saved checks, `rb schema <name>` prints a JSON Schema; `<run_id>` may also be a run directory, a `bundle.json`, or a version-1 results file read in place.
 
-Flags on `rb run`: `--limit N` (first N cases; use it for a pilot), `--no-trajectories` (stability then reads "not assessed", never "settled"), `--skip-reference` (do not check the adapter against the reference evaluation; the receipt says so), `--device cuda|cpu`, `--seed 0`, `--baseline-name/--candidate-name` (default: checkpoint file stems), `--fail-on none|regressions|flags|checks` (default `none`: findings are data, not errors), `--quiet`, and the limits `--max-regression 0.3 --max-late-share 0.25 --max-reversals 2 --max-trajectory-regression 0.3 --max-last-update <off>` (defaults for a project made by `rb init`; `rb import` leaves the trajectory-regression limit off unless you pass it; the late-share and reversal limits are generic heuristics, and a scorer fitted to the model is a separate, paid step). `rb findings` takes `--filter flagged|all|regressions|unstable|improved-unstable|settled-regressions|improved|stable` (default `flagged`), `--sort priority|error-change|late-share|name`, `--top N`.
+Flags on `rb run`: `--limit N` (first N cases; use it for a pilot), `--no-trajectories` (stability then reads "not assessed", never "settled"), `--skip-reference` (do not check the adapter against the reference evaluation; the receipt says so), `--device cuda|cpu`, `--seed 0`, `--baseline-name/--candidate-name` (default: checkpoint file stems), `--fail-on none|regressions|flags|checks` (default `none`: findings are data, not errors), `--quiet`, and the limits `--max-regression 0.3 --max-late-share 0.25 --max-reversals 2 --max-trajectory-regression 0.3 --max-last-update <off>` (defaults for a project made by `rb init`; `rb import` leaves the trajectory-regression limit off unless you pass it; the late-share and reversal limits are generic heuristics, and a scorer fitted to the model is a separate, paid step). `rb findings` takes `--filter flagged|all|regressions|unstable|improved-unstable|settled-regressions|improved|stable` (default `flagged`), `--sort priority|error-change|candidate-error|current-error|late-share|name` (`candidate-error` answers "where is the candidate worst in absolute terms", which the priority queue does not), `--top N`. Vocabulary: `stable` and `improved` are error outcomes (the change stayed within `max_regression`, or fell below it); `unstable` and `settled` are trajectory words. The findings table prints `late` (the candidate's share of refinement in the last third), `move` (its late movement minus the current model's, in the metric's unit per iteration) and `rev` (its reversals). Every command takes `--runs-dir` (repeated in the `next` hints when set) and `--verbose` (warnings from the model code are otherwise counted on stderr and hidden).
 
 ## rb.toml
 
@@ -60,10 +62,11 @@ iterations = 12                   # refinement iterations per case = trajectory 
 device = "cuda"
 small = false                     # only for random-weight checks; real checkpoints are read as raft or raft-small from their keys
 mixed_precision = false
+alternate_corr = false            # RAFT's memory-saving correlation (needs its CUDA extension); false is the default
 reference_cases = 5               # rb run first compares the adapter with the model repository's own evaluation on this many cases (0 = off)
 
 [dataset]
-name = "kitti2015-train"
+name = "kitti2015-train"          # rb init takes it from --dataset-name, else the directory's last component; it names the dataset in every receipt
 kind = "kitti"                    # image_2/*_10.png + *_11.png; flow_occ/*_10.png optional (no flow_occ = unlabeled cases)
 path = "./data/kitti2015/training"
 cases = "all"                     # "all", a file with one case id per line, or a number (first N)
@@ -80,7 +83,7 @@ level = "standard"                # none | standard (the top flagged cases) | fu
 top = 10                          # how many flagged cases get evidence at level standard
 ```
 
-Case ids come from the data (KITTI: the frame stem, e.g. `000012_10`) and must stay the same across checkpoints. Unlabeled cases (no ground truth) get stability findings and "error not measured"; they never count as regressions or as passing on error.
+Case ids come from the data (KITTI: the frame stem, e.g. `000012_10`) and must stay the same across checkpoints. Unlabeled cases (no ground truth) get stability findings and "error not measured"; they never count as regressions or as passing on error. `iterations` is the refinement count both checkpoints run with; keep it fixed across the runs you compare and across the checkpoints a `checks.json` follows (RAFT's own KITTI evaluation uses 24; the examples use 12 because the trajectory statistics are computed per iteration and 12 is what the checkpoints were tuned at). `rb init` also appends `rb-runs/*/evidence/` to `.gitignore` (evidence PNGs are large; the run's JSON files and report are meant to be committed) and says so.
 
 ## The trajectory (recorded for you, or the one line you add)
 
@@ -106,7 +109,79 @@ An adapter that loads, preprocesses or scores the model differently from the mod
 
 ## Custom adapters
 
-`[adapter] module = "package.module:Class"`. The class takes the `Config` and implements: `describe() -> dict` (id, version, settings; goes into the receipt), `load(checkpoint: Path, device: str) -> model`, `cases() -> Iterable[Case]` (`Case(id, name, inputs, gt=None, tags=[], notes=None)` from `rabbit_brain.adapters`), `infer(model, case, rec) -> Prediction` (call `rec.step(delta)` once per iteration or use `rec.attached(...)`), `metric_value(pred, case) -> float | None` (None when `case.gt` is None), `expected_iterations() -> int | None`. Set `task`, `metric` (a `Metric(id, name, unit)`) and `synthetic = False` as class attributes; set `trajectory_scale` when the update fields are at a lower resolution than the metric's pixels (the raft adapter uses 8, so trajectory values are image pixels like the error). Optional: `reference_value(model, case) -> float | None` and `reference_description() -> str` (adapter agreement, above); `read_images(case)` and `read_gt(case)` (evidence). `rb doctor` reports a missing method by name. `src/rabbit_brain/adapters/raft.py` is the reference; `synthetic.py` is the smallest complete example.
+For a model that is not RAFT, write one file next to `rb.toml` (say `rb_adapter.py`) and point the config at it: `rb init --adapter rb_adapter:MyAdapter --model-code ./mymodel --dataset ./data/val --kind npz --iterations 8`. The project directory and `model_code` are on `sys.path` when `rb` imports the adapter, so no `PYTHONPATH` is needed; the class takes the `Config` and implements six methods. Everything it needs is importable from `rabbit_brain.adapters`: `Case`, `Prediction`, `Metric`, `RBError`, `read_case_selector`. A complete adapter for a model whose `forward(x, iters)` applies `model.update` once per iteration:
+
+```python
+from pathlib import Path
+import numpy as np, torch
+from rabbit_brain.adapters import Case, Metric, Prediction, RBError, read_case_selector
+from mymodel.model import MyModel                      # your code, under [adapter] model_code
+
+class MyAdapter:
+    task = "flow"                                       # flow | stereo | depth | generic: sets the default metric and unit
+    metric = Metric(id="mean_endpoint_error", name="mean endpoint error", unit="px")
+    synthetic = False
+    trajectory_scale = 1.0                              # multiply recorded updates by this to be in the metric's unit (RAFT: 8, its updates are at 1/8 resolution)
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.iterations = cfg.adapter.iterations
+        self.root = Path(cfg.dataset.path)
+        self.architectures = {}                         # checkpoint path -> a pure architecture label; goes into the receipt, and rb warns when the two differ
+
+    def describe(self):                                 # settings, into the receipt
+        return {"id": "mymodel", "iterations": self.iterations, "hook": "forward hook on model.update", "architectures": dict(self.architectures)}
+
+    def load(self, checkpoint: Path, device: str):
+        if not checkpoint.exists():
+            raise RBError("E_CHECKPOINT_NOT_FOUND", message=f"No such checkpoint: {checkpoint}")
+        model = MyModel()
+        model.load_state_dict(torch.load(checkpoint, map_location="cpu", weights_only=True))
+        self.architectures[str(checkpoint)] = "MyModel(hidden=16)"   # architecture only, never a learned value
+        return model.to(device).eval()
+
+    def cases(self):                                    # one Case per sample; ids stable across checkpoints; gt=None when unlabeled
+        ids, limit = read_case_selector(self.cfg)       # honours [dataset] cases = "all" | a file of ids | N
+        for i, path in enumerate(sorted(self.root.glob("*.npz"))):
+            if ids is not None and path.stem not in ids:
+                continue
+            if limit is not None and i >= limit:
+                break
+            yield Case(id=path.stem, name=path.stem, inputs=str(path), gt=str(path))
+
+    def infer(self, model, case, rec):                  # rec records one value per refinement iteration
+        d = np.load(case.inputs)
+        x = torch.from_numpy(np.concatenate([d["frame1"], d["frame2"]], 0)).float()[None] / 255.0
+        with torch.no_grad(), rec.attached(model.update):    # the hook records model.update's output; output_index=k if it returns a tuple
+            out, _ = model(x.to(next(model.parameters()).device), iters=self.iterations)
+        return Prediction(output=out[0].cpu())         # (C, H, W) or (H, W, C); evidence renders 2-channel fields, read_gt must match its shape
+
+    def metric_value(self, pred, case):                 # the error, lower is better; None when case.gt is None
+        if case.gt is None:
+            return None
+        gt = torch.from_numpy(np.load(case.gt)["field"]).float()
+        return float(torch.sqrt(((pred.output - gt) ** 2).sum(0)).mean())
+
+    def expected_iterations(self):
+        return self.iterations
+
+    # optional: adapter agreement (strongly recommended) and evidence
+    def reference_description(self):
+        return "mymodel/eval.py: its own sample() loader and epe() formula, iters=8"
+    def reference_value(self, model, case):            # the same number through YOUR evaluator's code path, sharing nothing with infer/metric_value
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("my_eval", Path(self.cfg.adapter.model_code) / "eval.py"); ev = importlib.util.module_from_spec(spec); spec.loader.exec_module(ev)
+        x, gt = ev.sample(case.inputs)
+        with torch.no_grad():
+            out, _ = model(x, iters=8)
+        return ev.epe(out[0], gt)
+    def read_images(self, case):                        # list of HxWx3 uint8 arrays
+        d = np.load(case.inputs); return [np.transpose(d["frame1"], (1, 2, 0)), np.transpose(d["frame2"], (1, 2, 0))]
+    def read_gt(self, case):                            # (field, valid) in the prediction's layout; valid HxW bool
+        d = np.load(case.gt); return d["field"], np.ones(d["field"].shape[1:], bool)
+```
+
+What the recorder stores: for each call of the hooked module (or each `rec.step(delta)`), the mean over pixels of the L2 norm of the update vector, times `trajectory_scale`; the fields themselves are kept for the run's convergence statistics and the filmstrips. Late share uses the last third of the iterations (the last `n - 2n//3`; 3 of 8), late movement the last quarter (`n//4`, at least 1; 2 of 8). The reference path's iteration count is your evaluator's, so a run with a different `[adapter] iterations` will disagree with it by design; either keep them equal or run with `--skip-reference` and say so. `rb doctor` reports a missing method by name; `rb verify-hook` proves the hook fires `iterations` times; `rb verify-adapter` proves the numbers. Errors an adapter raises with `RBError(code, message=...)` reach the human with the table's fix text. `rb init` for a custom adapter writes only the generic keys; the built-in `src/rabbit_brain/adapters/raft.py` is the full reference and `synthetic.py` the smallest one.
 
 ## The results file for `rb import` (version 1)
 
@@ -123,7 +198,20 @@ An adapter that loads, preprocesses or scores the model differently from the mod
 }
 ```
 
-1–500 cases; ids match `^[a-zA-Z0-9_.-]{1,80}$`; errors are the same lower-is-better metric per case for both models, computed against the same ground truth and valid mask; trajectories are optional (2–64 values, mean |update| per iteration); `baseline_frames`/`candidate_frames` are optional paired per-frame series. `rb schema example` prints this file; `rb schema comparison-v1` the JSON Schema. A CSV works too (`case_id, baseline_error, candidate_error`, optional `name, tags, baseline_trajectory, candidate_trajectory, baseline_frames, candidate_frames` as semicolon-separated numbers) with `--project --baseline-name --candidate-name --dataset --metric --unit` as flags.
+1–500 cases; ids match `^[a-zA-Z0-9_.-]{1,80}$`; errors are the same lower-is-better metric per case for both models, computed against the same ground truth and valid mask; trajectories are optional (2–64 values, mean |update| per iteration); `baseline_frames`/`candidate_frames` are optional paired per-frame series. `rb schema example` prints this file; `rb schema comparison-v1` the JSON Schema.
+
+**CSV.** `rb schema csv` prints a sample. Columns `case_id, baseline_error, candidate_error` are required; `name, tags, baseline_trajectory, candidate_trajectory, baseline_frames, candidate_frames, notes` optional; series cells hold numbers separated by `;` (spaces work too). Your evaluator's own column names need no conversion script: map them with `--columns case_id=frame,baseline_error=epe_current,candidate_error=epe_candidate,candidate_trajectory=updates`. The names come from flags, and `--note` puts a sentence into the receipt (where the numbers came from, which file, what was converted). Worked example, an evaluator's CSV with two RAFT checkpoints on 200 KITTI pairs:
+
+```sh
+rb import kitti_eval.csv --project raft-kitti --baseline-name raft-things --candidate-name raft-sintel \
+   --dataset "KITTI-2015 training, 200 pairs" --metric endpoint_error --unit px \
+   --columns case_id=frame,baseline_error=epe_current,candidate_error=epe_candidate,baseline_trajectory=current_update_norms,candidate_trajectory=candidate_update_norms \
+   --note "from our evaluator's kitti_eval.csv, 12 iterations" --json
+rb findings <run_id> --top 5 --max-trajectory-regression 0.3   # the paired label-free test is off for imports until you pass it: do so when both trajectories are in the metric's unit
+rb case <run_id> <case_id>
+```
+
+An imported run has numbers only, so `rb case --render` is not available for it (evidence needs the model and the data, which is `rb run`). A CSV error names the row and column: "row 14 (000012_10), column updates: ... is not a series of numbers (separate values with ';')".
 
 ## Output
 
@@ -139,9 +227,9 @@ Every command accepts `--json` and prints exactly one JSON object on stdout; pro
  "next": ["rb findings 20260925-1412-raft-small --top 5", "rb case 20260925-1412-raft-small 000012_10"]}
 ```
 
-`next` lists the commands that usually follow. A run directory `rb-runs/<run_id>/` holds `bundle.json` (every case's numbers, trajectories, stability statistics and flags), `record.json` (the receipt: rb version, the exact command, both checkpoints with sha256, model-code git SHA, dataset hash, seeds, environment, hook status, adapter agreement, skipped cases), `findings.json` (the ranked queue, the summary, the verdict under those limits) and `report.md` (the human receipt). Those four are small and committable; `checks.json` belongs in the repo next to the model code. Schemas: `rb schema bundle|record|findings|checks|envelope`.
+`next` lists the commands that usually follow. A run directory `rb-runs/<run_id>/` holds `bundle.json` (every case's numbers, trajectories, stability statistics and flags), `record.json` (the receipt: rb version, the exact command, both checkpoints with sha256, model-code git SHA, dataset hash, seeds, environment, hook status, adapter agreement, skipped cases), `findings.json` (the ranked queue, the summary, the verdict under those limits) and `report.md` (the human receipt). Those four are small and committable; `checks.json` belongs in the repo next to the model code. The files and the `--json` output of the corresponding commands are the same documents (nulls written explicitly). `record.json` → `dataset.case_list_hash` is a hash of the case ids (the same set of cases); `dataset.content_hash` is a hash of the input and ground-truth files themselves (the same data), written by `rb run` when the adapter's cases name files. `rb runs` lists every run with its models and verdict. Schemas: `rb schema bundle|record|findings|checks|envelope`.
 
-Definitions `rb` applies, and restates in every report: a case is a **regression** when the candidate's error exceeds the current model's by more than `max_regression`; **late share** is the fraction of all refinement that happened in the last third of the iterations; a **reversal** is an iteration where the update grew by more than 5% over the previous one; a case is **unstable** when late share exceeds `max_late_share` or reversals exceed `max_reversals`, when it is a trajectory regression, or, only when `max_last_update` is set, when the **last update** (the size of the final refinement step, in the trajectory's unit) exceeds it. A **trajectory regression** is paired and label-free: the candidate's **late movement** (mean update over the last quarter of iterations, in the trajectory's unit) exceeds the current model's on the same case by more than `max_trajectory_regression`. It is the same test as the error regression, applied to the refinement instead of the answer, so it also works on cases without ground truth; on labeled cases it mostly coincides with error regressions and ranks the worst of them first (flag `trajectory_regression`). Cases are ranked regression+unstable, then regression, then **improved but unstable** (they pass on error and still need a look), then the rest, by error change; unlabeled cases rank after labeled ones within a group. A **saved check** is an absolute limit for a case id in a project: candidate error ≤ `max_error`, optionally late share ≤ `max_late_share` and reversals ≤ `max_reversals`; a saved case missing from a later run fails the check.
+Definitions `rb` applies, and restates in every report: a case is a **regression** when the candidate's error exceeds the current model's by more than `max_regression`; **late share** is the fraction of all refinement that happened in the last third of the iterations; a **reversal** is an iteration where the update grew by more than 5% over the previous one; a case is **unstable** when late share exceeds `max_late_share` or reversals exceed `max_reversals`, when it is a trajectory regression, or, only when `max_last_update` is set, when the **last update** (the size of the final refinement step, in the trajectory's unit) exceeds it. A **trajectory regression** is paired and label-free: the candidate's **late movement** (mean update over the last quarter of iterations, in the trajectory's unit) exceeds the current model's on the same case by more than `max_trajectory_regression`. It is the same test as the error regression, applied to the refinement instead of the answer, so it also works on cases without ground truth; on labeled cases it mostly coincides with error regressions and ranks the worst of them first (flag `trajectory_regression`). Cases are ranked regression+unstable, then regression, then **improved but unstable** (they pass on error and still need a look), then the rest, by error change; unlabeled cases rank after labeled ones within a group. A **saved check** is an absolute limit for a case id in a project: candidate error ≤ `max_error`, optionally late share ≤ `max_late_share` and reversals ≤ `max_reversals`; a saved case missing from a later run fails the check. `rb check save` defaults `max_error` to the better of the two models on that case plus `max_regression` (a case that improved keeps its improvement; a case that regressed must come back to the current model's level) and requires a settled trajectory unless `--no-settled`; a check saved from a run can therefore fail on that same run, which is the point: it fails until the case is fixed. `rb check run` prints the flagged cases and the check results (`--all` prints every case) and exits 1 when anything fails; its `--json` has `ok: true` with `data.failed: true`, because findings are data. Checks are meant for runs of the same project, case set, `iterations` and limits; a run made with different settings is a different question.
 
 **Evidence.** `rb run` renders the top flagged cases (`[evidence] level = "standard"`, `top`; `--evidence none|standard|full` overrides) and `rb case <run> <id> --render` renders any case: it re-runs both checkpoints on that case and writes `rb-runs/<run>/evidence/<case>/` with `inputs.png` (the inputs, and where the two models disagree: |candidate - current| per pixel, which needs no ground truth), `flow.png` (current | candidate | ground truth on one colour scale), `error.png` (per-pixel error of each model over the dimmed input, and the change: red where the candidate is worse, blue where it is better; only when ground truth exists), `filmstrip.png` (one tile per refinement iteration, the update size per pixel, candidate then current, one colour scale, the last quarter framed), `trajectory.png` (both trajectories on a log axis, the last quarter shaded) and `case.png` (all of it stacked, 1920 px wide, with the finding as caption), plus a README that states the scales. Scales show structure, not extremes: flow colour saturates at the 95th percentile with square-root saturation; heat maps run to the 99th percentile capped at four times the mean, so a region above that saturates, and saturation is itself the finding (a near object the model keeps moving, say). Every tile label says its scale. The caption and the JSON `evidence.check` say whether the re-run reproduced the run's error and trajectory for that case. Evidence directories are gitignored (large); `bundle.json` and the report list which cases have them. Rendering needs numpy and pillow (`E_EVIDENCE_DEPS` otherwise); a run never fails because a rendering did. Custom adapters opt in with `read_images(case)` and `read_gt(case)`; without them only the disagreement map, the filmstrips and the trajectory plot are drawn. Show the human `case.png` for the case the verdict names; do not describe images you have not opened.
 
@@ -157,7 +245,8 @@ Every trajectory also yields the absolute convergence statistics (`stability.can
 |---|---|---|
 | `E_CONFIG_MISSING` | no `rb.toml` here | `rb init …` in the project root, or `rb init --demo` |
 | `E_CONFIG_INVALID` | `rb.toml` has a bad field, or an unknown adapter id | fix the named field; `rb init --force` rewrites the file |
-| `E_ADAPTER_IMPORT` | the adapter or the model's dependencies did not import | `rb doctor`; install the model's requirements here (`pip install "rabbit-brain[raft]"` for RAFT) |
+| `E_ADAPTER_IMPORT` | the adapter or the model's dependencies did not import | `rb doctor` names the module: a custom adapter file goes next to rb.toml or under `model_code` (both are on `sys.path`); a missing dependency is installed here (`pip install "rabbit-brain[raft]"` for RAFT) |
+| `E_DOCTOR` | `rb doctor` found a failing check | read `data.checks`: every failed check has a detail and a fix |
 | `E_MODEL_CODE_MISSING` | `model_code` is not a RAFT checkout | point it at the repository (must contain `core/raft.py`) |
 | `E_CHECKPOINT_NOT_FOUND` | a checkpoint is missing, is not a torch state dict, or does not match RAFT's layers | check the path and that it is a RAFT checkpoint (raft-small is detected from the file); do not download weights without asking the human |
 | `E_DATASET_EMPTY` | no cases found | check `[dataset] path` and `kind`, or the cases file |
@@ -187,8 +276,8 @@ Every trajectory also yields the absolute convergence statistics (`stability.can
 Prompt from the human: *"Review candidate checkpoint ckpt/raft-small.pth against ckpt/raft-things.pth on the KITTI cases with Rabbit Brain and tell me what to look at."*
 
 ```sh
-rb doctor --checkpoint ckpt/raft-things.pth --checkpoint ckpt/raft-small.pth --json    # if there is no rb.toml: rb init first
-rb verify-hook --checkpoint ckpt/raft-small.pth --json
+rb doctor --checkpoint ckpt/raft-things.pth --checkpoint ckpt/raft-small.pth --json    # if there is no rb.toml: rb init first; doctor prints each checkpoint's architecture and parameter count
+rb verify-hook --checkpoint ckpt/raft-things.pth --json && rb verify-hook --checkpoint ckpt/raft-small.pth --json   # both checkpoints
 rb verify-adapter --checkpoint ckpt/raft-small.pth --json
 rb run --baseline ckpt/raft-things.pth --candidate ckpt/raft-small.pth --json           # add --limit 20 for a pilot
 rb findings <run_id> --top 5 --json
@@ -196,9 +285,13 @@ rb case <run_id> <top case id> --json
 rb report <run_id>
 ```
 
-Then report to the human, in this order: the verdict line; the top cases with their `why` text; the run id; the path to `report.md`; the command that reproduces the queue (`rb findings <run_id>` with the limits used). Quote numbers only from `findings.json`. If `hook.status` is not `recorded`, say that stability was not assessed and why. If `adapter_agreement` is not `agree` for both checkpoints, say so first.
+Then report to the human, in this order: the verdict line; the top cases with their `why` text; the run id; the path to `report.md`; the command that reproduces the queue (`rb findings <run_id>` with the limits used, as the report's Reproduce section prints it). Quote numbers only from `findings.json`. If `hook.status` is not `recorded`, say that stability was not assessed and why. If `adapter_agreement` is not `agree` for both checkpoints, say so first. If the two checkpoints are different architectures (the receipt's checkpoint lines and `rb doctor` say so), say that the review compares two models rather than a retrain of one.
 
 When a later checkpoint arrives: `rb check run` against a new `rb run` of it (same project, same case set) answers "are the cases we cared about still fine?" and exits 1 in CI if not; then `rb findings` for the full review.
+
+## Sharing a run's statistics (consent, and what leaves the machine: nothing, unless the human sends it)
+
+`rb share <run_id>` writes `rb-runs/<run_id>/share.json` and prints what is in it and what is not. In: the task and metric, the adapter id and architecture labels, iteration count, environment versions, the limits, per case the errors, the trajectories, the stability and convergence statistics, flags and outcomes (cases numbered, not named), and the run's summary. Out: case ids and names, tags, notes, file paths, dataset name and hashes, checkpoint paths, names and hashes, the project name, the command line, evidence, the verdict text. `rb schema share` prints the schema. The file is for the calibration corpus that sets the per-family limits `rb` ships with; the human reads it and decides whether to send it (as an attachment to a GitHub issue on `rabbit-brain/rb`, or by email). An agent may write the file and show the human where it is; an agent never sends it.
 
 ## Boundaries
 

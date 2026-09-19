@@ -141,13 +141,15 @@ class ModelRef(BaseModel):
     name: str
     checkpoint: Optional[str] = None
     sha256: Optional[str] = None
+    architecture: Optional[str] = None   # as the adapter read it from the checkpoint (raft, raft-small), when it can
 
 
 class DatasetRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     count: int
-    case_list_hash: Optional[str] = None
+    case_list_hash: Optional[str] = None   # sha256 over the case ids: the same set of cases
+    content_hash: Optional[str] = None     # sha256 over the input and ground-truth files themselves: the same data (runs only)
 
 
 class Convergence(BaseModel):
@@ -375,6 +377,7 @@ class CheckV2(BaseModel):
     max_reversals: Optional[int] = Field(default=None, ge=0, le=64)
     from_run: Optional[str] = None
     created: Optional[str] = None
+    unit: Optional[str] = None          # the metric's unit when the check was saved, so `rb check list` can say it
     note: str = Field(default="", max_length=400)
 
 
@@ -423,6 +426,7 @@ class Envelope(BaseModel):
 
 SCHEMAS: dict[str, type[BaseModel]] = {
     "bundle": Bundle,
+    "share": None,  # type: ignore[dict-item]  (filled below: share.py imports this module)
     "record": Record,
     "findings": Findings,
     "checks": ChecksV2,
@@ -431,3 +435,11 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "envelope": Envelope,
     "limits": Limits,
 }
+
+
+def _register_share() -> None:
+    from .share import ShareV1
+    SCHEMAS["share"] = ShareV1
+
+
+_register_share()

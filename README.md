@@ -1,6 +1,6 @@
 # Rabbit Brain
 
-> **Status.** 0.2.0 is the current release: the runner (`rb init`, `rb doctor`, `rb verify-hook`, `rb run` with the RAFT adapter, evidence sheets for flagged cases) on top of 0.1's importer, ranking, checks and receipts. Python 3.10 or later; the core depends on pydantic only, `[raft]` adds torch and the RAFT adapter's needs.
+> **Status.** The 0.2 line is on PyPI: the runner (`rb init`, `rb doctor`, `rb verify-hook`, `rb verify-adapter`, `rb run` with the RAFT adapter, evidence sheets for flagged cases) on top of 0.1's importer, ranking, checks and receipts; [CHANGELOG.md](CHANGELOG.md) says what each version added. Python 3.10 or later; the core depends on pydantic only, `[raft]` adds torch and the RAFT adapter's needs, `[evidence]` adds numpy and pillow for the sheets with a custom adapter.
 
 Release review for iterative perception models. Give it the per-case errors of your current and candidate checkpoints (and, if the model refines its answer iteratively, one number per refinement iteration) and it ranks the cases to look at: the ones that regressed on error, and the ones that pass on error but never settled. Then it keeps checks for the next checkpoint.
 

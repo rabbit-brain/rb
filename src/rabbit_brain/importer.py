@@ -115,44 +115,87 @@ CSV_SERIES = (("baseline_trajectory", 2, 64), ("candidate_trajectory", 2, 64), (
 
 
 def _numbers(text: Optional[str], name: str, low: int, high: int) -> Optional[list[float]]:
+    """A series cell: numbers separated by ';' (or by spaces, or by ',' inside a quoted cell)."""
     if text is None or not text.strip():
         return None
-    values = [float(v) for v in text.split(";") if v.strip()]
+    sep = ";" if ";" in text else ("," if "," in text else None)
+    parts = [v for v in (text.split(sep) if sep else text.split()) if v.strip()]
+    try:
+        values = [float(v) for v in parts]
+    except ValueError:
+        raise ValueError(f"{name}: '{text[:40]}{'...' if len(text) > 40 else ''}' is not a series of numbers (separate values with ';')")
     if not low <= len(values) <= high or any(not math.isfinite(n) or n < 0 for n in values):
-        raise ValueError(f"{name} must hold {low}-{high} finite nonnegative numbers")
+        raise ValueError(f"{name} must hold {low}-{high} finite nonnegative numbers (found {len(values)})")
     return values
 
 
-def csv_to_comparison(path: Path, *, project: str, baseline: str, candidate: str, dataset: str, metric: str, unit: str) -> ComparisonV1:
+CSV_COLUMNS = ("case_id", "baseline_error", "candidate_error", "name", "tags", "baseline_trajectory", "candidate_trajectory", "baseline_frames", "candidate_frames", "notes")
+
+CSV_EXAMPLE = """case_id,name,baseline_error,candidate_error,baseline_trajectory,candidate_trajectory,tags
+000012_10,000012_10,2.10,2.55,4.1;2.0;1.1;0.6;0.4;0.3;0.2;0.15;0.1;0.08;0.06;0.05,4.3;2.2;1.3;0.9;0.7;0.5;0.4;0.35;0.3;0.28;0.25;0.24,kitti;night
+000013_10,000013_10,1.40,1.05,3.9;1.8;0.9;0.5;0.3;0.2;0.15;0.1;0.08;0.06;0.05;0.04,3.6;1.7;0.8;0.4;0.25;0.15;0.1;0.07;0.05;0.04;0.03;0.03,kitti
+"""
+
+
+def parse_column_map(spec: Optional[str]) -> dict[str, str]:
+    """`--columns case_id=frame,baseline_error=epe_a,...`: rb column -> the file's column."""
+    mapping: dict[str, str] = {}
+    for item in (spec or "").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if "=" not in item:
+            raise RBError("E_CSV_INVALID", message=f"--columns entries look like rb_column=file_column; got '{item}'.")
+        ours, theirs = (x.strip() for x in item.split("=", 1))
+        if ours not in CSV_COLUMNS:
+            raise RBError("E_CSV_INVALID", message=f"--columns: '{ours}' is not an rb column. Columns: {', '.join(CSV_COLUMNS)}.")
+        mapping[ours] = theirs
+    return mapping
+
+
+def csv_to_comparison(path: Path, *, project: str, baseline: str, candidate: str, dataset: str, metric: str, unit: str, columns: Optional[dict[str, str]] = None) -> ComparisonV1:
     if not path.exists():
         raise RBError("E_FILE_NOT_FOUND", message=f"No such file: {path}")
     missing = [k for k, v in {"--project": project, "--baseline-name": baseline, "--candidate-name": candidate, "--dataset": dataset, "--metric": metric, "--unit": unit}.items() if not (v or "").strip()]
     if missing:
         raise RBError("E_IMPORT_CONFIG", message=f"CSV import needs {', '.join(missing)}.")
+    columns = columns or {}
+    col = lambda name: columns.get(name, name)  # noqa: E731
     cases: list[dict[str, Any]] = []
+    row_no = 1
     try:
         with io.open(path, newline="", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
-            required = {"case_id", "baseline_error", "candidate_error"}
-            if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
-                raise ValueError("required columns: case_id, baseline_error, candidate_error")
+            found = list(reader.fieldnames or [])
+            required = ["case_id", "baseline_error", "candidate_error"]
+            absent = [f"{r} (as '{col(r)}')" if col(r) != r else r for r in required if col(r) not in found]
+            if absent:
+                raise ValueError(f"required columns not found: {', '.join(absent)}; the file has: {', '.join(found) or 'no header'}. Map your names with --columns, e.g. --columns case_id=frame,baseline_error=epe_current,candidate_error=epe_candidate")
             for row in reader:
-                b, c = float(row["baseline_error"]), float(row["candidate_error"])
+                row_no += 1
+                cid = row[col("case_id")]
+                try:
+                    b, c = float(row[col("baseline_error")]), float(row[col("candidate_error")])
+                except ValueError:
+                    raise ValueError(f"row {row_no} ({cid}): baseline_error and candidate_error must be numbers")
                 if any(not math.isfinite(n) or n < 0 for n in (b, c)):
-                    raise ValueError("errors must be finite and nonnegative")
+                    raise ValueError(f"row {row_no} ({cid}): errors must be finite and nonnegative")
                 case: dict[str, Any] = {
-                    "id": row["case_id"], "name": row.get("name") or row["case_id"],
-                    "tags": [t.strip() for t in (row.get("tags") or "").split(";") if t.strip()],
+                    "id": cid, "name": row.get(col("name")) or cid,
+                    "tags": [t.strip() for t in (row.get(col("tags")) or "").split(";") if t.strip()],
                     "baseline_error": b, "candidate_error": c,
                 }
                 for key, low, high in CSV_SERIES:
-                    values = _numbers(row.get(key), key, low, high)
+                    try:
+                        values = _numbers(row.get(col(key)), key, low, high)
+                    except ValueError as exc:
+                        raise ValueError(f"row {row_no} ({cid}), column {col(key)}: {exc}")
                     if values is not None:
                         case[key] = values
                 if ("baseline_frames" in case) != ("candidate_frames" in case) or ("baseline_frames" in case and len(case["baseline_frames"]) != len(case["candidate_frames"])):
-                    raise ValueError(f"frame series must be paired with equal lengths for {row['case_id']}")
-                if row.get("notes"):
-                    case["notes"] = row["notes"]
+                    raise ValueError(f"row {row_no} ({cid}): frame series must be paired with equal lengths")
+                if row.get(col("notes")):
+                    case["notes"] = row[col("notes")]
                 cases.append(case)
     except (ValueError, KeyError) as exc:
         raise RBError("E_CSV_INVALID", message=f"The CSV could not be converted: {exc}.")

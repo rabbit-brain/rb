@@ -1,0 +1,25 @@
+# Rabbit Brain
+
+> Release review for iterative perception models. `pip install rabbit-brain`, then `rb docs`. It runs a candidate checkpoint against the current one on a case set (or reads per-case results you already have), ranks the cases that regressed on error or never settled during refinement, explains each one, renders the evidence, and keeps checks so the next checkpoint gets the same review. Everything runs locally and nothing leaves the machine.
+
+The one prompt that works: "Review candidate checkpoint B against A on this case set with Rabbit Brain." An agent then installs the package, reads AGENTS.md with `rb docs`, and follows the worked example. It must not compute errors, regressions, rankings, stability or verdicts itself; `rb` defines them and records how.
+
+## Docs
+
+- [AGENTS.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/AGENTS.md): the complete manual for agents and humans: the workflow, rb.toml, the trajectory hook, custom adapters (a runnable skeleton), the import format, the JSON output, exit codes, every error code with its fix, what to report to the human, how a human verifies what an agent did.
+- [README.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/README.md): what it does, what it needs, what it does not do, one real evidence sheet.
+- [CHANGELOG.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/CHANGELOG.md): what each version added.
+
+## Package
+
+- [PyPI: rabbit-brain](https://pypi.org/project/rabbit-brain/): `pip install rabbit-brain` (core, pydantic only), `pip install "rabbit-brain[raft]"` (the RAFT adapter's needs), `pip install "rabbit-brain[evidence]"` (numpy and pillow for evidence sheets with a custom adapter). Python 3.10 or later. CLI: `rb`.
+- [Source](https://github.com/rabbit-brain/rb): Apache-2.0.
+
+## Examples
+
+- [examples/raft-kitti](https://github.com/rabbit-brain/rb/tree/main/examples/raft-kitti): four real reviews of the official RAFT checkpoints on KITTI-2015 with their receipts, findings and evidence sheets, and the script that reproduces them on a GPU.
+
+## Optional
+
+- `rb init --demo` writes a synthetic project so the whole workflow runs on any machine in seconds; every output of it says it is synthetic.
+- `rb share <run>` writes a run's anonymised statistics for the calibration corpus; the human decides whether to send the file.

@@ -44,21 +44,46 @@ def stability_sentence(case: CaseV1, limits: Limits) -> str:
                 text += f" (current model: {base.last_update:.3f})"
             text += "."
         else:
-            text = f"The candidate made {pct(stats.late_share)} of its refinement in the last third of its iterations"
-            if stats.reversals > 0:
-                text += f" and reversed direction {stats.reversals} time{'' if stats.reversals == 1 else 's'}"
-            text += f", above your {pct(limits.max_late_share)} / {limits.max_reversals} limits."
-            if base:
-                text += f" The current model settled at {pct(base.late_share)}."
-        if not regression:
+            over_late = stats.late_share > limits.max_late_share + EPS
+            over_rev = stats.reversals > limits.max_reversals
+            share = share_text(stats.late_share, limits.max_late_share)
+            times = f"{stats.reversals} time{'' if stats.reversals == 1 else 's'}"
+            if over_late and over_rev:
+                text = f"The candidate made {share} of its refinement in the last third of its iterations and reversed direction {times}, above your {pct(limits.max_late_share)} and {limits.max_reversals}-reversal limits."
+            elif over_late:
+                text = f"The candidate made {share} of its refinement in the last third of its iterations, above your {pct(limits.max_late_share)} limit"
+                text += f", and reversed direction {times} (within your limit of {limits.max_reversals})." if stats.reversals > 0 else "."
+            else:
+                text = f"The candidate reversed direction {times}, above your limit of {limits.max_reversals} reversals, and made {share} of its refinement in the last third of its iterations (limit {pct(limits.max_late_share)})."
+            text += " " + current_model_sentence(base, limits)
+        if error_outcome(case, limits.max_regression) == "not_measured":
+            text += " No ground truth here, so the trajectory is the only signal for this case."
+        elif not regression:
             text += " The error looks fine; the answer is not settled."
         return text
     text = f"The candidate settled: {pct(stats.late_share)} late revision, {stats.reversals} reversal{'' if stats.reversals == 1 else 's'}."
     if base:
-        text += f" Current model: {pct(base.late_share)}."
+        text += " " + current_model_sentence(base, limits, short=True)
     if regression:
         text += " It converged to a worse answer: a data or training gap rather than instability."
     return text
+
+
+def share_text(share: float, limit: float) -> str:
+    """A late share as a percentage; one decimal when it sits within a point of the limit, so "25% ... above your 25% limit" cannot happen."""
+    if abs(share - limit) < 0.01:
+        return f"{share * 100:.1f}%"
+    return pct(share)
+
+
+def current_model_sentence(base, limits: Limits, short: bool = False) -> str:
+    """How the current model did on the same case, never calling an over-limit trajectory 'settled'."""
+    if base is None:
+        return ""
+    if is_settled(base, limits):
+        return f"Current model: {pct(base.late_share)}." if short else f"The current model settled at {pct(base.late_share)}."
+    detail = f"{pct(base.late_share)} late revision, {base.reversals} reversal{'' if base.reversals == 1 else 's'}"
+    return f"Current model: {detail}, not settled either." if short else f"The current model is not settled on this case either ({detail})."
 
 
 def why(case: CaseV1, limits: Limits, unit: str) -> str:

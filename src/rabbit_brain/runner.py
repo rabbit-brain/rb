@@ -19,7 +19,7 @@ from .config import Config
 from .errors import RBError
 from .models import Bundle, CaseV2, ChecksV2, DatasetRef, Evidence, Limits, ModelRef, Record
 from .recorder import TrajectoryRecorder
-from .runs import case_list_hash, compute_findings, derive_case, file_sha256, new_run_id, write_run
+from .runs import case_list_hash, compute_findings, content_hash, derive_case, file_sha256, new_run_id, write_run
 from .report import report_markdown
 
 Progress = Optional[Callable[[str], None]]
@@ -190,7 +190,9 @@ def run(cfg: Config, baseline: Path, candidate: Path, *, limits: Optional[Limits
         v2_cases.append(derive_case(raw, limits))
 
     run_id = new_run_id(cand_ref.name, runs_dir)
-    dataset = DatasetRef(name=cfg.dataset.name, count=len(v2_cases), case_list_hash=case_list_hash([c.id for c in v2_cases]))
+    dataset = DatasetRef(name=cfg.dataset.name, count=len(v2_cases), case_list_hash=case_list_hash([c.id for c in v2_cases]), content_hash=content_hash(kept))
+    archs = getattr(adapter, "architectures", {}) or {}
+    base_ref.architecture, cand_ref.architecture = archs.get(str(baseline)), archs.get(str(candidate))
     bundle = Bundle(version=2, run_id=run_id, project=cfg.project.name, task=cfg.project.task, source="run", metric=adapter.metric,
                     baseline=base_ref, candidate=cand_ref, dataset=dataset, limits=limits, record="record.json",
                     adapter=adapter.describe(), cases=v2_cases)
@@ -218,6 +220,8 @@ def run(cfg: Config, baseline: Path, candidate: Path, *, limits: Optional[Limits
         if targets:
             from .evidence import render_case
             run_dir_planned = runs_dir / run_id
+            if progress:
+                progress(f"rendering evidence for {len(targets)} case(s) (each re-runs both checkpoints on the case; --evidence none skips this)")
             loaded = {"baseline": adapter.load(baseline, device), "candidate": adapter.load(candidate, device)}
             rendered = {}
             for cid in targets:
@@ -242,6 +246,8 @@ def run(cfg: Config, baseline: Path, candidate: Path, *, limits: Optional[Limits
                     by_id[cid].evidence = Evidence(dir=str(Path(info["dir"]).relative_to(run_dir_planned)), files=info["files"])
                 record.evidence = {"level": evidence_level, "cases": list(rendered), "checks": {cid: info["check"] for cid, info in rendered.items()}}
                 findings = compute_findings(bundle, limits, checks)
+    record.wall_seconds = round(time.time() - t0, 3)
+    record.finished = datetime.now().astimezone().isoformat(timespec="seconds")
     md = report_markdown(bundle, record, findings, checks.checks if checks else ())
     if getattr(adapter, "synthetic", False):
         md = md.replace("\n\n## Verdict", "\n\n**Synthetic adapter: a test double, not a real model. The numbers are illustrative.**\n\n## Verdict", 1)
@@ -260,7 +266,7 @@ def verify_hook(cfg: Config, checkpoint: Optional[Path], device: Optional[str] =
     elif hasattr(adapter, "new_model"):
         model = adapter.new_model(device)
     else:
-        raise RBError("E_CHECKPOINT_NOT_FOUND", message="rb verify-hook needs --checkpoint for this adapter.")
+        raise RBError("E_CHECKPOINT_NOT_FOUND", message="rb verify-hook needs --checkpoint for this adapter (only the raft adapter can run with random weights).", fix="Pass --checkpoint <path to one of your checkpoints>.")
     case: Optional[Case] = None
     try:
         for c in adapter.cases():
@@ -354,8 +360,8 @@ def verify_adapter(cfg: Config, checkpoint: Path, device: Optional[str] = None, 
 def doctor(cfg: Optional[Config], checkpoints: list[Path], device: Optional[str] = None) -> list[dict]:
     checks: list[dict] = []
 
-    def add(name: str, ok: Optional[bool], detail: str, fix: Optional[str] = None) -> None:
-        checks.append({"check": name, "status": "ok" if ok else ("warn" if ok is None else "fail"), "detail": detail, **({"fix": fix} if fix and not ok else {})})
+    def add(name: str, ok: Optional[bool], detail: str, fix: Optional[str] = None, code: Optional[str] = None) -> None:
+        checks.append({"check": name, "status": "ok" if ok else ("warn" if ok is None else "fail"), "detail": detail, **({"fix": fix} if fix and not ok else {}), **({"code": code} if code and ok is False else {})})
 
     add("python", True, platform.python_version())
     add("rb", True, __version__)
@@ -378,17 +384,38 @@ def doctor(cfg: Optional[Config], checkpoints: list[Path], device: Optional[str]
         adapter = load_adapter(cfg)
         add("adapter", True, str(adapter.describe()))
     except RBError as exc:
-        add("adapter", False, exc.message or exc.code, exc.fix)
+        add("adapter", False, exc.message or exc.code, exc.fix, code=exc.code)
         return checks
     if cfg.adapter.model_code:
         p = Path(cfg.adapter.model_code)
-        add("model_code", p.exists(), str(p) + ("" if p.exists() else " (missing)"), "point [adapter] model_code at the model repository checkout")
+        sha = (adapter.describe().get("git_sha") or {}) if p.exists() else {}
+        detail = str(p) + ("" if p.exists() else " (missing)")
+        if p.exists():
+            detail += f" @ {sha['sha'][:12]}{' (uncommitted changes)' if sha.get('dirty') else ''}" if sha.get("sha") else " (not a git checkout: the receipt cannot pin a commit)"
+        add("model_code", p.exists(), detail, "point [adapter] model_code at the model repository checkout")
     try:
         cases = list(adapter.cases())
         add("dataset", bool(cases), f"{len(cases)} cases from {cfg.dataset.path or cfg.dataset.name}" + (f"; {sum(1 for c in cases if c.gt is not None)} with ground truth" if cases else ""), "check [dataset] path")
     except RBError as exc:
-        add("dataset", False, exc.message or exc.code, exc.fix)
+        add("dataset", False, exc.message or exc.code, exc.fix, code=exc.code)
     for ck in checkpoints:
-        add(f"checkpoint {ck.name}", ck.exists(), str(ck) + ("" if ck.exists() else " (missing)"), "check the path")
-    add("hook", None, "not verified yet", "rb verify-hook --checkpoint <path>")
+        if not ck.exists():
+            add(f"checkpoint {ck.name}", False, f"{ck} (missing)", "check the path")
+            continue
+        detail = f"{ck} · sha256 {file_sha256(ck)[:12]}…"
+        try:
+            model = adapter.load(ck, "cpu")
+            arch = getattr(adapter, "architectures", {}).get(str(ck))
+            params = sum(int(t.numel()) for t in model.parameters()) if hasattr(model, "parameters") else None
+            detail += (f" · {arch}" if arch else "") + ((f" · {params / 1e6:.2f}M parameters" if params >= 1e6 else f" · {params:,} parameters") if params else "")
+            del model
+            add(f"checkpoint {ck.name}", True, detail)
+        except RBError as exc:
+            add(f"checkpoint {ck.name}", False, f"{ck}: {exc.message}", exc.fix, code=exc.code)
+    archs = {str(ck): getattr(adapter, "architectures", {}).get(str(ck)) for ck in checkpoints if ck.exists()}
+    if len(checkpoints) >= 2 and len({a for a in archs.values() if a}) > 1:
+        add("architectures", None, "the checkpoints are different architectures: " + ", ".join(f"{Path(k).name} = {v}" for k, v in archs.items() if v) + "; the review compares models, not a retrain")
+    add("hook", None, "not verified yet", "rb verify-hook --checkpoint <path> (run it for each checkpoint)")
+    if hasattr(adapter, "reference_value"):
+        add("adapter agreement", None, "not verified yet", "rb verify-adapter --checkpoint <path> (rb run checks it on a few cases first)")
     return checks

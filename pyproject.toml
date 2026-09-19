@@ -31,6 +31,7 @@ dependencies = ["pydantic>=2.5,<3", "tomli>=2; python_version < '3.11'"]
 [project.optional-dependencies]
 dev = ["pytest>=8", "build>=1.2", "twine>=5"]
 raft = ["torch", "torchvision", "numpy", "opencv-python-headless", "scipy", "pillow"]
+evidence = ["numpy", "pillow"]
 
 [project.urls]
 Homepage = "https://github.com/rabbit-brain/rb"
@@ -49,7 +50,7 @@ packages = ["src/rabbit_brain"]
 "AGENTS.md" = "rabbit_brain/docs/AGENTS.md"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/rabbit_brain", "tests", "AGENTS.md", "README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml"]
+include = ["src/rabbit_brain", "tests", "AGENTS.md", "README.md", "LICENSE", "CHANGELOG.md", "llms.txt", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

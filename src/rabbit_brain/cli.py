@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sys
 import traceback
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
@@ -17,7 +19,7 @@ from .config import CONFIG_NAME, GITIGNORE_SNIPPET, AdapterSection, Config, Data
 from .errors import EXIT_CHECK_FAILED, EXIT_ENVIRONMENT, EXIT_INVALID, EXIT_OK, ERRORS, RBError
 from .example import MINIMAL_EXAMPLE, example_comparison
 from .fmt import pct, plain, signed, to_fixed
-from .importer import csv_to_comparison, load_comparison
+from .importer import CSV_EXAMPLE, csv_to_comparison, load_comparison, parse_column_map
 from .models import SCHEMAS, Bundle, ChecksV2, Envelope, Findings, Limits
 from .report import agreement_line, report_markdown
 from .adapters.base import task_metric as adapters_task_metric
@@ -27,7 +29,7 @@ from . import runner as runner_mod
 
 PLANNED = {"rerun", "open", "serve", "mcp"}
 FILTERS = ["flagged", "all", "regressions", "unstable", "improved-unstable", "settled-regressions", "improved", "stable"]
-SORTS = ["priority", "error-change", "late-share", "name"]
+SORTS = ["priority", "error-change", "candidate-error", "current-error", "late-share", "name"]
 
 # ---------------------------------------------------------------- output
 
@@ -44,6 +46,7 @@ class Out:
         self.ref: Optional[str] = None  # how the user named the run (id, directory or file); reused in `next`
         self.warnings: list[str] = []
         self.command_line: str = "rb"  # the exact invocation, recorded in record.json
+        self.runs_dir_flag: Optional[str] = None  # a --runs-dir in effect, repeated in `next` hints
 
     def say(self, *text: str) -> None:
         self.lines.extend(text)
@@ -53,6 +56,8 @@ class Out:
         print(f"rb {self.command}: {text}", file=sys.stderr)
 
     def emit(self, ok: bool = True, errors: Optional[list[dict]] = None) -> None:
+        if self.runs_dir_flag:
+            self.next = [n + f" --runs-dir {self.runs_dir_flag}" if n.startswith(("rb findings", "rb case", "rb report", "rb check", "rb runs")) else n for n in self.next]
         if self.json_mode:
             data = dict(self.data)
             if self.warnings:
@@ -102,7 +107,8 @@ def cmd_import(args: argparse.Namespace, out: Out) -> int:
     started = datetime.now().astimezone()
     path = Path(args.file)
     if path.suffix.lower() == ".csv":
-        cmp = csv_to_comparison(path, project=args.project or "", baseline=args.baseline_name or "", candidate=args.candidate_name or "", dataset=args.dataset or "", metric=args.metric or "", unit=args.unit or "")
+        cmp = csv_to_comparison(path, project=args.project or "", baseline=args.baseline_name or "", candidate=args.candidate_name or "", dataset=args.dataset or "", metric=args.metric or "", unit=args.unit or "",
+                                columns=parse_column_map(getattr(args, "columns", None)))
         fmt = "csv"
     else:
         cmp = load_comparison(path)
@@ -131,7 +137,7 @@ def _create_run(cmp, args, out: Out, started, path: Optional[Path], fmt: str) ->
     bundle = bundle_from_comparison(cmp, run_id, limits, "example" if cmp.source == "example" else "imported")
     checks = checks_for(args, bundle.project, out)
     findings = compute_findings(bundle, limits, checks)
-    record = import_record(bundle, cmp, path, fmt, started, out.command_line)
+    record = import_record(bundle, cmp, path, fmt, started, out.command_line, note=getattr(args, "note", "") or "")
     md = report_markdown(bundle, record, findings, checks.checks if checks else ())
     run_dir = write_run(base, bundle, record, findings, md)
     out.run_id = run_id
@@ -181,7 +187,11 @@ def _select(queue, flt: str):
 
 def _sorted(items, sort: str):
     if sort == "error-change":
-        return sorted(items, key=lambda q: -q.error_change)
+        return sorted(items, key=lambda q: -(q.error_change if q.error_change is not None else float("-inf")))
+    if sort == "candidate-error":
+        return sorted(items, key=lambda q: -(q.candidate_error if q.candidate_error is not None else -1))
+    if sort == "current-error":
+        return sorted(items, key=lambda q: -(q.baseline_error if q.baseline_error is not None else -1))
     if sort == "late-share":
         return sorted(items, key=lambda q: -(q.candidate_late_share if q.candidate_late_share is not None else -1))
     if sort == "name":
@@ -202,19 +212,24 @@ def cmd_findings(args: argparse.Namespace, out: Out) -> int:
         f"{bundle.project} · {bundle.baseline.name} → {bundle.candidate.name} · {bundle.metric.name} ({unit}), lower is better",
         f"Limits: +{plain(limits.max_regression)} {unit} · {pct(limits.max_late_share)} late · {limits.max_reversals} reversals" + (f" · +{plain(limits.max_trajectory_regression)} late movement" if limits.max_trajectory_regression is not None else ""),
         f"Verdict: {findings.verdict.line}",
-        f"{s.cases} cases · {s.regressions} regressions · {s.unstable} unstable ({s.improved_unstable} pass on error) · {s.settled_regressions} settled regressions · {s.flagged} flagged"
+        f"{s.cases} cases · mean {to_fixed(s.mean_error.baseline)} → {to_fixed(s.mean_error.candidate)} {unit} · {s.regressions} regressions · {s.unstable} unstable ({s.improved_unstable} pass on error) · {s.settled_regressions} settled regressions · {s.flagged} flagged"
         + (f" · checks {s.checks.passing} pass / {s.checks.failing} fail / {s.checks.missing} missing" if s.checks.saved else ""),
         "",
-        f"{'#':>3}  {'case':<24} {'change':>9}  {'late':>5} {'rev':>3}  flags",
+        f"{'rank':>4}  {'case':<24} {'current':>9} {'candidate':>9} {'change':>9}  {'late':>5} {'move':>7} {'rev':>3}  flags",
     )
+    any_move = False
     for q in shown:
         late = pct(q.candidate_late_share) if q.candidate_late_share is not None else "n/a"
-        if q.late_update_change is not None:
-            late += f" {signed(q.late_update_change)}mv"
+        move = signed(q.late_update_change) if q.late_update_change is not None else "-"
+        any_move = any_move or q.late_update_change is not None
         rev = str(q.candidate_reversals) if q.candidate_reversals is not None else "-"
-        change = signed(q.error_change) if q.error_change is not None else "n/a"
-        out.say(f"{q.rank:>3}  {q.id:<24} {change:>7} {unit:<2} {late:>5} {rev:>3}  {', '.join(q.flags) or '-'}")
-    out.say("", f"{len(shown)} of {s.cases} cases shown (filter: {args.filter}, sort: {args.sort}).")
+        change = f"{signed(q.error_change)} {unit}" if q.error_change is not None else "no gt"
+        cur = to_fixed(q.baseline_error) if q.baseline_error is not None else "-"
+        cand = to_fixed(q.candidate_error) if q.candidate_error is not None else "-"
+        out.say(f"{q.rank:>4}  {q.id:<24} {cur:>9} {cand:>9} {change:>9}  {late:>5} {move:>7} {rev:>3}  {', '.join(q.flags) or '-'}")
+    out.say("", f"{len(shown)} of {s.cases} cases shown (filter: {args.filter}, sort: {args.sort}); rank is the queue position under these limits.",
+            f"late = candidate's share of refinement in the last third of its iterations; rev = its reversals"
+            + (f"; move = candidate late movement minus the current model's, {unit} per iteration" if any_move else "") + ".")
     out.data = {**findings.model_dump(exclude={"queue"}), "queue": [q.model_dump() for q in shown], "shown": len(shown), "filter": args.filter, "sort": args.sort}
     ref = out.ref or bundle.run_id
     if shown:
@@ -266,6 +281,9 @@ def cmd_case(args: argparse.Namespace, out: Out) -> int:
         run_dir = resolve_run(args.run, runs_dir(args.runs_dir))[1]
         if run_dir is None or not run_dir.is_dir():
             raise RBError("E_RUN_NOT_FOUND", message="Evidence needs a run directory (rb-runs/<run_id>), not a loose comparison file.")
+        if bundle.source != "run":
+            raise RBError("E_CONFIG_MISSING", message=f"Run {bundle.run_id} was {bundle.source}: rb has only its numbers, not the model or the data, so there is nothing to render. Evidence comes from `rb run` (rb init with the model code and the dataset, then rb run).",
+                          fix="Set up the runner with `rb init --adapter raft --model-code ./raft --dataset <path>` and `rb run` the two checkpoints; then `rb case <run> <id> --render` works.")
         cfg = load_config()
         rendered = render_case(cfg, bundle, q.id, run_dir, device=getattr(args, "device", None))
         chk = rendered["check"]
@@ -278,7 +296,7 @@ def cmd_case(args: argparse.Namespace, out: Out) -> int:
                 "baseline_frames": c.baseline_frames, "candidate_frames": c.candidate_frames, "limits": limits.model_dump(), "metric": bundle.metric.model_dump(),
                 "evidence": rendered or (c.evidence.model_dump() if c.evidence else None)}
     ref = out.ref or bundle.run_id
-    out.next = [f"rb check save {ref} {q.id}", f"rb findings {ref}"] + ([] if rendered or c.evidence else [f"rb case {ref} {q.id} --render"])
+    out.next = [f"rb check save {ref} {q.id}", f"rb findings {ref}"] + ([] if rendered or c.evidence or bundle.source != "run" else [f"rb case {ref} {q.id} --render"])
     return EXIT_OK
 
 
@@ -322,13 +340,16 @@ def cmd_check_run(args: argparse.Namespace, out: Out) -> int:
     if bundle.source == "example":
         out.say("EXAMPLE DATA - illustrative metrics, no inference was run.")
     out.say(f"{bundle.project} | {bundle.baseline.name} -> {bundle.candidate.name} | {bundle.metric.name} ({unit}), lower is better")
-    for q in queue:
-        status = "REGRESSION" if "regression" in q.flags else "OK"
+    shown = queue if (args.all or args.case_id) else flagged
+    for q in shown:
+        status = {"regression": "REGRESSION", "improved": "IMPROVED", "stable": "OK", "not_measured": "NO GT"}.get(q.error_outcome, "OK")
         numbers = f"{q.baseline_error:.2f} -> {q.candidate_error:.2f} {unit} ({q.error_change:+.2f})" if q.error_change is not None else "error not measured (no ground truth)"
         line = f"{status:12} {q.id:24} {numbers}"
         if q.candidate_late_share is not None:
             line += f"  | {'UNSTABLE' if 'unstable' in q.flags else 'settled':8} late {q.candidate_late_share * 100:4.0f}%  reversals {q.candidate_reversals}"
         out.say(line)
+    if not args.all and not args.case_id:
+        out.say(f"{len(queue) - len(flagged)} of {len(queue)} cases within limits and not shown (--all shows every case).")
     for r in results:
         tag = {"passing": "PASS", "failing": "FAIL", "missing": "MISSING", "other-project": "SKIP"}[r.status]
         limits_text = f"max {r.max_error:.2f} {unit}" + (f", late <= {r.max_late_share * 100:.0f}%" if r.max_late_share is not None else "") + (f", reversals <= {r.max_reversals}" if r.max_reversals is not None else "")
@@ -351,7 +372,7 @@ def cmd_check_list(args: argparse.Namespace, out: Out) -> int:
     else:
         out.say(f"{len(checks.checks)} saved check{'' if len(checks.checks) == 1 else 's'} for '{checks.project}' in {path}:")
         for c in checks.checks:
-            out.say(f"- {c.case_id}{f' ({c.name})' if c.name else ''}: {describe_check(c, args.unit or 'units')}{f' · from {c.from_run}' if c.from_run else ''}{f' · {c.note}' if c.note else ''}")
+            out.say(f"- {c.case_id}{f' ({c.name})' if c.name else ''}: {describe_check(c, args.unit or c.unit or 'units')}{f' · from {c.from_run}' if c.from_run else ''}{f' · {c.note}' if c.note else ''}")
     out.data = checks.model_dump(exclude_none=True)
     return EXIT_OK
 
@@ -366,6 +387,32 @@ def cmd_check_rm(args: argparse.Namespace, out: Out) -> int:
     save_checks(path, checks)
     out.say(f"Removed the check for {args.case_id} from {path}. {len(checks.checks)} remain.")
     out.data = {"removed": args.case_id, "remaining": len(checks.checks)}
+    return EXIT_OK
+
+
+def cmd_share(args: argparse.Namespace, out: Out) -> int:
+    from .share import build_share, consent_text, write_share
+    bundle, run_dir, limits = _load(args, out)
+    findings = compute_findings(bundle, limits, None)
+    record = None
+    if run_dir and (run_dir / "record.json").exists():
+        from .models import Record
+        try:
+            record = Record.model_validate_json((run_dir / "record.json").read_text(encoding="utf-8"))
+        except ValidationError:
+            record = None
+    share = build_share(bundle, record, findings)
+    if args.print:
+        out.say(json.dumps(share.model_dump(), indent=1))
+        out.data = share.model_dump()
+        return EXIT_OK
+    if run_dir is None:
+        raise RBError("E_RUN_NOT_FOUND", message="rb share needs a run directory (rb-runs/<run_id>) to write share.json into; use --print for a file read in place.")
+    path = write_share(run_dir, share)
+    out.say(*consent_text(share, path))
+    out.data = {"path": str(path), "cases": len(share.cases), "share_id": share.share_id, "included": list(__import__("rabbit_brain.share", fromlist=["INCLUDED"]).INCLUDED),
+                "excluded": list(__import__("rabbit_brain.share", fromlist=["EXCLUDED"]).EXCLUDED), "sent": False}
+    out.next = [f"cat {path}"]
     return EXIT_OK
 
 
@@ -424,10 +471,12 @@ def cmd_init(args: argparse.Namespace, out: Out) -> int:
     text = render_config(cfg)
     path.write_text(text, encoding="utf-8")
     gi = Path(".gitignore")
+    gi_line = f".gitignore already ignores rb-runs/*/evidence/."
     if "rb-runs/*/evidence/" not in (gi.read_text(encoding="utf-8") if gi.exists() else ""):
         with gi.open("a", encoding="utf-8") as f:
             f.write(("\n" if gi.exists() and gi.stat().st_size else "") + GITIGNORE_SNIPPET)
-    out.say(f"Wrote {path} for project '{cfg.project.name}' (adapter {cfg.adapter.id or cfg.adapter.module}).", "Added rb-runs/*/evidence/ to .gitignore.")
+        gi_line = f"{'Appended to' if gi.stat().st_size > len(GITIGNORE_SNIPPET) + 1 else 'Wrote'} .gitignore: rb-runs/*/evidence/ (evidence PNGs are large; the run's JSON and report are meant to be committed)."
+    out.say(f"Wrote {path} for project '{cfg.project.name}' (adapter {cfg.adapter.id or cfg.adapter.module}); dataset name '{cfg.dataset.name}' (--dataset-name to change it).", gi_line)
     if args.demo:
         out.say("Demo checkpoints: ckpt/synth-current.json and ckpt/synth-candidate.json (synthetic, not a real model).")
         out.next = ["rb doctor", "rb run --baseline ckpt/synth-current.json --candidate ckpt/synth-candidate.json"]
@@ -447,7 +496,10 @@ def cmd_doctor(args: argparse.Namespace, out: Out) -> int:
     out.say("", "Environment problems found." if failed else "Ready to run." if cfg else "Not configured.")
     out.data = {"checks": checks, "ok": not failed}
     out.next = ["rb verify-hook --checkpoint <path>", "rb verify-adapter --checkpoint <path>", "rb run --baseline <ckpt-A> --candidate <ckpt-B>"] if cfg and not failed else ["rb init --project <name> --adapter raft --model-code ./raft --dataset <path>"] if not cfg else []
-    return EXIT_ENVIRONMENT if failed else EXIT_OK
+    if failed:
+        first = failed[0]
+        raise RBError(first.get("code") or "E_DOCTOR", message=f"{len(failed)} check(s) failed; first: {first['check']}: {first['detail']}", fix=first.get("fix"), exit_code=EXIT_ENVIRONMENT)
+    return EXIT_OK
 
 
 def cmd_verify_hook(args: argparse.Namespace, out: Out) -> int:
@@ -564,6 +616,10 @@ def cmd_schema(args: argparse.Namespace, out: Out) -> int:
         out.say(json.dumps(cmp, indent=2))
         out.data = cmp
         return EXIT_OK
+    if args.name == "csv":
+        out.say(CSV_EXAMPLE.rstrip("\n"))
+        out.data = {"csv": CSV_EXAMPLE, "columns": "case_id, baseline_error, candidate_error required; name, tags, baseline_trajectory, candidate_trajectory, baseline_frames, candidate_frames, notes optional; series values separated by ';'; other column names map with --columns"}
+        return EXIT_OK
     schema = SCHEMAS[args.name].model_json_schema()
     out.say(json.dumps(schema, indent=2))
     out.data = schema
@@ -579,8 +635,21 @@ def cmd_version(args: argparse.Namespace, out: Out) -> int:
 def cmd_runs(args: argparse.Namespace, out: Out) -> int:
     base = runs_dir(args.runs_dir)
     ids = list_runs(base)
-    out.say(*(ids or [f"No runs under {base}/."]))
-    out.data = {"runs_dir": str(base), "runs": ids}
+    rows = []
+    for rid in ids:
+        row = {"run_id": rid}
+        try:
+            fj = json.loads((base / rid / "findings.json").read_text(encoding="utf-8"))
+            bj = json.loads((base / rid / "bundle.json").read_text(encoding="utf-8"))
+            row.update({"baseline": bj["baseline"]["name"], "candidate": bj["candidate"]["name"], "cases": len(bj.get("cases", [])), "source": bj.get("source"), "verdict": fj["verdict"]["line"]})
+        except (OSError, ValueError, KeyError):
+            pass
+        rows.append(row)
+    if not rows:
+        out.say(f"No runs under {base}/.")
+    for row in rows:
+        out.say(f"{row['run_id']:<32} {row.get('baseline', '?')} → {row.get('candidate', '?')} · {row.get('cases', '?')} cases · {row.get('verdict', '(no findings.json)')}")
+    out.data = {"runs_dir": str(base), "runs": ids, "details": rows}
     if ids:
         out.next = [f"rb findings {ids[-1]}"]
     return EXIT_OK
@@ -593,6 +662,7 @@ def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="print one JSON object (the envelope) instead of text")
     common.add_argument("--runs-dir", default=None, help="where runs live (default rb-runs/, or $RB_RUNS_DIR)")
+    common.add_argument("--verbose", action="store_true", help="show warnings raised by the model code and libraries (they are counted and hidden otherwise)")
     lim = argparse.ArgumentParser(add_help=False)
     lim.add_argument("--max-regression", type=float, default=None, help="allowed error increase over the current model, in the metric's unit (default 0.3)")
     lim.add_argument("--max-late-share", type=float, default=None, help="allowed share of refinement in the last third of iterations (default 0.25)")
@@ -614,6 +684,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--dataset", help="evaluation set's name (CSV)")
     s.add_argument("--metric", help="error metric name, e.g. mean_endpoint_error (CSV)")
     s.add_argument("--unit", help="metric unit, e.g. px or cm (CSV)")
+    s.add_argument("--columns", default=None, help="map rb's columns to the file's, e.g. case_id=frame,baseline_error=epe_current,candidate_error=epe_candidate,candidate_trajectory=updates (CSV)")
+    s.add_argument("--note", default="", help="a note for the receipt (record.json), e.g. where the numbers came from")
     s.set_defaults(func=cmd_import)
 
     s = sub.add_parser("example", parents=[common, lim, chk], help="create a run from the built-in example data, or write it as a version-1 JSON")
@@ -639,7 +711,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = csub.add_parser("save", parents=[common, lim, chk], help="keep a case for the next checkpoint (default limit: current error + max regression)")
     s.add_argument("run")
     s.add_argument("case_id")
-    s.add_argument("--max-error", type=float, default=None, help="absolute candidate error limit (default: current model's error + max regression)")
+    s.add_argument("--max-error", type=float, default=None, help="absolute candidate error limit (default: the better of the two models on this case + max regression)")
     s.add_argument("--no-settled", action="store_true", help="do not require a settled trajectory")
     s.add_argument("--note", default="")
     s.set_defaults(func=cmd_check_save)
@@ -647,6 +719,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("run")
     s.add_argument("--case", dest="case_id", default=None, help="only this case")
     s.add_argument("--fail-on", choices=["any", "checks", "flags"], default="any", help="what makes the exit code 1 (default any: a flagged case or a failing/missing check)")
+    s.add_argument("--all", action="store_true", help="print every case, not only the flagged ones")
     s.set_defaults(func=cmd_check_run)
     s = csub.add_parser("list", parents=[common, chk], help="list saved checks")
     s.add_argument("--project", default=None)
@@ -709,12 +782,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--skip-reference", action="store_true", help="do not check the adapter against the model repository's own evaluation first (the receipt says so)")
     s.set_defaults(func=cmd_run)
 
+    s = sub.add_parser("share", parents=[common, lim], help="write the run's anonymised statistics to share.json for the calibration corpus; nothing is sent")
+    s.add_argument("run")
+    s.add_argument("--print", action="store_true", help="print the JSON instead of writing share.json")
+    s.set_defaults(func=cmd_share)
+
     s = sub.add_parser("docs", parents=[common], help="print AGENTS.md (or --errors for the error table)")
     s.add_argument("--errors", action="store_true")
     s.set_defaults(func=cmd_docs)
 
     s = sub.add_parser("schema", parents=[common], help="print a JSON Schema, the minimal example, or the full example")
-    s.add_argument("name", choices=[*SCHEMAS.keys(), "example", "full-example"])
+    s.add_argument("name", choices=[*SCHEMAS.keys(), "example", "full-example", "csv"])
     s.set_defaults(func=cmd_schema)
 
     s = sub.add_parser("runs", parents=[common], help="list runs")
@@ -725,7 +803,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-COMMANDS = ["init", "doctor", "verify-hook", "verify-adapter", "run", "import", "example", "findings", "case", "check save", "check run", "check list", "check rm", "report", "docs", "schema", "runs", "version"]
+COMMANDS = ["init", "doctor", "verify-hook", "verify-adapter", "run", "import", "example", "findings", "case", "check save", "check run", "check list", "check rm", "report", "share", "docs", "schema", "runs", "version"]
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -751,10 +829,22 @@ def main(argv: Optional[list[str]] = None) -> int:
         return EXIT_OK
     command = args.command + (f" {args.check_command}" if args.command == "check" else "")
     out = Out(command, getattr(args, "json", False))
-    out.command_line = " ".join(["rb", *argv])
+    out.command_line = shlex.join(["rb", *argv])  # quoted where needed, so the receipt's command pastes back
+    out.runs_dir_flag = getattr(args, "runs_dir", None)
     func: Callable = args.func
+    verbose = getattr(args, "verbose", False)
+    caught: list = []
     try:
-        code = func(args, out)
+        with warnings.catch_warnings(record=not verbose) as rec:
+            if not verbose:
+                warnings.simplefilter("always")
+            try:
+                code = func(args, out)
+            finally:
+                if rec:
+                    caught.extend(rec)
+                    kinds = sorted({f"{w.category.__name__} from {Path(str(w.filename)).name}" for w in rec})
+                    print(f"rb {command}: {len(rec)} warning(s) from the model code and libraries hidden ({'; '.join(kinds[:4])}{'; ...' if len(kinds) > 4 else ''}); --verbose shows them", file=sys.stderr)
         out.emit(ok=code in (EXIT_OK, EXIT_CHECK_FAILED))
         return code
     except RBError as err:

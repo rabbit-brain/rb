@@ -42,6 +42,25 @@ def new_run_id(candidate: str, base: Path, now: Optional[datetime] = None) -> st
     return candidate_id
 
 
+def content_hash(cases) -> Optional[str]:
+    """sha256 over the bytes of every file a case names (inputs and ground truth, when they are paths), in case order."""
+    h = hashlib.sha256()
+    seen = 0
+    for c in cases:
+        paths = []
+        inputs = c.inputs if isinstance(c.inputs, (list, tuple)) else [c.inputs]
+        for item in [*inputs, c.gt]:
+            if isinstance(item, str) and Path(item).is_file():
+                paths.append(item)
+        for p in paths:
+            h.update(p.encode("utf-8"))
+            with open(p, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    h.update(chunk)
+            seen += 1
+    return h.hexdigest() if seen else None
+
+
 def case_list_hash(ids: list[str]) -> str:
     return hashlib.sha256("\n".join(sorted(ids)).encode("utf-8")).hexdigest()[:16]
 
@@ -143,7 +162,7 @@ def environment() -> dict:
     return {"python": platform.python_version(), "platform": platform.platform(), "rb_version": __version__}
 
 
-def import_record(bundle: Bundle, cmp: ComparisonV1, input_path: Optional[Path], input_format: str, started: datetime, command: str) -> Record:
+def import_record(bundle: Bundle, cmp: ComparisonV1, input_path: Optional[Path], input_format: str, started: datetime, command: str, note: str = "") -> Record:
     finished = datetime.now().astimezone()
     lengths = sorted(len(c.candidate_trajectory) for c in cmp.cases if c.candidate_trajectory)
     hook = {"status": "imported" if lengths else "disabled", "verified": None, "iterations": lengths[len(lengths) // 2] if lengths else None,
@@ -156,6 +175,7 @@ def import_record(bundle: Bundle, cmp: ComparisonV1, input_path: Optional[Path],
         environment=environment(), hook=hook, limits=bundle.limits,
         input={"path": str(input_path) if input_path else None, "sha256": file_sha256(input_path) if input_path else None, "format": input_format,
                "bytes": input_path.stat().st_size if input_path else None},
+        notes=note or "",
     )
 
 
@@ -165,9 +185,10 @@ def write_run(base: Path, bundle: Bundle, record: Record, findings: Findings, re
         if (run_dir / "bundle.json").exists():
             raise RBError("E_WRITE_FAILED", message=f"{run_dir} already holds a run.")
         run_dir.mkdir(parents=True, exist_ok=True)  # evidence rendering may have created it already
-        (run_dir / "bundle.json").write_text(json.dumps(bundle.model_dump(exclude_none=True), indent=1) + "\n", encoding="utf-8")
-        (run_dir / "record.json").write_text(json.dumps(record.model_dump(exclude_none=True), indent=1) + "\n", encoding="utf-8")
-        (run_dir / "findings.json").write_text(json.dumps(findings.model_dump(exclude_none=True), indent=1) + "\n", encoding="utf-8")
+        # nulls are written explicitly so the files and `--json` output are the same documents
+        (run_dir / "bundle.json").write_text(json.dumps(bundle.model_dump(), indent=1) + "\n", encoding="utf-8")
+        (run_dir / "record.json").write_text(json.dumps(record.model_dump(), indent=1) + "\n", encoding="utf-8")
+        (run_dir / "findings.json").write_text(json.dumps(findings.model_dump(), indent=1) + "\n", encoding="utf-8")
         (run_dir / "report.md").write_text(report_md, encoding="utf-8")
     except OSError as exc:
         raise RBError("E_WRITE_FAILED", message=f"Could not write {run_dir}: {exc}")

@@ -149,7 +149,10 @@ def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings
         for role in ("baseline", "candidate"):
             ref = record.checkpoints.get(role)
             if ref and (ref.checkpoint or ref.sha256):
-                prov.append(f"{role.capitalize()} checkpoint: {ref.checkpoint or ''}{f' (sha256 {ref.sha256[:16]}…)' if ref.sha256 else ''}")
+                prov.append(f"{role.capitalize()} checkpoint: {ref.checkpoint or ''}{f' ({ref.architecture})' if getattr(ref, 'architecture', None) else ''}{f' (sha256 {ref.sha256[:16]}…)' if ref.sha256 else ''}")
+        archs = {r: getattr(record.checkpoints.get(r), "architecture", None) for r in ("baseline", "candidate")}
+        if archs["baseline"] and archs["candidate"] and archs["baseline"] != archs["candidate"]:
+            prov.append(f"Note: the two checkpoints are different architectures ({archs['baseline']} vs {archs['candidate']}); this review compares two models, not a retrain of one.")
         env = record.environment or {}
         env_line = f"Environment: python {env.get('python', '?')} · {env.get('platform', '?')}"
         if env.get("torch"):
@@ -157,9 +160,13 @@ def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings
         prov.append(env_line)
         if record.model_code and record.model_code.get("path"):
             mc = record.model_code
-            prov.append(f"Model code: {mc['path']}" + (f" @ {mc['sha'][:12]}{' (uncommitted changes)' if mc.get('dirty') else ''}" if mc.get("sha") else ""))
+            prov.append(f"Model code: {mc['path']}" + (f" @ {mc['sha'][:12]}{' (uncommitted changes)' if mc.get('dirty') else ''}" if mc.get("sha") else " (not a git checkout; no commit to pin)"))
+        if record.dataset and getattr(record.dataset, "content_hash", None):
+            prov.append(f"Dataset: {record.dataset.name}, {record.dataset.count} cases, content sha256 {record.dataset.content_hash[:16]}…")
         hook = record.hook or {}
         prov.append(f"Trajectories: {hook.get('status', 'unknown')}{'. ' + hook['note'] if hook.get('note') else ''}")
+        if record.notes:
+            prov.append(f"Notes: {record.notes}")
         if record.adapter_agreement:
             prov.append("Adapter agreement: " + agreement_line(record.adapter_agreement, bundle.metric.unit))
     else:
@@ -167,12 +174,14 @@ def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings
     verdict = f"## Verdict\n\n{findings.verdict.line}\n"
     reproduce = (
         "## Reproduce\n\n"
-        f"- Ranked queue under the same limits: `rb findings {bundle.run_id} --max-regression {plain(findings.limits.max_regression)} --max-late-share {plain(findings.limits.max_late_share)} --max-reversals {findings.limits.max_reversals}`\n"
+        f"- Ranked queue under the same limits: `rb findings {bundle.run_id} --max-regression {plain(findings.limits.max_regression)} --max-late-share {plain(findings.limits.max_late_share)} --max-reversals {findings.limits.max_reversals}"
+        + (f" --max-trajectory-regression {plain(findings.limits.max_trajectory_regression)}" if findings.limits.max_trajectory_regression is not None else "")
+        + (f" --max-last-update {plain(findings.limits.max_last_update)}" if findings.limits.max_last_update is not None else "") + "`\n"
         f"- One case with its evidence and reasoning: `rb case {bundle.run_id} <case_id>`\n"
         f"- Saved checks against this run: `rb check run {bundle.run_id} --checks checks.json`\n"
         "- Definitions: `rb docs`. Schemas: `rb schema bundle|findings|checks|record`.\n"
     )
-    convergence = convergence_section(bundle, findings.limits) if bundle.source == "run" else ""
+    convergence = convergence_section(bundle, findings.limits) if bundle.source != "example" else ""   # any run with trajectories, imported ones included
     with_evidence = [c for c in bundle.cases if c.evidence]
     evidence = ""
     if with_evidence:

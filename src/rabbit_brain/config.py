@@ -100,8 +100,14 @@ def render_config(cfg: Config) -> str:
     lines += [
         f"iterations = {a.iterations}                  # refinement iterations per case; the trajectory has this many values",
         f"device = {_toml_str(a.device)}",
-        f"small = {'true' if a.small else 'false'}                     # RAFT: random-weight checks only; real checkpoints are read as raft or raft-small from their keys",
-        f"mixed_precision = {'true' if a.mixed_precision else 'false'}",
+    ]
+    if a.id == "raft":
+        lines += [
+            f"small = {'true' if a.small else 'false'}                     # RAFT: random-weight checks only; real checkpoints are read as raft or raft-small from their keys",
+            f"mixed_precision = {'true' if a.mixed_precision else 'false'}",
+            f"alternate_corr = {'true' if a.alternate_corr else 'false'}            # RAFT's memory-saving correlation (needs its CUDA extension)",
+        ]
+    lines += [
         f"reference_cases = {a.reference_cases}               # rb run checks the adapter against the model repository's own evaluation on this many cases first (0 = off)",
         "",
         "[dataset]",

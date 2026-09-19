@@ -94,10 +94,14 @@ def default_check(bundle: Bundle, case_id: str, *, max_error: Optional[float], m
     if case is None:
         raise RBError("E_CASE_NOT_FOUND", message=f"Case '{case_id}' is not in run {bundle.run_id}.")
     if max_error is None:
-        max_error = float(to_fixed(case.baseline_error + bundle.limits.max_regression, 2))
+        # the best level either model reached on this case, plus the regression tolerance: a case that improved keeps its
+        # improvement, a case that regressed must come back to the current model's level
+        best = min(v for v in (case.baseline_error, case.candidate_error) if v is not None)
+        max_error = float(to_fixed(best + bundle.limits.max_regression, 2))
     if max_late_share is None and require_settled and case.candidate_trajectory:
         max_late_share = bundle.limits.max_late_share
-    return CheckV2(case_id=case.id, name=case.name, max_error=max_error, max_late_share=max_late_share, max_reversals=max_reversals, from_run=bundle.run_id, created=date.today().isoformat(), note=note or "")
+    return CheckV2(case_id=case.id, name=case.name, max_error=max_error, max_late_share=max_late_share, max_reversals=max_reversals, from_run=bundle.run_id,
+                   created=date.today().isoformat(), unit=bundle.metric.unit, note=note or "")
 
 
 def describe_check(check: CheckV2, unit: str) -> str:

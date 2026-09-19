@@ -34,7 +34,7 @@ ERRORS: dict[str, tuple[str, str]] = {
         "Required columns: case_id, baseline_error, candidate_error. Optional: name, tags, baseline_trajectory, candidate_trajectory, baseline_frames, candidate_frames (semicolon-separated numbers).",
     ),
     "E_FILE_NOT_FOUND": ("A file given on the command line does not exist.", "Check the path; it is relative to the current directory."),
-    "E_RUN_NOT_FOUND": ("No such run.", "`ls rb-runs/` lists runs; ids look like 20260925-1412-raft-small. A path to bundle.json or a v1 comparison JSON also works."),
+    "E_RUN_NOT_FOUND": ("No such run.", "`rb runs` lists runs (add --runs-dir if the runs live elsewhere); ids look like 20260925-1412-raft-small. A path to bundle.json or a v1 comparison JSON also works."),
     "E_CASE_NOT_FOUND": ("That case id is not in this run.", "`rb findings <run> --filter all` lists every case id."),
     "E_CHECKS_INVALID": ("The checks file is not valid.", "Expected version 1 or 2; see `rb schema checks`."),
     "E_CHECKS_PROJECT_MISMATCH": ("The checks file belongs to another project.", "Use the same project name when importing, or point --checks at that project's file."),
@@ -47,6 +47,7 @@ ERRORS: dict[str, tuple[str, str]] = {
     "E_CHECKPOINT_NOT_FOUND": ("A checkpoint is missing or does not match the configured architecture.", "Check the path; for raft-small weights set [adapter] small = true. Do not download weights without asking the human."),
     "E_DATASET_EMPTY": ("No cases were found.", "Check [dataset] path and kind in rb.toml (KITTI: image_2/*_10.png and *_11.png; flow_occ/ optional) or the --cases file."),
     "E_HOOK_NOT_REACHABLE": ("The update loop is not instrumented; no trajectory was recorded.", "For RAFT-family models the built-in adapter hooks model.update_block automatically; for a custom adapter call rec.step(delta) once per iteration inside infer(). Or run with --no-trajectories (stability is then 'not assessed')."),
+    "E_DOCTOR": ("rb doctor found a problem with the environment or the project.", "Read data.checks: every failed check has a detail and a fix."),
     "E_ADAPTER_DISAGREES": ("The adapter's per-case error disagrees with the model repository's own evaluation on the same cases, so its results are not evidence about the model.", "Run `rb verify-adapter --checkpoint <path>` and compare the two columns: the adapter's loading, preprocessing (input range, padding, colour order), forward call or metric formula differs from the reference path. Fix the adapter; `rb run --skip-reference` runs anyway and says so in the receipt."),
     "E_HOOK_LENGTH": ("The recorder fired a different number of times than the configured iterations.", "Check that the hook fires exactly once per refinement iteration, and that [adapter] iterations matches what infer() runs."),
     "E_DEVICE": ("The requested device is not available.", "Set [adapter] device = \"cpu\" (slow) or pass --device cpu, or run on a machine with CUDA."),
@@ -57,7 +58,7 @@ ERRORS: dict[str, tuple[str, str]] = {
 }
 
 
-ENVIRONMENT_CODES = {"E_ADAPTER_IMPORT", "E_MODEL_CODE_MISSING", "E_DEVICE", "E_HOOK_NOT_REACHABLE", "E_HOOK_LENGTH", "E_INFERENCE_FAILED", "E_ADAPTER_DISAGREES", "E_EVIDENCE_DEPS"}  # exit 3
+ENVIRONMENT_CODES = {"E_DOCTOR", "E_ADAPTER_IMPORT", "E_MODEL_CODE_MISSING", "E_DEVICE", "E_HOOK_NOT_REACHABLE", "E_HOOK_LENGTH", "E_INFERENCE_FAILED", "E_ADAPTER_DISAGREES", "E_EVIDENCE_DEPS"}  # exit 3
 
 
 @dataclass

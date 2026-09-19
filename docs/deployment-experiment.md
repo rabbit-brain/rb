@@ -257,3 +257,84 @@ Whatever the ablation returns, the recorder's documentation is wrong today. `rec
 #### Machine change
 
 The pod lost its GPUs between the frozen run and this one and its data was migrated, so the corrected channel will not be measured on the hardware that produced the table above. Gate 4's exactly-zero repeat variance was a property of that machine. The original coarse configuration is therefore re-run first on the new hardware and compared against the saved numbers. Exact reproduction strengthens gate 4; any difference is itself a finding and bears on `claude/cross-machine-reproduction.md`.
+
+### Amendment 2: results
+
+Run on the migrated pod: RTX 4090, kernel 6.8.0-134, NVIDIA driver 580.159.04, torch 2.8.0+cu128, `rabbit-brain` 0.2.2 from PyPI, checkpoint `raft-things.pth`, the same two frozen splits. Artifacts on the pod volume at `/workspace/exp/ablation/`, with the executed originals preserved under `/workspace/exp/archive/`.
+
+#### The machine check came back exact
+
+The archived driver, unmodified, re-run on the truncation configuration split:
+
+| Field | Identical | max abs difference |
+|---|---|---|
+| baseline_error | 100/100 | 0.0 |
+| candidate_error | 100/100 | 0.0 |
+| baseline_trajectory | 100/100 | 0.0 |
+| candidate_trajectory | 100/100 | 0.0 |
+| B1 tag | 100/100 | 0.0 |
+
+The machines differ: kernel 6.8.0-138 to 6.8.0-134, driver 580.178.04 to 580.159.04, different physical host. Same GPU model, same torch build, same CUDA, same Python.
+
+**Gate 4 is therefore stronger than it was recorded.** It was stated as bounding run-to-run variation on one GPU back to back. It also survives a different host, kernel and driver version. It still does not show cross-architecture reproduction, so `claude/cross-machine-reproduction.md` keeps its scope, but "same process, same allocation, same driver" is no longer an available explanation.
+
+The same comparison against all five archived runs is identical on every field, so the new driver's coarse channel is the old driver's coarse channel. Two identical runs of the corrected channel also differ by exactly zero, so gate 4 covers it too.
+
+#### Amendment 1a's caveat is discharged
+
+The executed driver is on the volume at sha256 `18726e4e62b8af1ba86a01166a613a47ec6d2bfd14fdda2132f47bc65b6245e7`, 9565 bytes. The repository's reconstruction at `edae22c` is byte-identical: same hash, same length. The deterministic replay was exact. The caveat in amendment 1a can be read as discharged rather than outstanding.
+
+#### Instrumentation on the GPU
+
+`verify_channels.py` passes at both precisions on the 4090, including under real FP16 autocast, which CPU cannot exercise. The output tensor is bitwise identical with instrumentation on and off; the corrected channel's last cumulative state is that output, bitwise; the differences sum back to it to 1.5e-05 px on a 193 px field; twelve values per channel.
+
+#### Predictions
+
+| | Predicted | Observed |
+|---|---|---|
+| P1 | corrected magnitudes smaller, roughly constant within-case factor | median ratio 0.71 to 0.77 across the four blocks, p10 0.56, p90 0.84, max 0.90 |
+| P2 | Spearman rho above 0.8 | **0.9984 to 0.9990** |
+| P3 | corrected RB does not exceed B1 by more than 0.02 restricted | largest excess 0.009 |
+
+All three hold. P2 holds far more strongly than predicted, and it is the finding that explains the rest.
+
+#### Held-out results, all three channels
+
+AUROC for worse against better, n = 100 per arm, restricted to cases at or above B1's frozen selection threshold of 0.0295 px.
+
+| Arm | n | base rate | | B1 | RB coarse | RB corrected |
+|---|---|---|---|---|---|---|
+| Mixed precision, unrestricted | 100 | 0.55 | AUROC | 0.525 | 0.520 | 0.520 |
+| | | | prec@10 | 0.40 | 0.50 | 0.40 |
+| | | | prec@20 | 0.65 | 0.60 | 0.60 |
+| **Mixed precision, restricted** | 46 | 0.61 | AUROC | **0.437** | **0.444** | **0.446** |
+| | | | prec@10 | 0.40 | 0.50 | 0.40 |
+| | | | prec@20 | 0.65 | 0.60 | 0.60 |
+| Truncation, unrestricted | 100 | 0.84 | AUROC | 0.656 | 0.649 | 0.647 |
+| | | | prec@10 | 0.90 | 0.90 | 0.90 |
+| | | | prec@20 | 0.90 | 0.90 | 0.90 |
+| **Truncation, restricted** | 98 | 0.85 | AUROC | **0.641** | **0.635** | **0.635** |
+| | | | prec@10 | 0.90 | 0.90 | 0.90 |
+| | | | prec@20 | 0.90 | 0.90 | 0.90 |
+
+Configuration half, for completeness: mixed precision B1 0.486, coarse 0.502, corrected 0.505 unrestricted, and 0.497, 0.535, 0.537 restricted over 51 cases; truncation B1 0.702, coarse 0.670, corrected 0.665 unrestricted, and 0.710, 0.677, 0.672 restricted over 99 cases.
+
+Two honest notes on reading this table. In the mixed arm every score sits below 0.5, that is below chance, and they are separated by less than 0.01; RB's nominal lead over B1 there is not a win for either, which is why the pre-registered bound in P3 was set at 0.02 rather than at zero. And with n = 100 and these base rates, precision at 10 moves in steps of 0.10, so it is a blunt instrument next to AUROC; the one place the channels differ at all, mixed precision at k = 10, is a single case changing places.
+
+#### Verdict
+
+**The recorder defect was not the reason H1 failed.** Section 12's verdict stands unchanged, now with the suspected confound measured rather than assumed. The deployment wedge stays off the plan and historical replay across checkpoints remains the first engagement.
+
+Under the decision rule, prediction 3 held, so this closes the recorder gap as a correctness matter and licenses nothing further. No fresh test is triggered.
+
+#### Why the correction changed so little
+
+The corrected channel is very nearly a rank-preserving rescaling of the coarse one: Spearman rho of 0.999 on `late_update`, with the corrected value about three quarters of the coarse value. The convex upsampling RAFT applies is a weighted average over a 3 by 3 neighbourhood of the coarse field, and averaging shrinks magnitudes while largely preserving their ordering across cases. So the mask does carry information the recorder never saw, and the shrinkage is real and case-dependent between 0.56 and 0.90, but it is not information that reorders cases.
+
+That is worth stating plainly because it cuts both ways. It means the published table was not distorted by the defect. It also means that for RAFT specifically the coarse channel is an adequate proxy, so the fix is a correctness and documentation matter rather than an accuracy improvement, and the case for recording the output channel rests on models where the upsampling is not close to an average.
+
+#### What remains true regardless
+
+The recorder's documentation still describes the trajectory as the model's refinement when for RAFT it is the movement of an internal field at one eighth resolution. That is unchanged by this result and is tracked in `claude/recorder-upsampling-gap.md`.
+
+And the open question from section 12 is untouched. If an output difference ranks regressions as well as the trajectory does where ground truth exists to check, the argument for trusting the trajectory where it does not still has to be made. The corrected channel does not make it.

@@ -1,7 +1,7 @@
 # raft-kitti: model comparison
 
 Run: 20260918-1854-raft-kitti · rb 0.2.0.dev1 · finished 2026-09-18T18:54:47+00:00
-Report rendered by rb 0.2.1.dev1 from this run's bundle.json and record.json; the numbers are the run's, the wording and any later annotations are this version's.
+Report rendered by rb 0.2.1 from this run's bundle.json and record.json; the numbers are the run's, the wording and any later annotations are this version's.
 Command: `rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-kitti.pth --quiet`
 Baseline checkpoint: raft/models/raft-things.pth (sha256 fcfa4125d6418f4d…)
 Candidate checkpoint: raft/models/raft-kitti.pth (sha256 b9d170362415e1a2…)

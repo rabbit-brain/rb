@@ -7,6 +7,7 @@ flags, a generalised metric object and an evaluation record.
 from __future__ import annotations
 
 import math
+import re
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -27,22 +28,48 @@ def _finite_nonneg(values: list[float], name: str) -> list[float]:
 class Limits(BaseModel):
     """What gets flagged. `max_regression` is in the metric's unit; the stability limits read the candidate's trajectory.
     `max_last_update` (same unit as the trajectory values) is off unless set: a case is not settled when the model was
-    still moving its answer by more than this per iteration at the end."""
+    still moving its answer by more than this per iteration at the end.
+
+    The five named limits below are what this engine enforces, and four of the five are specific to the trajectory
+    diagnostic. `extra` carries limits for diagnostics this version does not implement, so a run stores the team's whole
+    release policy even when only part of it can be checked here. Unrecognised entries are preserved and reported, never
+    silently treated as passing: see `unenforced_limits`."""
     model_config = ConfigDict(extra="forbid")
     max_regression: float = Field(0.3, ge=0, le=SCORE_MAX)
     max_late_share: float = Field(0.25, ge=0, le=1)
     max_reversals: int = Field(2, ge=0, le=64)
     max_last_update: Optional[float] = Field(default=None, ge=0, le=SCORE_MAX)
     max_trajectory_regression: Optional[float] = Field(default=None, ge=0, le=SCORE_MAX)  # paired: candidate late movement minus the current model's, same case
+    extra: dict[str, float] = Field(default_factory=dict, max_length=32)   # named limits this version records but does not enforce
+
+    @field_validator("extra")
+    @classmethod
+    def _extra(cls, v: dict[str, float]) -> dict[str, float]:
+        for k, x in v.items():
+            if not re.fullmatch(r"[a-z0-9_]{1,60}", k):
+                raise ValueError(f"extra limit names must be lowercase identifiers, got {k!r}")
+            if isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x):
+                raise ValueError(f"extra limit {k!r} must be a finite number")
+        return {k: float(x) for k, x in v.items()}
+
+    def unenforced_limits(self) -> list[str]:
+        """Names in `extra`, which this version stores but does not check. Callers must surface these rather than
+        letting a team believe a saved policy was applied in full."""
+        return sorted(self.extra)
 
 
 class Metric(BaseModel):
-    """Any lower-is-better error with a unit (px for flow, cm or m for depth, ...)."""
+    """A measurement with a unit: endpoint error in px for flow, cm or m for depth, a success rate, a latency in ms.
+
+    `lower_is_better` is part of the stored contract so that a higher-is-better measurement (depth delta<1.25, task
+    success, PSNR) can be recorded faithfully from the start. **This engine only compares lower-is-better metrics.**
+    A bundle whose primary metric is higher-is-better is rejected at the boundary rather than run through comparison
+    logic that would report its improvements as regressions."""
     model_config = ConfigDict(extra="forbid")
     id: str = Field(min_length=1, max_length=60)
     name: str = Field(min_length=1, max_length=80)
     unit: str = Field(min_length=1, max_length=16)
-    lower_is_better: Literal[True] = True
+    lower_is_better: bool = True
 
     @classmethod
     def from_v1(cls, metric: str, unit: Optional[str]) -> "Metric":
@@ -67,6 +94,35 @@ class CaseV1(BaseModel):
     baseline_trajectory: Optional[list[float]] = Field(default=None, min_length=2, max_length=64)
     candidate_trajectory: Optional[list[float]] = Field(default=None, min_length=2, max_length=64)
     notes: Optional[str] = Field(default=None, max_length=1000)
+    # Secondary measurements on the same case: latency_ms, memory_mb, a downstream task score. Stored and reported;
+    # this version does not rank or flag on them, and `Metric.lower_is_better` is what will say which way each runs.
+    baseline_metrics: dict[str, float] = Field(default_factory=dict, max_length=16)
+    candidate_metrics: dict[str, float] = Field(default_factory=dict, max_length=16)
+    # Named intermediate states beyond the single scalar trajectory: per-iteration confidence, a second recorded
+    # channel, a disparity series. The scalar `*_trajectory` above stays the one the stability statistics read.
+    baseline_series: dict[str, list[float]] = Field(default_factory=dict, max_length=8)
+    candidate_series: dict[str, list[float]] = Field(default_factory=dict, max_length=8)
+
+    @field_validator("baseline_metrics", "candidate_metrics")
+    @classmethod
+    def _metrics(cls, v: dict[str, float], info) -> dict[str, float]:
+        for k, x in v.items():
+            if not re.fullmatch(r"[a-z0-9_]{1,60}", k):
+                raise ValueError(f"{info.field_name} keys must be lowercase identifiers, got {k!r}")
+            if isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) or abs(x) > SCORE_MAX:
+                raise ValueError(f"{info.field_name}[{k!r}] must be a finite number")
+        return {k: float(x) for k, x in v.items()}   # signed: a secondary metric may legitimately be negative
+
+    @field_validator("baseline_series", "candidate_series")
+    @classmethod
+    def _named_series(cls, v: dict[str, list[float]], info) -> dict[str, list[float]]:
+        for k, xs in v.items():
+            if not re.fullmatch(r"[a-z0-9_]{1,60}", k):
+                raise ValueError(f"{info.field_name} keys must be lowercase identifiers, got {k!r}")
+            if not isinstance(xs, list) or not 2 <= len(xs) <= 512:
+                raise ValueError(f"{info.field_name}[{k!r}] must hold between 2 and 512 values")
+            _finite_nonneg(xs, f"{info.field_name}[{k!r}]")
+        return {k: [float(x) for x in xs] for k, xs in v.items()}
 
     @field_validator("name", mode="before")
     @classmethod
@@ -237,6 +293,26 @@ class Bundle(BaseModel):
     record: str = "record.json"
     adapter: Optional[dict] = None
     cases: list[CaseV2]
+    # Definitions for the keys used in each case's `*_metrics`. Recorded so a stored run is self-describing; this
+    # version neither ranks nor flags on them.
+    metrics: list[Metric] = Field(default_factory=list, max_length=16)
+
+    @model_validator(mode="after")
+    def _engine_supports_primary_metric(self):
+        """The format can express a higher-is-better primary metric; the comparison logic cannot.
+
+        `error_outcome` calls candidate-minus-baseline a regression when it exceeds `max_regression`, and the report,
+        the ranked queue and the saved checks all inherit that direction. Running a higher-is-better metric through it
+        would label every improvement a regression. Rejecting it here is the honest boundary: the contract is ready for
+        the metric, this version of the engine is not.
+        """
+        if not self.metric.lower_is_better:
+            raise ValueError(
+                f"metric {self.metric.id!r} is higher-is-better, which this version cannot compare: the comparison "
+                f"logic treats an increase as a regression. Record it as a secondary metric in each case's "
+                f"*_metrics instead, or invert it into an error."
+            )
+        return self
 
     def to_v1(self) -> ComparisonV1:
         """The workspace-compatible view of this bundle (drops derived fields)."""

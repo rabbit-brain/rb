@@ -213,6 +213,7 @@ def cmd_findings(args: argparse.Namespace, out: Out) -> int:
     out.say(
         f"{bundle.project} · {bundle.baseline.name} → {bundle.candidate.name} · {bundle.metric.name} ({unit}), lower is better",
         f"Limits: +{plain(limits.max_regression)} {unit} · {pct(limits.max_late_share)} late · {limits.max_reversals} reversals" + (f" · +{plain(limits.max_trajectory_regression)} late movement" if limits.max_trajectory_regression is not None else ""),
+        *([f"NOT CHECKED: {', '.join(limits.unenforced_limits())}. Recorded in this run's limits, not enforced by rb {__version__}. The verdict below does not account for them."] if limits.unenforced_limits() else []),
         f"Verdict: {findings.verdict.line}",
         f"{s.cases} cases · mean {to_fixed(s.mean_error.baseline)} → {to_fixed(s.mean_error.candidate)} {unit} · {s.regressions} regressions · {s.unstable} unstable ({s.improved_unstable} pass on error) · {s.settled_regressions} settled regressions · {s.flagged} flagged"
         + (f" · {s.borderline} borderline" if s.borderline else "")

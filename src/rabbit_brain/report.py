@@ -86,7 +86,11 @@ def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequen
         f"Mean of case errors: {to_fixed(s.baseline)} → {to_fixed(s.candidate)} {unit}. Cases are weighted equally; this is not a pooled per-pixel mean.\n"
         f"Regression threshold: increase greater than {plain(limits.max_regression)} {unit}.\n{s.regressions} of {len(run.cases)} cases regress on error.\n{f'{s.not_measured} of {len(run.cases)} cases have no ground truth; their error was not measured.' + chr(10) if s.not_measured else ''}{stability_line}{borderline_line}\n"
         f"{header}\n{divider}\n{rows}\n\n## Saved checks\n{check_lines}\n\n"
-        "The check runner evaluates these supplied metrics and trajectories against the limits. It does not run inference or certify a model for deployment.\n"
+        + (f"## Limits not checked\n\nThis run's limits also carry {', '.join(f'`{n}`' for n in limits.unenforced_limits())}, "
+           f"which this version records but does not enforce. Nothing above tests {'them' if len(limits.unenforced_limits()) > 1 else 'it'}, "
+           f"and the verdict does not account for {'them' if len(limits.unenforced_limits()) > 1 else 'it'}.\n\n"
+           if limits.unenforced_limits() else "")
+        + "The check runner evaluates these supplied metrics and trajectories against the limits. It does not run inference or certify a model for deployment.\n"
     )
 
 

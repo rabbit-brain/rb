@@ -116,3 +116,5 @@ What it does **not** carry: `checkpoints.baseline.sha256` is null for imported r
 - `bc.py` - Astra rungs B and C on the archive, decisions not correlations
 - `frozen_policy.py` - threshold frozen on the configuration half, judged on the holdout
 - `profile_loop.py` - how much of a forward pass the refinement loop is
+
+- `policy_profile.py` - component profile, batch retained-state cost, and the implemented streaming policy timed end to end

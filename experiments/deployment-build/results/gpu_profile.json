@@ -1,0 +1,62 @@
+{
+ "iters": 12,
+ "reps": 5,
+ "cases": 12,
+ "rows": [
+  {
+   "component": "refinement (update_block)",
+   "ms_per_pass": 17.962477604548134,
+   "share": 0.5727320557325203,
+   "calls_per_pass": 12.0,
+   "ms_per_call": 1.496641431003809
+  },
+  {
+   "component": "encoder fnet",
+   "ms_per_pass": 4.987226566299796,
+   "share": 0.15901729074376067,
+   "calls_per_pass": 1.0,
+   "ms_per_call": 4.986838437616825
+  },
+  {
+   "component": "correlation lookup",
+   "ms_per_pass": 4.791098041459918,
+   "share": 0.15276374957353323,
+   "calls_per_pass": 12.0,
+   "ms_per_call": 0.3956458531320095
+  },
+  {
+   "component": "encoder cnet",
+   "ms_per_pass": 2.0859560618797937,
+   "share": 0.06651052988289476,
+   "calls_per_pass": 1.0,
+   "ms_per_call": 2.0855730399489403
+  },
+  {
+   "component": "correlation build",
+   "ms_per_pass": 1.4393719223638375,
+   "share": 0.04589425012562727,
+   "calls_per_pass": 1.0,
+   "ms_per_call": 1.4390936121344566
+  },
+  {
+   "component": "upsampling (hoisted, 1 call)",
+   "ms_per_pass": 0.09666401892900467,
+   "share": 0.0030821239416637144,
+   "calls_per_pass": 1.0,
+   "ms_per_call": 0.09357975795865059
+  }
+ ],
+ "instrumented_total_s": 0.03136279421548049,
+ "clean_median_s": 0.028813826385885477,
+ "loop_share_instrumented": 0.7254958053060534,
+ "environment": {
+  "python": "3.12.3",
+  "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.39",
+  "rb_version": "0.2.2",
+  "torch": "2.8.0+cu128",
+  "cuda": "12.8",
+  "cuda_available": true,
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "device": "cuda"
+ }
+}

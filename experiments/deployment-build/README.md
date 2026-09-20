@@ -118,3 +118,6 @@ What it does **not** carry: `checkpoints.baseline.sha256` is null for imported r
 - `profile_loop.py` - how much of a forward pass the refinement loop is
 
 - `policy_profile.py` - component profile, batch retained-state cost, and the implemented streaming policy timed end to end
+
+- `margin.py` - a conservative absolute cutoff, guard derived from the configuration half alone
+- `opt_policy.py` - hoisted upsampling applied to baseline and policy, verified bitwise, interleaved timing

@@ -33,6 +33,30 @@ ERRORS: dict[str, tuple[str, str]] = {
         "The CSV could not be converted.",
         "Required columns: case_id, baseline_error, candidate_error. Optional: name, tags, baseline_trajectory, candidate_trajectory, baseline_frames, candidate_frames (semicolon-separated numbers).",
     ),
+    "E_WORKSPACE_NO_TOKEN": (
+        "No workspace token. The workspace is the paid feature; the tool itself needs no account.",
+        "Set RB_WORKSPACE_TOKEN to a token from your workspace settings. `rb plans` needs no token and shows what a workspace costs.",
+    ),
+    "E_WORKSPACE_AUTH": (
+        "The workspace rejected this token.",
+        "It may have been revoked, or it may belong to a different deployment. Create a new one in your workspace settings and set RB_WORKSPACE_TOKEN.",
+    ),
+    "E_WORKSPACE_PAYMENT_REQUIRED": (
+        "This workspace has no active subscription.",
+        "Comparing, saving checks and failing CI stay free and local. Collecting results into a shared workspace is the paid part: `rb workspace checkout` returns a link for someone to approve.",
+    ),
+    "E_WORKSPACE_NOT_SELLABLE": (
+        "That plan is published but not yet sellable.",
+        "It is not finished, and we do not take payment for unfinished work. `rb plans` shows which plans can be bought today.",
+    ),
+    "E_WORKSPACE_UNREACHABLE": (
+        "Could not reach the workspace.",
+        "Check network access to the host, or set RB_WORKSPACE_URL if you run your own deployment. Nothing local was affected; the run is still on disk.",
+    ),
+    "E_WORKSPACE_REJECTED": (
+        "The workspace refused the request.",
+        "The message says why. If it mentions the bundle's shape, push the bundle.json that `rb run` or `rb import` wrote, unmodified.",
+    ),
     "E_FILE_NOT_FOUND": ("A file given on the command line does not exist.", "Check the path; it is relative to the current directory."),
     "E_RUN_NOT_FOUND": ("No such run.", "`rb runs` lists runs (add --runs-dir if the runs live elsewhere); ids look like 20260925-1412-raft-small. A path to bundle.json or a v1 comparison JSON also works."),
     "E_CASE_NOT_FOUND": ("That case id is not in this run.", "`rb findings <run> --filter all` lists every case id."),
@@ -58,7 +82,7 @@ ERRORS: dict[str, tuple[str, str]] = {
 }
 
 
-ENVIRONMENT_CODES = {"E_DOCTOR", "E_ADAPTER_IMPORT", "E_MODEL_CODE_MISSING", "E_DEVICE", "E_HOOK_NOT_REACHABLE", "E_HOOK_LENGTH", "E_INFERENCE_FAILED", "E_ADAPTER_DISAGREES", "E_EVIDENCE_DEPS"}  # exit 3
+ENVIRONMENT_CODES = {"E_DOCTOR", "E_ADAPTER_IMPORT", "E_MODEL_CODE_MISSING", "E_DEVICE", "E_HOOK_NOT_REACHABLE", "E_HOOK_LENGTH", "E_INFERENCE_FAILED", "E_ADAPTER_DISAGREES", "E_EVIDENCE_DEPS", "E_WORKSPACE_UNREACHABLE"}  # exit 3
 
 
 @dataclass

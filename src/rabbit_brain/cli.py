@@ -649,6 +649,74 @@ def cmd_run(args: argparse.Namespace, out: Out) -> int:
     return EXIT_CHECK_FAILED if (failed or unenforced) else EXIT_OK
 
 
+# ---------------------------------------------------------------- workspace (the paid surface)
+
+def cmd_plans(args: argparse.Namespace, out: Out) -> int:
+    """What a workspace costs. No token, no account: an agent can answer "what would this cost"
+    before anyone has signed up for anything."""
+    from . import workspace
+    data = workspace.plans()
+    out.say("Plans")
+    for p in data.get("plans", []):
+        mark = "" if p.get("available") else "   (published, not yet sellable)"
+        out.say(f"  {p['id']:<20} {p.get('price','?'):<30}{mark}")
+        for line in p.get("includes", [])[:3]:
+            out.say(f"      + {line}")
+    out.say("", data.get("note", ""))
+    out.data = data
+    out.next = ["rb workspace status"]
+    return EXIT_OK
+
+
+def cmd_workspace_status(args: argparse.Namespace, out: Out) -> int:
+    from . import workspace
+    data = workspace.status_of()
+    ws = data.get("workspace", {})
+    out.say(
+        f"Workspace: {ws.get('name','?')} ({ws.get('slug','?')})",
+        f"Plan: {data.get('plan')} · status {data.get('status')} · active {data.get('active')}",
+        "Comparisons can be pushed." if data.get("can_post_comparisons")
+        else "Comparisons cannot be pushed: this workspace has no active subscription.",
+    )
+    out.data = data
+    out.next = ["rb workspace push <run>"] if data.get("can_post_comparisons") else ["rb workspace checkout"]
+    return EXIT_OK
+
+
+def cmd_workspace_checkout(args: argparse.Namespace, out: Out) -> int:
+    """Returns a link. A person opens it and approves the payment; this command cannot and will not
+    complete a purchase itself."""
+    from . import workspace
+    data = workspace.checkout(args.plan)
+    out.say(
+        f"Checkout for the {data.get('plan')} plan on workspace {data.get('workspace')}:",
+        f"  {data.get('checkout_url')}",
+        "",
+        "Open that link and complete the payment. A person has to approve it; this command cannot.",
+        "Then `rb workspace status` until active is true.",
+    )
+    out.data = data
+    out.next = ["rb workspace status"]
+    return EXIT_OK
+
+
+def cmd_workspace_push(args: argparse.Namespace, out: Out) -> int:
+    """Push one finished comparison into the workspace. The run stays on disk either way."""
+    from . import workspace
+    bundle, _ = resolve_run(args.run, runs_dir(args.runs_dir))
+    out.run_id = bundle.run_id
+    data = workspace.push(json.loads(bundle.model_dump_json()))
+    out.say(
+        f"Pushed {bundle.run_id} to workspace project {data.get('project')}.",
+        f"{data.get('cases')} cases · {data.get('metrics')} metric(s) · policy {data.get('policy')}",
+    )
+    if data.get("policy") == "incomplete":
+        out.say(f"POLICY INCOMPLETE: {', '.join(data.get('unenforced_limits') or [])} were not evaluated. "
+                f"The workspace records this review as incomplete, as rb does.")
+    out.data = data
+    return EXIT_OK
+
+
 def docs_text() -> str:
     here = Path(__file__).resolve().parent
     for candidate in (here / "docs" / "AGENTS.md", here.parent.parent / "AGENTS.md"):
@@ -866,6 +934,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("runs", parents=[common], help="list runs")
     s.set_defaults(func=cmd_runs)
+
+    s = sub.add_parser("plans", parents=[common], help="what a workspace costs (no token needed)")
+    s.set_defaults(func=cmd_plans)
+
+    s = sub.add_parser("workspace", parents=[common], help="the paid workspace: status, checkout, push")
+    wsub = s.add_subparsers(dest="workspace_command", required=True)
+    w = wsub.add_parser("status", parents=[common], help="is this workspace active, and can it accept comparisons")
+    w.set_defaults(func=cmd_workspace_status)
+    w = wsub.add_parser("checkout", parents=[common], help="get a link for a person to approve; this cannot buy anything itself")
+    w.add_argument("--plan", default="workspace", help="which plan (default: workspace)")
+    w.set_defaults(func=cmd_workspace_checkout)
+    w = wsub.add_parser("push", parents=[common], help="push one finished comparison into the workspace")
+    w.add_argument("run", help="a run id, a run directory, or a bundle.json")
+    w.set_defaults(func=cmd_workspace_push)
 
     s = sub.add_parser("version", parents=[common], help="print the version")
     s.set_defaults(func=cmd_version)

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 (2026-09-21): the workspace, and buying one without a sales call
+- `rb plans`, `rb workspace status`, `rb workspace checkout` and `rb workspace push <run>`. Everything the tool already did stays free and local; what a subscription buys is that a finished review stops living only in the terminal that produced it.
+- **A person completes every purchase.** `rb workspace checkout` returns a URL and stops. It cannot pay. The sequence for an agent whose push was refused is in `rb docs`: push gives `E_WORKSPACE_PAYMENT_REQUIRED` with the plan and its price, checkout gives a link to hand to a human, status is polled until active, then push again.
+- The token is read from `RB_WORKSPACE_TOKEN` and nowhere else. It is never written to disk, never put in a URL, and never printed, including in errors, which a test pins. A CI secret is enough and there is no credential file to leak.
+- No new dependency: the client is `urllib` from the standard library.
+- Six error codes with fixes: `E_WORKSPACE_NO_TOKEN`, `E_WORKSPACE_AUTH`, `E_WORKSPACE_PAYMENT_REQUIRED`, `E_WORKSPACE_NOT_SELLABLE`, `E_WORKSPACE_UNREACHABLE` (exit 3, because the host being down is not the caller's mistake and the run is still on disk) and `E_WORKSPACE_REJECTED`.
+- A plan that is published but unfinished cannot be bought: checkout returns `E_WORKSPACE_NOT_SELLABLE`. The team workspace is priced in the open and marked unsellable until it actually shares a review with a second person.
+- **Corrected in `AGENTS.md`:** "Nothing leaves the machine" was no longer unconditionally true. It now reads that nothing leaves unless you send it, naming the two commands that do (`rb share` writes a file for a human to send; `rb workspace push` posts one comparison you name), and that no command sends anything on its own.
+
+
 ## 0.3.0 (2026-09-20): the stored contract is wider than the engine
 - The data model was shaped by one task and one diagnostic, and a run's stored shape is the expensive thing to change once a team has history in it. This release widens the contract without touching the comparison logic, so runs recorded now do not need migrating later. Nothing here changes what is checked or how anything is ranked.
 - `Metric.lower_is_better` is a real boolean, not `Literal[True]`. A higher-is-better measurement (depth `delta < 1.25`, task success, PSNR) can now be recorded faithfully. **The engine still only compares lower-is-better metrics**, and a bundle whose primary metric is higher-is-better is rejected at the boundary with a message saying so, because `error_outcome` calls candidate-minus-baseline a regression and would otherwise report every improvement as one.

@@ -280,6 +280,12 @@ Every trajectory also yields the absolute convergence statistics (`stability.can
 | `E_WRITE_FAILED` | a file could not be written | check permissions, or `--runs-dir` |
 | `E_EVIDENCE_DEPS` | evidence rendering needs numpy and pillow | `pip install numpy pillow` (included in `rabbit-brain[raft]`) |
 | `E_INTERNAL` | unexpected failure | re-run with `--json` and report it |
+| `E_WORKSPACE_NO_TOKEN` | no `RB_WORKSPACE_TOKEN` | the workspace is the paid feature; the tool needs no account. `rb plans` needs no token |
+| `E_WORKSPACE_AUTH` | the workspace rejected the token | it may be revoked or for another deployment; create a new one |
+| `E_WORKSPACE_PAYMENT_REQUIRED` | no active subscription on that workspace | `rb workspace checkout` returns a link for a person to approve |
+| `E_WORKSPACE_NOT_SELLABLE` | that plan is published but unfinished | `rb plans` shows which plans can be bought today |
+| `E_WORKSPACE_UNREACHABLE` | the workspace host could not be reached | exit 3. Nothing local was affected; the run is still on disk |
+| `E_WORKSPACE_REJECTED` | the workspace refused the request | the message says why; push the `bundle.json` unmodified |
 
 ## Worked example
 
@@ -303,9 +309,34 @@ When a later checkpoint arrives: `rb check run` against a new `rb run` of it (sa
 
 `rb share <run_id>` writes `rb-runs/<run_id>/share.json` and prints what is in it and what is not. In: the task and metric, the adapter id and architecture labels, iteration count, environment versions, the limits, per case the errors, the trajectories, the stability and convergence statistics, flags and outcomes (cases numbered, not named), and the run's summary. Out: case ids and names, tags, notes, file paths, dataset name and hashes, checkpoint paths, names and hashes, the project name, the command line, evidence, the verdict text. `rb schema share` prints the schema. The file is for the calibration corpus that sets the per-family limits `rb` ships with; the human reads it and decides whether to send it (as an attachment to a GitHub issue on `rabbit-brain/rb`, or by email). An agent may write the file and show the human where it is; an agent never sends it.
 
+## The workspace: what payment is for, and how to buy it without a sales call
+
+Everything above is free and local, and stays that way: comparing, investigating, saving checks,
+failing CI. What a subscription buys is that a finished review stops living only in the terminal
+that produced it.
+
+    rb plans                          what a workspace costs. No token, no account
+    rb workspace status               is this workspace active, can it accept comparisons
+    rb workspace checkout             a link for a person to open and approve
+    rb workspace push <run>           push one finished comparison into the workspace
+
+The token comes from `RB_WORKSPACE_TOKEN` and from nowhere else. `rb` never writes it to disk, never
+puts it in a URL, and never prints it, so a CI secret is enough and there is no credential file to
+leak.
+
+**A person completes every purchase.** `rb workspace checkout` returns a URL and stops. It cannot
+pay, and that is deliberate. The sequence an agent should follow when a push is refused:
+
+    rb workspace push <run>    ->  E_WORKSPACE_PAYMENT_REQUIRED, with the plan and its price
+    rb workspace checkout      ->  a URL. Give it to the human and say what it costs
+    rb workspace status        ->  poll until `active` is true, then push again
+
+Exit codes follow the table above: 2 for anything the caller can fix, 3 when the host is unreachable.
+A refused push changes nothing locally; the run is still on disk and still complete.
+
 ## Boundaries
 
-`rb` does not train, does not modify model code (the recorder is a forward hook or one line you add, and `rb verify-hook` checks it), and does not certify a model. Stability limits are generic heuristics and a starting point; a scorer fitted to the model is a separate, paid step. Nothing leaves the machine. The synthetic adapter is a test double and every output of it says so.
+`rb` does not train, does not modify model code (the recorder is a forward hook or one line you add, and `rb verify-hook` checks it), and does not certify a model. Stability limits are generic heuristics and a starting point; a scorer fitted to the model is a separate, paid step. Nothing leaves the machine unless you send it: `rb share` writes a file for a human to send, and `rb workspace push` posts one comparison you name to a workspace you configured. No command sends anything on its own. The synthetic adapter is a test double and every output of it says so.
 
 ## For humans: verify what your agent did
 

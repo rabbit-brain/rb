@@ -112,3 +112,7 @@ What it does **not** carry: `checkpoints.baseline.sha256` is null for imported r
 - `iteration_sweep.py` - per-case error and trajectory at 8 to 12 iterations
 - `oracle.py` - the oracle iteration-allocation curve against fixed and random baselines
 - `step8.py` - whether step-8 trajectory information captures the oracle room
+
+- `bc.py` - Astra rungs B and C on the archive, decisions not correlations
+- `frozen_policy.py` - threshold frozen on the configuration half, judged on the holdout
+- `profile_loop.py` - how much of a forward pass the refinement loop is

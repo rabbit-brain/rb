@@ -1,0 +1,103 @@
+# Rabbit Brain as a release gate in GitHub Actions.
+#
+# WHAT THIS FILE DOES, AND WHAT IT DOES NOT DO
+#
+# It runs your saved checks against a candidate build and exits non-zero when they fail, or when a
+# limit you declared was never evaluated. That makes the job red.
+#
+# **A red job is not a blocked merge.** Nothing in this file can stop a pull request landing. For
+# that, someone with repository admin has to add this job to the branch protection rules as a
+# required status check:
+#
+#     Settings -> Branches -> Branch protection rules -> Require status checks to pass
+#     -> add "release-gate"
+#
+# Until that is done the gate reports and does not enforce, which is a legitimate way to start: run
+# it in report-only mode for a few releases, see what it would have caught, then make it required.
+# The distinction is worth keeping straight, because "our CI fails on a regression" and "our CI
+# cannot merge a regression" are different claims and only the second is a gate.
+
+name: release-gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rabbit Brain
+        run: pip install rabbit-brain
+
+      # Your evaluator produces the per-case numbers. Rabbit Brain does not replace it; it compares
+      # what it produced against the approved baseline. Replace this step with however your
+      # evaluation runs, leaving a results file behind.
+      - name: Evaluate the candidate
+        run: |
+          python scripts/evaluate.py \
+            --checkpoint "${{ github.workspace }}/checkpoints/candidate.pth" \
+            --out candidate-results.json
+
+      - name: Import the comparison
+        run: |
+          rb import candidate-results.json --json > import.json
+          echo "RB_RUN_ID=$(python -c 'import json;print(json.load(open("import.json"))["run_id"])')" >> "$GITHUB_ENV"
+
+      # The gate.
+      #
+      # --fail-on checks: the build fails on the cases you decided matter, not on every case the
+      # ranking flags. Without it the default is --fail-on any, which fails whenever any case is
+      # flagged; that is a stricter policy and a much noisier one to adopt first.
+      #
+      # An unevaluated limit fails the job whatever --fail-on says: a required measurement that was
+      # never taken must not silently count as a pass.
+      #
+      # set -o pipefail is load-bearing. Actions runs each step with `bash -e` but not pipefail, so
+      # without it the pipeline's exit code is tee's, which is always 0, and the gate would go green
+      # on a failing check. If you change this line, keep that in mind.
+      - name: Run the release checks
+        id: gate
+        run: |
+          set -o pipefail
+          rb check run "$RB_RUN_ID" --fail-on checks --json | tee gate.json
+
+      # The verdict, in the pull request, so a reviewer sees why without opening the logs.
+      - name: Summarise the verdict
+        if: always()
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open("gate.json"))["data"]
+          s, v, c = d["summary"], d["verdict"], d["summary"]["checks"]
+          print(f"## Release gate: {v['line']}\n")
+          print(f"- {s['cases']} cases, {s['regressions']} regressed, {s['unstable']} unstable")
+          print(f"- checks: {c['passing']} pass, {c['failing']} fail, {c['missing']} missing")
+          print(f"- policy: **{d['policy']}**")
+          if d["unenforced_limits"]:
+              print(f"- NOT EVALUATED: {', '.join(d['unenforced_limits'])}. This verdict does not cover them.")
+          PY
+
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate
+          path: |
+            rb-runs/
+            gate.json
+
+      # Optional, and the paid part: keep this verdict, its baseline and its policy version in a
+      # workspace so the next release is measured against an approved build rather than whatever
+      # someone pasted. Needs RB_WORKSPACE_TOKEN as a repository secret.
+      # - name: Push to the team workspace
+      #   if: always() && github.ref == 'refs/heads/main'
+      #   env:
+      #     RB_WORKSPACE_TOKEN: ${{ secrets.RB_WORKSPACE_TOKEN }}
+      #   run: rb workspace push "$RB_RUN_ID"

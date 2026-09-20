@@ -40,6 +40,8 @@ Below is the one regression in a real review of raft-sintel against raft-things 
 
 ![Evidence sheet for case 000145_10: inputs, disagreement, flow fields, error maps, filmstrips, trajectory plot](examples/raft-kitti/rb-runs/20260918-1852-raft-sintel/evidence/000145_10/case-1400.jpg)
 
+**In CI.** [examples/ci/github-actions.yml](examples/ci/github-actions.yml) is a working release gate: it imports your evaluator's results, runs your saved checks, writes the verdict into the pull request and keeps the run as an artifact. It exits non-zero when a saved check fails, and also when your policy declares a limit this version cannot evaluate, so a required measurement that was never taken does not quietly pass. One thing that file is careful about and worth repeating here: a red job is not a blocked merge. Someone with repository admin has to add the job to branch protection as a required status check before the gate enforces anything.
+
 **For coding agents.** `rb docs` prints [AGENTS.md](AGENTS.md): the workflow, the file format, the JSON output (`--json` on every command), exit codes and every error code with its fix. Tell your agent: *"Review candidate checkpoint B against A on this case set with Rabbit Brain."*
 
 **Install and versions.** `pip install rabbit-brain` (core, pydantic only), `pip install "rabbit-brain[raft]"` (torch and the RAFT adapter's needs), `pip install "rabbit-brain[evidence]"` (numpy and pillow, for evidence sheets with a custom adapter). Python 3.10 or later. [CHANGELOG.md](CHANGELOG.md) for what each version changed.

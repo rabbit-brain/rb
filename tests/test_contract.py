@@ -146,3 +146,49 @@ def test_bundle_to_v1_is_unaffected_by_the_new_fields():
     v1 = b.to_v1()
     assert [c.id for c in v1.cases] == ["c1"]
     assert v1.metric == "mean_endpoint_error"
+
+
+# ---- the gate must not pass what it could not evaluate ------------------------------------------
+
+def _bundle_path(run_id: str):
+    from rabbit_brain.runs import runs_dir
+    return runs_dir() / run_id / "bundle.json"
+
+
+def test_unevaluated_limit_makes_the_policy_incomplete(workdir, capsys):
+    """Accuracy passes, a declared limit was never evaluated, and CI goes green. That is the exact
+    failure this product exists to prevent, so the gate must report incomplete and exit non-zero.
+
+    A human-readable warning is not enough: the thing that decides a release is `--json` and the
+    exit code.
+    """
+    import json as _json
+    from rabbit_brain.cli import main
+    from rabbit_brain.models import Envelope
+
+    def run_json(*argv):
+        code = main([*argv, "--json"])
+        return code, Envelope.model_validate_json(capsys.readouterr().out)
+
+    code, env = run_json("example")
+    run_id = env.run_id
+    assert code == 0
+
+    # A saved check that comfortably passes, so nothing else can be the reason the gate fails.
+    run_json("check", "save", run_id, "loading-018", "--max-error", "999")  # settled, so the default stability requirement passes too
+    code, env = run_json("check", "run", run_id, "--fail-on", "checks")
+    assert code == 0, "control: with every limit enforced and the check passing, the gate passes"
+    assert env.data["policy"] == "complete"
+    assert env.data["unenforced_limits"] == []
+
+    # The team's policy also requires a latency limit this version cannot evaluate.
+    p = _bundle_path(run_id)
+    assert p.exists(), p
+    b = _json.loads(p.read_text(encoding="utf-8"))
+    b["limits"]["extra"] = {"max_latency_ms": 30.0}
+    p.write_text(_json.dumps(b), encoding="utf-8")
+
+    code, env = run_json("check", "run", run_id, "--fail-on", "checks")
+    assert env.data["policy"] == "incomplete"
+    assert env.data["unenforced_limits"] == ["max_latency_ms"]
+    assert code != 0, "a limit that was declared but not evaluated must not exit zero"

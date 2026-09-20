@@ -82,6 +82,7 @@ def limits_from(args: argparse.Namespace, base: Optional[Limits] = None) -> Limi
             max_reversals=base.max_reversals if args.max_reversals is None else args.max_reversals,
             max_last_update=base.max_last_update if getattr(args, "max_last_update", None) is None else args.max_last_update,
             max_trajectory_regression=base.max_trajectory_regression if getattr(args, "max_trajectory_regression", None) is None else args.max_trajectory_regression,
+            extra=base.extra,   # no CLI flag sets these; they come from the stored run and must survive a rebuild
         )
     except ValidationError as exc:
         raise RBError("E_LIMITS_INVALID", message=f"Limit out of range: {exc.errors()[0].get('msg', '')}")
@@ -366,12 +367,18 @@ def cmd_check_run(args: argparse.Namespace, out: Out) -> int:
         out.say(f"CHECK {tag:7} {r.case_id} | {limits_text}" + ("" if r.status == "passing" else f" | {r.reason}"))
     if checks is None:
         out.say("No checks file found (checks.json); only the regression and stability limits were applied.")
-    out.say("CHECKS NEED ATTENTION" if failed else "CHECKS PASSED")
+    unenforced = limits.unenforced_limits()
+    if unenforced:
+        out.say(f"POLICY INCOMPLETE: {', '.join(unenforced)} could not be evaluated by rb {__version__}.",
+                "This run does not establish that the saved policy passed. Remove the limit or use a version that checks it.")
+    out.say("CHECKS NEED ATTENTION" if failed else ("CHECKS PASSED, POLICY INCOMPLETE" if unenforced else "CHECKS PASSED"))
     out.data = {"failed": failed, "fail_on": args.fail_on, "flagged": [q.id for q in flagged], "checks": [r.model_dump() for r in results],
-                "summary": findings.summary.model_dump(), "verdict": findings.verdict.model_dump(), "limits": limits.model_dump()}
+                "summary": findings.summary.model_dump(), "verdict": findings.verdict.model_dump(), "limits": limits.model_dump(),
+                # A limit that was declared but not evaluated must not read as one that passed, to a person or to CI.
+                "policy": "incomplete" if unenforced else "complete", "unenforced_limits": unenforced}
     ref = out.ref or bundle.run_id
     out.next = [f"rb case {ref} {flagged[0].id}" if flagged else f"rb report {ref}"]
-    return EXIT_CHECK_FAILED if failed else EXIT_OK
+    return EXIT_CHECK_FAILED if (failed or unenforced) else EXIT_OK
 
 
 def cmd_check_list(args: argparse.Namespace, out: Out) -> int:
@@ -629,12 +636,17 @@ def cmd_run(args: argparse.Namespace, out: Out) -> int:
         out.say(f"{len(skipped)} case(s) skipped after inference errors: {', '.join(list(skipped)[:5])}{' …' if len(skipped) > 5 else ''}")
     flagged = [q for q in findings.queue if "regression" in q.flags or "unstable" in q.flags]
     failed = {"none": False, "regressions": s.regressions > 0, "flags": bool(flagged), "checks": s.checks.failing + s.checks.missing > 0}[args.fail_on]
+    unenforced = limits.unenforced_limits()
+    if unenforced:
+        out.say(f"POLICY INCOMPLETE: {', '.join(unenforced)} could not be evaluated by rb {__version__}.",
+                "This run does not establish that the saved policy passed.")
     out.data = {"run_dir": str(run_dir), "summary": s.model_dump(), "verdict": findings.verdict.model_dump(), "limits": limits.model_dump(), "metric": bundle.metric.model_dump(),
                 "hook": record.hook, "adapter_agreement": getattr(record, "adapter_agreement", None),
                 "checkpoints": {k: v.model_dump() for k, v in record.checkpoints.items()}, "skipped": skipped, "fail_on": args.fail_on, "failed": failed,
-                "evidence": ev}
+                "evidence": ev,
+                "policy": "incomplete" if unenforced else "complete", "unenforced_limits": unenforced}
     out.next = [f"rb findings {bundle.run_id} --top 5", f"rb case {bundle.run_id} {findings.verdict.start}" if findings.verdict.start else f"rb report {bundle.run_id} --print"]
-    return EXIT_CHECK_FAILED if failed else EXIT_OK
+    return EXIT_CHECK_FAILED if (failed or unenforced) else EXIT_OK
 
 
 def docs_text() -> str:

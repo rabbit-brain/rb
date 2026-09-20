@@ -11,7 +11,10 @@
                so it applies to cases without ground truth exactly like the error regression applies to cases with it)
 
 A converged model keeps shrinking its updates; one that keeps revising late, or re-opens its
-estimate, is unstable on that case whatever the final error says.
+estimate, gets the `unstable` label on that case. The label is computed from the trajectory alone,
+so it is independent of the final error by construction. It marks a case as worth looking at; it is
+not a finding that the answer is wrong. Late movement correlates with per-case error (Spearman 0.88
+to 0.92 across the four public RAFT checkpoints) and that is the whole of the evidence for it.
 
 The same values also give the paper's convergence statistics (quarter windows, absolute magnitudes):
 last_update, late_update (mean over the last quarter), early_update (first quarter), late_to_early.

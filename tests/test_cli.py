@@ -214,3 +214,70 @@ def test_share_contains_statistics_and_no_identities(workdir, capsys):
     assert code == 0 and env.data["properties"]["cases"]
     code, env, _ = run_json(capsys, "share", run_id, "--print")
     assert code == 0 and env.data["schema_version"] == "rb-share-1"
+
+
+def test_report_writes_an_html_report_beside_the_markdown(workdir, capsys):
+    """`rb report --html` is the local viewer: one file, opened from disk, nothing uploaded."""
+    code, env, _ = run_json(capsys, "example")
+    run_id = env.run_id
+    code, env, _ = run_json(capsys, "report", run_id, "--html")
+    assert code == 0
+    html = workdir / "rb-runs" / run_id / "report.html"
+    assert Path(env.data["html"]).resolve() == html.resolve() and html.exists()
+    text = html.read_text(encoding="utf-8")
+    assert '<script id="rb-data"' in text
+    # Everything it needs is in the file: on file:// a fetch of a sibling is blocked.
+    assert not re.search(r'<(script|link)[^>]*\s(src|href)=', text)
+    assert "rb-runs" not in text.split('<script id="rb-data"')[0]
+
+
+def test_report_without_html_writes_only_the_markdown(workdir, capsys):
+    code, env, _ = run_json(capsys, "example")
+    run_id = env.run_id
+    code, env, _ = run_json(capsys, "report", run_id)
+    assert code == 0 and env.data["html"] is None
+    assert not (workdir / "rb-runs" / run_id / "report.html").exists()
+
+
+def test_report_html_elsewhere_carries_its_evidence_with_it(workdir, capsys):
+    """Evidence is referenced by relative path, which only resolves inside the run directory. A file
+    written anywhere else has to carry the images or it renders broken ones."""
+    code, env, _ = run_json(capsys, "example")
+    run_id = env.run_id
+    evidence = workdir / "rb-runs" / run_id / "evidence" / "aisle-042"
+    evidence.mkdir(parents=True)
+    (evidence / "error.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 16)
+
+    inside = workdir / "rb-runs" / run_id / "report.html"
+    code, _, _ = run(capsys, "report", run_id, "--html")
+    assert "evidence/aisle-042/error.png" in inside.read_text(encoding="utf-8")
+
+    outside = workdir / "elsewhere" / "report.html"
+    code, env, out = run_json(capsys, "report", run_id, "--html", str(outside))
+    assert code == 0 and outside.exists()
+    text = outside.read_text(encoding="utf-8")
+    assert "data:image/png;base64," in text and '"evidence/aisle-042/error.png"' not in text
+
+
+def test_report_embed_inlines_evidence_even_beside_the_run(workdir, capsys):
+    code, env, _ = run_json(capsys, "example")
+    run_id = env.run_id
+    evidence = workdir / "rb-runs" / run_id / "evidence" / "aisle-042"
+    evidence.mkdir(parents=True)
+    (evidence / "error.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 16)
+    code, env, _ = run_json(capsys, "report", run_id, "--embed")
+    assert code == 0
+    text = Path(env.data["html"]).read_text(encoding="utf-8")
+    assert "data:image/png;base64," in text and '"evidence/aisle-042/error.png"' not in text
+
+
+def test_report_html_states_the_limits_the_run_was_checked_at(workdir, capsys):
+    """The viewer computes its own verdict. Handed the wrong limits it would contradict report.md."""
+    code, env, _ = run_json(capsys, "example")
+    run_id = env.run_id
+    code, env, _ = run_json(capsys, "report", run_id, "--html", "--max-regression", "0.9")
+    data = json.loads(Path(env.data["html"]).read_text(encoding="utf-8")
+                      .split('<script id="rb-data" type="application/json">')[1].split("</script>")[0]
+                      .replace("<\\/script", "</script"))
+    assert data["limits"]["threshold"] == 0.9
+    assert data["run"]["project"] and data["run"]["cases"]

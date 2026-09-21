@@ -1,0 +1,41 @@
+{
+  "files": [
+    "app/comparison-workspace.tsx",
+    "app/evidence-sheets.tsx",
+    "app/globals.css",
+    "app/plots.tsx",
+    "components/ui/button.tsx",
+    "components/ui/dialog.tsx",
+    "components/ui/popover.tsx",
+    "components/ui/tabs.tsx",
+    "lib/comparison.ts",
+    "lib/demo-evidence.ts",
+    "lib/demo-run.ts",
+    "lib/integration-kit.ts",
+    "lib/utils.ts",
+    "lib/zip.ts",
+    "public/demo/run.json",
+    "viewer/main.tsx",
+    "viewer/viewer.css"
+  ],
+  "hash": "c6ebeb963a5d7c8ef08c587b3ce79fe2f859f8dfd124a73535b3a38d8677ac9a",
+  "perFile": {
+    "app/comparison-workspace.tsx": "f6468e3ff0cd578d08d57f331258415152846a1dd8c8b336e0afc4976c437b03",
+    "app/evidence-sheets.tsx": "8580f307ff996c515bf2d03eb53b6a877bdc6c8a668cdf9cd661922872fede13",
+    "app/globals.css": "5e6ff39db05800f2017f96e35eecbbc7ba7671fc1b80efe4a919f7aa16b2b5b1",
+    "app/plots.tsx": "55cc14769f91dbca7a5193e6ad71fed9130344de7d4cb58e41e98f9a3ddd4ead",
+    "components/ui/button.tsx": "cc36af0f8b5019c33cc039fbf03bb952a513072b15b55b53c592b78af3e5f4c4",
+    "components/ui/dialog.tsx": "dce39c6adc47d997bd2567f8b7a72f466b0134715105cd42f9194007b8ecdb14",
+    "components/ui/popover.tsx": "31c350309ff5d3034e6ecf1b0eda75ba8855bdbf987fc7ad6d71f0ef07c5a447",
+    "components/ui/tabs.tsx": "865d0194331b9b2be36723fa79d3575dc83078b4cb941cafee87cb72fc2cff46",
+    "lib/comparison.ts": "9ee74908d8e546c4c0bcb44b78272398aa90e9f7a2c2143f7ad98a032cc32652",
+    "lib/demo-evidence.ts": "bd660acbb9858c82cdae8da135b8d1bec144062c443b179e899ea0efc2af5e6e",
+    "lib/demo-run.ts": "4cf6cdf66cf1361e9cb7d47cc1b95a48ad81c36e574e21adaf30ad5667064394",
+    "lib/integration-kit.ts": "33aecafed8253a97f5c43b1cc2b286830843e34f7deef88eecce082156de9975",
+    "lib/utils.ts": "53f3d3d070f0a9082934da25b875f9499855c2b0693868dd28be8c23d8730f68",
+    "lib/zip.ts": "f597861c70a927bde551fd77482f00bcdbf44e6e9c733f80236093a4b5fa5624",
+    "public/demo/run.json": "67413658ad99b2da652921c555e1d3cb4f4e23df859c3b4e89baa83acbe2db35",
+    "viewer/main.tsx": "9c63ea7fd7c27cf9e271e2bc697a1b98e588bc6e291644cee58a71c86c90b0e6",
+    "viewer/viewer.css": "7510f63fd782daeb991793adf74c674c39c5704f6b16763557e01e604e99e04c"
+  }
+}

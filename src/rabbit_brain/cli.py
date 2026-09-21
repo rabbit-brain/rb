@@ -454,9 +454,56 @@ def cmd_report(args: argparse.Namespace, out: Out) -> int:
         out.say(f"Report written to {target}")
     if args.print or not target:
         out.say("", md)
-    out.data = {"path": str(target) if target else None, "markdown": md, "verdict": findings.verdict.model_dump()}
+    html_path = None
+    if args.open or args.html or args.embed:
+        html_path = _write_html(args, bundle, run_dir, target, out, checks)
+    out.data = {"path": str(target) if target else None, "html": str(html_path) if html_path else None,
+                "markdown": md, "verdict": findings.verdict.model_dump()}
     out.next = [f"rb findings {out.ref or bundle.run_id}"]
     return EXIT_OK
+
+
+def _html_target(args: argparse.Namespace, run_dir: Optional[Path], md_target: Optional[Path]) -> Path:
+    if isinstance(args.html, str):
+        return Path(args.html)
+    if run_dir:
+        return run_dir / "report.html"
+    if md_target:
+        return md_target.with_suffix(".html")
+    src = Path(args.run)
+    return (src.parent if src.is_file() else Path.cwd()) / "report.html"
+
+
+def _write_html(args: argparse.Namespace, bundle: Bundle, run_dir: Optional[Path], md_target: Optional[Path], out: Out,
+                checks: Optional[ChecksV2] = None) -> Path:
+    from . import viewer
+    target = _html_target(args, run_dir, md_target)
+    # Evidence images are referenced relative to the HTML file, so they only resolve while the file
+    # sits in the run directory. Written anywhere else they have to travel inside the document.
+    away = run_dir is not None and target.parent.resolve() != run_dir.resolve()
+    embed = bool(args.embed) or away
+    try:
+        html = viewer.build(bundle, run_dir, embed, checks)
+    except FileNotFoundError as exc:
+        raise RBError("E_WRITE_FAILED", message=str(exc))
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(html, encoding="utf-8")
+    except OSError as exc:
+        raise RBError("E_WRITE_FAILED", message=f"Could not write {target}: {exc}")
+    size = f"{target.stat().st_size / 1_000_000:.1f} MB" if target.stat().st_size >= 1_000_000 else f"{target.stat().st_size // 1000} KB"
+    out.say(f"HTML report written to {target} ({size}). It opens from disk and sends nothing anywhere.")
+    if away and not args.embed:
+        out.say("Evidence images were inlined because the file is not in the run directory, where their relative paths point.")
+    if args.open:
+        opened = False
+        try:
+            import webbrowser
+            opened = webbrowser.open(target.resolve().as_uri())
+        except Exception:
+            opened = False
+        out.say("Opened it in your browser." if opened else f"No browser to open here. Open the file yourself: {target}")
+    return target
 
 
 # ---------------------------------------------------------------- runner commands (0.2)
@@ -860,10 +907,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("case_id")
     s.set_defaults(func=cmd_check_rm)
 
-    s = sub.add_parser("report", parents=[common, lim, chk], help="write report.md for a run (the receipt)")
+    s = sub.add_parser("report", parents=[common, lim, chk], help="write the run's receipt: report.md, and report.html to read in a browser with --open")
     s.add_argument("run")
     s.add_argument("--out", default=None, help="write here instead of the run directory")
     s.add_argument("--print", action="store_true", help="also print the report")
+    s.add_argument("--open", action="store_true", help="also write report.html and open it in your browser")
+    s.add_argument("--html", nargs="?", const=True, default=None, metavar="PATH", help="write the HTML report, optionally somewhere other than the run directory")
+    s.add_argument("--embed", action="store_true", help="carry evidence images inside the HTML so the file travels on its own")
     s.set_defaults(func=cmd_report)
 
     s = sub.add_parser("init", parents=[common], help="write rb.toml for this project (or --demo for a synthetic project that runs anywhere)")

@@ -17,6 +17,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: zod, for the conformance test
+        # tests/test_conformance.py runs the viewer's own TypeScript against stability.py and fails
+        # if they disagree. Node runs the TypeScript directly; zod is the only thing it needs, and
+        # without it the test skips, which would leave the two implementations uncompared.
+        run: npm install --no-save --no-audit --no-fund zod@3.25.76
       - name: Build
         run: |
           python -m pip install build twine
@@ -33,6 +41,14 @@ jobs:
           python -m pip install dist/*.whl pytest numpy pillow
           python -m pytest -q
           rb version
+      - name: The report viewer is in the wheel and agrees with rb
+        # The wheel carries the viewer that writes report.html. Released without it, `rb report --open`
+        # fails on a user's machine; released with a stale one, the HTML contradicts the markdown.
+        run: |
+          set -o pipefail   # without it the exit code is tee's, and a failing test reads as a pass
+          python -c "import zipfile,sys; n='rabbit_brain/assets/report-template.html'; z=zipfile.ZipFile(sys.argv[1]); sys.exit(0 if n in z.namelist() else 1)" dist/*.whl
+          python -m pytest -q tests/test_conformance.py tests/test_viewer.py -rs | tee /tmp/conf.txt
+          ! grep -q SKIPPED /tmp/conf.txt
       - name: No paper reference or mock link in the release
         run: |
           ! grep -ril "endpoint sufficiency\|neurips\|chatgpt.site\|claude.ai/artifact" README.md AGENTS.md CHANGELOG.md pyproject.toml src

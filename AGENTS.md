@@ -43,6 +43,7 @@ rb case <run_id> <case_id> [--render]                  # one case: numbers, traj
 rb check save <run_id> <case_id>                       # keep this case for the next checkpoint
 rb check run <run_id> --checks checks.json             # next time: exit 1 if a saved check fails or a case is flagged
 rb report <run_id> --print                             # the receipt a human reads
+rb report <run_id> --open                              # the same review as report.html, for a human to read in a browser; --embed to make it a single attachable file
 rb share <run_id>                                      # anonymised statistics of the run as share.json, for the human to send if they choose; nothing is sent
 ```
 
@@ -301,7 +302,7 @@ rb case <run_id> <top case id> --json
 rb report <run_id>
 ```
 
-Then report to the human, in this order: the verdict line; the top cases with their `why` text (it says when a case is borderline, and a borderline case is worth naming as such rather than reporting as settled fact); the run id; the path to `report.md`; the command that reproduces the queue (`rb findings <run_id>` with the limits used, as the report's Reproduce section prints it). Quote numbers only from `findings.json`. If `hook.status` is not `recorded`, say that stability was not assessed and why. If `adapter_agreement` is not `agree` for both checkpoints, say so first. If the two checkpoints are different architectures (the receipt's checkpoint lines and `rb doctor` say so), say that the review compares two models rather than a retrain of one.
+Then report to the human, in this order: the verdict line; the top cases with their `why` text (it says when a case is borderline, and a borderline case is worth naming as such rather than reporting as settled fact); the run id; the path to `report.md`, and to `report.html` if you wrote one (`rb report <run_id> --html`, which a human can open in a browser; do not use `--open`, which tries to launch one); the command that reproduces the queue (`rb findings <run_id>` with the limits used, as the report's Reproduce section prints it). Quote numbers only from `findings.json`. If `hook.status` is not `recorded`, say that stability was not assessed and why. If `adapter_agreement` is not `agree` for both checkpoints, say so first. If the two checkpoints are different architectures (the receipt's checkpoint lines and `rb doctor` say so), say that the review compares two models rather than a retrain of one.
 
 When a later checkpoint arrives: `rb check run` against a new `rb run` of it (same project, same case set) answers "are the cases we cared about still fine?" and exits 1 in CI if not; then `rb findings` for the full review.
 

@@ -17,11 +17,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: zod, for the conformance test
+        # tests/test_conformance.py runs the viewer's own TypeScript against stability.py and fails
+        # if they disagree. Node runs the TypeScript directly; zod is the only thing it needs, and
+        # without it the test skips, which would leave the two implementations uncompared.
+        run: npm install --no-save --no-audit --no-fund zod@3.25.76
       - name: Install
         run: python -m pip install -e ".[dev]" numpy pillow
       - name: Test
         # the RAFT adapter tests skip without torch and a RAFT checkout (RB_RAFT_PATH); everything else runs
         run: python -m pytest -q
+      - name: The conformance test actually ran
+        # It skips when node or zod is missing, and a skipped guard reads exactly like a passing one.
+        run: |
+          set -o pipefail   # without it the exit code is tee's, and a failing test reads as a pass
+          python -m pytest -q tests/test_conformance.py -rs | tee /tmp/conf.txt
+          ! grep -q SKIPPED /tmp/conf.txt
       - name: Package builds and the docs agree with the CLI
         run: |
           python -m build

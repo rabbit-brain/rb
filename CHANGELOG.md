@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 (unreleased): the review, readable without the terminal
+- `rb report <run> --open` writes `report.html` beside `report.md` and opens it. One self-contained file: the viewer's script and stylesheet are inlined and the comparison travels with it, because the file is opened from disk and `file://` blocks a fetch of a sibling. Nothing loads over the network and no part of the run is uploaded. `--html [PATH]` writes it without opening a browser, which is the form for CI and for an agent.
+- Evidence images are referenced beside the file, so a run's sheets are not duplicated into every report. `--embed` carries them inside it instead, for a single file to attach to a pull request. A report written outside the run directory embeds them automatically, because the relative paths would not resolve there, and says so.
+- It is the same viewer the website runs, given local data. **Two implementations of the same arithmetic, held together by a test:** `tests/test_conformance.py` runs the website's `lib/comparison.ts` and this package's `stability.py` over the same fixtures and fails on any difference, in a verdict, a count, a per-case label, the queue order, or a saved check's status or wording. Four divergences found on the way in, all of which would have shown a reader a different answer than `report.md`:
+  - the viewer computed at generic limits rather than the run's own, so any project that changed a limit got a report that contradicted its receipt;
+  - it did not implement `max_last_update` or `max_trajectory_regression` at all, and `rb init` sets the second one for every new project;
+  - errors were rounded on the way in, which moves a case across the limit it sits on;
+  - a saved check with a `max_reversals` limit was evaluated as if that limit were absent, and failing checks were left out of the verdict line.
+- The generated report keeps nothing in browser storage. Every `file://` document shares one origin, so a report that restored the last saved workspace would open showing the previous run's cases under this run's title.
+- A limit the run carries but this version cannot evaluate is stated in the report itself, as it already is in `report.md`. A policy that was stored but unchecked must not read as a policy that passed, in either file.
+
 ## 0.4.0 (2026-09-21): the workspace, and buying one without a sales call
 - `rb plans`, `rb workspace status`, `rb workspace checkout` and `rb workspace push <run>`. Everything the tool already did stays free and local; what a subscription buys is that a finished review stops living only in the terminal that produced it.
 - **A person completes every purchase.** `rb workspace checkout` returns a URL and stops. It cannot pay. The sequence for an agent whose push was refused is in `rb docs`: push gives `E_WORKSPACE_PAYMENT_REQUIRED` with the plan and its price, checkout gives a link to hand to a human, status is polled until active, then push again.

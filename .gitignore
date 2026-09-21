@@ -11,3 +11,8 @@ releases/
 
 # full-size evidence PNGs of the example runs (the 1400 px JPEG copies are kept)
 examples/raft-kitti/rb-runs/*/evidence/*/*.png
+
+# node is only here for the conformance test (tests/conformance/README.md); zod is installed on demand
+node_modules/
+package-lock.json
+.DS_Store

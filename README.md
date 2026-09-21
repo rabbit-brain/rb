@@ -19,6 +19,7 @@ rb run --baseline ckpt/raft-things.pth --candidate ckpt/raft-small.pth    # both
 rb findings <run> --top 5     # the ranked queue and a verdict
 rb check save <run> <case>    # keep a case for the next checkpoint
 rb check run <run>            # exit 1 in CI when something regressed
+rb report <run> --open        # the same review as a local HTML page, opened from disk
 
 rb import results.json        # or bring per-case results your evaluator already produced (rb schema example)
 rb init --demo && rb run --baseline ckpt/synth-current.json --candidate ckpt/synth-candidate.json   # a synthetic dry run on any machine
@@ -33,6 +34,8 @@ Nothing is sent anywhere. Every run leaves a receipt (`report.md`, `record.json`
 **What it needs.** Either a checkpoint pair and a case set for a supported adapter (RAFT-family optical flow today, RAFT-Stereo-style depth through a small custom adapter, and any other iterative model the same way; `rb onboard` writes that adapter's scaffold from a description of your setup, with the parts only you can write marked one by one), or one lower-is-better error per case for both models from your own evaluator (any metric with a unit: endpoint error in px, depth error in cm), computed against the same ground truth and valid mask. Trajectories are recorded by the adapter with a forward hook, or by the one-line `TrajectoryRecorder` in your loop. Without trajectories you get the error half and the tool says stability was not assessed.
 
 **What it doesn't do.** Train anything, or certify a model. The stability limits are generic heuristics and a starting point; a scorer fitted to your model is a separate, paid evaluation. It does not replace your evaluator either: the error is whatever your metric says it is.
+
+**Reading a review without the terminal.** `rb report <run> --open` writes `report.html` beside `report.md` and opens it. It is one file with the viewer already inside it, opened from your filesystem: the same case list, evidence and trajectory plots the website shows, computed at the limits the run was checked at. Nothing loads over the network and nothing is uploaded, which is why it works on an air-gapped machine. Evidence images are referenced beside the file; `--embed` puts them inside it instead, for a single attachment on a pull request. The arithmetic behind that page and the arithmetic behind `report.md` are two implementations of the same rules, so a test runs both over the same fixtures and fails the build if they ever disagree.
 
 **What a flagged case looks like.** For each case it flags, `rb` renders the evidence: the inputs, where the two models disagree (no ground truth needed), both flow fields, the per-pixel error of each and where it changed, the per-iteration filmstrips and the trajectory. The decision is a look, not a number.
 

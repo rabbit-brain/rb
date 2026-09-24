@@ -1,10 +1,9 @@
 {
   "created_by": "agent:claude-code",
-  "created_at": "2026-09-24T09:16:38.205+00:00",
+  "created_at": "2026-09-24T10:37:27.730+00:00",
   "via": "cli",
-  "asserted_from": null,
   "retracted": null,
-  "id": "evsyhr",
+  "id": "evfmbx",
   "experiment": "sintel",
   "metrics": {
     "cases": 200.0,
@@ -23,27 +22,27 @@
   "files": [],
   "links": {},
   "basis": "run",
-  "spec_sha256": "20faa31b7e5ba342fb74b1a0699347391c41f910b5102191644ff713914b42bf",
+  "spec_sha256": "4a13122ba0270750ddd37bbd58d055e642f810177f55b3d02a85b7dfc135adeb",
   "settings": {
     "iterations": 12,
     "max_regression": 0.3,
-    "dataset.cases": 200,
+    "dataset.count": 200,
     "model_code.sha": "2888e15a51fa41140771d3f498ed8023cff098d1",
-    "things.checkpoint_sha256": "fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1",
-    "sintel.checkpoint_sha256": "90630d2e7d488a0d3ccb5e8194524850c4c05c732ea4ff99799822c7fa5c5cbf"
+    "things.checkpoint.sha256": "fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1",
+    "sintel.checkpoint.sha256": "90630d2e7d488a0d3ccb5e8194524850c4c05c732ea4ff99799822c7fa5c5cbf"
   },
   "spec_frozen": false,
   "synthetic": false,
-  "fingerprint": "bf2e449153ae51f500d3c014facc12877c3eed70f98706c45ea2efcbd98a290e",
+  "fingerprint": "31bde8b4b2bc7524d482fcc2058e365433aca3781a61602494f5b4aacb7d3f8d",
   "receipt": {
-    "at": "2026-09-24T09:16:38.193+00:00",
+    "at": "2026-09-24T10:37:27.715+00:00",
     "actor": "agent:claude-code",
     "actor_via": "detected:CLAUDECODE",
     "via": "cli",
     "rb_version": "0.5.0.dev0",
     "command": "rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-sintel.pth (runpod.sh, 18 Sep 2026)",
     "attached": {
-      "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+      "commit": "a8fd91668b3b23d2113fac0e390dc2f655955beb",
       "branch": "claude/dreamy-curie-rt6di1",
       "dirty": false
     },
@@ -65,6 +64,10 @@
         "lower_is_better": true
       },
       "review_verdict": "Not ready: 1 error regression. Start with 000145_10.",
+      "models": {
+        "baseline": "raft-things",
+        "candidate": "raft-sintel"
+      },
       "record_sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
       "command": "rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-sintel.pth --quiet",
       "checkpoints": {
@@ -127,6 +130,7 @@
       "path": "record.json",
       "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
       "matches": [
+        "dataset.count",
         "iterations",
         "model_code.sha"
       ],

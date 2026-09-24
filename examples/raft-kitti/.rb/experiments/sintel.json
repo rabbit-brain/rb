@@ -1,8 +1,7 @@
 {
   "created_by": "agent:claude-code",
-  "created_at": "2026-09-24T09:16:35.898+00:00",
+  "created_at": "2026-09-24T10:37:25.363+00:00",
   "via": "cli",
-  "asserted_from": null,
   "retracted": null,
   "id": "sintel",
   "title": "raft-things vs raft-sintel, 200 KITTI-2015 training pairs",
@@ -10,7 +9,7 @@
     "sintel-safe"
   ],
   "varies": [
-    "checkpoint_sha256"
+    "checkpoint.sha256"
   ],
   "variants": [
     {
@@ -18,7 +17,7 @@
       "role": "baseline",
       "settings": [
         {
-          "name": "checkpoint_sha256",
+          "name": "checkpoint.sha256",
           "value": "fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1",
           "status": "verified",
           "required": true,
@@ -36,8 +35,8 @@
             "locator": null,
             "note": "",
             "resolved": {
-              "at": "2026-09-24T09:16:37.621+00:00",
-              "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+              "at": "2026-09-24T10:37:27.144+00:00",
+              "commit": "a8fd91668b3b23d2113fac0e390dc2f655955beb",
               "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
               "line": null,
               "text": "\"fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1\"",
@@ -48,14 +47,14 @@
           "conflict": null,
           "note": "",
           "set_by": "agent:claude-code",
-          "set_at": "2026-09-24T09:16:37.617+00:00",
+          "set_at": "2026-09-24T10:37:27.139+00:00",
           "via": "cli",
           "retracted": null
         }
       ],
       "note": "",
       "created_by": "agent:claude-code",
-      "created_at": "2026-09-24T09:16:35.898+00:00",
+      "created_at": "2026-09-24T10:37:25.363+00:00",
       "via": "cli",
       "retracted": null
     },
@@ -64,7 +63,7 @@
       "role": "candidate",
       "settings": [
         {
-          "name": "checkpoint_sha256",
+          "name": "checkpoint.sha256",
           "value": "90630d2e7d488a0d3ccb5e8194524850c4c05c732ea4ff99799822c7fa5c5cbf",
           "status": "verified",
           "required": true,
@@ -82,8 +81,8 @@
             "locator": null,
             "note": "",
             "resolved": {
-              "at": "2026-09-24T09:16:37.900+00:00",
-              "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+              "at": "2026-09-24T10:37:27.425+00:00",
+              "commit": "a8fd91668b3b23d2113fac0e390dc2f655955beb",
               "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
               "line": null,
               "text": "\"90630d2e7d488a0d3ccb5e8194524850c4c05c732ea4ff99799822c7fa5c5cbf\"",
@@ -94,14 +93,14 @@
           "conflict": null,
           "note": "",
           "set_by": "agent:claude-code",
-          "set_at": "2026-09-24T09:16:37.896+00:00",
+          "set_at": "2026-09-24T10:37:27.420+00:00",
           "via": "cli",
           "retracted": null
         }
       ],
       "note": "",
       "created_by": "agent:claude-code",
-      "created_at": "2026-09-24T09:16:35.898+00:00",
+      "created_at": "2026-09-24T10:37:25.363+00:00",
       "via": "cli",
       "retracted": null
     }
@@ -126,8 +125,8 @@
         "locator": null,
         "note": "",
         "resolved": {
-          "at": "2026-09-24T09:16:36.485+00:00",
-          "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+          "at": "2026-09-24T10:37:25.966+00:00",
+          "commit": "a8fd91668b3b23d2113fac0e390dc2f655955beb",
           "sha256": "dcb2cb2337b30d80bdd1a680927f6d268ca1dd7ce8780e1c9edf824deee0849e",
           "line": null,
           "text": "adapter.iterations: 12",
@@ -138,7 +137,7 @@
       "conflict": null,
       "note": "",
       "set_by": "agent:claude-code",
-      "set_at": "2026-09-24T09:16:36.475+00:00",
+      "set_at": "2026-09-24T10:37:25.956+00:00",
       "via": "cli",
       "retracted": null
     },
@@ -161,8 +160,8 @@
         "locator": null,
         "note": "",
         "resolved": {
-          "at": "2026-09-24T09:16:36.780+00:00",
-          "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+          "at": "2026-09-24T10:37:26.266+00:00",
+          "commit": "a8fd91668b3b23d2113fac0e390dc2f655955beb",
           "sha256": "dcb2cb2337b30d80bdd1a680927f6d268ca1dd7ce8780e1c9edf824deee0849e",
           "line": null,
           "text": "limits.max_regression: 0.3",
@@ -173,12 +172,12 @@
       "conflict": null,
       "note": "",
       "set_by": "agent:claude-code",
-      "set_at": "2026-09-24T09:16:36.770+00:00",
+      "set_at": "2026-09-24T10:37:26.255+00:00",
       "via": "cli",
       "retracted": null
     },
     {
-      "name": "dataset.cases",
+      "name": "dataset.count",
       "value": 200,
       "status": "verified",
       "required": true,
@@ -196,8 +195,8 @@
         "locator": null,
         "note": "",
         "resolved": {
-          "at": "2026-09-24T09:16:37.056+00:00",
-          "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+          "at": "2026-09-24T10:37:26.547+00:00",
+          "commit": "a8fd91668b3b23d2113fac0e390dc2f655955beb",
           "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
           "line": null,
           "text": "200",
@@ -208,7 +207,7 @@
       "conflict": null,
       "note": "",
       "set_by": "agent:claude-code",
-      "set_at": "2026-09-24T09:16:37.052+00:00",
+      "set_at": "2026-09-24T10:37:26.542+00:00",
       "via": "cli",
       "retracted": null
     },
@@ -231,8 +230,8 @@
         "locator": null,
         "note": "",
         "resolved": {
-          "at": "2026-09-24T09:16:37.338+00:00",
-          "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+          "at": "2026-09-24T10:37:26.832+00:00",
+          "commit": "a8fd91668b3b23d2113fac0e390dc2f655955beb",
           "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
           "line": null,
           "text": "\"2888e15a51fa41140771d3f498ed8023cff098d1\"",
@@ -243,7 +242,7 @@
       "conflict": null,
       "note": "",
       "set_by": "agent:claude-code",
-      "set_at": "2026-09-24T09:16:37.334+00:00",
+      "set_at": "2026-09-24T10:37:26.827+00:00",
       "via": "cli",
       "retracted": null
     }

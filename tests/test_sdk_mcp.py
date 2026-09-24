@@ -111,7 +111,8 @@ def test_sdk_person_calls_raise_with_the_rb_line_for_an_agent(project, monkeypat
     assert state.actor == "agent:my-agent"
     with pytest.raises(RBError) as e:
         state.experiment("int8").freeze(why="before runs")
-    assert e.value.code == "E_HUMAN_ONLY" and e.value.extra["handoff"]["command"] == "rb freeze int8 -m 'before runs'"
+    assert e.value.code == "E_HUMAN_ONLY" and e.value.extra["handoff"]["command"] == "rb freeze int8 --why 'before runs'"
+    assert e.value.extra["handoff"]["request"] in {r.id for r in state.ledger.pending_requests()}
 
 
 def test_sdk_claim_needs_exactly_one_criterion(project):
@@ -198,3 +199,107 @@ def test_mcp_serves_line_delimited_json_over_stdio(project):
     assert [r.get("id") for r in replies] == [1, 2, None]
     assert {t["name"] for t in replies[1]["result"]["tools"]} >= {"context", "claim_add", "evidence_attach", "freeze", "decide"}
     assert replies[2]["error"]["code"] == -32700
+
+
+# ---------------------------------------------------------------- the handoff as a queue: rb approve
+
+def _queued_freeze(capsys, monkeypatch):
+    from rabbit_brain.cli import main
+    started()
+    monkeypatch.setenv("CLAUDECODE", "1")
+    main(["claim", "add", "INT8 costs at most 0.05", "-e", "int8", "--metric", "change.epe", "--at-most", "0.05", "--json"])
+    capsys.readouterr()
+    code = main(["freeze", "int8", "--why", "before the runs", "--json"])
+    env = json.loads(capsys.readouterr().out)
+    monkeypatch.delenv("CLAUDECODE")
+    return code, env
+
+
+def test_an_agents_person_call_is_queued_and_changes_nothing_else(project, capsys, monkeypatch):
+    code, env = _queued_freeze(capsys, monkeypatch)
+    rid = env["errors"][0]["handoff"]["request"]
+    assert code == 2 and env["errors"][0]["code"] == "E_HUMAN_ONLY" and "rb approve" in env["errors"][0]["fix"]
+    assert Path(f".rb/requests/{rid}.json").exists() and rb.open().experiment("int8").data.frozen is None
+    assert all(json.loads(line)["op"] != "freeze" for line in Path(".rb/log.jsonl").read_text().splitlines())
+    status = rb.open().status()
+    assert status["open"][0]["code"] == "request" and status["open"][0]["do"] == f"rb approve {rid}"
+    assert not any(t["kind"] == "request" for t in rb.open().ledger.tampered())     # a request is a note, not research state
+
+
+def test_the_same_request_is_queued_once(project, capsys, monkeypatch):
+    _, first = _queued_freeze(capsys, monkeypatch)
+    from rabbit_brain.cli import main
+    monkeypatch.setenv("CLAUDECODE", "1")
+    main(["freeze", "int8", "--why", "before the runs", "--json"])
+    again = json.loads(capsys.readouterr().out)
+    assert again["errors"][0]["handoff"]["request"] == first["errors"][0]["handoff"]["request"]
+
+
+def test_a_person_approves_a_request_and_it_runs_as_them(project, capsys, monkeypatch):
+    from rabbit_brain.cli import main
+    _, env = _queued_freeze(capsys, monkeypatch)
+    rid = env["errors"][0]["handoff"]["request"]
+    code = main(["approve", rid])
+    out = capsys.readouterr().out
+    assert code == 0 and "claim" in out and "change.epe ≤ 0.05" in out and "approved: rb freeze int8" in out and "ran as human:" in out
+    exp = rb.open().experiment("int8").data
+    assert exp.frozen is not None and exp.frozen.by.startswith("human:") and exp.frozen.why == "before the runs"
+    assert rb.open().ledger.load_request(rid).status == "approved" and not rb.open().ledger.pending_requests()
+
+
+def test_a_person_declines_a_request_with_a_reason(project, capsys, monkeypatch):
+    from rabbit_brain.cli import main
+    _, env = _queued_freeze(capsys, monkeypatch)
+    rid = env["errors"][0]["handoff"]["request"]
+    assert main(["approve", rid, "--decline", "--why", "the criterion is too loose"]) == 0
+    r = rb.open().ledger.load_request(rid)
+    assert r.status == "declined" and r.resolved.why == "the criterion is too loose"
+    assert rb.open().experiment("int8").data.frozen is None
+
+
+def test_an_agent_cannot_approve_and_approving_is_never_queued(project, capsys, monkeypatch):
+    from rabbit_brain.cli import main
+    _, env = _queued_freeze(capsys, monkeypatch)
+    rid = env["errors"][0]["handoff"]["request"]
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setenv("RB_ACTOR", "human:t")
+    code = main(["approve", rid, "--json"])
+    err = json.loads(capsys.readouterr().out)["errors"][0]
+    assert code == 2 and err["code"] == "E_HUMAN_ONLY" and "request" not in err.get("handoff", {})
+    assert len(rb.open(agent="x").ledger.pending_requests()) == 1
+
+
+def test_the_review_is_computed_not_taken_from_the_request(project, capsys, monkeypatch):
+    """A request file an agent wrote by hand says what it likes; rb approve shows what the command would do."""
+    from rabbit_brain.cli import main
+    started()
+    Path(".rb/requests").mkdir(exist_ok=True)
+    Path(".rb/requests/rfake.json").write_text(json.dumps({"id": "rfake", "argv": ["freeze", "int8", "--why", "x"], "why": "just a typo fix",
+                                                          "status": "pending", "created_by": "human:t", "created_at": "2026-01-01T00:00:00.000+00:00"}))
+    main(["approve"])
+    out = capsys.readouterr().out
+    assert "rfake" in out and "int8: INT8 vs FP32" in out and "precision" in out and not rb.open().experiment("int8").data.frozen
+
+
+def test_a_freeze_review_points_at_settings_verified_under_another_name(project, capsys, monkeypatch):
+    from rabbit_brain.cli import main
+    state, exp = started()
+    Path("paper.txt").write_text("The learning rate is 0.01 and weight decay 0.0001 for all runs.\n")
+    exp.spec.set("wd", 0.0001, source="paper.txt:1", term="weight decay")
+    exp.spec.set("optim.lr", source="configs/train.yaml#optim.lr")
+    main(["freeze", "int8", "--why", "go"])
+    out = capsys.readouterr().out
+    assert "look: wd is verified, matched by the words 'weight decay'" in out and "look: optim.lr" not in out
+
+
+def test_approve_runs_only_a_persons_call_whatever_a_request_file_says(project, capsys):
+    """A request is a note anyone can write by hand; rb approve never runs anything but freeze, decide, retract, an
+    --amend or doctor --adopt."""
+    from rabbit_brain.cli import main
+    started()
+    Path(".rb/requests").mkdir(exist_ok=True)
+    Path(".rb/requests/rpush.json").write_text(json.dumps({"id": "rpush", "argv": ["workspace", "push", "run1", "--amend"], "status": "pending",
+                                                          "created_by": "agent:x", "created_at": "2026-01-01T00:00:00.000+00:00"}))
+    assert main(["approve", "rpush"]) == 0
+    assert "is not a person's call rb can run" in capsys.readouterr().out
+    assert rb.open().ledger.load_request("rpush").status == "pending"

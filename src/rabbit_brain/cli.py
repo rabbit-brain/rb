@@ -1081,7 +1081,7 @@ DESCRIPTION = ("Research state for ML work done with coding agents: claims with 
 
 HELP_GROUPS = [
     ("Research state", ["init", "question", "hypothesis", "assumption", "experiment", "variant", "metric", "spec", "claim", "evidence",
-                        "freeze", "decide", "retract", "status", "show", "compare", "log", "context", "doctor"]),
+                        "approve", "freeze", "decide", "retract", "status", "show", "compare", "log", "context", "doctor"]),
     ("Release review (built in; its runs attach as evidence)", ["review"]),
     ("For agents", ["mcp"]),
     ("Reference", ["docs", "schema", "version"]),
@@ -1134,6 +1134,18 @@ def cmd_doctor_router(args: argparse.Namespace, out: "Out") -> int:
             raise RBError("E_NO_INVESTIGATION", message="--restore and --adopt work on the research state, and there is no .rb/ here or above.")
         return cmd_doctor(args, out)
     return ledger_cli.cmd_research_doctor(args, out, Ledger(find_root()))   # not Ledger.open: doctor must run when a file is corrupt
+
+
+def _queue_request(argv: list[str], why: str) -> Optional[str]:
+    """A person's call an agent asked for becomes a request the person approves with rb approve, rather than a line
+    they have to copy. None when there is no research state, or for rb approve itself."""
+    from .ledger import Ledger, find_root
+    if not argv or argv[0] == "approve" or find_root() is None:
+        return None
+    try:
+        return Ledger.open().request(argv, why).id
+    except RBError:
+        return None
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -1203,10 +1215,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     except RBError as err:
         handoff = None
         if err.code == "E_HUMAN_ONLY":
-            handoff = shlex.join(["rb", *(a for a in argv if a != "--json")])  # the line the person runs: text, not an envelope
-            err.extra["handoff"] = {"who": "person", "command": handoff}
-        if handoff:
-            err.fix = f"Hand this to the person, to run in their own terminal: {handoff}   Do not set or unset RB_ACTOR."
+            clean = [a for a in argv if a != "--json"]
+            handoff = shlex.join(["rb", *clean])  # the line the person runs: text, not an envelope
+            request = _queue_request(clean, getattr(locals().get("args"), "why", None) or "")
+            err.extra["handoff"] = {"who": "person", "command": handoff, **({"request": request} if request else {})}
+            err.fix = (f"Queued as {request}: the person reviews and approves it in their own terminal with rb approve "
+                       f"(or runs {handoff} there). Do not set or unset RB_ACTOR." if request else
+                       f"Hand this to the person, to run in their own terminal: {handoff}   Do not set or unset RB_ACTOR.")
         if not out.json_mode:
             print(f"rb {command}: {err.message}", file=sys.stderr)
             for pr in err.problems:

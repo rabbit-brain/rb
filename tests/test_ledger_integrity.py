@@ -241,8 +241,8 @@ def test_an_agent_is_refused_a_persons_call_with_the_exact_command_to_hand_over(
     code, env = rbj(capsys, *argv)
     err = env.errors[0]
     assert code == 2 and err.code == "E_HUMAN_ONLY"
-    assert err.handoff == {"who": "person", "command": shlex.join(["rb", *argv])}
-    assert shlex.join(["rb", *argv]) in err.fix
+    assert (err.handoff["who"], err.handoff["command"]) == ("person", shlex.join(["rb", *argv]))
+    assert shlex.join(["rb", *argv]) in err.fix and "rb approve" in err.fix
 
 
 def test_a_refused_freeze_writes_nothing(person, capsys, monkeypatch):
@@ -905,3 +905,21 @@ def test_concurrent_writers_lose_nothing(person, capsys):
     assert sum(1 for r in led.log_entries() if r["kind"] == "question") == 40
     assert all(led.edited_outside("question", q) is None for q in ids)
     assert not list((person / ".rb").rglob("*.tmp"))
+
+
+@pytest.mark.skipif(not HAS_GIT, reason="the committed log is read from git")
+def test_rewriting_a_committed_log_line_fails_every_gate(person, capsys):
+    """The log only grows. A line that was committed and is now gone or changed means the record was rewritten."""
+    start(capsys)
+    git("add", "-A")
+    git("commit", "-qm", "state")
+    ok(capsys, "question", "add", "appending is fine")
+    assert rbj(capsys, "status", "--fail-on", "untested")[0] == 0
+    log = person / ".rb" / "log.jsonl"
+    lines = log.read_text(encoding="utf-8").splitlines()
+    lines[0] = lines[0].replace('"op": "init"', '"op": "inited"')
+    log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    code, env = rbj(capsys, "status", "--fail-on", "untested")
+    assert code == 1 and any(i["code"] == "edited_outside_rb" and "log.jsonl" in i["what"] for i in env.data["open"])
+    code, env = rbj(capsys, "doctor")
+    assert code == 1 and any("the log was rewritten" in c["detail"] for c in env.data["checks"])

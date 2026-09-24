@@ -581,6 +581,24 @@ class ClaimVerdict(BaseModel):
     decision: Optional[str] = None
 
 
+class Resolved(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    by: str = Field(pattern=PERSON_PATTERN)
+    at: str
+    why: str = Field(default="", max_length=TEXT)
+    exit_code: Optional[int] = None
+
+
+class Request(Written):
+    """A person's call an agent asked for: the exact rb command, and why. It changes nothing until the person approves
+    it with `rb approve`, which shows what it will do, computed fresh, and runs it as them."""
+    id: str = Field(pattern=ID_PATTERN)
+    argv: list[str] = Field(min_length=1)
+    why: str = Field(default="", max_length=TEXT)
+    status: Literal["pending", "approved", "declined"] = "pending"
+    resolved: Optional[Resolved] = None
+
+
 OBJECT_SCHEMAS: dict[str, type[BaseModel]] = {
     "investigation": Investigation,
     "question": Question,
@@ -591,5 +609,6 @@ OBJECT_SCHEMAS: dict[str, type[BaseModel]] = {
     "claim": Claim,
     "evidence": Evidence,
     "decision": Decision,
+    "request": Request,
     "verdict": ClaimVerdict,
 }

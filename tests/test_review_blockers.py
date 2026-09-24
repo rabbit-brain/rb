@@ -746,7 +746,8 @@ def test_an_asserted_decision_is_refused(refuted_undecided, rb, subject):
     assert led.load("question", "q1").status == "open"
     code, st = rb("status", "--fail-on", "undecided")
     assert code == 1
-    assert any(i["code"] == "undecided" and i["subject"] == "c1" and i["who"] == "person" for i in st.data["open"])
+    assert any(i["who"] == "person" and ((i["code"] == "undecided" and i["subject"] == "c1") or (i["code"] == "request" and "decide c1" in i["what"]))
+               for i in st.data["open"])      # the refused decision is queued for the person, in place of the undecided item
     assert rb.verdict()["decision"] is None
 
 

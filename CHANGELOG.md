@@ -105,6 +105,12 @@
 
   Every write is recorded `via: sdk`. The person's calls raise `RBError("E_HUMAN_ONLY")` with the handoff.
 - **`rb mcp`.** The research state over the Model Context Protocol (stdio), with no new dependency. Each tool runs the CLI command of the same name, with the same envelope and rules. Resources are `rb://context`, `rb://status` and `rb://docs`. Every call on a connection is recorded as `agent:<client name>`, whatever `RB_ACTOR` says, so `freeze` and `decide` return the command for the person.
+- **The handoff is a queue.** A person's call attempted by an agent is queued as a request instead of only refused.
+  - `rb approve` in the person's own terminal reviews each request as it would land, computed at that moment. For a freeze it shows the criteria with their `n` and noise, every setting and its source, and a `look:` line for each setting whose source matched only through other words.
+  - `y` runs the command as the person; `rb approve <id>` and `--decline --why` work non-interactively.
+  - Pending requests head **Needs a person**, in place of the items they would settle.
+  - A request is a note in `.rb/requests/`, not research state, so a hand-written one is only a suggestion.
+- **The log only grows.** A committed line of `log.jsonl` that is gone or changed fails every gate and shows in `rb doctor`.
 - Planned, and answering `E_NOT_AVAILABLE` with what to do today: `rb paper`, `rb open`, `rb publish`, `rb clone`.
 - `pip install "rabbit-brain[yaml]"` adds pyyaml for YAML configs.
 - `rb report <run> --open` writes `report.html` beside `report.md` and opens it. One self-contained file: the viewer's script and stylesheet are inlined and the comparison travels with it, because the file is opened from disk and `file://` blocks a fetch of a sibling. Nothing loads over the network and no part of the run is uploaded. `--html [PATH]` writes it without opening a browser, which is the form for CI and for an agent.

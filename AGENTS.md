@@ -34,7 +34,15 @@ Python 3.10 or later. The core depends only on pydantic. `rb` works on your mach
   - `--amend` on a frozen experiment
   - `rb doctor --adopt`
 
-  From an agent they fail with `E_HUMAN_ONLY`, and `errors[0].handoff.command` holds the exact command line. Give it to the person as it is, to run in their own terminal. Do not set or unset `RB_ACTOR` to get past it.
+  From an agent they fail with `E_HUMAN_ONLY` and change nothing. `rb` queues the call as a request (`errors[0].handoff.request`), and `errors[0].handoff.command` holds the exact command line. Tell the person there is something to approve. Do not set or unset `RB_ACTOR` to get past it.
+
+**Approving: the person's side.** `rb approve`, run by the person in their own terminal, goes through every pending request. For each it shows what the command would do, worked out from the state as it is then, not from the agent's description:
+
+- for a freeze, every criterion it locks, with its `n` and noise, and every setting with its status and source;
+- for a decision, the claim's standing or the setting's value;
+- for an amendment, what it changes.
+
+It flags each setting whose source names it by other words (`look: wd is verified, matched by the words 'weight decay'`), because that is the one judgement verification cannot make for them. It then asks, one request at a time; `y` runs the command as the person. `rb approve <id>` approves one directly, and `rb approve <id> --decline --why "..."` declines it. `rb status` lists pending requests first under **Needs a person**. A request is a note, not research state: it lives in `.rb/requests/`, and nothing in it counts until the person runs it.
 
 **Who you are to rb.** Every write records an actor. `rb` works it out in this order:
 
@@ -662,6 +670,6 @@ A refused push changes nothing locally; the run is still on disk and still compl
 
 Open `rb-runs/<run_id>/report.md`. The header lists the run id, the `rb` version, the exact command, both checkpoints with their sha256, the environment, the hook status and whether the adapter agreed with the model's own evaluation; the body restates the definitions with the limits in force and lists every case. `record.json` adds the model-code git SHA, the dataset hash, seeds and skipped cases. Re-run the command from the header, or `rb review findings <run_id>` with the same limits, and compare. If what the agent told you differs from the report, the report is right.
 
-For research state: `rb status` and `rb show <id>` are computed from `.rb/`, not from what anyone wrote about it. `rb log` lists every write with its actor and how `rb` knew it (inside an agent session your name in `RB_ACTOR` is ignored, and the entry says so), and `git log -p .rb/` shows every change. A setting is verified only with the text `rb` read, which `rb show <experiment>/<name>` prints. `rb doctor` lists anything changed outside `rb`, and `rb doctor --restore` puts back what `rb` wrote. It cannot catch someone who edits a file and also rewrites `log.jsonl` to match; git can, so review `git log -p .rb/` for changes to `log.jsonl` other than new lines. If what the agent told you differs from `rb status`, `rb status` is right.
+For research state: `rb status` and `rb show <id>` are computed from `.rb/`, not from what anyone wrote about it. `rb log` lists every write with its actor and how `rb` knew it (inside an agent session your name in `RB_ACTOR` is ignored, and the entry says so), and `git log -p .rb/` shows every change. A setting is verified only with the text `rb` read, which `rb show <experiment>/<name>` prints. `rb doctor` lists anything changed outside `rb`, and `rb doctor --restore` puts back what `rb` wrote. The log only grows: a line that was committed and is now gone or changed fails every gate. What `rb` cannot catch on its own is a file edited and a matching line appended since the last commit. The witness for that is outside the agent's reach: commit `.rb/` and push it to a branch the agent cannot rewrite. If what the agent told you differs from `rb status`, `rb status` is right.
 
 Re-running on a different machine is a weaker check than it looks, and the report says so where it matters. Same code, same checkpoints, same data, a different GPU or torch build: most cases land on the same numbers to several decimals, a few land far enough apart to cross a limit. On the RAFT examples in this repository, run on two machines, 53 of 200 cases differed by more than 0.01 px and six cases changed what they were called; all six are marked borderline by the first machine's own numbers, without knowing the second machine's. So: a difference on a case the report marks borderline is the machine, not a discrepancy; a difference on any other case, or a different verdict, is worth chasing.

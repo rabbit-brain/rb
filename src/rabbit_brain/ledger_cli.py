@@ -13,10 +13,14 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import fnmatch
+import io
 import json
 import math
 import os
+import shlex
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -29,7 +33,7 @@ from .sources import Unresolved, as_value, flatten, parse_structured, structured
 
 GATES = ["unestablished", "untested", "refuted", "not_reproduced", "undecided", "unknown", "stale"]
 LEDGER_COMMANDS = ["init", "question add", "hypothesis add", "assumption add", "experiment add", "variant add", "metric add",
-                   "spec set", "spec verify", "spec vary", "claim add", "evidence attach", "freeze", "decide", "retract",
+                   "spec set", "spec verify", "spec vary", "claim add", "evidence attach", "approve", "freeze", "decide", "retract",
                    "status", "show", "compare", "log", "context"]
 STATUS_CAVEATS = 3
 RESEARCH_DOCTOR_HELP = "check the research state: who you are recorded as, edits made outside rb, merge leftovers, sources outside the repository"
@@ -613,8 +617,7 @@ def cmd_freeze(args: argparse.Namespace, out: Any) -> int:
         out.say(f"{exp.id} amended: the freeze record now matches it as it is ({am.before[:12]} -> {am.after[:12]}) · {am.why}")
     else:
         out.say(f"{exp.id} frozen: spec {fr.sha256[:12]}" + (f" · {fr.why}" if fr.why else ""))
-    for c in claims:
-        out.say(f"  locks {c.id}: {c.criterion()}  ({'written by ' + c.created_by})")
+    out.say(*freeze_review(led, exp))
     if not amend:
         out.say("  Changing a setting or its source, a variant, what it varies, or a claim now needs a person's --amend --why \"<reason>\", and is kept.")
         agents = [c.id for c in claims if not c.created_by.startswith("human:")]
@@ -627,6 +630,143 @@ def cmd_freeze(args: argparse.Namespace, out: Any) -> int:
     _actor_line(out, led)
     out.data.update({"object": _obj("experiment", exp), "unknown_required": unknown})
     out.next = [f'rb evidence attach {exp.id} --from <metrics.json> --command "..."']
+    return EXIT_OK
+
+
+def _named_otherwise(name: str, s: Any) -> Optional[str]:
+    """How a setting's source names it, when not by the setting's own name: the one judgement verification cannot make
+    for a person, so it is shown to them when they decide."""
+    src = s.source
+    if src is None or s.status != "verified":
+        return None
+    if src.term:
+        return f"matched by the words {src.term!r}"
+    from .sources import key_steps
+    key = src.key or (src.pointer if src.kind == "run" else None)
+    if key and key_steps(str(key))[-1].lower() != name.split(".")[-1].lower():
+        return f"read from {key}"
+    return None
+
+
+def freeze_review(led: Ledger, exp: Any) -> list[str]:
+    """What freezing an experiment locks, the way a person should read it before they do."""
+    lines = [f"  {exp.id}: {exp.title}", "    variants: " + ", ".join(f"{v.name} ({v.role})" for v in exp.live_variants())
+             + (f" · varies {', '.join(exp.varies)}" if exp.varies else " · varies nothing declared")]
+    look = []
+    for c in [c for c in led.claims_of(exp.id) if c.retracted is None]:
+        lines.append(f"    claim {c.id}: {c.criterion()}   (written by {c.created_by})")
+        if not c.created_by.startswith("human:") and led.criterion_fixed_at(c, exp) is None:
+            look.append(f"    look: {c.id} was written by {c.created_by}; freezing makes its criterion yours. Is it the test you mean?")
+    for full, s in exp.all_settings():
+        state = "per-run" if s.per_run else s.status
+        where = s.source.label() if s.source else "no source"
+        lines.append(f"    {full} = {show(s.value) if not s.per_run else '(each run)'} · {state} · {where}")
+        why = _named_otherwise(full, s)
+        if why:
+            look.append(f"    look: {full} is verified, {why}: is that this setting?")
+        if s.conflict is not None:
+            look.append(f"    look: {full} conflicts with its source: {s.conflict.text}")
+    unknown = [n for n, s in exp.all_settings() if s.value is None and s.required and not s.per_run]
+    if unknown:
+        look.append(f"    look: unknown and required: {', '.join(unknown)}")
+    return lines + look
+
+
+def request_review(led: Ledger, r: Any) -> list[str]:
+    """What an approved request would do, computed now, not described by whoever asked."""
+    from .ledger import parse_address
+    argv = r.argv
+    lines = [f"{r.id}: {r.created_by} asks: {shlex.join(['rb', *argv])}"] + ([f"  why: {r.why}"] if r.why and r.why not in argv else [])
+    try:
+        if argv[0] == "freeze" and len(argv) > 1:
+            exp = led.load("experiment", argv[1])
+            if "--amend" in argv:
+                lines.append(f"  adopts {exp.id} as it is now; its record says {(led.recorded_sha(exp) or '')[:12]}, it is {led.freeze_sha(exp)[:12]}")
+            lines += freeze_review(led, exp)
+        elif argv[0] == "decide" and len(argv) > 2:
+            subject = argv[1]
+            exp_id, setting = parse_address(subject)
+            if setting is not None:
+                exp, name, s = led.resolve_setting(subject)
+                lines.append(f"  {subject} = {show(s.value)} · {s.status} · {s.source.label() if s.source else 'no source'}")
+            else:
+                kind, obj = led.get(subject)
+                if kind == "claim":
+                    v = led.verdict(obj)
+                    lines.append(f"  {obj.id}: {obj.statement} · {_standing(v.model_dump(mode='json'))} · {obj.criterion()}")
+                else:
+                    lines.append(f"  {kind} {obj.id}: {getattr(obj, 'statement', None) or getattr(obj, 'text', None) or getattr(obj, 'title', '')}")
+        elif argv[0] == "retract" and len(argv) > 1:
+            lines.append(f"  takes back {argv[1]}; it stays on record and stops counting")
+        elif "--adopt" in argv:
+            lines += [f"  keeps {t['path']} as it stands: {t['why']}" for t in led.tampered()]
+        elif "--amend" in argv:
+            lines.append("  changes a frozen experiment; the change, the reason and the hash before and after are kept")
+    except RBError as e:
+        lines.append(f"  cannot be run as it stands: {e.message}")
+    return lines
+
+
+def cmd_approve(args: argparse.Namespace, out: Any) -> int:
+    """The person's side of a handoff: every request an agent queued, reviewed and run as the person, or declined."""
+    from .cli import main as rb_main
+    led = Ledger.open()
+    who = led.actor()
+    if not who.is_person:
+        raise RBError("E_HUMAN_ONLY", message=f"Approving a request is a person's call, and rb records you as {who.id} ({who.via}).")
+    pending = led.pending_requests()
+    targets = pending if args.id is None else [led.load_request(args.id)]
+    if not targets:
+        out.say("No requests waiting.")
+    results = []
+    interactive = args.id is None and not out.json_mode and sys.stdin.isatty()
+
+    def show_now(*lines: str) -> None:        # in a terminal, the review must be on screen before the question
+        if interactive:
+            print("\n".join(lines), flush=True)
+        else:
+            out.say(*lines)
+
+    for r in targets:
+        show_now(*request_review(led, r), "")
+        if r.status != "pending":
+            show_now(f"  already {r.status}.")
+            continue
+        if args.id is None and not interactive:
+            continue
+        from .ledger import is_person_call
+        if not is_person_call(r.argv) and not args.decline:   # a request file written by hand can say anything
+            show_now(f"  {r.id} is not a person's call rb can run: rb {shlex.join(r.argv)}. Decline it with --decline.", "")
+            results.append({"request": r.id, "status": "pending", "refused": "not a person's call"})
+            continue
+        choice = "n" if args.decline else "y"
+        if interactive:
+            choice = (input(f"Approve {r.id}? [y]es / [n]o / [s]kip: ").strip().lower() or "s")[0]
+        if choice == "n":
+            why = args.why or (input("  why (recorded): ").strip() if interactive else "")
+            led.resolve_request(r.id, approved=False, why=why)
+            show_now(f"  {r.id} declined.", "")
+            results.append({"request": r.id, "status": "declined"})
+        elif choice == "y":
+            stdout, stderr = io.StringIO(), io.StringIO()     # the command's own output, reduced to its outcome
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                code = rb_main([*r.argv, "--json"])
+            try:
+                env = json.loads(stdout.getvalue())
+            except ValueError:
+                env = {"ok": False, "errors": [{"message": stderr.getvalue().strip()[-400:]}]}
+            if code == 0:
+                led = Ledger.open()
+                led.resolve_request(r.id, approved=True, why=args.why or "", exit_code=code)
+                show_now(f"  {r.id} approved: rb {shlex.join(r.argv)} ran as {led.actor().id}.", "")
+                results.append({"request": r.id, "status": "approved", "exit_code": code, "result": env})
+            else:
+                errs = "; ".join(e.get("message", "") for e in env.get("errors", [])) or "see rb status"
+                show_now(f"  {r.id} did not run: {errs}", "  It stays pending; decline it with --decline if it no longer applies.", "")
+                results.append({"request": r.id, "status": "pending", "exit_code": code, "result": env})
+    if args.id is None and not interactive and pending:
+        out.next = [f"rb approve {r.id}" for r in pending[:3]]
+    out.data.update({"pending_count": len(led.pending_requests()), "requests": [r.model_dump(mode="json") for r in targets], "results": results})
     return EXIT_OK
 
 
@@ -1031,7 +1171,7 @@ def context_markdown(led: Ledger, st: dict) -> str:
          "## Rules", "",
          "- You propose; rb verifies and computes; people decide. Add questions, hypotheses, experiments, variants, settings with their sources, claims and evidence.",
          "- Only `rb spec verify` (or `rb spec set` with a checkable source) makes a setting verified. Only rb computes a verdict. Never edit `.rb/` by hand.",
-         "- Freezing, deciding, amending, and retracting what something rests on are a person's calls. When rb refuses one, hand the person the exact command it gives you; do not set or unset RB_ACTOR.",
+         "- Freezing, deciding, amending, and retracting what a person wrote or what something rests on are a person's calls. When rb refuses one it queues it: tell the person to run `rb approve` in their own terminal. Do not set or unset RB_ACTOR.",
          "- Write a claim before the run that tests it; evidence attached before its claim or before the freeze is exploratory and never counts.",
          "- Pass on every caveat and every unknown below with any result you report.", "",
          "## Words", "",
@@ -1273,6 +1413,12 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser, research_common: argp
     s.add_argument("subject", help="an id, or <experiment>/<setting>")
     why(s, required=True)
     s.set_defaults(func=cmd_retract)
+
+    s = sub.add_parser("approve", parents=rc, help="the person's side of a handoff: review what agents asked for, and run or decline it")
+    s.add_argument("id", nargs="?", default=None, help="one request (default: every pending one; asked one by one in a terminal)")
+    s.add_argument("--decline", action="store_true", help="decline it instead")
+    why(s)
+    s.set_defaults(func=cmd_approve)
 
     s = sub.add_parser("freeze", parents=rc, help="lock an experiment's spec and claim criteria before the runs that count (a person's call)")
     s.add_argument("experiment")

@@ -47,7 +47,7 @@ from .actor import Actor
 from .errors import RBError
 from .investigation import (ID_PATTERN, SETTING_PATTERN, VARIANT_PATTERN, Amendment, Assumption, Caveat, Cited, Claim, ClaimVerdict,
                             ConfigCheck, Conflict, Decision, Evidence, Experiment, FileRef, Freeze, Hypothesis, Investigation,
-                            Metric, Observation, Question, Receipt, Retraction, Setting, Source, Variant)
+                            Metric, Observation, Question, Receipt, Request, Resolved, Retraction, Setting, Source, Variant)
 from .sources import (Unresolved, file_ref, flatten, git_state, load_config, now, recheck, resolve, sha256_bytes, structured_kind,
                       yaml_key_at)
 
@@ -57,6 +57,15 @@ except ImportError:  # pragma: no cover - Windows: writes are not serialised acr
     fcntl = None  # type: ignore[assignment]
 
 DIR = ".rb"
+PERSON_COMMANDS = ("freeze", "decide", "retract")   # plus any command given --amend, and rb doctor --adopt
+
+
+def is_person_call(argv: list[str]) -> bool:
+    """Whether a command line is one of the calls a request may carry: nothing else is ever run by rb approve."""
+    if not argv:
+        return False
+    return (argv[0] in PERSON_COMMANDS or (argv[0] in ("spec", "claim", "variant") and "--amend" in argv)
+            or (argv[0] == "doctor" and "--adopt" in argv))
 GITIGNORE = ".lock\n*.tmp\nobjects/\n"      # objects/: rb's local copies of what it wrote, for rb doctor --restore
 
 # kind -> (directory, id prefix, model)
@@ -365,8 +374,26 @@ class Ledger:
                 why = self.edited_outside(kind, id)
                 if why:
                     out.append({"kind": kind, "id": id, "path": str(self._path(kind, id).relative_to(self.root)), "why": why})
+            rewritten = self._log_rewritten()
+            if rewritten:
+                out.append({"kind": "log", "id": "log.jsonl", "path": str((self.dir / "log.jsonl").relative_to(self.root)), "why": rewritten})
             self._tamper = out
         return self._tamper
+
+    def _log_rewritten(self) -> Optional[str]:
+        """The log only grows: every line of it as last committed must still be in it (a union merge only adds). A
+        committed line gone or changed means someone rewrote the record; git shows who and when."""
+        try:
+            r = subprocess.run(["git", "show", "HEAD:./" + DIR + "/log.jsonl"], cwd=self.root, capture_output=True, timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if r.returncode != 0:
+            return None                 # not a git repository, no commit yet, or the log is not committed
+        committed = {line for line in r.stdout.decode("utf-8", errors="replace").splitlines() if line.strip()}
+        p = self.dir / "log.jsonl"
+        current = set(p.read_text(encoding="utf-8").splitlines()) if p.exists() else set()
+        missing = committed - current
+        return f"{len(missing)} line(s) of log.jsonl as last committed are gone or changed: the log was rewritten" if missing else None
 
     def restore(self) -> list[dict]:
         """Put back what rb last wrote for every object changed outside rb. A file rb never wrote is moved aside, not
@@ -375,6 +402,10 @@ class Ledger:
         done = []
         with self._locked():
             for t in self.tampered():
+                if t["kind"] == "log":
+                    done.append({**t, "done": "not restored: git diff shows what was rewritten, and git checkout puts back the committed log "
+                                              "(entries written since the last commit are then lost)"})
+                    continue
                 entry = self.last_writes().get((t["kind"], t["id"]))
                 path = self._path(t["kind"], t["id"])
                 if entry is None or entry.get("op") == "adopt_delete":
@@ -400,6 +431,9 @@ class Ledger:
         done = []
         with self._locked():
             for t in self.tampered():
+                if t["kind"] == "log":
+                    done.append({**t, "done": "not adopted here: a rewritten log is kept by committing it, where git keeps what it replaced"})
+                    continue
                 path = self._path(t["kind"], t["id"])
                 if not path.exists():
                     self._log(who, "adopt_delete", t["kind"], t["id"], why=why)
@@ -1164,6 +1198,64 @@ class Ledger:
             self._commit(who, "retract", kind, obj, why=why)
             return kind, subject, deps
 
+    # ------------------------------------------------------------ requests: a person's call an agent asked for
+
+    def _request_path(self, request_id: str) -> Path:
+        if not re.fullmatch(ID_PATTERN, request_id):
+            raise RBError("E_OBJECT_NOT_FOUND", message=f"No request {request_id!r}.")
+        return self.dir / "requests" / f"{request_id}.json"
+
+    def request(self, argv: list[str], why: str = "") -> Request:
+        """Queue a person's call an agent asked for. A request is not research state: it is a note from the agent to
+        the person, kept in .rb/requests/ outside the log, and it does nothing until the person approves it, when
+        `rb approve` shows what it would do, computed then, and runs it as them. The same pending request is not
+        queued twice."""
+        who = self.actor()
+        argv = [a for a in argv if a != "--json"]
+        if not is_person_call(argv):
+            raise RBError("E_OBJECT_INVALID", message=f"rb {' '.join(argv[:2])} is not a person's call; run it yourself.")
+        with self._locked():
+            same = next((r for r in self.pending_requests() if r.argv == argv), None)
+            if same is not None:
+                return same
+            taken = {p.name[:-5] for p in (self.dir / "requests").glob("*.json")} if (self.dir / "requests").is_dir() else set()
+            rid = next(i for i in ("r" + base64.b32encode(secrets.token_bytes(5)).decode().lower()[:4] for _ in range(100)) if i not in taken)
+            r = _build(Request, id=rid, argv=argv, why=why, created_by=who.id, created_at=now(), via=self.via)
+            self._write(self._request_path(rid), _dump(r))
+        return r
+
+    def requests(self) -> list[Request]:
+        d = self.dir / "requests"
+        out = []
+        for p in sorted(d.glob("*.json")) if d.is_dir() else []:
+            try:
+                out.append(Request.model_validate_json(p.read_text(encoding="utf-8")))
+            except (ValidationError, ValueError, OSError):
+                continue                      # a note that does not parse is not a request anyone can approve
+        return sorted(out, key=lambda r: r.created_at)
+
+    def pending_requests(self) -> list[Request]:
+        return [r for r in self.requests() if r.status == "pending"]
+
+    def load_request(self, request_id: str) -> Request:
+        p = self._request_path(request_id)
+        if not p.exists():
+            raise RBError("E_OBJECT_NOT_FOUND", message=f"No request {request_id!r}: rb approve lists the pending ones.")
+        return self._read(p, Request)
+
+    def resolve_request(self, request_id: str, approved: bool, why: str = "", exit_code: Optional[int] = None,
+                        handoff: Optional[str] = None) -> Request:
+        who = self.actor()
+        self._person(who, "Approving or declining a request", handoff)
+        with self._locked():
+            r = self.load_request(request_id)
+            if r.status != "pending":
+                raise RBError("E_OBJECT_INVALID", message=f"{r.id} was already {r.status} by {r.resolved.by if r.resolved else '?'}.")
+            r.status = "approved" if approved else "declined"
+            r.resolved = _build(Resolved, by=who.id, at=now(), why=why, exit_code=exit_code)
+            self._write(self._request_path(r.id), _dump(r))
+        return r
+
     # ------------------------------------------------------------ verdicts
 
     def metric_aliases(self) -> dict[str, str]:
@@ -1609,6 +1701,9 @@ class Ledger:
             if not c.experiment:
                 item("agent", "no_experiment", c.id, f"{c.id} is on no experiment, so no evidence can test it: {c.statement}",
                      f'rb claim add "{c.statement}" -e <experiment> --metric {c.metric} ...   (then rb retract {c.id} --why "moved onto an experiment")')
+        for r in self.pending_requests():
+            item("person", "request", r.id, f"{r.id}: {r.created_by} asks: rb {shlex.join(r.argv)}" + (f" ({r.why})" if r.why and r.why not in r.argv else ""),
+                 f"rb approve {r.id}")
         tamper = self.tampered()
         if tamper:
             gate = {k: True for k in gate}          # a state changed outside rb fails every gate until it is restored or adopted
@@ -1678,7 +1773,9 @@ class Ledger:
                 first["what"] = f"{first['subject']}: " + first["what"].split(": ", 1)[-1]
             else:
                 merged.setdefault(key, dict(it))
-        items = sorted(merged.values(), key=lambda i: {"person": 0, "agent": 1, "anyone": 2}[i["who"]])
+        asked = {tuple(r.argv[:2]) for r in self.pending_requests()}        # a queued request answers the item it would do
+        kept = [i for i in merged.values() if i["code"] == "request" or i["who"] != "person" or tuple(i["do"].split()[1:3]) not in asked]
+        items = sorted(kept, key=lambda i: ({"person": 0, "agent": 1, "anyone": 2}[i["who"]], i["code"] != "request"))
         exp_rows = []
         for e in experiments:
             counts = {k: 0 for k in ("verified", "provisional", "unknown", "inherited", "per_run")}

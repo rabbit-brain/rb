@@ -59,10 +59,16 @@ def _handing_over(*argv: Any):
     try:
         yield
     except RBError as err:
-        if err.code == "E_HUMAN_ONLY" and "handoff" not in err.extra:
+        if err.code == "E_HUMAN_ONLY":
             cmd = _handoff(*argv)
-            err.extra["handoff"] = {"who": "person", "command": cmd}
-            err.fix = f"Hand this to the person, to run in their own terminal: {cmd}   Do not set or unset RB_ACTOR."
+            request = None
+            try:                                       # queued, so the person approves it with rb approve
+                request = Ledger.open(via="sdk").request([str(a) for a in argv if a is not None]).id
+            except RBError:
+                pass
+            err.extra["handoff"] = {"who": "person", "command": cmd, **({"request": request} if request else {})}
+            err.fix = (f"Queued as {request}: the person reviews and approves it in their own terminal with rb approve." if request
+                       else f"Hand this to the person, to run in their own terminal: {cmd}   Do not set or unset RB_ACTOR.")
         raise
 
 
@@ -147,10 +153,12 @@ class State:
     # -- a person's calls
     def decide(self, subject: str, outcome: str, *, why: str) -> str:
         """accept, reject or investigate: a claim, hypothesis, assumption, question, experiment, or a setting ("int8/lr")."""
-        return self.ledger.decide(subject, outcome, why, handoff=_handoff("decide", subject, outcome, "-m", why)).id
+        with _handing_over("decide", subject, outcome, "--why", why):
+            return self.ledger.decide(subject, outcome, why, handoff=_handoff("decide", subject, outcome, "--why", why)).id
 
     def retract(self, subject: str, *, why: str) -> None:
-        self.ledger.retract(subject, why, handoff=_handoff("retract", subject, "-m", why))
+        with _handing_over("retract", subject, "--why", why):
+            self.ledger.retract(subject, why, handoff=_handoff("retract", subject, "--why", why))
 
 
 class Experiment:
@@ -221,7 +229,8 @@ class Experiment:
     # -- a person's call
     def freeze(self, *, why: str) -> None:
         """Lock the spec and the claims' criteria before the runs that count."""
-        self.state.ledger.freeze(self.id, why, handoff=_handoff("freeze", self.id, "-m", why))
+        with _handing_over("freeze", self.id, "--why", why):
+            self.state.ledger.freeze(self.id, why, handoff=_handoff("freeze", self.id, "--why", why))
 
 
 class Spec:

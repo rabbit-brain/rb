@@ -145,7 +145,8 @@ def test_the_agent_cannot_freeze_and_is_handed_the_command_for_the_person(gamed,
     code, env = rbj(capsys, *FREEZE)
     err = env.errors[0]
     assert code == 2 and err.code == "E_HUMAN_ONLY"
-    assert err.handoff == {"who": "person", "command": shlex.join(["rb", *FREEZE])}
+    assert (err.handoff["who"], err.handoff["command"]) == ("person", shlex.join(["rb", *FREEZE]))
+    assert err.handoff["request"].startswith("r") and "rb approve" in err.fix     # queued for the person to approve
     assert Ledger(session).load("experiment", "e1").frozen is None
 
 

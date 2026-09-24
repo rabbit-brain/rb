@@ -53,7 +53,7 @@ It says what the config states, not what the run used. For that, attach the run'
 - amending a frozen spec;
 - retracting what something rests on.
 
-`rb` detects Claude Code, Codex and other agent runtimes, and answers these calls from an agent with the exact command for you to run. Inside an agent session, a person's name in `RB_ACTOR` is ignored. Every write records who made it and how `rb` knew. Evidence attached before its claim, or before the freeze, is shown and never counted.
+`rb` detects Claude Code, Codex and other agent runtimes. When an agent attempts one of these calls, `rb` queues it for you instead. `rb approve`, in your own terminal, shows each request as it would actually land, then asks. For a freeze, that means every criterion it locks, every setting with its source, and any setting whose source matched only through other words. Inside an agent session, a person's name in `RB_ACTOR` is ignored. Every write records who made it and how `rb` knew. Evidence attached before its claim, or before the freeze, is shown and never counted.
 
 **Release review, built in.** For iterative perception models (optical flow, stereo, depth, anything that refines an answer over iterations), `rb review` compares a candidate checkpoint against the current one case by case. It ranks the cases that got worse and the cases whose error improved while the model never stopped changing its answer. It renders the evidence for each, and keeps the cases you cared about as checks for the next checkpoint. A review is evidence like any other: `rb evidence attach <exp> --run <run>`.
 

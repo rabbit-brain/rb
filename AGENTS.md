@@ -2,6 +2,8 @@
 
 Rabbit Brain (`rb`) reviews a candidate checkpoint of an iterative perception model against the current one: it runs both on a case set (or reads results you already have), ranks the cases that regressed on error or never settled during refinement, explains each one, and keeps checks so the next checkpoint gets the same review. It runs locally; nothing leaves this machine.
 
+It also keeps a project's research state in `.rb/`: the questions, hypotheses, experiments with every setting and where it came from, claims with their criteria, the evidence attached to them, and the decisions people made. If the project has a `.rb/` directory, run `rb context` before anything else and read the section "Research state" below: it is the state of the work, and it replaces anyone's summary of it.
+
 Read this whole file before running anything. **Do not compute errors, regressions, rankings, stability or verdicts yourself.** `rb` defines them, applies the same definitions on every run, and records how. That is what makes a result comparable across checkpoints and people. If you find yourself writing an evaluation or comparison script, stop and use `rb run` (or `rb import` when the per-case numbers already exist).
 
 ## Install
@@ -277,7 +279,7 @@ Every trajectory also yields the absolute convergence statistics (`stability.can
 | `E_CHECKS_INVALID` | the checks file is not valid | `rb schema checks` |
 | `E_CHECKS_PROJECT_MISMATCH` | the named checks file is for another project | same project name, or another `--checks` file (an unnamed `checks.json` for another project is ignored with a warning) |
 | `E_LIMITS_INVALID` | a limit is out of range | `--max-regression ≥ 0`, `0 ≤ --max-late-share ≤ 1`, `0 ≤ --max-reversals ≤ 64`, `--max-trajectory-regression ≥ 0`, `--max-last-update ≥ 0` |
-| `E_NOT_AVAILABLE` | the command is planned, not in this version | `rb rerun`, `rb open`, `rb mcp` are not here yet; use the commands above |
+| `E_NOT_AVAILABLE` | the command is planned, not in this version | `rb rerun`, `rb open`, `rb mcp`, `rb reproduce`, `rb publish`, `rb clone` are not here yet; use the commands above |
 | `E_WRITE_FAILED` | a file could not be written | check permissions, or `--runs-dir` |
 | `E_EVIDENCE_DEPS` | evidence rendering needs numpy and pillow | `pip install numpy pillow` (included in `rabbit-brain[raft]`) |
 | `E_INTERNAL` | unexpected failure | re-run with `--json` and report it |
@@ -287,6 +289,16 @@ Every trajectory also yields the absolute convergence statistics (`stability.can
 | `E_WORKSPACE_NOT_SELLABLE` | that plan is published but unfinished | `rb plans` shows which plans can be bought today |
 | `E_WORKSPACE_UNREACHABLE` | the workspace host could not be reached | exit 3. Nothing local was affected; the run is still on disk |
 | `E_WORKSPACE_REJECTED` | the workspace refused the request | the message says why; push the `bundle.json` unmodified |
+| `E_NO_INVESTIGATION` | no `.rb/` here or in any directory above | `rb investigation init "<title>"` in the project root |
+| `E_INVESTIGATION_EXISTS` | `.rb/` already exists here or above | use it: `rb status` |
+| `E_OBJECT_NOT_FOUND` | no object with that id | `rb status` lists every id |
+| `E_OBJECT_INVALID` | the values do not make a valid object (a claim with two criteria, a within without a tolerance, a taken id) | fix the named field; `rb schema <kind>` |
+| `E_FROZEN` | the experiment is frozen and this changes its spec | a person passes `--amend "<reason>"`; the amendment is kept |
+| `E_HUMAN_ONLY` | freeze, decide, retract or amend with `RB_ACTOR` set to an agent | hand the step to the human |
+| `E_ACTOR_INVALID` | `RB_ACTOR` is not `human:<name>` or `agent:<name>` | set it correctly, or unset it |
+| `E_SOURCE_UNRESOLVED` | the source was read and does not state the value, or could not be read | the knob stays inferred; fix the path, line, quote or commit, or set the value the source states |
+| `E_SOURCE_UNVERIFIABLE` | a url, a note, or a file source with no line or quote | save the page as a file and use `--quote`, or point at a config line or a run's `record.json` |
+| `E_LEDGER_CORRUPT` | a file under `.rb/` is not valid, usually a hand edit | `git diff .rb/`, restore it, and change state with `rb` commands |
 
 ## Worked example
 
@@ -305,6 +317,50 @@ rb report <run_id>
 Then report to the human, in this order: the verdict line; the top cases with their `why` text (it says when a case is borderline, and a borderline case is worth naming as such rather than reporting as settled fact); the run id; the path to `report.md`, and to `report.html` if you wrote one (`rb report <run_id> --html`, which a human can open in a browser; do not use `--open`, which tries to launch one); the command that reproduces the queue (`rb findings <run_id>` with the limits used, as the report's Reproduce section prints it). Quote numbers only from `findings.json`. If `hook.status` is not `recorded`, say that stability was not assessed and why. If `adapter_agreement` is not `agree` for both checkpoints, say so first. If the two checkpoints are different architectures (the receipt's checkpoint lines and `rb doctor` say so), say that the review compares two models rather than a retrain of one.
 
 When a later checkpoint arrives: `rb check run` against a new `rb run` of it (same project, same case set) answers "are the cases we cared about still fine?" and exits 1 in CI if not; then `rb findings` for the full review.
+
+## Research state: questions, hypotheses, experiments, claims, evidence (`.rb/`)
+
+`rb` keeps the state of a line of work as plain files in `.rb/` next to the code: commit them with it. They record what the work is trying to establish, what would test it, which setting has which value and where that value came from, what was run, what the evidence supports, what is still unknown, and what a person decided. A fresh session reads this instead of a summary, because a summary drops exactly the caveats that matter.
+
+**The rule: you propose; `rb` sets statuses; people decide.**
+
+- You may add questions, hypotheses, assumptions, experiments, knob values with their sources, claims, and evidence.
+- A knob you set is `inferred`. Only `rb knob verify` makes it `verified`, by reading the source you gave and finding the value in it. It records the commit, the file's hash and the line as read; if the file changes later, `rb status` reports the knob as stale. Never edit `.rb/` by hand: a knob marked verified without what `rb` read fails to load (`E_LEDGER_CORRUPT`).
+- A claim's verdict is computed from the evidence every time it is read, and never written. A claim is **established** only when its evidence meets the criterion, no required knob is unknown, no verified source has changed, and the evidence is not only rb's example data. Report "supported, not established" exactly as that.
+- `rb freeze`, `rb decide`, `rb evidence retract` and `--amend` are a person's calls. Set `RB_ACTOR=agent:<your name>` (for example `agent:claude-code`) in your environment so every write records who made it; with that set, those four are refused (`E_HUMAN_ONLY`). `rb` cannot tell a person at a shell from an agent at one, so this rests on you setting it.
+
+```sh
+rb investigation init "Does INT8 keep flow quality?"                  # creates .rb/ here; commands then work from any subdirectory
+rb question add "Can we ship INT8 RAFT without losing accuracy?"
+rb hypothesis add "INT8 keeps mean EPE within 0.05 px of FP32" --question q1 --expect "delta <= 0.05" --why "late updates are small"
+rb experiment add "INT8 vs FP32 on KITTI-2015" --id int8 --tests h1 --baseline fp32 --candidate int8
+rb assumption add "KITTI train is not in the pretraining set" --applies-to int8
+rb knob set int8 lr 1e-4 --source configs/train.yaml:17 --verify       # inferred, then verified if line 17 states 1e-4
+rb knob set int8 seed --unknown                                        # nobody has found it: blocks the claims until found (--optional if it should not)
+rb knob set int8 cuda 12.4 --source https://example.com/env            # recorded, stays inferred: a url cannot be checked by reading a file
+rb knob verify int8                                                    # re-read every source; a source that no longer states the value demotes the knob
+rb claim add "INT8 keeps quality" --experiment int8 --metric delta_epe --at-most 0.05 --hypothesis h1
+rb freeze int8                                                         # the human, before held-out results: later spec changes need --amend "<reason>"
+rb evidence attach int8 --metric delta_epe=0.0486 --command "python eval.py --int8"   # numbers from any evaluator
+rb evidence attach int8 --run <run_id>                                 # or an rb run: candidate.<metric>, baseline.<metric>, change.<metric>, regressions, flagged, ...
+rb status --fail-on unestablished                                      # the CI gate: exit 1 unless every claim is established
+rb show c1                                                             # the claim, its verdict, every observation and what it rests on
+rb context                                                             # the handoff pack a fresh session reads first
+```
+
+**Knobs.** A value is a number, `true`/`false`, text, or a JSON list (`1e-4` is a number; `'"6"'` is the text 6). `--source` is `path:LINE`, `path` with `--quote "exact text"`, `run:PATH#/json/pointer` (a run directory means its `record.json`), `https://...`, or `note:text`; `--commit <sha>` reads the file at that commit, which never goes stale; `--locator "§4.2"` says where a reader finds it. Numbers compare numerically, so `lr: 0.0001` states `1e-4`. Changing a knob's value or source puts it back to `inferred`. `rb knob verify` exits 1 when any knob it tried did not verify, with `E_SOURCE_UNRESOLVED` (read, and the value is not there) or `E_SOURCE_UNVERIFIABLE` (a url, a note, or a file with no line or quote) per knob in `data.results`.
+
+**Claims.** Exactly one criterion: `--at-most X`, `--at-least X`, or `--within TARGET --tolerance T`. `--metric` names a number the evidence reports. A claim with `--source` (a paper's table: save the text as a file and give `--quote` and `--locator`) is a claimed number, and its verdict is `reproduced` or `diverged`; your own claims are `supported` or `refuted`; mixed evidence is `contested`; no evidence is `not_tested`. An observation is **borderline** when moving the criterion by a tenth of itself would change the call, the same rule as a borderline case in a review; say so when you report it.
+
+**Evidence.** `--metric name=value` (repeatable), `--from metrics.json` (a JSON object; nested keys join with dots; anything that is not a number is named in a warning, not dropped silently), or `--run` for an rb run. `--file` hashes an output into the receipt, `--link wandb=URL` records where else it lives, `--command` records what produced the numbers (rb did not run it). The receipt records the actor, the time, the repository's commit and whether the tree had uncommitted changes (with a hash of the diff; `.rb/` itself is left out), and for an rb run its own receipt and the hash of its `record.json`. Evidence from `rb example` is marked synthetic, and a claim resting only on it is never established. Wrong evidence is retracted with a reason by a person, never deleted: it stays on record and stops counting.
+
+**Freezing.** `rb freeze <experiment>` records the hash of its spec: baseline, candidate, every knob's value and whether it is required, every claim's criterion. After that, a change to any of them fails with `E_FROZEN` unless given `--amend "<reason>"`, which keeps the change, the reason and the hash before and after. Verifying a knob does not change the spec. Each observation says whether its evidence was attached before the freeze, against the current spec, or against a spec amended since.
+
+**Decisions.** `rb decide <id> accept|reject|investigate --why "..."` on a claim, hypothesis, assumption, question or experiment. On a claim it records the verdict at that moment, so a decision is always read against what it was made on; a person may accept a refuted claim, and `rb status` shows both. Accepting or rejecting a hypothesis sets it `accepted` or `rejected` (a verdict alone never does); a question becomes `answered` or `dropped`; an assumption `holds` or is `violated`.
+
+**Reading the state.** `rb status` lists the claims with their verdicts, the experiments with their knob counts, and **Open**: open questions, hypotheses nothing tests, unchecked assumptions, unknown required knobs, inferred knobs and how to verify them, stale sources, untested claims, and refuted or contested claims nobody has decided on. Work from the open list. `--fail-on` takes `unestablished`, `unknown`, `untested`, `refuted`, `stale` (repeatable or comma-separated) and exits 1 when any applies. `rb context` prints the same state as a handoff pack in Markdown; `--json` on either gives the structure. `rb schema claim` (and `investigation`, `question`, `hypothesis`, `assumption`, `experiment`, `evidence`, `decision`, `verdict`) prints each object's shape. Planned and not in this version: `rb mcp` (the same operations for agents over MCP, with the actor set on every call), `rb reproduce` (a paper's claims and settings as a pre-filled experiment), `rb publish` and `rb clone`.
+
+When you report to a human from this state: quote the verdict and whether it is established; name every blocking unknown and every condition `rb show` lists; say which knobs are inferred rather than verified; and never describe a claim as settled that `rb status` does not show as established.
 
 ## Sharing a run's statistics (consent, and what leaves the machine: nothing, unless the human sends it)
 
@@ -337,10 +393,12 @@ A refused push changes nothing locally; the run is still on disk and still compl
 
 ## Boundaries
 
-`rb` does not train, does not modify model code (the recorder is a forward hook or one line you add, and `rb verify-hook` checks it), and does not certify a model. Stability limits are generic heuristics and a starting point; a scorer fitted to the model is a separate, paid step. Nothing leaves the machine unless you send it: `rb share` writes a file for a human to send, and `rb workspace push` posts one comparison you name to a workspace you configured. No command sends anything on its own. The synthetic adapter is a test double and every output of it says so.
+`rb` does not run experiments for the research state: it records what was run, by whom, from which commit, and what the numbers support. `rb` does not train, does not modify model code (the recorder is a forward hook or one line you add, and `rb verify-hook` checks it), and does not certify a model. Stability limits are generic heuristics and a starting point; a scorer fitted to the model is a separate, paid step. Nothing leaves the machine unless you send it: `rb share` writes a file for a human to send, and `rb workspace push` posts one comparison you name to a workspace you configured. No command sends anything on its own. The synthetic adapter is a test double and every output of it says so.
 
 ## For humans: verify what your agent did
 
 Open `rb-runs/<run_id>/report.md`. The header lists the run id, the `rb` version, the exact command, both checkpoints with their sha256, the environment, the hook status and whether the adapter agreed with the model's own evaluation; the body restates the definitions with the limits in force and lists every case. `record.json` adds the model-code git SHA, the dataset hash, seeds and skipped cases. Re-run the command from the header, or `rb findings <run_id>` with the same limits, and compare. If what the agent told you differs from the report, the report is right.
+
+For research state: `rb status` and `rb show <id>` are computed from `.rb/`, not from what anyone wrote about it. `.rb/log.jsonl` lists every write with its actor, and `git log -p .rb/` shows every change. A knob is verified only with the line or value `rb` read, which `rb show <experiment>` prints next to it.
 
 Re-running on a different machine is a weaker check than it looks, and the report says so where it matters. Same code, same checkpoints, same data, a different GPU or torch build: most cases land on the same numbers to several decimals, a few land far enough apart to cross a limit. On the RAFT examples in this repository, run on two machines, 53 of 200 cases differed by more than 0.01 px and six cases changed what they were called; all six are marked borderline by the first machine's own numbers, without knowing the second machine's. So: a difference on a case the report marks borderline is the machine, not a discrepancy; a difference on any other case, or a different verdict, is worth chasing.

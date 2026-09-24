@@ -47,6 +47,8 @@ Below is the one regression in a real review of raft-sintel against raft-things 
 
 **For coding agents.** `rb docs` prints [AGENTS.md](AGENTS.md): the workflow, the file format, the JSON output (`--json` on every command), exit codes and every error code with its fix. Tell your agent: *"Review candidate checkpoint B against A on this case set with Rabbit Brain."*
 
+**Research state, for work done with coding agents.** `rb investigation init` starts `.rb/` beside the code: the questions, hypotheses and experiments of a line of work, every setting with where its value came from, claims with their criteria, the evidence attached to them, and who decided what. You and your agent propose; `rb` sets the statuses: a setting is verified only when `rb` reads its source and finds the value there, a claim's verdict is computed from the evidence every time it is read, and a claim with a required setting still unknown is never shown as established. `rb context` is the handoff a fresh agent session reads instead of the last one's summary. See "Research state" in [AGENTS.md](AGENTS.md).
+
 **Install and versions.** `pip install rabbit-brain` (core, pydantic only), `pip install "rabbit-brain[raft]"` (torch and the RAFT adapter's needs), `pip install "rabbit-brain[evidence]"` (numpy and pillow, for evidence sheets with a custom adapter). Python 3.10 or later. [CHANGELOG.md](CHANGELOG.md) for what each version changed.
 
 The trajectory diagnostic comes from a paper that is not public yet; the reference goes here when it is.

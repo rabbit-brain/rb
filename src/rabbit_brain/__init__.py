@@ -8,5 +8,6 @@ from __future__ import annotations
 __version__ = "0.4.0"
 
 from .recorder import TrajectoryRecorder  # noqa: E402
+from .ledger import Ledger  # noqa: E402
 
-__all__ = ["__version__", "TrajectoryRecorder"]
+__all__ = ["__version__", "TrajectoryRecorder", "Ledger"]

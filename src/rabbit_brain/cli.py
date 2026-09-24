@@ -27,8 +27,9 @@ from .adapters.base import task_metric as adapters_task_metric
 from .runs import (bundle_from_comparison, compute_findings, import_record, list_runs, new_run_id, rederive, resolve_run, runs_dir, write_run)
 from .stability import case_stability
 from . import runner as runner_mod
+from . import ledger_cli
 
-PLANNED = {"rerun", "open", "serve", "mcp"}
+PLANNED = {"rerun", "open", "serve", "mcp", "reproduce", "publish", "clone"}
 FILTERS = ["flagged", "all", "regressions", "unstable", "improved-unstable", "settled-regressions", "improved", "stable"]
 SORTS = ["priority", "error-change", "candidate-error", "current-error", "late-share", "name"]
 INTEGRATION_HINT = "INTEGRATION.md has the ladder that turns this into a trusted run: doctor, the hook, the adapter check, a five-case run, then the review."
@@ -850,7 +851,7 @@ def build_parser() -> argparse.ArgumentParser:
     chk = argparse.ArgumentParser(add_help=False)
     chk.add_argument("--checks", default=None, help="saved checks file (default checks.json in the current directory)")
 
-    p = argparse.ArgumentParser(prog="rb", description="Rabbit Brain: release review for iterative perception models. Docs for agents and humans: rb docs.")
+    p = argparse.ArgumentParser(prog="rb", description="Rabbit Brain: the research state and evidence for ML work done with coding agents, and release review for iterative perception models. Docs for agents and humans: rb docs.")
     p.add_argument("--version", action="version", version=f"rabbit-brain {__version__}")
     sub = p.add_subparsers(dest="command", metavar="<command>")
 
@@ -999,12 +1000,14 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("run", help="a run id, a run directory, or a bundle.json")
     w.set_defaults(func=cmd_workspace_push)
 
+    ledger_cli.add_parsers(sub, common)
+
     s = sub.add_parser("version", parents=[common], help="print the version")
     s.set_defaults(func=cmd_version)
     return p
 
 
-COMMANDS = ["init", "onboard", "doctor", "verify-hook", "verify-adapter", "run", "import", "example", "findings", "case", "check save", "check run", "check list", "check rm", "report", "share", "docs", "schema", "runs", "version"]
+COMMANDS = ["init", "onboard", "doctor", "verify-hook", "verify-adapter", "run", "import", "example", "findings", "case", "check save", "check run", "check list", "check rm", "report", "share", "docs", "schema", "runs", "version", *ledger_cli.LEDGER_COMMANDS]
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -1029,6 +1032,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.parse_args(["check", "--help"])
         return EXIT_OK
     command = args.command + (f" {args.check_command}" if args.command == "check" else "")
+    if getattr(args, "sub_command", None):
+        command += f" {args.sub_command}"
     out = Out(command, getattr(args, "json", False))
     out.command_line = shlex.join(["rb", *argv])  # quoted where needed, so the receipt's command pastes back
     out.runs_dir_flag = getattr(args, "runs_dir", None)

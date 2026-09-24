@@ -524,3 +524,11 @@ def _register_share() -> None:
 
 
 _register_share()
+
+
+def _register_investigation() -> None:
+    from .investigation import OBJECT_SCHEMAS
+    SCHEMAS.update(OBJECT_SCHEMAS)
+
+
+_register_investigation()

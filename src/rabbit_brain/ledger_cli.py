@@ -166,9 +166,9 @@ def split_pairs(tokens: Optional[list[str]]) -> list[str]:
 
 def _actor_line(out: Any, led: Ledger) -> None:
     a = led.actor()
-    stamp = f" (asserted from {runtime_label(a.asserted_from)}: on record, not counted as a person's call)" if a.asserted_from else ""
+    stamp = f" (RB_ACTOR={a.ignored} is ignored inside {runtime_label(a.runtime)})" if a.ignored and a.runtime else ""
     out.say(f"· recorded as {a.id}{stamp}")
-    out.data["actor"] = {"id": a.id, "via": a.via, **({"asserted_from": a.asserted_from} if a.asserted_from else {})}
+    out.data["actor"] = {"id": a.id, "via": a.via, **({"ignored_rb_actor": a.ignored} if a.ignored else {})}
 
 
 def _obj(kind: str, obj: Any) -> dict:
@@ -242,7 +242,7 @@ def cmd_variant_add(args: argparse.Namespace, out: Any) -> int:
     v = led.add_variant(args.experiment, args.name, args.role, note=args.note, amend=_amend(args))
     out.say(f"{args.experiment}: variant {v.name} ({v.role})")
     _actor_line(out, led)
-    out.data.update({"object": {"kind": "variant", "experiment_id": args.experiment, **v.model_dump(mode="json")}})
+    out.data.update({"object": {"kind": "variant", "id": f"{args.experiment}/{v.name}", "experiment_id": args.experiment, **v.model_dump(mode="json")}})
     out.next = [f"rb spec set {args.experiment} {v.name}.<setting> <value> --source <file#key>"]
     return EXIT_OK
 
@@ -298,7 +298,7 @@ def cmd_spec_set(args: argparse.Namespace, out: Any) -> int:
         out.say("  It stays provisional until a file (file#key, file:LINE, or --quote) or a run's JSON that states it is its source; a url or a note is recorded but cannot be checked.")
     _actor_line(out, led)
     failures = [_failure(row)] if row is not None and not row["ok"] and not row.get("skipped") else []
-    out.data.update({"object": {"kind": "setting", "experiment_id": args.experiment, "address": f"{args.experiment}/{name}", **setting.model_dump(mode="json")},
+    out.data.update({"object": {"kind": "setting", "id": f"{args.experiment}/{name}", "experiment_id": args.experiment, "address": f"{args.experiment}/{name}", **setting.model_dump(mode="json")},
                      "outcome": {"passed": not failures, "failures": failures}})
     if setting.status == "provisional" and setting.source is not None and setting.source.checkable() and args.no_verify:
         out.next = [f"rb spec verify {args.experiment} {name}"]
@@ -332,6 +332,23 @@ def _read_value(led: Ledger, source: Source, name: str) -> Any:
     return got
 
 
+def _not_a_value(v: Any) -> Optional[str]:
+    """Why a config value is not one rb records as a setting, or None."""
+    if v is None:
+        return "empty"
+    if isinstance(v, dict):
+        return "a section"
+    if isinstance(v, list):
+        return None if v and all(_not_a_value(x) is None and not isinstance(x, list) for x in v) else "a list of sections or an empty list"
+    if isinstance(v, bool) or isinstance(v, int):
+        return None
+    if isinstance(v, float):
+        return None if v == v and v not in (float("inf"), float("-inf")) else "not a finite number"
+    if isinstance(v, str):
+        return None if v.strip() else "empty text"
+    return f"a {type(v).__name__}"
+
+
 def _spec_from(args: argparse.Namespace, out: Any, led: Ledger) -> int:
     """Record the keys that define an experiment from its config, each sourced by key path and verified."""
     path = args.from_file
@@ -351,19 +368,24 @@ def _spec_from(args: argparse.Namespace, out: Any, led: Ledger) -> int:
     flat = {k: v for k, v in flatten(doc).items() if not str(k).startswith("_")}
     if not args.keys:
         tops = sorted({k.split(".")[0] for k in flat})
-        raise RBError("E_OBJECT_INVALID", message=f"{path} has {len(flat)} keys; pick the ones that define the experiment with --keys, e.g. --keys \"{tops[0]}.*\"" if tops else f"{path} has no keys.",
+        sections = [t for t in tops if any(k.startswith(t + ".") for k in flat)]
+        example = f"{sections[0]}.*" if sections else (tops[0] if tops else "")
+        raise RBError("E_OBJECT_INVALID", message=f"{path} has {len(flat)} keys; pick the ones that define the experiment with --keys, e.g. --keys \"{example}\"" if tops else f"{path} has no keys.",
                       fix="Choosing which keys define the experiment is the researcher's call: a key like log_every_n_steps should not stop runs counting when it changes.",
                       problems=[f"top-level: {', '.join(tops[:20])}"])
     patterns = [p.strip() for item in args.keys for p in item.split(",") if p.strip()]
     chosen = [k for k in flat if any(fnmatch.fnmatchcase(k, p) for p in patterns)]
     if not chosen:
         raise RBError("E_OBJECT_INVALID", message=f"--keys {', '.join(patterns)} matches none of {path}'s {len(flat)} keys.")
-    rows, skipped = [], []
-    for key in chosen:
+    rows, skipped, todo = [], [], []
+    for key in chosen:            # decide every key first, so a value rb cannot record never leaves half the keys written
         value = as_value(flat[key])
-        if isinstance(value, (dict, list)) and not (isinstance(value, list) and value and all(not isinstance(x, (dict, list)) for x in value)) or value is None:
-            skipped.append(key)
-            continue
+        why_not = _not_a_value(value)
+        if why_not:
+            skipped.append(f"{key} ({why_not})")
+        else:
+            todo.append((key, value))
+    for key, value in todo:
         name = f"{args.variant}.{key}" if args.variant else key
         src = Source(kind="file", path=rel, key=key, commit=args.commit)
         setting, row = led.set_setting(args.experiment, name, value, source=src, required=False if args.optional else None,
@@ -380,7 +402,7 @@ def _spec_from(args: argparse.Namespace, out: Any, led: Ledger) -> int:
     _actor_line(out, led)
     failures = [_failure(r) for _, _, r in rows if r is not None and not r["ok"] and not r.get("skipped")]
     out.data.update({"object": {"kind": "settings", "experiment_id": args.experiment, "from": rel,
-                                "settings": [{"address": f"{args.experiment}/{n}", **s.model_dump(mode="json")} for n, s, _ in rows]},
+                                "settings": [{"kind": "setting", "id": f"{args.experiment}/{n}", "address": f"{args.experiment}/{n}", **s.model_dump(mode="json")} for n, s, _ in rows]},
                      "outcome": {"passed": not failures, "failures": failures}})
     return EXIT_CHECK_FAILED if failures else EXIT_OK
 
@@ -496,6 +518,7 @@ def cmd_evidence_attach(args: argparse.Namespace, out: Any) -> int:
     if result["duplicate_of"]:
         rec = (ev.receipt.run_record or {}).get("record_sha256")
         out.say(f"Already attached as {ev.id}" + (f" (same run record {rec[:12]})" if rec else " (same numbers and files)") + "; nothing written. To attach a deliberate repeat: --again --why \"...\"")
+        _actor_line(out, led)
         out.data.update({"object": _obj("evidence", ev), "duplicate_of": ev.id})
         return EXIT_OK
     out.say(f"{ev.id} on {ev.experiment}: " + ", ".join(f"{k}={v:g}" for k, v in sorted(ev.metrics.items())) + (f" · {', '.join(f'{k}={show(v)}' for k, v in ev.per_run.items())}" if ev.per_run else ""))
@@ -509,8 +532,11 @@ def cmd_evidence_attach(args: argparse.Namespace, out: Any) -> int:
     if cfg is not None:
         if cfg.mismatches:
             out.say("  Ran with a different spec: " + "; ".join(f"{m['name']} {show(m['ran'])} (spec {show(m['spec'])})" for m in cfg.mismatches) + ". It will not count.")
+        elif cfg.matches:
+            out.say(f"  Ran with the spec: {len(cfg.matches)} of its settings found in {cfg.path}, all matching"
+                    + (f" ({len(cfg.absent)} not mentioned there)." if cfg.absent else "."))
         else:
-            out.say(f"  Ran with the spec ({len(cfg.matches)}/{len(cfg.matches) + len(cfg.absent)} settings found in {cfg.path} match).")
+            out.say(f"  {cfg.path} mentions none of the spec's settings, so nothing was compared: the run's config is unchecked.")
     git = ev.receipt.attached
     if not git:
         out.say("  Not in a git repository: the receipt has no commit.")
@@ -576,19 +602,28 @@ def cmd_retract(args: argparse.Namespace, out: Any) -> int:
 
 def cmd_freeze(args: argparse.Namespace, out: Any) -> int:
     led = Ledger.open()
-    fr = led.freeze(args.experiment, why=args.why or "", handoff=out.command_line)
+    amend = getattr(args, "amend", False)
+    if amend and not args.why:
+        raise RBError("E_OBJECT_INVALID", message="rb freeze --amend needs --why \"<reason>\": the reason is what the amendment records.")
+    fr = led.freeze(args.experiment, why=args.why or "", handoff=out.command_line, amend=amend)
     exp = led.load("experiment", args.experiment)
-    claims = led.claims_of(exp.id)
-    n_claims = len([c for c in claims if c.retracted is None])
-    out.say(f"{exp.id} frozen: spec {fr.sha256[:12]}" + (f" and {n_claims} claim criteri{'on' if n_claims == 1 else 'a'}" if n_claims else "") + " locked"
-            + (f" · {fr.why}" if fr.why else ""))
-    out.say("  Changing a setting, adding a variant or a claim now needs --amend --why \"<reason>\" from a person, and is kept.")
-    if fr.after_evidence:
-        out.say(f"  {exp.id} already has evidence: {', '.join(fr.after_evidence)}. This freeze does not pre-register it: that evidence stays "
-                "exploratory; only evidence attached after the freeze counts.")
+    claims = [c for c in led.claims_of(exp.id) if c.retracted is None]
+    if amend:
+        am = exp.amendments[-1]
+        out.say(f"{exp.id} amended: the freeze record now matches it as it is ({am.before[:12]} -> {am.after[:12]}) · {am.why}")
+    else:
+        out.say(f"{exp.id} frozen: spec {fr.sha256[:12]}" + (f" · {fr.why}" if fr.why else ""))
+    for c in claims:
+        out.say(f"  locks {c.id}: {c.criterion()}  ({'written by ' + c.created_by})")
+    if not amend:
+        out.say("  Changing a setting or its source, a variant, what it varies, or a claim now needs a person's --amend --why \"<reason>\", and is kept.")
+        agents = [c.id for c in claims if not c.created_by.startswith("human:")]
+        if fr.after_evidence and agents:
+            out.say(f"  {exp.id} already has evidence ({', '.join(fr.after_evidence)}). For {', '.join(agents)}, written by an agent, it stays "
+                    "exploratory: their criteria are fixed now, so only runs attached from here count.")
     unknown = [n for n, s in exp.all_settings() if s.value is None and s.required and not s.per_run]
     if unknown:
-        out.say(f"  Frozen with required settings unknown: {', '.join(unknown)}. No claim on it is established until they are known.")
+        out.say(f"  Required settings still unknown: {', '.join(unknown)}. No claim on it is established until they are known.")
     _actor_line(out, led)
     out.data.update({"object": _obj("experiment", exp), "unknown_required": unknown})
     out.next = [f'rb evidence attach {exp.id} --from <metrics.json> --command "..."']
@@ -606,8 +641,6 @@ def cmd_decide(args: argparse.Namespace, out: Any) -> int:
     elif kind == "assumption":
         word = {"accept": "assumed", "reject": "violated", "investigate": "open"}[d.outcome]
     out.say(f"{d.id}: {word} {d.subject} by {d.by}{against}: {d.why}")
-    if d.asserted_from:
-        out.say(f"  Asserted from {runtime_label(d.asserted_from)}: on record and marked wherever it is shown, and not counted as a person's call. The person runs it in their own terminal.")
     if d.verdict and ((d.outcome == "accept" and d.verdict not in SETTLED) or (d.outcome == "reject" and d.verdict in SETTLED)):
         out.say(f"  This goes against the verdict ({d.verdict}). It is recorded as made; rb status shows both.")
     if kind == "hypothesis" and not [c for c in led.live("claim") if c.hypothesis == d.subject]:
@@ -681,10 +714,12 @@ def _items_text(items: list[dict]) -> list[str]:
     for it in items:
         groups.setdefault((it["who"], it["code"]), []).append(it)
     for (who, code), its in groups.items():
-        if len(its) > 3 and who != "person":
-            subjects = ", ".join(i["subject"] for i in its[:6]) + (" ..." if len(its) > 6 else "")
-            out.append(f"  - {len(its)} × {code.replace('_', ' ')}: {subjects}")
-            out.append(f"      {its[0]['do']}")
+        if len(its) > 3 and who != "person":       # many of one kind: one line, and each one's own command under it
+            out.append(f"  - {len(its)} × {code.replace('_', ' ')}:")
+            for it in its[:6]:
+                out.append(f"      {it['do']}")
+            if len(its) > 6:
+                out.append(f"      ... and {len(its) - 6} more: rb status --json lists every one")
         else:
             for it in its:
                 out.append(f"  - {it['what']}")
@@ -774,7 +809,7 @@ def cmd_show(args: argparse.Namespace, out: Any) -> int:
         r = obj.receipt
         if r.command:
             out.say(f"  command (as given): {r.command}")
-        out.say(f"  produced: {(r.produced.get('commit') or 'commit unknown')[:12]} ({r.produced.get('from')})")
+        out.say(f"  produced: {(r.produced.get('commit') or '')[:12] or 'commit unknown'} ({r.produced.get('from')})")
         if r.attached:
             out.say(f"  repository when attached: {(r.attached.get('commit') or 'no commit yet')[:12]}{' with uncommitted changes' if r.attached.get('dirty') else ''}")
         if r.config:
@@ -788,7 +823,7 @@ def cmd_show(args: argparse.Namespace, out: Any) -> int:
         status = getattr(obj, "status", None) or getattr(obj, "outcome", None) or getattr(obj, "direction", "")
         out.say(f"{kind.capitalize()} {obj.id} ({status}): {text}")
         if kind == "decision":
-            out.say(f"  on {obj.subject} by {obj.by} at {obj.at}" + (f" · verdict then: {obj.verdict}" if obj.verdict else "") + (f" · asserted from {runtime_label(obj.asserted_from)}, not counted" if obj.asserted_from else ""))
+            out.say(f"  on {obj.subject} by {obj.by} at {obj.at}" + (f" · verdict then: {obj.verdict}" if obj.verdict else ""))
     retracted = getattr(obj, "retracted", None)
     if retracted:
         out.say(f"  RETRACTED {retracted.at} by {retracted.by}: {retracted.why}")
@@ -819,7 +854,7 @@ def _show_setting(led: Ledger, subject: str, out: Any) -> int:
             out.say(f"    {str(r.get('at', ''))[:19]} {r.get('actor')} {r.get('op')}: {d.get('change') or d.get('outcome') or d.get('why') or ''}")
     for d in led.decisions_on(address):
         out.say(f"  decision {d.id}: {d.outcome} by {d.by}: {d.why}")
-    out.data.update({"object": {"kind": "setting", "address": address, "experiment_id": exp.id, **s.model_dump(mode="json")}, "history": history})
+    out.data.update({"object": {"kind": "setting", "id": address, "address": address, "experiment_id": exp.id, **s.model_dump(mode="json")}, "history": history})
     return EXIT_OK
 
 
@@ -907,8 +942,9 @@ def cmd_log(args: argparse.Namespace, out: Any) -> int:
         if r.get("op") == "spec_verify" and d.get("results"):
             ok = sum(1 for x in d["results"] if x.get("ok"))
             what = f"{ok} of {len(d['results'])} checked"
-        stamp = f" (asserted from {runtime_label(r['asserted_from'])})" if r.get("asserted_from") else ""
-        out.say(f"{str(r.get('at', ''))[:16].replace('T', ' ')} {r.get('actor')}{stamp} {r.get('op')} {r.get('kind')} {r.get('id')}" + (f": {what}" if what else ""))
+        stamp = f", RB_ACTOR={r['ignored_rb_actor']} ignored" if r.get("ignored_rb_actor") else ""
+        out.say(f"{str(r.get('at', ''))[:16].replace('T', ' ')} {r.get('actor')} ({r.get('actor_via', '?')}{stamp}; via {r.get('via', '?')}) "
+                f"{r.get('op')} {r.get('kind')} {r.get('id')}" + (f": {what}" if what else ""))
     if not rows:
         out.say("Nothing logged.")
     out.data["entries"] = rows
@@ -916,31 +952,65 @@ def cmd_log(args: argparse.Namespace, out: Any) -> int:
 
 
 def cmd_research_doctor(args: argparse.Namespace, out: Any, led: Ledger) -> int:
-    """What can go wrong with .rb/ that no single command would notice."""
+    """What can go wrong with .rb/ that no single command would notice. It reads every file on its own, so one that does
+    not parse is listed rather than stopping the check. --restore puts back what rb last wrote; --adopt (a person's
+    call) takes the files as they stand."""
     from .actor import current
+    from .ledger import KINDS
     from .sources import inside_project
+    if getattr(args, "restore", False) and getattr(args, "adopt", False):
+        raise RBError("E_USAGE", message="rb doctor takes --restore or --adopt, not both.")
+    if getattr(args, "restore", False):
+        restored = led.restore()
+        for d in restored:
+            out.say(f"restored {d['path']}: {d['done']}")
+        if not restored:
+            out.say("Nothing to restore: every file is what rb last wrote.")
+        out.data["restored"] = restored
+    if getattr(args, "adopt", False):
+        if not getattr(args, "why", None):
+            raise RBError("E_OBJECT_INVALID", message="rb doctor --adopt needs --why \"<reason>\": the reason is what the adoption records.")
+        adopted = led.adopt(args.why)
+        for d in adopted:
+            out.say(f"adopted {d['path']}: {d['done']}")
+        out.data["adopted"] = adopted
     a = led.actor() if led._agent else current(led.root)
-    checks = [{"check": "actor", "ok": True, "detail": f"{a.id}, from {a.via}" + (f" (a person's name given inside {runtime_label(a.asserted_from)}: recorded, not counted as a person's call)" if a.asserted_from else "")}]
+    checks = [{"check": "actor", "ok": True, "detail": f"{a.id}, from {a.via}" + (f" (RB_ACTOR={a.ignored} is ignored inside {runtime_label(a.runtime)})" if a.ignored and a.runtime else "")}]
     problems = []
-    for kind in ("question", "hypothesis", "assumption", "experiment", "metric", "claim", "evidence", "decision"):
-        for obj in led.all(kind):
-            why = led.edited_outside(kind, obj.id)
-            if why:
-                problems.append({"check": "edited_outside_rb", "ok": False, "detail": why, "fix": f"git checkout .rb/{kind}s/{obj.id}.json, or retract it and add it again"})
-    for p in led.dir.rglob("*.json"):
-        text = p.read_text(encoding="utf-8", errors="replace")
+    fix_edit = 'rb doctor --restore puts back what rb last wrote; if the change is right, a person runs rb doctor --adopt --why "..."'
+    parsed: dict[str, list] = {}
+    files = [("investigation", led.dir / "investigation.json")] + [(k, p) for k, (d, _, _) in KINDS.items() for p in sorted((led.dir / d).glob("*.json"))]
+    for kind, p in files:
+        rel = p.relative_to(led.root)
+        text = p.read_text(encoding="utf-8", errors="replace") if p.exists() else ""
         if "<<<<<<<" in text or ">>>>>>>" in text:
-            problems.append({"check": "merge_conflict", "ok": False, "detail": f"{p.relative_to(led.root)} has conflict markers", "fix": "resolve it, keeping both objects' content; rb doctor then shows what differs from what rb wrote"})
-    ids = {}
+            problems.append({"check": "merge_conflict", "ok": False, "detail": f"{rel} has conflict markers",
+                             "fix": "resolve it by keeping one side as rb wrote it (the other side's write is in log.jsonl), then rb doctor again"})
+            continue
+        try:
+            obj = led._read(p, KINDS[kind][2] if kind in KINDS else type(led.investigation))
+        except RBError as e:
+            problems.append({"check": "corrupt", "ok": False, "detail": f"{rel} is not a valid {kind}: {'; '.join(e.problems[:2]) or e.message}", "fix": fix_edit})
+            continue
+        parsed.setdefault(kind, []).append(obj)
+    try:
+        tamper = led.tampered()
+    except RBError as e:
+        tamper = []
+        problems.append({"check": "log", "ok": False, "detail": e.message, "fix": "resolve the merge in .rb/log.jsonl by keeping every line from both sides"})
+    for t in tamper:
+        if not any(p["detail"].startswith(t["path"]) for p in problems):
+            problems.append({"check": "edited_outside_rb", "ok": False, "detail": f"{t['path']}: {t['why']}", "fix": fix_edit})
+    ids: dict[str, str] = {}
     for kind in ("question", "hypothesis", "assumption", "experiment", "claim", "evidence", "decision"):
-        for obj in led.all(kind):
+        for obj in parsed.get(kind, []):
             if obj.id in ids:
                 problems.append({"check": "duplicate_id", "ok": False, "detail": f"{obj.id} is both a {ids[obj.id]} and a {kind}", "fix": "retract one and add it again"})
             ids[obj.id] = kind
-    for c in led.all("claim"):
+    for c in parsed.get("claim", []):
         if c.experiment and c.experiment not in ids:
-            problems.append({"check": "dangling", "ok": False, "detail": f"claim {c.id} points at experiment {c.experiment}, which is missing", "fix": "restore the experiment from git"})
-    for e in led.all("experiment"):
+            problems.append({"check": "dangling", "ok": False, "detail": f"claim {c.id} points at experiment {c.experiment}, which is missing", "fix": fix_edit})
+    for e in parsed.get("experiment", []):
         for full, s in e.all_settings():
             if s.source is not None and s.source.path and s.source.kind in ("file", "run") and not inside_project(led.root, s.source.path):
                 problems.append({"check": "outside", "ok": False, "detail": f"{e.id}/{full} reads {s.source.path}, outside the project", "fix": "copy it into the repository and set the source again"})
@@ -1013,8 +1083,7 @@ def context_markdown(led: Ledger, st: dict) -> str:
     if st["assumptions"]:
         L += ["## Assumptions", ""] + [f"- {x['id']} ({x['status']}): {x['text']}" for x in st["assumptions"]] + [""]
     if st["decisions"]:
-        L += ["## Decisions", ""] + [f"- {d['id']}: {d['outcome']} {d['subject']} by {d['by']}" + (f" (verdict then: {d['verdict']})" if d.get("verdict") else "")
-                                     + (f" (asserted from {runtime_label(d['asserted_from'])}, not counted)" if d.get("asserted_from") else "") + f": {d['why']}" for d in st["decisions"]] + [""]
+        L += ["## Decisions", ""] + [f"- {d['id']}: {d['outcome']} {d['subject']} by {d['by']}" + (f" (verdict then: {d['verdict']})" if d.get("verdict") else "") + f": {d['why']}" for d in st["decisions"]] + [""]
     recent = led.log_entries(last=40)
     if recent:
         L += ["## Recent activity", ""] + _collapse_log(recent)[-12:] + [""]
@@ -1158,7 +1227,7 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser, research_common: argp
     g = group("claim", "add", "a statement with a criterion evidence can meet or miss")
     s = g.add_parser("add", parents=rc, help="add a claim; write it before the run that tests it")
     s.add_argument("statement")
-    s.add_argument("-e", "--experiment", default=None, help="the experiment whose evidence tests it")
+    s.add_argument("-e", "--experiment", required=True, help="the experiment whose evidence tests it")
     s.add_argument("--metric", required=True, help="what the evidence reports: epe, int8.epe, candidate.epe, or change.epe (candidate minus baseline)")
     s.add_argument("--at-most", type=float, default=None)
     s.add_argument("--at-least", type=float, default=None)
@@ -1206,6 +1275,7 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser, research_common: argp
 
     s = sub.add_parser("freeze", parents=rc, help="lock an experiment's spec and claim criteria before the runs that count (a person's call)")
     s.add_argument("experiment")
+    s.add_argument("--amend", action="store_true", help="the experiment is frozen: adopt it as it is now (a person's call, with --why)")
     why(s)
     s.set_defaults(func=cmd_freeze)
 

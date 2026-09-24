@@ -27,7 +27,7 @@
   - amending a frozen spec;
   - retracting what something rests on.
 
-  From an agent they are refused with `E_HUMAN_ONLY`, and the error carries `handoff.command`, the exact line for the person to run. A person's name given inside an agent session is recorded and stamped "asserted from" that session wherever it is shown. It is not counted as a person's call: an asserted freeze, vouch or claim author fixes nothing, and a person can freeze again over an asserted freeze.
+  From an agent they are refused with `E_HUMAN_ONLY`, and the error carries `handoff.command`, the exact line for the person to run. Inside a detected agent session, `RB_ACTOR=human:<name>` is ignored: a person's name typed there is what an agent would type, so the call is recorded as the agent's and handed over. Codex is detected by its sandbox variables, so a `CODEX_HOME` in someone's shell profile does not make them an agent.
 - **Experiments compare variants.** Each variant has a role: baseline, candidate, control or ablation. A setting belongs to the experiment or to one variant (`int8.precision`). `--varies` (or `rb spec vary`) declares what differs on purpose. **Any other difference between variants is a confound, and it blocks.** `rb compare <exp>` prints the experiment's own table: variants by metrics, with the change against the baseline read in each metric's direction from the catalogue (`rb metric add epe --unit px --minimize --alias endpoint_error`).
 - **Settings: provisional until checked, and checked on the spot.** `rb spec set` verifies by default. It reads config files by key path (`configs/train.yaml#optim.lr`; YAML, JSON, TOML), and a YAML `file:LINE` becomes its key path. `--from config.yaml --keys "optim.*"` records many settings at once.
   - A comment line never verifies, and a prose line needs the setting's name or `--term`.
@@ -60,7 +60,12 @@
   - `--run` for an `rb review` run.
 
   The receipt records the actor, how `rb` knew it, and the repository's state when the evidence was attached (the commit, and a hash covering the diff and the untracked files). With `--commit` it also records the commit that produced the numbers. An identical attachment is recognised and not written twice, unless it is `--again --why`.
-- **Hand edits are detected.** `rb` logs the hash of every file it writes. An object edited outside `rb` stops counting, fails every `--fail-on` gate, and is listed by `rb doctor`. A file that no longer parses is `E_STATE_CORRUPT` (was `E_LEDGER_CORRUPT`).
+- **Changes made outside rb are caught.** `log.jsonl` keeps the hash of every object `rb` writes, and `.rb/objects/` (gitignored) a local copy. When an object is edited, deleted, or written into `.rb/` by hand:
+  - no claim is established;
+  - every `--fail-on` gate fails;
+  - `rb` refuses to write over that object (`E_STATE_EDITED`), so a hand edit cannot be passed off as `rb`'s own.
+
+  `rb doctor` lists them, even when a file does not parse or is mid-merge. `rb doctor --restore` puts back what `rb` last wrote, from the local copy or git history; `rb doctor --adopt --why` is a person keeping the change. A file that no longer parses is `E_STATE_CORRUPT` (was `E_LEDGER_CORRUPT`).
 - **Output for agents.** In `--json` output:
   - `data.object` carries the object with its `kind` and `id`;
   - `data.outcome` carries `passed` and `failures`;
@@ -68,7 +73,29 @@
   - `data.actor` says who `rb` recorded.
 
   `rb status` sorts what is open into **Needs a person** and **Agent can do**, each item with the exact command. `rb context` is the Markdown handoff a fresh session reads first, with a "Report it like this" line.
-- New error codes: `E_SOURCE_OUTSIDE` (a source outside the project cannot be checked by anyone else) and `E_USAGE` (a command line that does not parse answers `--json` with an envelope). A negative number in scientific notation (`--at-most -1e-3`) is read as a value.
+- **The freeze covers everything that decides a verdict.** That is:
+  - each setting's source and the value a cited source used;
+  - the catalogue entries its claims' metrics use (so a metric cannot be redefined under a frozen claim by aliasing or retracting it);
+  - the criteria, shown with their `n` and noise when the person freezes.
+
+  `rb freeze <exp> --amend --why` is a person adopting the experiment as it is. A claim retracted on a frozen experiment is recorded as an amendment.
+- **Retracting.** What a person wrote is a person's to retract, and so is a metric a claim reads. Variants can be retracted (`rb retract e1/fp16`). A retracted experiment blocks its claims and takes no more writes.
+- **Counting.**
+  - The same numbers count once however they are attached, and a repeated seed counts once.
+  - Evidence must give every per-run value the experiment declares.
+  - `change.<m>` is worked out from the variants' numbers, never taken from a given value that disagrees.
+  - Two names that read as one metric and disagree are not read.
+  - The borderline threshold is never below twice the runs' own spread, whatever `--noise` says.
+  - `rb compare` averages only what counts.
+  - A person's own claim counts evidence attached after it, even before a freeze.
+- **Verification is stricter.**
+  - A key, a run pointer or a quote's line must name the setting (or its `--term`).
+  - A trailing comment is not read.
+  - Text stays text (`"11.10"` is not 11.1), and YAML's `1e-4` and dates are read the way configs mean them.
+  - A decimal at the end of a sentence reads.
+  - `.rb/` itself cannot be a source.
+  - `--from` never half-writes.
+- New error codes: `E_STATE_EDITED`, `E_SOURCE_OUTSIDE` (a source outside the project cannot be checked by anyone else) and `E_USAGE` (a command line that does not parse answers `--json` with an envelope). A negative number in scientific notation (`--at-most -1e-3`) is read as a value.
 - **Honesty.** "Nothing leaves this machine" is gone from the docs and the package. `rb` works on your machine and uploads nothing unless you run `rb workspace push`. Your adapter and model code run with your permissions.
 - **From Python.** `import rabbit_brain as rb` gives you:
   - `rb.open()` and `rb.init()`;

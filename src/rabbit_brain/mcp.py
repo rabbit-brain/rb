@@ -145,17 +145,19 @@ def argv_for(name: str, arguments: dict) -> list[str]:
     if unknown:
         raise ValueError(f"unknown argument(s) for {name}: {', '.join(sorted(unknown))}")
     argv = _cli_words(name)
+    positional: list[str] = []
     for a in tool["args"]:
         if a.startswith("*"):
             vals = arguments.get(a[1:]) or []
-            argv += [str(x) for x in (vals if isinstance(vals, list) else [vals])]
+            positional += [str(x) for x in (vals if isinstance(vals, list) else [vals])]
         elif arguments.get(a) is not None:
-            argv.append(_scalar(arguments[a]))
+            positional.append(_scalar(arguments[a]))
     if name == "evidence_attach":
-        argv += [f"{k}={_scalar(v)}" for k, v in (arguments.get("metrics") or {}).items()]
+        positional += [f"{k}={_scalar(v)}" for k, v in (arguments.get("metrics") or {}).items()]
     for key, flag in (tool.get("opts") or {}).items():
         v = arguments.get(key)
-        if v is None or v is False:
+        switch = tool["props"].get(key, {}).get("type") == "boolean"
+        if v is None or (v is False and switch):     # a switch left off; a value of false is a value (cited=false)
             continue
         if key == "direction":
             argv.append(f"--{v}")
@@ -171,7 +173,9 @@ def argv_for(name: str, arguments: dict) -> list[str]:
             argv += [flag, ",".join(str(x) for x in v)]
         else:
             argv += [flag, _scalar(v)]
-    return argv
+    if any(x.startswith("-") for x in positional):        # after --, a value may start with '-' (-O2, -10%)
+        return argv + ["--", *positional]
+    return argv[:len(_cli_words(name))] + positional + argv[len(_cli_words(name)):]
 
 
 def run_tool(name: str, arguments: dict, agent: str) -> dict:
@@ -179,8 +183,9 @@ def run_tool(name: str, arguments: dict, agent: str) -> dict:
     from .cli import main
     argv = argv_for(name, arguments)
     buf, err = io.StringIO(), io.StringIO()
+    cut = argv.index("--") if "--" in argv else len(argv)
     with session("mcp", agent), contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
-        code = main([*argv, "--json"])
+        code = main([*argv[:cut], "--json", *argv[cut:]])
     try:
         env = json.loads(buf.getvalue())
     except ValueError:
@@ -207,9 +212,12 @@ class Server:
         self.agent = agent
         self.initialized = False
 
-    def handle(self, msg: dict) -> Optional[dict]:
+    def handle(self, msg: Any) -> Optional[dict]:
+        if not isinstance(msg, dict) or msg.get("jsonrpc") != "2.0" or not isinstance(msg.get("method"), str):
+            mid = msg.get("id") if isinstance(msg, dict) else None
+            return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32600, "message": "invalid request: a JSON-RPC 2.0 object with a method"}}
         method, mid = msg.get("method"), msg.get("id")
-        if mid is None:                    # a notification: nothing to answer
+        if "id" not in msg:                # a notification: nothing to answer
             return None
         try:
             result = self._dispatch(method, msg.get("params") or {})
@@ -279,8 +287,11 @@ def serve(stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout, agent: Optiona
             stdout.write(json.dumps({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}}) + "\n")
             stdout.flush()
             continue
-        batch = msg if isinstance(msg, list) else [msg]
-        replies = [r for r in (server.handle(m) for m in batch if isinstance(m, dict)) if r is not None]
+        if isinstance(msg, list) and not msg:
+            replies = [{"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "invalid request: an empty batch"}}]
+            msg = {}
+        else:
+            replies = [r for r in (server.handle(m) for m in (msg if isinstance(msg, list) else [msg])) if r is not None]
         if replies:
             stdout.write(json.dumps(replies if isinstance(msg, list) else replies[0], default=str) + "\n")
             stdout.flush()

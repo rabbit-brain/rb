@@ -89,7 +89,8 @@ ERRORS: dict[str, tuple[str, str]] = {
     "E_SOURCE_UNRESOLVED": ("The source was read and does not state the value, or could not be read.", "The setting stays provisional. Check the path, key, line, quote or commit, or set the value the source actually states: `rb spec set <exp> <name> <value> --source <file#key>`."),
     "E_SOURCE_OUTSIDE": ("The source is outside the project, so nobody else can check it.", "Copy it into the repository, commit it, and point --source at the copy."),
     "E_SOURCE_UNVERIFIABLE": ("This source cannot be checked by reading a file: a url, a note, or a file source without a line or a quote.", "Point at a config key (file#key), a file line, a quote in a saved copy of the page, or a run's JSON (run:PATH#/pointer) that states the value; or a person vouches for it: `rb decide <exp>/<name> accept --why \"...\"`."),
-    "E_STATE_CORRUPT": ("A file under .rb/ is not valid.", "It was probably edited by hand or left mid-merge. `git diff .rb/` shows what changed and `rb doctor` lists every such file; restore it, and change state with rb commands."),
+    "E_STATE_EDITED": ("An object under .rb/ was changed outside rb (edited, deleted, or written by hand), and rb will not write over it.", "`rb doctor` lists every such file. `rb doctor --restore` puts back what rb last wrote; if the change is right, a person runs `rb doctor --adopt --why \"...\"`."),
+    "E_STATE_CORRUPT": ("A file under .rb/ is not valid.", "It was probably edited by hand or left mid-merge. `rb doctor` lists every such file; `rb doctor --restore` puts back what rb last wrote."),
     "E_INTERNAL": ("Unexpected failure.", "Re-run with --json and report the output at https://github.com/rabbit-brain/rb/issues."),
 }
 

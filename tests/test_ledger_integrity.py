@@ -132,9 +132,9 @@ def edit_json(path: Path, **changes) -> None:
 # ---------------------------------------------------------------- who: actor detection
 
 
-def test_rb_actor_wins_over_a_detected_runtime(person):
+def test_rb_actor_names_the_agent_inside_a_detected_runtime(person):
     a = actor_mod.current(person, {"RB_ACTOR": "agent:bot", "CLAUDECODE": "1"})
-    assert (a.id, a.via, a.is_person) == ("agent:bot", "RB_ACTOR", False)
+    assert (a.id, a.via, a.is_person) == ("agent:bot", "RB_ACTOR in a Claude Code session", False)
 
 
 @pytest.mark.parametrize("env,expected,via", [
@@ -190,20 +190,26 @@ def test_a_malformed_rb_actor_is_refused_on_any_command(person, capsys, monkeypa
     assert code == 2 and env.errors[0].code == "E_ACTOR_INVALID"
 
 
-def test_a_person_named_inside_an_agent_session_is_marked_as_asserted(person):
+def test_a_person_named_inside_an_agent_session_is_ignored(person):
+    """A person's name typed inside an agent session is exactly what an agent would type, so rb does not take it."""
     a = actor_mod.current(person, {"RB_ACTOR": "human:x", "CLAUDECODE": "1"})
-    assert (a.id, a.is_person, a.asserted_from) == ("human:x", True, "claude-code")
+    assert (a.id, a.is_person, a.ignored) == ("agent:claude-code", False, "human:x")
 
 
-def test_an_asserted_persons_freeze_is_stamped_on_the_object_and_in_the_log(person, capsys, monkeypatch):
+def test_a_freeze_with_a_persons_name_inside_an_agent_session_is_handed_over(person, capsys, monkeypatch):
     start(capsys)
     monkeypatch.setenv("CLAUDECODE", "1")
     monkeypatch.setenv("RB_ACTOR", "human:x")
-    env = ok(capsys, "freeze", "e1", "-m", "go")
-    assert env.data["actor"] == {"id": "human:x", "via": "RB_ACTOR", "asserted_from": "claude-code"}
-    assert env.data["object"]["frozen"]["by"] == "human:x" and env.data["object"]["frozen"]["asserted_from"] == "claude-code"
-    last = Ledger(person).log_entries()[-1]
-    assert (last["op"], last["actor"], last["actor_via"], last["asserted_from"]) == ("freeze", "human:x", "RB_ACTOR", "claude-code")
+    code, env = rbj(capsys, "freeze", "e1", "-m", "go")
+    err = env.errors[0].model_dump()
+    assert code == 2 and err["code"] == "E_HUMAN_ONLY"
+    assert "RB_ACTOR=human:x is ignored" in err["message"] and err["handoff"]["command"] == "rb freeze e1 -m go"
+    assert Ledger(person).load("experiment", "e1").frozen is None
+
+
+def test_a_codex_home_in_a_shell_profile_does_not_make_a_person_an_agent(person):
+    a = actor_mod.current(person, {"CODEX_HOME": "/home/me/.codex"})
+    assert a.is_person
 
 
 # ---------------------------------------------------------------- person-only calls
@@ -270,7 +276,15 @@ def test_a_prose_line_needs_the_settings_name_or_a_term(person, capsys):
 def test_a_quote_verifies_the_value_it_contains(person, capsys):
     start(capsys)
     Path("paper.txt").write_text("We train with a learning rate of 0.0001 for 90 epochs.\n", encoding="utf-8")
-    assert spec_set(capsys, "e1", "lr", "1e-4", "--source", "paper.txt", "--quote", "learning rate of 0.0001") == (0, "verified")
+    assert spec_set(capsys, "e1", "lr", "1e-4", "--source", "paper.txt", "--quote", "learning rate of 0.0001", "--term", "learning rate") == (0, "verified")
+
+
+def test_a_quote_that_does_not_name_the_setting_does_not_verify_it(person, capsys):
+    """'for 90 epochs' states 90, but not for weight_decay: a quote has to be about the setting it verifies."""
+    start(capsys)
+    Path("paper.txt").write_text("We train with a learning rate of 0.0001 for 90 epochs.\n", encoding="utf-8")
+    assert spec_set(capsys, "e1", "weight_decay", "90", "--source", "paper.txt", "--quote", "for 90 epochs") == (1, "provisional")
+    assert spec_set(capsys, "e1", "lr", "1e-4", "--source", "paper.txt", "--quote", "learning rate of 0.0001") == (1, "provisional")
 
 
 @pytest.mark.parametrize("file,text,source,value", [
@@ -511,13 +525,25 @@ def test_evidence_attached_before_the_claim_is_exploratory(person, capsys):
     assert v["status"] == "untested" and "exploratory_only" in v["not_established_because"]
 
 
-def test_evidence_attached_before_the_freeze_is_exploratory(person, capsys):
+def test_for_an_agents_claim_evidence_before_the_freeze_is_exploratory(person, capsys, monkeypatch):
+    """An agent's criterion is fixed when a person freezes: runs before that were seen before it was fixed."""
+    start(capsys)
+    monkeypatch.setenv("CLAUDECODE", "1")
+    ok(capsys, "claim", "add", "s", "-e", "e1", "--metric", "top1", "--at-least", "0.7", "--id", "c1")
+    ev = attach(capsys, "top1=0.76")
+    monkeypatch.delenv("CLAUDECODE")
+    ok(capsys, "freeze", "e1", "-m", "locked")
+    v = verdict(capsys)
+    assert [(o["evidence"], o["role"]) for o in v["observations"]] == [(ev, "exploratory")] and not v["established"]
+
+
+def test_for_a_persons_claim_evidence_after_the_claim_counts_even_before_the_freeze(person, capsys):
+    """A person fixed the criterion when they wrote it, so freezing later does not demote runs that came after it."""
     start(capsys)
     ok(capsys, "claim", "add", "s", "-e", "e1", "--metric", "top1", "--at-least", "0.7", "--id", "c1")
     ev = attach(capsys, "top1=0.76")
     ok(capsys, "freeze", "e1", "-m", "locked")
-    v = verdict(capsys)
-    assert [(o["evidence"], o["role"]) for o in v["observations"]] == [(ev, "exploratory")] and not v["established"]
+    assert [(o["evidence"], o["role"]) for o in verdict(capsys)["observations"]] == [(ev, "confirmatory")]
 
 
 def test_evidence_attached_after_the_claim_and_the_freeze_is_confirmatory(person, capsys):
@@ -826,7 +852,7 @@ def test_a_cited_claim_source_outside_the_project_is_refused(person, capsys, tmp
 
 def test_init_keeps_the_lock_out_of_git_and_merges_the_log_by_line(person, capsys):
     ok(capsys, "init", "integrity")
-    assert (person / ".rb" / ".gitignore").read_text(encoding="utf-8").split() == [".lock", "*.tmp"]
+    assert (person / ".rb" / ".gitignore").read_text(encoding="utf-8").split() == [".lock", "*.tmp", "objects/"]
     assert (person / ".rb" / ".gitattributes").read_text(encoding="utf-8").strip() == "log.jsonl merge=union"
 
 

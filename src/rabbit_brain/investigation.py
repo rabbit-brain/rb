@@ -63,7 +63,6 @@ class Retraction(BaseModel):
     at: str
     by: str = Field(pattern=ACTOR_PATTERN)
     why: str = Field(min_length=1, max_length=TEXT)
-    asserted_from: Optional[str] = None
 
 
 class Written(BaseModel):
@@ -72,7 +71,6 @@ class Written(BaseModel):
     created_by: str = Field(pattern=ACTOR_PATTERN)
     created_at: str
     via: Via = "cli"
-    asserted_from: Optional[str] = None      # a person's name given inside this agent runtime: recorded, never counted as a person's
     retracted: Optional[Retraction] = None
 
 
@@ -243,7 +241,6 @@ class Freeze(BaseModel):
     by: str = Field(pattern=ACTOR_PATTERN)
     why: str = Field(default="", max_length=TEXT)
     after_evidence: list[str] = Field(default_factory=list)   # evidence already attached when it was frozen: exploratory, never confirmatory
-    asserted_from: Optional[str] = None
 
 
 class Amendment(BaseModel):
@@ -254,7 +251,6 @@ class Amendment(BaseModel):
     change: str = Field(max_length=400)
     before: str
     after: str
-    asserted_from: Optional[str] = None
 
 
 class Experiment(Written):
@@ -398,10 +394,11 @@ class Claim(Written):
         return self
 
     def criterion(self) -> str:
+        """The whole criterion as a person reads it before freezing: the rule, and how many runs and what noise it takes."""
         head = f"mean {self.metric}" if self.over == "mean" else self.metric
-        if self.comparator == "equals":
-            return f"{head} = {self.target:g} ± {self.tolerance:g}"
-        return f"{head} {'≤' if self.comparator == 'at_most' else '≥'} {self.target:g}"
+        rule = f"{head} = {self.target:g} ± {self.tolerance:g}" if self.comparator == "equals" else f"{head} {'≤' if self.comparator == 'at_most' else '≥'} {self.target:g}"
+        extra = ([f"n ≥ {self.min_n}"] if self.min_n > 1 else []) + ([f"noise {self.noise:g}"] if self.noise is not None else [])
+        return rule + (f" ({', '.join(extra)})" if extra else "")
 
 
 class FileRef(BaseModel):
@@ -506,7 +503,6 @@ class Decision(BaseModel):
     by: str = Field(pattern=PERSON_PATTERN)
     at: str
     via: Via = "cli"
-    asserted_from: Optional[str] = None
     verdict: Optional[VerdictStatus] = None
     evidence: list[str] = Field(default_factory=list)
     value: Any = None                    # for a setting: the value vouched for; the vouch lapses when the value changes

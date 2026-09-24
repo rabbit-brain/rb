@@ -23,13 +23,16 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import gzip
 import json
 import math
 import os
 import platform
 import re
 import secrets
+import shlex
 import statistics
+import subprocess
 import tempfile
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -54,6 +57,7 @@ except ImportError:  # pragma: no cover - Windows: writes are not serialised acr
     fcntl = None  # type: ignore[assignment]
 
 DIR = ".rb"
+GITIGNORE = ".lock\n*.tmp\nobjects/\n"      # objects/: rb's local copies of what it wrote, for rb doctor --restore
 
 # kind -> (directory, id prefix, model)
 KINDS: dict[str, tuple[str, str, type[BaseModel]]] = {
@@ -136,7 +140,8 @@ class Ledger:
         self.via = via
         self._agent = agent
         self._depth = 0
-        self._hashes: Optional[dict[tuple[str, str], str]] = None
+        self._hashes: Optional[dict[tuple[str, str], dict]] = None
+        self._tamper: Optional[list[dict]] = None
 
     # ------------------------------------------------------------ opening
 
@@ -163,9 +168,11 @@ class Ledger:
         inv = _build(Investigation, id=slug, title=title, created_by=who.id, created_at=now(), via=via)
         led.dir.mkdir(parents=True, exist_ok=True)
         with led._locked():
-            led._write(led.dir / ".gitignore", ".lock\n*.tmp\n")
+            led._write(led.dir / ".gitignore", GITIGNORE)
             led._write(led.dir / ".gitattributes", "log.jsonl merge=union\n")
-            sha = led._write(led.dir / "investigation.json", _dump(inv))
+            body = _dump(inv)
+            sha = led._write(led.dir / "investigation.json", body)
+            led._stash(body)
             led._log(who, "init", "investigation", inv.id, sha256=sha, title=title)
         return led
 
@@ -196,7 +203,7 @@ class Ledger:
             if fcntl is not None:
                 fcntl.flock(fd, fcntl.LOCK_EX)
             self._depth = 1
-            self._hashes = None
+            self._hashes, self._tamper = None, None
             yield
         finally:
             self._depth = 0
@@ -226,17 +233,65 @@ class Ledger:
             raise RBError("E_STATE_CORRUPT", message=f"{path.relative_to(self.root)} is not valid.", problems=problems)
 
     def _path(self, kind: str, id: str) -> Path:
+        if kind == "investigation":
+            return self.dir / "investigation.json"
         return self.dir / KINDS[kind][0] / f"{id}.json"
 
     def _commit(self, who: Actor, op: str, kind: str, obj: BaseModel, **detail: Any) -> None:
-        """Write an object and log it with its hash. Every write of an object goes through here."""
-        sha = self._write(self._path(kind, obj.id), _dump(obj))  # type: ignore[attr-defined]
+        """Write an object and log it with its hash and body. Every write of an object goes through here, and none
+        writes over a file changed outside rb: that would log someone else's edit as rb's own."""
+        why = self.edited_outside(kind, obj.id)  # type: ignore[attr-defined]
+        if why:
+            raise RBError("E_STATE_EDITED", message=f"{why}; rb will not write over it.")
+        body = _dump(obj)
+        sha = self._write(self._path(kind, obj.id), body)  # type: ignore[attr-defined]
+        self._stash(body)
         self._log(who, op, kind, obj.id, sha256=sha, **detail)  # type: ignore[attr-defined]
+
+    def _stash(self, body: str) -> None:
+        """Keep a copy of what rb wrote, by its hash, so rb doctor --restore can put it back exactly. The store is local
+        (gitignored): what came from elsewhere is found in git history instead."""
+        data = body.encode("utf-8")
+        sha = sha256_bytes(data)
+        p = self.dir / "objects" / sha[:2] / f"{sha}.gz"
+        if p.exists():
+            return
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(dir=p.parent, suffix=".tmp")
+            with os.fdopen(fd, "wb") as f:
+                f.write(gzip.compress(data, mtime=0))
+            os.replace(tmp, p)
+            ignore = self.dir / ".gitignore"
+            if ignore.exists() and "objects/" not in ignore.read_text(encoding="utf-8").split():
+                with ignore.open("a", encoding="utf-8") as f:
+                    f.write("objects/\n")
+        except OSError:
+            pass            # a copy that could not be kept only means --restore falls back to git
+
+    def _body(self, kind: str, id: str, sha: str) -> Optional[str]:
+        """What rb wrote with this hash: from the local store, else from the file's git history."""
+        p = self.dir / "objects" / sha[:2] / f"{sha}.gz"
+        if p.exists():
+            try:
+                return gzip.decompress(p.read_bytes()).decode("utf-8")
+            except (OSError, EOFError, ValueError):
+                pass
+        rel = str(self._path(kind, id).relative_to(self.root))
+        try:
+            commits = subprocess.run(["git", "log", "--format=%H", "--", rel], cwd=self.root, capture_output=True, text=True, timeout=30).stdout.split()
+            for c in commits:
+                blob = subprocess.run(["git", "show", f"{c}:{rel}"], cwd=self.root, capture_output=True, timeout=30).stdout
+                if blob and sha256_bytes(blob) == sha:
+                    return blob.decode("utf-8")
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return None
 
     def _log(self, who: Actor, op: str, kind: str, id: str, sha256: Optional[str] = None, **detail: Any) -> None:
         entry: dict[str, Any] = {"at": now(), "actor": who.id, "actor_via": who.via, "via": self.via, "op": op, "kind": kind, "id": id}
-        if who.asserted_from:
-            entry["asserted_from"] = who.asserted_from
+        if who.ignored:
+            entry["ignored_rb_actor"] = who.ignored
         if sha256:
             entry["sha256"] = sha256
         if detail:
@@ -246,8 +301,9 @@ class Ledger:
                 f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
         except OSError as exc:
             raise RBError("E_WRITE_FAILED", message=f"Could not append to {self.dir / 'log.jsonl'}: {exc}")
-        if self._hashes is not None and sha256:
-            self._hashes[(kind, id)] = sha256
+        if self._hashes is not None and (sha256 or op == "adopt_delete"):
+            self._hashes[(kind, id)] = entry
+        self._tamper = None
 
     def log_entries(self, last: Optional[int] = None, about: Optional[str] = None) -> list[dict]:
         p = self.dir / "log.jsonl"
@@ -270,26 +326,89 @@ class Ledger:
             rows = [r for r in rows if r.get("id") == exp_id and (setting is None or (r.get("detail") or {}).get("setting") == setting)]
         return rows[-last:] if last else rows
 
-    def logged_hashes(self) -> dict[tuple[str, str], str]:
+    def last_writes(self) -> dict[tuple[str, str], dict]:
+        """The last log entry that wrote each object (or recorded a person adopting its deletion)."""
         if self._hashes is None:
-            hashes: dict[tuple[str, str], str] = {}
+            last: dict[tuple[str, str], dict] = {}
             for r in self.log_entries():
-                if r.get("sha256") and r.get("kind") and r.get("id"):
-                    hashes[(r["kind"], r["id"])] = r["sha256"]
-            self._hashes = hashes
+                if r.get("kind") and r.get("id") and (r.get("sha256") or r.get("op") == "adopt_delete"):
+                    last[(r["kind"], r["id"])] = r
+            self._hashes = last
         return self._hashes
 
     def edited_outside(self, kind: str, id: str) -> Optional[str]:
-        """Why the object's file is not what rb last wrote, or None. An object with no write in log.jsonl was not
-        written by rb at all: a file dropped into .rb/ by hand counts as edited outside rb."""
-        logged = self.logged_hashes().get((kind, id))
-        if logged is None:
-            return f"{kind} {id} was not written by rb: log.jsonl has no record of it"
-        try:
-            now_sha = sha256_bytes(self._path(kind, id).read_bytes())
-        except OSError:
+        """Why the object's file is not what rb last wrote, or None: edited, deleted, or never written by rb."""
+        entry = self.last_writes().get((kind, id))
+        path = self._path(kind, id)
+        exists = path.exists()
+        if entry is None:
+            return f"{kind} {id} was not written by rb: log.jsonl has no record of it" if exists else None
+        if entry.get("op") == "adopt_delete":
+            return f"{kind} {id} was deleted (a person adopted that) and its file is back" if exists else None
+        if not exists:
             return f"{kind} {id} was deleted outside rb"
-        return None if now_sha == logged else f"{kind} {id} differs from what rb wrote: it was edited outside rb"
+        return None if sha256_bytes(path.read_bytes()) == entry["sha256"] else f"{kind} {id} differs from what rb wrote: it was edited outside rb"
+
+    def tampered(self) -> list[dict]:
+        """Every object whose file is not what rb last wrote. While any is, no claim is established and every gate fails."""
+        if self._tamper is None:
+            seen = set(self.last_writes())
+            for kind, (d, _, _) in KINDS.items():
+                p = self.dir / d
+                if p.is_dir():
+                    seen |= {(kind, f.name[:-5]) for f in p.glob("*.json")}
+            out = []
+            for kind, id in sorted(seen):
+                why = self.edited_outside(kind, id)
+                if why:
+                    out.append({"kind": kind, "id": id, "path": str(self._path(kind, id).relative_to(self.root)), "why": why})
+            self._tamper = out
+        return self._tamper
+
+    def restore(self) -> list[dict]:
+        """Put back what rb last wrote for every object changed outside rb. A file rb never wrote is moved aside, not
+        deleted. Anyone may restore: it only returns the state to rb's own record."""
+        who = self.actor()
+        done = []
+        with self._locked():
+            for t in self.tampered():
+                entry = self.last_writes().get((t["kind"], t["id"]))
+                path = self._path(t["kind"], t["id"])
+                if entry is None or entry.get("op") == "adopt_delete":
+                    aside = path.with_name(path.name + ".outside-rb")
+                    os.replace(path, aside)
+                    self._log(who, "restore", t["kind"], t["id"], moved_aside=str(aside.relative_to(self.root)))
+                    done.append({**t, "done": f"moved aside to {aside.relative_to(self.root)}"})
+                else:
+                    body = self._body(t["kind"], t["id"], entry["sha256"])
+                    if body is None:
+                        done.append({**t, "done": "not restored: no copy of rb's last write here or in git history"})
+                        continue
+                    sha = self._write(path, body)
+                    self._log(who, "restore", t["kind"], t["id"], sha256=sha)
+                    done.append({**t, "done": "restored to what rb last wrote"})
+        return done
+
+    def adopt(self, why: str, handoff: Optional[str] = None) -> list[dict]:
+        """A person accepts every change made outside rb as it stands: the files become rb's record, and a deletion is
+        recorded as one. A file that does not parse is refused."""
+        who = self.actor()
+        self._person(who, "Adopting changes made outside rb", handoff)
+        done = []
+        with self._locked():
+            for t in self.tampered():
+                path = self._path(t["kind"], t["id"])
+                if not path.exists():
+                    self._log(who, "adopt_delete", t["kind"], t["id"], why=why)
+                    done.append({**t, "done": "deletion adopted"})
+                    continue
+                model = Investigation if t["kind"] == "investigation" else KINDS[t["kind"]][2]
+                self._read(path, model)            # E_STATE_CORRUPT if it is not a valid object
+                body = path.read_text(encoding="utf-8")
+                self._stash(body)
+                self._log(who, "adopt", t["kind"], t["id"], sha256=sha256_bytes(body.encode("utf-8")), why=why)
+                done.append({**t, "done": "adopted as it stands"})
+        return done
 
     def all(self, kind: str) -> list[Any]:
         d = self.dir / KINDS[kind][0]
@@ -359,7 +478,8 @@ class Ledger:
 
     def _person(self, who: Actor, what: str, handoff: Optional[str] = None) -> None:
         if not who.is_person:
-            raise RBError("E_HUMAN_ONLY", message=f"{what} is a person's call, and rb records you as {who.id} ({who.via}).",
+            ignored = f"; RB_ACTOR={who.ignored} is ignored inside {actor_mod.runtime_label(who.runtime)}" if who.ignored and who.runtime else ""
+            raise RBError("E_HUMAN_ONLY", message=f"{what} is a person's call, and rb records you as {who.id} ({who.via}{ignored}).",
                           extra={"handoff": {"who": "person", "command": handoff}} if handoff else {})
 
     # ------------------------------------------------------------ questions, hypotheses, assumptions, metrics
@@ -444,6 +564,7 @@ class Ledger:
             self._person(who, "Amending a frozen experiment")
         with self._locked():
             exp = self.load("experiment", experiment_id)
+            self._writable(exp)
             if not re.fullmatch(VARIANT_PATTERN, name):
                 raise RBError("E_OBJECT_INVALID", message=f"Variant names are letters, digits, '_' and '-' (no '.'), up to 40 (got {name!r}).")
             if any(v.name == name for v in exp.variants):
@@ -469,6 +590,7 @@ class Ledger:
                 raise RBError("E_OBJECT_INVALID", message=f"rb spec vary takes setting names (got {n!r}).")
         with self._locked():
             exp = self.load("experiment", experiment_id)
+            self._writable(exp)
             new = [n for n in names if n not in exp.varies]
             if not new:
                 raise RBError("E_OBJECT_INVALID", message=f"{exp.id} already varies {', '.join(names)}.")
@@ -477,6 +599,10 @@ class Ledger:
             amended = self._guard(exp, before, self.freeze_sha(exp), amend, who, f"varies {', '.join(new)} on purpose")
             self._commit(who, "spec_vary", "experiment", exp, varies=new, **amended)
         return exp, new
+
+    def _writable(self, exp: Experiment) -> None:
+        if exp.retracted is not None:
+            raise RBError("E_OBJECT_INVALID", message=f"Experiment {exp.id} was retracted ({exp.retracted.why}); it takes no more settings, claims or evidence.")
 
     def spec_sha(self, exp: Experiment) -> str:
         """The settings evidence is produced under: every variant and its role, every setting's value and whether it is
@@ -488,17 +614,33 @@ class Ledger:
         })
 
     def freeze_sha(self, exp: Experiment, claims: Optional[list[Claim]] = None) -> str:
-        """What freezing locks: the spec and every claim's criterion."""
+        """What freezing locks: the spec, where each setting's value comes from and what a cited source used, every claim's
+        criterion, and the catalogue entries the claims read (so a metric cannot be redefined under a frozen claim)."""
         claims = self.claims_of(exp.id) if claims is None else claims
-        return _sha({"spec": self.spec_sha(exp), "claims": sorted(
-            (c.id, c.metric, c.comparator, c.target, c.tolerance, c.over, c.min_n, c.noise) for c in claims if c.retracted is None)})
+        live = [c for c in claims if c.retracted is None]
+        return _sha({"spec": self.spec_sha(exp),
+                     "claims": sorted((c.id, c.metric, c.comparator, c.target, c.tolerance, c.over, c.min_n, c.noise) for c in live),
+                     "sources": sorted((name, s.source.label() if s.source else None, _canonical(s.cited.value) if s.cited else None,
+                                        s.cited.source.label() if s.cited and s.cited.source else None) for name, s in exp.all_settings()),
+                     "catalogue": self._catalogue_read_by(live)})
+
+    def _catalogue_read_by(self, claims: list[Claim]) -> list:
+        """The catalogue entries whose names a claim's metric could read, retracted ones included."""
+        names = {c.metric.split(".")[-1] for c in claims}
+        return sorted((m.id, sorted(m.aliases), m.direction, m.retracted is not None) for m in self.all("metric") if names & {m.id, *m.aliases})
+
+    def recorded_sha(self, exp: Experiment) -> Optional[str]:
+        """The hash the freeze record says the experiment has: the last amendment's, else the freeze's."""
+        if exp.frozen is None:
+            return None
+        return exp.amendments[-1].after if exp.amendments else exp.frozen.sha256
 
     def spec_drift(self, exp: Experiment) -> Optional[str]:
         if exp.frozen is None:
             return None
-        expected = exp.amendments[-1].after if exp.amendments else exp.frozen.sha256
+        expected = self.recorded_sha(exp) or ""
         if self.freeze_sha(exp) != expected:
-            return f"{exp.id}'s spec no longer matches its freeze record ({expected[:12]}): it was changed without an amendment"
+            return f"{exp.id} no longer matches its freeze record ({expected[:12]}): its spec, a source, a cited value or a metric its claims read changed without an amendment"
         return None
 
     def settings_snapshot(self, exp: Experiment) -> dict[str, Any]:
@@ -515,8 +657,11 @@ class Ledger:
         if not amend:
             raise RBError("E_FROZEN", message=f"Experiment {exp.id} was frozen at {exp.frozen.at} ({exp.frozen.sha256[:12]}); this changes it ({change}).")
         self._person(who, "Amending a frozen experiment")
-        exp.amendments.append(_build(Amendment, at=now(), by=who.id, why=amend, change=change[:400], before=before, after=after, asserted_from=who.asserted_from))
-        return {"amendment": {"why": amend, "change": change, "before": before, "after": after}}
+        recorded = self.recorded_sha(exp) or before
+        if before != recorded:        # an earlier unamended change is adopted by this amendment, and says so
+            change += "; also adopts changes made without an amendment since the last record"
+        exp.amendments.append(_build(Amendment, at=now(), by=who.id, why=amend, change=change[:400], before=recorded, after=after))
+        return {"amendment": {"why": amend, "change": change, "before": recorded, "after": after}}
 
     def set_setting(self, experiment_id: str, name: str, value: Any = None, *, unknown: bool = False, source: Optional[Source] = None,
                     required: Optional[bool] = None, per_run: Optional[bool] = None, cited: Optional[Cited] = None, note: Optional[str] = None,
@@ -533,6 +678,7 @@ class Ledger:
             source = source.model_copy(update={"resolved": None})
         with self._locked():
             exp = self.load("experiment", experiment_id)
+            self._writable(exp)
             variant, bare = exp.split(name)
             if not re.fullmatch(SETTING_PATTERN, bare):
                 raise RBError("E_OBJECT_INVALID", message=f"Setting names are letters, digits and _.:- (got {bare!r}).")
@@ -633,6 +779,7 @@ class Ledger:
         wanted = list(names or [])
         with self._locked():
             exp = self.load("experiment", experiment_id)
+            self._writable(exp)
             for n in wanted:
                 if exp.lookup(n) is None:
                     raise RBError("E_OBJECT_NOT_FOUND", message=f"Experiment {exp.id} has no setting {n!r}.")
@@ -642,16 +789,26 @@ class Ledger:
                 self._commit(who, "spec_verify", "experiment", exp, results=[{"setting": r["setting"], "after": r["after"], "ok": r["ok"]} for r in rows])
         return rows
 
-    def freeze(self, experiment_id: str, why: str = "", handoff: Optional[str] = None) -> Freeze:
+    def freeze(self, experiment_id: str, why: str = "", handoff: Optional[str] = None, amend: bool = False) -> Freeze:
         who = self.actor()
-        self._person(who, "Freezing an experiment", handoff)
+        self._person(who, "Amending a frozen experiment" if amend else "Freezing an experiment", handoff)
         with self._locked():
             exp = self.load("experiment", experiment_id)
-            if exp.frozen is not None and not (exp.frozen.asserted_from and not who.asserted_from):
+            self._writable(exp)
+            if amend:
+                if exp.frozen is None:
+                    raise RBError("E_OBJECT_INVALID", message=f"{exp.id} is not frozen; freeze it without --amend.")
+                recorded, current = self.recorded_sha(exp), self.freeze_sha(exp)
+                if recorded == current:
+                    raise RBError("E_OBJECT_INVALID", message=f"{exp.id} matches its freeze record; there is nothing to adopt.")
+                exp.amendments.append(_build(Amendment, at=now(), by=who.id, why=why, change="adopted the experiment as it is now", before=recorded or "", after=current))
+                self._commit(who, "amend", "experiment", exp, why=why, before=recorded, after=current)
+                return exp.frozen
+            if exp.frozen is not None:
                 raise RBError("E_FROZEN", message=f"Experiment {exp.id} is already frozen ({exp.frozen.at}).",
                               fix="Change it with --amend --why \"<reason>\" on the command that changes it; the amendment is recorded.")
             before = [e.id for e in self.live("evidence") if e.experiment == exp.id]
-            exp.frozen = _build(Freeze, sha256=self.freeze_sha(exp), at=now(), by=who.id, why=why, after_evidence=before, asserted_from=who.asserted_from)
+            exp.frozen = _build(Freeze, sha256=self.freeze_sha(exp), at=now(), by=who.id, why=why, after_evidence=before)
             self._commit(who, "freeze", "experiment", exp, sha256_spec=exp.frozen.sha256, why=why, after_evidence=before)
         return exp.frozen
 
@@ -673,18 +830,19 @@ class Ledger:
             source = source.model_copy(update={"resolved": None})
         with self._locked():
             self._require("hypothesis", hypothesis)
-            claim = _build(Claim, id=self._new_id("claim", id), asserted_from=who.asserted_from, statement=statement, experiment=experiment, hypothesis=hypothesis, metric=metric,
+            claim = _build(Claim, id=self._new_id("claim", id), statement=statement, experiment=experiment, hypothesis=hypothesis, metric=metric,
                            comparator=comparator, target=target, tolerance=tolerance, over=over, min_n=min_n, noise=noise,
                            origin="cited" if source is not None else "own", source=source, note=note, created_by=who.id, created_at=now(), via=self.via)
             if source is not None and source.checkable():
                 try:
-                    claim.source = source.model_copy(update={"resolved": resolve(source, claim.target, self.root, metric.split(".")[-1])})
+                    claim.source = source.model_copy(update={"resolved": resolve(source, claim.target, self.root, metric.split(".")[-1], named=False)})
                 except Unresolved as u:
                     raise RBError(u.code, message=f"The claim's source does not state its target {claim.target:g}: {u.reason}",
                                   fix="Point --source/--quote at the text that states the number, or correct the target.")
             amended: dict = {}
             if experiment is not None:
                 exp = self.load("experiment", experiment)
+                self._writable(exp)
                 before = self.freeze_sha(exp)
                 after = self.freeze_sha(exp, [*self.claims_of(exp.id), claim])
                 amended = self._guard(exp, before, after, amend, who, f"new claim {claim.id}: {claim.criterion()}")
@@ -708,6 +866,7 @@ class Ledger:
         files = list(files)
         with self._locked():
             exp = self.load("experiment", experiment_id)
+            self._writable(exp)
             if variant is not None and exp.variant(variant) is None:
                 raise RBError("E_OBJECT_NOT_FOUND", message=f"{exp.id} has no variant {variant!r} (it has: {', '.join(v.name for v in exp.live_variants()) or 'none'}).")
             for k, x in (metrics or {}).items():
@@ -729,6 +888,12 @@ class Ledger:
                 s = exp.lookup(k)
                 if s is None or not s.per_run:
                     raise RBError("E_OBJECT_INVALID", message=f"--set {k}: {k} is not a per-run setting of {exp.id}. Declare it: rb spec set {exp.id} {k} --per-run.")
+            missing = sorted({n for n, s in exp.all_settings() if s.per_run and s.retracted is None and n not in given and n.split(".")[-1] not in given})
+            if missing:
+                raise RBError("E_OBJECT_INVALID", message=f"{exp.id} declares {', '.join(missing)} per-run: give each run's own with "
+                              + " ".join(f"--set {n}=<value>" for n in missing) + ". Without it, rb cannot tell a new run from the same one again.")
+            if run is not None:
+                self._check_run_names(exp, run)
             refs = []
             for f in files:
                 try:
@@ -737,8 +902,9 @@ class Ledger:
                     raise RBError("E_FILE_NOT_FOUND", message=f"No such file: {f}")
                 except OSError as exc:
                     raise RBError("E_FILE_NOT_FOUND", message=f"{f} could not be read: {exc}")
+            check = self._config_check(exp, variant, config, run_record, given)
             fingerprint = _sha({"metrics": values, "per_run": given, "files": sorted(r.sha256 for r in refs),
-                                "record": (run_record or {}).get("record_sha256")})
+                                "record": (run_record or {}).get("record_sha256"), "config": check.sha256 if check else None})
             dup = next((e for e in self.live("evidence") if e.experiment == exp.id and e.fingerprint == fingerprint), None)
             if dup is not None and not again:
                 return {"evidence": dup, "duplicate_of": dup.id, "warning": None}
@@ -746,7 +912,6 @@ class Ledger:
             if given:
                 repeat = next((e for e in self.live("evidence") if e.experiment == exp.id and e.per_run == given
                                and _variants_of(e) == set(k.split(".")[0] for k in values if "." in k)), None)
-            check = self._config_check(exp, variant, config, run_record)
             produced = {"commit": commit, "from": "flag"} if commit else _produced_from(run_record)
             receipt = Receipt(at=now(), actor=who.id, actor_via=who.via, via=self.via, rb_version=__version__, command=command,
                               attached=git_state(self.root), produced=produced,
@@ -778,7 +943,22 @@ class Ledger:
                 return f"{vs[0].name}.{rest}"
         return key
 
-    def _config_check(self, exp: Experiment, variant: Optional[str], config: Optional[str], run_record: Optional[dict]) -> Optional[ConfigCheck]:
+    def _check_run_names(self, exp: Experiment, run: dict) -> None:
+        """A review run names its two models. When those names are this experiment's variants in the other roles, the
+        numbers would land on the wrong variant: refuse rather than flip the sign of every change."""
+        names = run.get("names") or {}
+        for role, other in (("baseline", "candidate"), ("candidate", "baseline")):
+            n = names.get(role)
+            v = exp.variant(n) if n else None
+            if v is not None and v.role != role:
+                raise RBError("E_OBJECT_INVALID", message=f"The run's {role} is {n!r}, which is {exp.id}'s {v.role}: its numbers would be recorded "
+                              f"against the wrong variant. Attach a run whose {role} is {exp.id}'s {role}.")
+        if len(exp.by_role("candidate")) > 1:
+            raise RBError("E_OBJECT_INVALID", message=f"{exp.id} has several candidates, and a review run compares two models: attach its numbers "
+                          f"by name instead (rb evidence attach {exp.id} <baseline>.<metric>=... <candidate>.<metric>=...).")
+
+    def _config_check(self, exp: Experiment, variant: Optional[str], config: Optional[str], run_record: Optional[dict],
+                      given: Optional[dict] = None) -> Optional[ConfigCheck]:
         """Compare the spec with the run's own resolved config: did the run use what the spec says?"""
         if config is None and not run_record:
             return None
@@ -815,6 +995,14 @@ class Ledger:
                 check.matches.append(name)
             else:
                 check.mismatches.append({"name": name, "spec": spec_value, "ran": ran})
+        from .sources import equal as _eq
+        for name, said in sorted((given or {}).items()):      # the per-run values given with --set, against the run's own
+            ran, found = _config_value(flat, name)
+            if found:
+                if _eq(said, ran):
+                    check.matches.append(name)
+                else:
+                    check.mismatches.append({"name": name, "spec": said, "ran": ran})
         return check
 
     # ------------------------------------------------------------ people's calls: decide, retract
@@ -852,7 +1040,7 @@ class Ledger:
             if last is not None and last.outcome == outcome and last.verdict == verdict and last.why == why:
                 raise RBError("E_OBJECT_INVALID", message=f"{last.id} already records this decision on {subject}.")
             d = _build(Decision, id=self._new_id("decision"), subject=subject, outcome=outcome, why=why, by=who.id, at=now(), via=self.via,
-                       asserted_from=who.asserted_from, verdict=verdict, evidence=evidence, value=value, across=across if kind == "setting" else None)
+                       verdict=verdict, evidence=evidence, value=value, across=across if kind == "setting" else None)
             self._commit(who, "decide", "decision", d, subject=subject, outcome=outcome, verdict=verdict, value=value)
             status_map = {
                 "hypothesis": {"accept": "accepted", "reject": "rejected", "investigate": "active"},
@@ -868,11 +1056,8 @@ class Ledger:
         return [d for d in self.all("decision") if d.subject == subject and d.retracted is None]
 
     def vouch(self, exp: Experiment, name: str, s: Setting) -> Optional[Decision]:
-        """A person's accept on e1/lr, still standing for the value the setting has now. A call asserted from inside an
-        agent session is on record and does not count."""
+        """A person's accept on e1/lr, still standing for the value the setting has now."""
         for d in reversed(self.decisions_on(f"{exp.id}/{name}")):
-            if d.asserted_from:
-                continue
             if d.outcome == "accept":
                 return d if d.value is not None and s.value is not None and _same_value(d.value, s.value) else None
             if d.outcome == "reject":
@@ -882,8 +1067,6 @@ class Ledger:
     def accepted_difference(self, exp: Experiment, name: str, values: dict[str, Any]) -> Optional[Decision]:
         """A person's accept of a setting differing between variants, still standing for the values they have now."""
         for d in reversed(self.decisions_on(f"{exp.id}/{name}")):
-            if d.asserted_from:
-                continue
             if d.outcome == "accept":
                 same = d.across is not None and set(d.across) == set(values) and all(_canonical(d.across[k]) == _canonical(values[k]) for k in values)
                 return d if same else None
@@ -914,6 +1097,9 @@ class Ledger:
             exp_id = subject.split("/")[0]
             if self.load("experiment", exp_id).frozen is not None:
                 deps.append(f"experiment {exp_id} is frozen")
+        elif kind == "metric":
+            names = {obj.id, *obj.aliases}
+            deps += [f"claim {c.id} reads it" for c in self.live("claim") if c.metric.split(".")[-1] in names]
         elif kind in ("hypothesis", "question"):
             deps += [f"claim {c.id}" for c in self.live("claim") if c.hypothesis == obj.id]
             deps += [f"experiment {e.id}" for e in self.live("experiment") if obj.id in e.hypotheses]
@@ -921,18 +1107,34 @@ class Ledger:
         return deps
 
     def retract(self, subject: str, why: str, handoff: Optional[str] = None) -> tuple[str, str, list[str]]:
-        """Retract anything: it stays on record and stops counting. Anyone may retract what nothing rests on; otherwise it
-        is a person's call. Returns (kind, id, what rested on it)."""
+        """Retract anything: it stays on record and stops counting. An agent may retract what it wrote while nothing rests
+        on it; what a person wrote, or what something rests on, is a person's call. On a frozen experiment a retraction is
+        recorded as an amendment. Returns (kind, id, what rested on it)."""
         who = self.actor()
         with self._locked():
-            exp_id, setting = parse_address(subject)
-            if setting is not None:
+            exp_id, name = parse_address(subject)
+            if name is not None:
+                exp = self.load("experiment", exp_id)
+                v = exp.variant(name) if exp.lookup(name) is None else None
+                if v is not None:
+                    if v.retracted is not None:
+                        raise RBError("E_OBJECT_INVALID", message=f"Variant {exp.id}/{name} was already retracted at {v.retracted.at}.")
+                    deps = [f"{exp.id} is frozen"] if exp.frozen else []
+                    why_person = deps + ([f"{v.created_by} added it"] if v.created_by.startswith("human:") else [])
+                    if why_person:
+                        self._person(who, f"Retracting variant {exp.id}/{name} ({'; '.join(why_person)})", handoff)
+                    before = self.freeze_sha(exp)
+                    v.retracted = _build(Retraction, at=now(), by=who.id, why=why)
+                    amended = self._guard(exp, before, self.freeze_sha(exp), why if exp.frozen else None, who, f"variant {name} retracted")
+                    self._commit(who, "retract", "experiment", exp, variant=name, why=why, **amended)
+                    return "variant", f"{exp.id}/{name}", deps
                 exp, name, s = self.resolve_setting(subject)
                 deps = self.rests_on("setting", s, f"{exp.id}/{name}")
-                if deps:
-                    self._person(who, f"Retracting {exp.id}/{name}, which {', '.join(deps)} rest on,", handoff)
+                why_person = deps + ([f"{s.set_by} set it"] if (s.set_by or "").startswith("human:") else [])
+                if why_person:
+                    self._person(who, f"Retracting {exp.id}/{name} ({'; '.join(why_person)})", handoff)
                 before = self.freeze_sha(exp)
-                s.retracted = _build(Retraction, at=now(), by=who.id, why=why, asserted_from=who.asserted_from)
+                s.retracted = _build(Retraction, at=now(), by=who.id, why=why)
                 amended = self._guard(exp, before, self.freeze_sha(exp), why if exp.frozen else None, who, f"setting {name} retracted")
                 self._commit(who, "retract", "experiment", exp, setting=name, why=why, **amended)
                 return "setting", f"{exp.id}/{name}", deps
@@ -940,9 +1142,20 @@ class Ledger:
             if getattr(obj, "retracted", None) is not None:
                 raise RBError("E_OBJECT_INVALID", message=f"{subject} was already retracted at {obj.retracted.at}: {obj.retracted.why}")
             deps = [] if kind == "decision" else self.rests_on(kind, obj, subject)
-            if deps or kind == "decision":
-                self._person(who, f"Retracting {kind} {subject}" + (f", which {', '.join(deps)} rest on," if deps else ""), handoff)
-            obj.retracted = _build(Retraction, at=now(), by=who.id, why=why, asserted_from=who.asserted_from)
+            author = getattr(obj, "created_by", None) or getattr(obj, "by", None) or ""
+            why_person = deps + ([f"{author} wrote it"] if author.startswith("human:") else [])
+            if why_person or kind == "decision":
+                self._person(who, f"Retracting {kind} {subject} ({'; '.join(why_person) or 'a decision'})", handoff)
+            obj.retracted = _build(Retraction, at=now(), by=who.id, why=why)
+            if kind == "claim" and obj.experiment:
+                exp = self.load("experiment", obj.experiment)
+                if exp.frozen is not None:     # the criteria are part of the freeze: record the change as an amendment
+                    before = self.freeze_sha(exp)
+                    after = self.freeze_sha(exp, [obj if c.id == obj.id else c for c in self.claims_of(exp.id)])
+                    amended = self._guard(exp, before, after, why, who, f"claim {obj.id} retracted")
+                    self._commit(who, "retract", kind, obj, why=why)
+                    self._commit(who, "amend", "experiment", exp, **amended)
+                    return kind, subject, deps
             self._commit(who, "retract", kind, obj, why=why)
             return kind, subject, deps
 
@@ -957,30 +1170,71 @@ class Ledger:
         return out
 
     def value_for(self, exp: Experiment, metric: str, ev: Evidence, aliases: Optional[dict[str, str]] = None) -> Optional[float]:
-        """The number a claim's metric reads in one piece of evidence, or None."""
+        """The number a claim's metric reads in one piece of evidence, or None (also when the reading is ambiguous)."""
+        return self.read_metric(exp, metric, ev, aliases)[0]
+
+    def read_metric(self, exp: Experiment, metric: str, ev: Evidence, aliases: Optional[dict[str, str]] = None) -> tuple[Optional[float], Optional[str]]:
+        """(the number a claim's metric reads in one piece of evidence, or None; why it cannot be read, or None).
+        Two reported names that read as the same metric and disagree are ambiguous, never last-one-wins. change.<m> is
+        computed from the two variants' numbers when the evidence has them, and a given change.<m> that disagrees with
+        them is not read."""
         aliases = self.metric_aliases() if aliases is None else aliases
-        metrics = {_canon(k, exp, aliases): v for k, v in ev.metrics.items()}
+        canon: dict[str, list[tuple[str, float]]] = {}
+        for k, v in ev.metrics.items():
+            canon.setdefault(_canon(k, exp, aliases), []).append((k, v))
+
+        def get(key: str) -> tuple[Optional[float], Optional[str]]:
+            got = canon.get(key, [])
+            if not got:
+                return None, None
+            if len({_canonical(x) for _, x in got}) > 1:
+                return None, f"{' and '.join(k for k, _ in got)} both read as {key} and disagree"
+            return got[0][1], None
+
         want = _canon(metric, exp, aliases)
-        if want in metrics:
-            return metrics[want]
         head, _, rest = want.partition(".")
         if head == "change" and rest:
             v2, _, m2 = rest.partition(".")
             cand = exp.variant(v2) if m2 else None
+            cands = exp.by_role("candidate")
             if cand is None:
-                cands = exp.by_role("candidate")
                 cand, m2 = (cands[0], rest) if len(cands) == 1 else (None, rest)
             base = exp.by_role("baseline")
             if cand is not None and len(base) == 1:
-                b, c = metrics.get(f"{base[0].name}.{m2}"), metrics.get(f"{cand.name}.{m2}")
+                b, pb = get(f"{base[0].name}.{m2}")
+                c, pc = get(f"{cand.name}.{m2}")
+                if pb or pc:
+                    return None, pb or pc
                 if b is not None and c is not None:
-                    return _minus(c, b)
-            return None
+                    computed = _minus(c, b)
+                    given, pg = get(want)
+                    if pg:
+                        return None, pg
+                    if given is not None and not math.isclose(given, computed, rel_tol=1e-9, abs_tol=1e-12):
+                        return None, f"{want} is given as {given:g}, but {cand.name}.{m2} minus {base[0].name}.{m2} is {computed:g}"
+                    return computed, None
+            if cand is None and len(cands) > 1 and want in canon:
+                return None, f"{want} does not say which of {', '.join(v.name for v in cands)} it is for: name one ({cands[0].name}.{rest} ...)"
+            return get(want)
+        v, p = get(want)
+        if v is not None or p:
+            return v, p
         if "." not in want or exp.variant(head) is None and head not in ROLES:
             cands = exp.by_role("candidate")
             if len(cands) == 1:
-                return metrics.get(f"{cands[0].name}.{want}")
-        return None
+                return get(f"{cands[0].name}.{want}")
+        return None, None
+
+    def criterion_fixed_at(self, claim: Claim, exp: Experiment) -> Optional[str]:
+        """When a person fixed the claim's criterion: when they wrote it, or else when they first froze or amended the
+        experiment after it was written. None while no person has."""
+        if claim.created_by.startswith("human:"):
+            return claim.created_at
+        times = []
+        if exp.frozen is not None and exp.frozen.by.startswith("human:") and exp.frozen.at > claim.created_at:
+            times.append(exp.frozen.at)
+        times += [a.at for a in exp.amendments if a.by.startswith("human:") and a.at > claim.created_at]
+        return min(times) if times else None
 
     def setting_caveats(self, exp: Experiment, has_origin: bool) -> list[Caveat]:
         """Everything about an experiment's settings that a verdict on it rests on."""
@@ -1004,7 +1258,7 @@ class Ledger:
                 continue
             vouch = self.vouch(exp, name, s)
             rejected = next((d for d in reversed(self.decisions_on(subject)) if d.outcome == "reject"), None)
-            if rejected is not None and (vouch is None or vouch.at < rejected.at):
+            if rejected is not None and (vouch is None or vouch.at < rejected.at) and (rejected.value is None or _same_value(rejected.value, s.value)):
                 out.append(Caveat(code="rejected_setting", subject=subject, blocks=True, text=f"{name} = {show(s.value)} was rejected by {rejected.by} ({rejected.id}): {rejected.why}"))
                 continue
             if s.status == "provisional":
@@ -1074,15 +1328,16 @@ class Ledger:
         caveats: list[Caveat] = []
         if claim.retracted is not None:
             return ClaimVerdict(**base, status="untested", caveats=[Caveat(code="retracted", subject=claim.id, blocks=True, text=f"retracted: {claim.retracted.why}")], decision=latest)
-        edited = self.edited_outside("claim", claim.id)
-        if edited:
-            caveats.append(Caveat(code="edited_outside_rb", subject=claim.id, blocks=True, text=edited))
+        tamper = self.tampered()
+        if tamper:
+            caveats.append(Caveat(code="edited_outside_rb", subject=claim.id, blocks=True,
+                                  text=f"{len(tamper)} object(s) in .rb/ changed outside rb, first {tamper[0]['why']}: rb doctor lists them"))
         if claim.source is not None:
             if claim.source.resolved is None:
                 caveats.append(Caveat(code="cited_unchecked", subject=claim.id, blocks=True,
                                       text=f"the cited {claim.target:g} rests on {claim.source.label()}, which rb did not check"))
             else:
-                state, why = recheck(claim.source, claim.target, self.root, claim.metric.split(".")[-1])
+                state, why = recheck(claim.source, claim.target, self.root, claim.metric.split(".")[-1], named=False)
                 if state in ("stale", "conflict"):
                     caveats.append(Caveat(code="cited_source_changed", subject=claim.id, blocks=True, text=f"the cited number's source: {why}"))
         if claim.experiment is None:
@@ -1091,25 +1346,17 @@ class Ledger:
                                 not_established_because=_codes(caveats), decision=latest)
         exp = self.load("experiment", claim.experiment)
         inv = self.investigation
-        if self.edited_outside("experiment", exp.id):
-            caveats.append(Caveat(code="edited_outside_rb", subject=exp.id, blocks=True, text=self.edited_outside("experiment", exp.id) or ""))
+        if exp.retracted is not None:
+            caveats.append(Caveat(code="experiment_retracted", subject=exp.id, blocks=True, text=f"{exp.id} was retracted: {exp.retracted.why}"))
         drift = self.spec_drift(exp)
         if drift:
             caveats.append(Caveat(code="drift", subject=exp.id, blocks=True, text=drift))
         caveats += self.setting_caveats(exp, inv.parent is not None)
-        frozen_by_person = exp.frozen is not None and exp.frozen.by.startswith("human:") and not exp.frozen.asserted_from
-        person_fixed = (claim.created_by.startswith("human:") and not claim.asserted_from) or (frozen_by_person and exp.frozen.at > claim.created_at)
-        if not person_fixed:
-            author = claim.created_by + (f" (asserted from {actor_mod.runtime_label(claim.asserted_from)})" if claim.asserted_from else "")
-            if exp.frozen is None or (exp.frozen.asserted_from and exp.frozen.at > claim.created_at):
-                how = f"a person freezes {exp.id} in their own terminal, then attach a new run"
-            else:
-                how = f"it was written after {exp.id} was frozen; a person re-adopts it by amending, then attach a new run"
-            caveats.append(Caveat(code="criterion_not_fixed_by_person", subject=claim.id, blocks=True, text=f"criterion written by {author}; {how}"))
-        if exp.frozen is not None and exp.frozen.asserted_from:
-            caveats.append(Caveat(code="asserted_freeze", subject=exp.id, blocks=True,
-                                  text=f"{exp.id} was frozen as {exp.frozen.by} from inside {actor_mod.runtime_label(exp.frozen.asserted_from)}: "
-                                       f"on record, not counted as a person's call; the person runs rb freeze {exp.id} in their own terminal"))
+        fixed_at = self.criterion_fixed_at(claim, exp)
+        if fixed_at is None:
+            how = (f"a person freezes {exp.id}, then attach a new run" if exp.frozen is None
+                   else f"it was written after {exp.id} was frozen; a person adopts it with rb freeze {exp.id} --amend --why \"...\", then attach a new run")
+            caveats.append(Caveat(code="criterion_not_fixed_by_person", subject=claim.id, blocks=True, text=f"criterion written by {claim.created_by}; {how}"))
         cited_differs = [c for c in caveats if c.code == "cited_differs"]
         aliases = self.metric_aliases()
         spec_now = self.spec_sha(exp)
@@ -1117,14 +1364,20 @@ class Ledger:
         evid = [e for e in self.all("evidence") if e.experiment == exp.id]
         observations: list[Observation] = []
         first_of: dict[str, str] = {}
+        counts_from = fixed_at or claim.created_at
+        fixed_by_freeze = exp.frozen is not None and fixed_at == exp.frozen.at and fixed_at != claim.created_at
         for e in evid:
             if e.retracted is not None:
                 continue
-            value = self.value_for(exp, claim.metric, e, aliases)
+            value, problem = self.read_metric(exp, claim.metric, e, aliases)
+            if problem:
+                caveats.append(Caveat(code="not_read", subject=e.id, blocks=False, text=f"{e.id} not read: {problem}"))
+                continue
             if value is None:
                 continue
             role, reason = "confirmatory", ""
             mism = (e.receipt.config.mismatches if e.receipt.config else [])
+            same_numbers = "numbers:" + _canonical(e.metrics)
             if e.synthetic:
                 role, reason = "not_counted", "synthetic: rb's example data or its synthetic adapter, not evidence about any model"
             elif self.edited_outside("evidence", e.id):
@@ -1133,19 +1386,18 @@ class Ledger:
                 role, reason = "not_counted", "spec changed since: " + (_diff(e.settings, snapshot_now) or "the variants or declared variables changed")
             elif mism:
                 role, reason = "not_counted", "ran with " + "; ".join(f"{m['name']} {show(m['ran'])} (the spec says {show(m['spec'])})" for m in mism[:3])
-            elif e.fingerprint and e.fingerprint in first_of:
-                role, reason = "not_counted", f"repeats {first_of[e.fingerprint]}: the same numbers, per-run values and files count once"
+            elif same_numbers in first_of:
+                role, reason = "not_counted", f"the same numbers as {first_of[same_numbers]}: a repeat adds nothing, and counts once"
+            elif e.created_at < claim.created_at:
+                role, reason = "exploratory", f"attached before {claim.id} was written"
+            elif e.created_at < counts_from or (fixed_by_freeze and e.id in exp.frozen.after_evidence):
+                role, reason = "exploratory", f"attached before a person fixed {claim.id}'s criterion ({exp.id} frozen {exp.frozen.at[:16] if exp.frozen else ''})"
             elif e.per_run and _run_key(e) in first_of:
                 role, reason = "not_counted", f"repeats {', '.join(f'{k}={show(x)}' for k, x in sorted(e.per_run.items()))} of {first_of[_run_key(e)]}: not an independent run"
-            elif claim.created_at > e.created_at:
-                role, reason = "exploratory", f"attached before {claim.id} was written"
-            elif exp.frozen is not None and (e.id in exp.frozen.after_evidence or e.created_at < exp.frozen.at):
-                role, reason = "exploratory", f"attached before {exp.id} was frozen"
             if role != "not_counted":
-                if e.fingerprint:
-                    first_of.setdefault(e.fingerprint, e.id)
-                if e.per_run:
-                    first_of.setdefault(_run_key(e), e.id)
+                first_of.setdefault(same_numbers, e.id)
+            if role == "confirmatory" and e.per_run:
+                first_of.setdefault(_run_key(e), e.id)
             holds, margin = _judge(claim, value)
             observations.append(Observation(evidence=e.id, value=value, holds=holds, margin=margin, role=role, reason=reason, basis=e.basis, per_run=e.per_run))
         conf = [o for o in observations if o.role == "confirmatory"]
@@ -1181,7 +1433,8 @@ class Ledger:
                 caveats.append(Caveat(code="too_few_runs", subject=claim.id, blocks=True, text=f"{n} confirmatory run(s); the claim needs {claim.min_n}"))
             elif n == 1:
                 caveats.append(Caveat(code="single_run", subject=claim.id, blocks=False, text="1 run (no repeat)"))
-            noise = claim.noise if claim.noise is not None else (2 * sd if sd is not None and n >= 3 else None)
+            spread = 2 * sd if sd is not None and n >= 3 else None     # what the runs themselves show; a stated noise never lowers it
+            noise = max((x for x in (claim.noise, spread) if x is not None), default=None)
             judged = [_judge(claim, mean)[1]] if claim.over == "mean" else [o.margin for o in conf]  # type: ignore[arg-type]
             if noise is None:
                 caveats.append(Caveat(code="noise_unknown", subject=claim.id, blocks=False,
@@ -1189,7 +1442,7 @@ class Ledger:
                                       else "any margin holds against a target of 0; give the claim --noise"))
             elif any(abs(m) < noise for m in judged):
                 caveats.append(Caveat(code="borderline", subject=claim.id, blocks=True, text=f"within the noise ({noise:g}) of the criterion: another run may land on the other side"))
-            if all(e.receipt.config is None for e in evid if e.id in {o.evidence for o in conf}):
+            if all(e.receipt.config is None or not (e.receipt.config.matches or e.receipt.config.mismatches) for e in evid if e.id in {o.evidence for o in conf}):
                 caveats.append(Caveat(code="config_unchecked", subject=claim.id, blocks=False, text="no run config was compared with the spec (attach with --config)"))
             typed = [o.evidence for o in conf if o.basis == "typed"]
             if typed:
@@ -1202,6 +1455,43 @@ class Ledger:
 
     # ------------------------------------------------------------ views over the whole state
 
+    def _attach_hint(self, c: Claim) -> str:
+        """The attach command that would test a claim: the variants' own numbers (rb works out change.*, never the
+        caller), and every per-run value the experiment declares."""
+        exp = self.load("experiment", c.experiment) if c.experiment else None
+        if exp is None:
+            return f"rb evidence attach <experiment> {c.metric}=<value>"
+        head, _, rest = c.metric.partition(".")
+        base = exp.by_role("baseline")
+        if head == "change" and rest:
+            v2, _, m2 = rest.partition(".")
+            cand = exp.variant(v2) if m2 and exp.variant(v2) else None
+            m = m2 if cand else rest
+            cands = [cand] if cand else exp.by_role("candidate")[:1]
+            pairs = " ".join(f"{v.name}.{m}=<value>" for v in [*base[:1], *cands])
+        else:
+            pairs = f"{c.metric}=<value>"
+        per_run = " ".join(f"--set {n}=<value>" for n, s in exp.all_settings() if s.per_run and s.retracted is None)
+        return f"rb evidence attach {exp.id} {pairs}" + (f" {per_run}" if per_run else "") + ' --command "..."'
+
+    def counted_evidence(self, exp: Experiment) -> list[Evidence]:
+        """The evidence that counts for the experiment as a whole, whatever any claim says: not synthetic, not edited,
+        under the current spec, run with a config that agrees with it, and each run once."""
+        spec_now = self.spec_sha(exp)
+        seen: set[str] = set()
+        out = []
+        for e in sorted(self.live("evidence"), key=lambda x: x.created_at):
+            if e.experiment != exp.id or e.synthetic or e.spec_sha256 != spec_now or self.edited_outside("evidence", e.id):
+                continue
+            if e.receipt.config is not None and e.receipt.config.mismatches:
+                continue
+            keys = ["numbers:" + _canonical(e.metrics)] + ([_run_key(e)] if e.per_run else [])
+            if any(k in seen for k in keys):
+                continue
+            seen.update(keys)
+            out.append(e)
+        return out
+
     def compare(self, experiment_id: str) -> dict:
         """The experiment's own table: its variants as rows, the settings it varies and the metrics its evidence reports
         as columns, each metric with its mean over counted evidence and its change against the baseline, read in the
@@ -1209,8 +1499,7 @@ class Ledger:
         exp = self.load("experiment", experiment_id)
         aliases = self.metric_aliases()
         catalogue = {m.id: m for m in self.live("metric")}
-        spec_now = self.spec_sha(exp)
-        evid = [e for e in self.live("evidence") if e.experiment == exp.id and not e.synthetic and e.spec_sha256 == spec_now]
+        evid = self.counted_evidence(exp)
         variants = sorted(exp.live_variants(), key=lambda v: (ROLES.index(v.role), v.name))
         per: dict[str, dict[str, list[float]]] = {v.name: {} for v in variants}
         overall: dict[str, list[float]] = {}
@@ -1283,70 +1572,84 @@ class Ledger:
             gate["not_reproduced"] |= v.status == "not_reproduced"
             claimed_metrics.setdefault(c.experiment or "", set()).add(c.metric)
             last = next(iter(reversed(self.decisions_on(c.id))), None)
-            if v.status in UNSETTLED:
-                if last is None:
-                    gate["undecided"] = True
-                    item("person", "undecided", c.id, f"{c.id} is {v.status.replace('_', ' ')} and nobody has decided on it: {c.statement}",
-                         f'rb decide {c.id} accept|reject|investigate --why "..."')
-                elif last.verdict != v.status:
-                    gate["undecided"] = True
-                    item("person", "decision_outdated", c.id, f"{last.id} was made on {last.verdict}; {c.id} is now {v.status}",
-                         f'rb decide {c.id} accept|reject|investigate --why "..."')
+            if last is None and v.status in UNSETTLED:
+                gate["undecided"] = True
+                item("person", "undecided", c.id, f"{c.id} is {v.status.replace('_', ' ')} and nobody has decided on it: {c.statement}",
+                     f'rb decide {c.id} accept|reject|investigate --why "..."')
+            elif last is not None and last.verdict is not None and last.verdict != v.status:
+                gate["undecided"] = True       # a decision is read against what it was made on: that has changed
+                item("person", "decision_outdated", c.id, f"{last.id} ({last.outcome}) was made on {last.verdict}; {c.id} is now {v.status}",
+                     f'rb decide {c.id} accept|reject|investigate --why "..."')
             if last is not None and last.outcome == "investigate":
                 item("person", "investigating", c.id, f"{c.id} · investigating since {last.id} ({last.by}): {last.why}",
                      f'rb decide {c.id} accept|reject --why "..." when it is resolved')
-            if any(x.code in ("edited_outside_rb",) for x in v.caveats):
-                gate["stale"] = True
             for cav in v.caveats:
                 if cav.code == "criterion_not_fixed_by_person" and c.experiment:
-                    item("person", cav.code, c.id, f"{c.id}: {cav.text}", f'rb freeze {c.experiment} --why "..."')
+                    frozen = self.load("experiment", c.experiment).frozen is not None
+                    item("person", cav.code, c.id, f"{c.id}: {cav.text}", f'rb freeze {c.experiment}{" --amend" if frozen else ""} --why "..."')
                 elif cav.code == "untested" or (v.status == "untested" and cav.code == "exploratory_only"):
-                    item("agent", "exploratory_only", c.id, f"{c.id}: {cav.text}", f"rb evidence attach {c.experiment} {c.metric}=<value> --command \"...\"")
+                    item("agent", "exploratory_only", c.id, f"{c.id}: {cav.text}", self._attach_hint(c))
                 elif cav.code == "too_few_runs":
-                    item("agent", cav.code, c.id, f"{c.id}: {cav.text}", f"rb evidence attach {c.experiment} {c.metric}=<value> --set <per-run setting>=<value>")
+                    item("agent", cav.code, c.id, f"{c.id}: {cav.text}", self._attach_hint(c))
                 elif cav.code == "borderline":
-                    item("agent", cav.code, c.id, f"{c.id}: {cav.text}", f"rb evidence attach {c.experiment} {c.metric}=<value> (more runs narrow it)")
+                    item("agent", cav.code, c.id, f"{c.id}: {cav.text}", self._attach_hint(c) + "   (more runs narrow it)")
+                elif cav.code == "cited_source_changed":
+                    gate["stale"] = True
+                    item("person", cav.code, c.id, f"{c.id}: {cav.text}", f'git diff -- {c.source.path if c.source else ""}   (restore the cited text, or retract {c.id} and write it again against the source as it is: rb retract {c.id} --why "...")')
                 elif cav.code == "cited_unchecked":
                     item("agent", cav.code, c.id, f"{c.id}: {cav.text}", "save the source in the repository; a cited claim is checked when written, so write it again against the file")
             if v.status == "untested" and not any(x.code == "exploratory_only" for x in v.caveats) and c.experiment:
-                item("agent", "untested", c.id, f"{c.id} is untested: {c.statement}", f"rb evidence attach {c.experiment} {c.metric}=<value> --command \"...\"")
+                item("agent", "untested", c.id, f"{c.id} is untested: {c.statement}", self._attach_hint(c))
+            if not c.experiment:
+                item("agent", "no_experiment", c.id, f"{c.id} is on no experiment, so no evidence can test it: {c.statement}",
+                     f'rb claim add "{c.statement}" -e <experiment> --metric {c.metric} ...   (then rb retract {c.id} --why "moved onto an experiment")')
+        tamper = self.tampered()
+        if tamper:
+            gate = {k: True for k in gate}          # a state changed outside rb fails every gate until it is restored or adopted
+            item("anyone", "edited_outside_rb", ", ".join(t["id"] for t in tamper[:6]) + (" ..." if len(tamper) > 6 else ""),
+                 f"{len(tamper)} object(s) in .rb/ changed outside rb, first {tamper[0]['why']}",
+                 'rb doctor --restore   (puts back what rb last wrote; if the change is right, a person runs rb doctor --adopt --why "..." instead)')
         for e in experiments:
             drift = self.spec_drift(e)
-            edited = self.edited_outside("experiment", e.id)
-            if drift or edited:
+            if drift:
                 gate["stale"] = True
-                item("person", "drift" if drift else "edited_outside_rb", e.id, drift or edited or "",
-                     f"git checkout .rb/experiments/{e.id}.json (to change it deliberately: rb spec set ... --amend --why \"...\")")
+                item("person", "drift", e.id, drift, f'rb freeze {e.id} --amend --why "..."   (adopts the spec as it is now)')
+            amend = ' --amend --why "..."' if e.frozen else ""
+            owner = "person" if e.frozen else "agent"
             for cav in self.setting_caveats(e, inv.parent is not None):
                 name = cav.subject.split("/", 1)[1]
+                s_ = e.lookup(name)
+                label = s_.source.label() if s_ is not None and s_.source is not None else None
                 if cav.code == "unknown":
                     gate["unknown"] = True
-                    item("agent", "unknown", cav.subject, f"{cav.subject} is unknown and required", f"rb spec set {e.id} {name} <value> --source <file#key>")
+                    item(owner, "unknown", cav.subject, f"{cav.subject} is unknown and required", f"rb spec set {e.id} {name} <value> --source <file#key>{amend}")
                 elif cav.code == "unknown_optional":
-                    item("agent", "unknown_optional", cav.subject, f"{cav.subject} is unknown (optional)", f"rb spec set {e.id} {name} <value> --source <file#key>")
+                    item(owner, "unknown_optional", cav.subject, f"{cav.subject} is unknown (optional)", f"rb spec set {e.id} {name} <value> --source <file#key>{amend}")
                 elif cav.code == "provisional":
-                    s_ = e.lookup(name)
                     if s_ is not None and s_.source is not None and s_.source.checkable():
                         item("agent", "provisional", cav.subject, f"{cav.subject}: {cav.text}", f"rb spec verify {e.id} {name}")
                     else:
-                        item("agent", "provisional", cav.subject, f"{cav.subject}: {cav.text}",
-                             f"rb spec set {e.id} {name} {show(s_.value) if s_ else '<value>'} --source <file#key>   (or a person: rb decide {e.id}/{name} accept --why \"...\")")
+                        value = shlex.quote(show(s_.value)) if s_ is not None and s_.value is not None else "<value>"
+                        item(owner, "provisional", cav.subject, f"{cav.subject}: {cav.text}",
+                             f"rb spec set {e.id} {name} {value} --source <file#key that states it>{amend}   (or a person: rb decide {e.id}/{name} accept --why \"...\")")
                 elif cav.code in ("stale", "conflict"):
                     gate["stale"] = True
-                    fix = f"rb spec verify {e.id} {name}" if cav.code == "stale" else f"rb spec set {e.id} {name} <the value the source states>" + (" --amend --why \"...\" (a person)" if e.frozen else "")
-                    item("agent" if cav.code == "stale" and not e.frozen else "person" if e.frozen else "agent", cav.code, cav.subject, f"{cav.subject}: {cav.text}", fix)
+                    where = f" --source {shlex.quote(label)}" if label else ""
+                    fix = (f"rb spec set {e.id} {name} <the value it states now>{where}{amend}   (or point --source at where the value is stated)" if cav.code == "stale"
+                           else f"rb spec set {e.id} {name} <the value the source states>{where}{amend}")
+                    item(owner, cav.code, cav.subject, f"{cav.subject}: {cav.text}", fix)
                 elif cav.code == "source_changed":
                     item("agent", cav.code, cav.subject, f"{cav.subject}: {cav.text}", f"rb spec verify {e.id} {name}")
                 elif cav.code == "confound":
                     fix = (f'rb spec vary {e.id} {name} --amend --why "..."   (it differs on purpose) or rb decide {cav.subject} accept --why "..."   (it does not matter)'
                            if e.frozen else f'rb spec vary {e.id} {name}   (it differs on purpose), or set it the same in every variant')
-                    item("person" if e.frozen else "agent", cav.code, cav.subject, cav.text, fix)
+                    item(owner, cav.code, cav.subject, cav.text, fix)
                 elif cav.code in ("inherited_without_parent", "rejected_setting"):
-                    item("agent", cav.code, cav.subject, cav.text, f"rb spec set {e.id} {name} <value> --source <file#key>")
+                    item(owner, cav.code, cav.subject, cav.text, f"rb spec set {e.id} {name} <value> --source <file#key>{amend}")
             unread = self.unread_metrics(e, [ev for ev in evidence if ev.experiment == e.id], [c for c in claims if c.experiment == e.id])
             if unread and len(unread) <= 12:
-                item("agent", "unclaimed_metric", e.id, f"{e.id}: evidence reports {', '.join(unread[:6])}{' ...' if len(unread) > 6 else ''}, which no claim reads (write the claim before the next run)",
-                     f'rb claim add "<what it should show>" -e {e.id} --metric {unread[0]} --at-most <x>')
+                item(owner, "unclaimed_metric", e.id, f"{e.id}: evidence reports {', '.join(unread[:6])}{' ...' if len(unread) > 6 else ''}, which no claim reads (write the claim before the next run)",
+                     f'rb claim add "<what it should show>" -e {e.id} --metric {unread[0]} --at-most <x>{amend}')
         for q in questions:
             if q.status == "open":
                 item("agent", "open_question", q.id, f"{q.id} is open: {q.text}", f'rb hypothesis add "..." --question {q.id}')
@@ -1428,7 +1731,8 @@ def evidence_from_run(bundle: Any, run_dir: Optional[Path], root: Path, given: O
     if s.with_gt > 0:
         metrics.update({f"baseline.{m}": s.mean_error.baseline, f"candidate.{m}": s.mean_error.candidate,
                         f"change.{m}": s.mean_error.candidate - s.mean_error.baseline})
-    record: dict[str, Any] = {"run_id": bundle.run_id, "source": bundle.source, "metric": bundle.metric.model_dump(), "review_verdict": findings.verdict.line}
+    record: dict[str, Any] = {"run_id": bundle.run_id, "source": bundle.source, "metric": bundle.metric.model_dump(), "review_verdict": findings.verdict.line,
+                              "models": {"baseline": bundle.baseline.name, "candidate": bundle.candidate.name}}
     if m != bundle.metric.id:
         record["metric_key"] = m
     if s.with_gt == 0:
@@ -1451,7 +1755,8 @@ def evidence_from_run(bundle: Any, run_dir: Optional[Path], root: Path, given: O
         path = rel if not rel.startswith("..") else os.path.abspath(where)
         if run_dir is None:
             file = path
-    return {"metrics": metrics, "record": record, "synthetic": bundle.source == "example" or adapter_id == "synthetic", "path": path, "file": file}
+    return {"metrics": metrics, "record": record, "synthetic": bundle.source == "example" or adapter_id == "synthetic", "path": path, "file": file,
+            "names": {"baseline": bundle.baseline.name, "candidate": bundle.candidate.name}}
 
 
 # ---------------------------------------------------------------- helpers

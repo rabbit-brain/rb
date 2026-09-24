@@ -16,6 +16,7 @@ pip install "rabbit-brain[yaml]"
 rb init "Does INT8 keep RAFT's accuracy on KITTI?"
 rb experiment add "INT8 vs FP32" --id int8 --baseline fp32 --candidate int8 --varies precision
 rb spec set int8 --from configs/train.yaml --keys "optim.*,data.*"   # every setting read by key and checked against the file
+rb spec set int8 seed --per-run                                       # each run gives its own
 rb claim add "INT8 costs at most 0.05 px EPE" -e int8 --metric change.epe --at-most 0.05 --min-n 3
 rb freeze int8 -m "before the held-out runs"                          # yours: an agent is refused and handed this command
 rb evidence attach int8 --from out/metrics.json --set seed=1 --config out/.hydra/config.yaml
@@ -32,7 +33,7 @@ rb context                                                             # what a 
 - no source changed since it was checked;
 - the margin is not within the run-to-run noise;
 - there are enough runs;
-- nothing was edited outside `rb`.
+- nothing in `.rb/` was changed outside `rb` (`rb doctor --restore` puts back what `rb` wrote).
 
 Otherwise `rb` says `supported, not established` and lists why. `rb status --fail-on unestablished` makes that a CI gate.
 
@@ -52,7 +53,7 @@ It says what the config states, not what the run used. For that, attach the run'
 - amending a frozen spec;
 - retracting what something rests on.
 
-`rb` detects Claude Code, Codex and other agent runtimes, and answers these calls from an agent with the exact command for you to run. A person's name given from inside an agent session is recorded, marked, and not counted as yours. Every write records who made it and how `rb` knew. Evidence attached before its claim, or before the freeze, is shown and never counted.
+`rb` detects Claude Code, Codex and other agent runtimes, and answers these calls from an agent with the exact command for you to run. Inside an agent session, a person's name in `RB_ACTOR` is ignored. Every write records who made it and how `rb` knew. Evidence attached before its claim, or before the freeze, is shown and never counted.
 
 **Release review, built in.** For iterative perception models (optical flow, stereo, depth, anything that refines an answer over iterations), `rb review` compares a candidate checkpoint against the current one case by case. It ranks the cases that got worse and the cases whose error improved while the model never stopped changing its answer. It renders the evidence for each, and keeps the cases you cared about as checks for the next checkpoint. A review is evidence like any other: `rb evidence attach <exp> --run <run>`.
 

@@ -315,7 +315,7 @@ def test_spec_set_verifies_a_quote_on_its_line(project, capsys):
 
 
 @pytest.mark.parametrize("name, value, source, expected", [
-    ("seed", None, "run:run1#/seeds/torch", 1234),                          # a run directory means its record.json
+    ("seeds.torch", None, "run:run1#/seeds/torch", 1234),                   # a run directory means its record.json
     ("cuda", '"12.4"', "run:run1/record.json#/environment/cuda", "12.4"),   # text that looks like a number stays text
 ], ids=["number", "text"])
 def test_spec_set_verifies_a_value_at_a_run_pointer(project, capsys, name, value, source, expected):
@@ -622,13 +622,16 @@ def test_an_agents_writes_are_recorded_as_the_agent(lab, capsys, monkeypatch):
     assert log_entries(lab)[-1]["actor"] == "agent:claude-code"
 
 
-def test_a_person_named_inside_an_agent_session_is_accepted_and_stamped(lab, capsys, monkeypatch):
+def test_a_person_named_inside_an_agent_session_is_still_the_agent(lab, capsys, monkeypatch):
+    """A person's name typed inside an agent session is what an agent would type: rb ignores it, records the agent, and
+    says so, so the person's call is handed over like any other."""
     _agent_refusal_setup(capsys, monkeypatch)
     monkeypatch.setenv("RB_ACTOR", "human:jh")
-    data = ok(capsys, "decide", "c1", "accept", "-m", "within budget")
-    assert data["actor"]["id"] == "human:jh" and data["actor"]["asserted_from"] == "claude-code"
-    assert data["object"]["by"] == "human:jh" and data["object"]["asserted_from"] == "claude-code"
-    assert log_entries(lab)[-1]["asserted_from"] == "claude-code"
+    err = refused(capsys, 2, "E_HUMAN_ONLY", "decide", "c1", "accept", "-m", "within budget")
+    assert "RB_ACTOR=human:jh is ignored inside a Claude Code session" in err["message"]
+    data = ok(capsys, "question", "add", "who wrote this?")
+    assert data["actor"]["id"] == "agent:claude-code" and data["actor"]["ignored_rb_actor"] == "human:jh"
+    assert log_entries(lab)[-1]["actor"] == "agent:claude-code" and log_entries(lab)[-1]["ignored_rb_actor"] == "human:jh"
 
 
 def test_a_frozen_spec_changes_only_with_a_persons_amendment(lab, capsys):

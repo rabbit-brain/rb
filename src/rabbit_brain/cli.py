@@ -1030,6 +1030,9 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("doctor", parents=[common], help="with .rb/ here: check the research state; otherwise release review's environment check")
     s.add_argument("--checkpoint", action="append", default=None, help="checkpoint path to check (release review)")
     s.add_argument("--device", default=None)
+    s.add_argument("--restore", action="store_true", help="research state: put back what rb last wrote for every file changed outside rb")
+    s.add_argument("--adopt", action="store_true", help="research state: take every change made outside rb as it stands (a person's call, with --why)")
+    s.add_argument("-m", "--why", default=None, help="the reason, recorded with --adopt")
     s.set_defaults(func=cmd_doctor_router)
     ledger_cli.add_parsers(sub, common, research_common)
 
@@ -1127,8 +1130,10 @@ def cmd_init_router(args: argparse.Namespace, out: "Out") -> int:
 def cmd_doctor_router(args: argparse.Namespace, out: "Out") -> int:
     from .ledger import Ledger, find_root
     if args.checkpoint or find_root() is None:
+        if args.restore or args.adopt:
+            raise RBError("E_NO_INVESTIGATION", message="--restore and --adopt work on the research state, and there is no .rb/ here or above.")
         return cmd_doctor(args, out)
-    return ledger_cli.cmd_research_doctor(args, out, Ledger.open())
+    return ledger_cli.cmd_research_doctor(args, out, Ledger(find_root()))   # not Ledger.open: doctor must run when a file is corrupt
 
 
 def main(argv: Optional[list[str]] = None) -> int:

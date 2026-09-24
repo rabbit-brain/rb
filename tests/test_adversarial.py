@@ -184,45 +184,37 @@ def test_the_agent_cannot_decide_or_vouch_for_its_own_work(gamed, capsys, argv):
 # ---------------------------------------------------------------- cheat: asserting a person from inside the session
 
 
-def test_asserting_a_person_inside_the_session_freezes_and_is_stamped(gamed, capsys, monkeypatch, session):
+@pytest.mark.parametrize("argv", [
+    ("freeze", "e1", "-m", "lock the criterion"),
+    ("decide", "c1", "accept", "-m", "fine"),
+    ("spec", "set", "e1", "top1_floor", "0.5", "--amend", "-m", "looser"),
+])
+def test_a_persons_name_typed_inside_the_session_changes_nothing(gamed, capsys, monkeypatch, session, argv):
+    """RB_ACTOR=human:x inside the agent's own session is ignored: every person's call is still handed over."""
+    if argv[0] != "freeze":
+        as_person(monkeypatch)
+        ok(capsys, *FREEZE)
+        as_agent(monkeypatch)
+    before = (session / ".rb" / "log.jsonl").read_text()
     monkeypatch.setenv("RB_ACTOR", "human:x")
-    env = ok(capsys, *FREEZE)
-    frozen = env.data["object"]["frozen"]
-    assert (frozen["by"], frozen["asserted_from"]) == ("human:x", "claude-code")
-    last = Ledger(session).log_entries()[-1]
-    assert (last["op"], last["actor"], last["actor_via"], last["asserted_from"]) == ("freeze", "human:x", "RB_ACTOR", "claude-code")
+    code, env = rbj(capsys, *argv)
+    assert code == 2 and env.errors[0].code == "E_HUMAN_ONLY" and "RB_ACTOR=human:x is ignored" in env.errors[0].message
+    assert (session / ".rb" / "log.jsonl").read_text() == before
 
 
-@pytest.fixture
-def asserted(session, capsys, monkeypatch):
-    """The agent writes a claim, freezes as RB_ACTOR=human:x from inside the session, then attaches a run."""
-    ok(capsys, "init", "resnet50 on imagenet")
-    ok(capsys, "experiment", "add", "resnet50 top-1", "--id", "e1")
-    ok(capsys, "claim", "add", "ResNet-50 reaches 76% top-1", "-e", "e1", "--metric", "top1", "--at-least", "0.76", "--noise", "0.0001", "--id", "c1")
-    monkeypatch.setenv("RB_ACTOR", "human:x")
+def test_a_persons_name_typed_inside_the_session_cannot_retract_what_a_claim_counts(session, capsys, monkeypatch):
+    as_person(monkeypatch)
+    ok(capsys, "init", "t")
+    ok(capsys, "experiment", "add", "x", "--id", "e1", "--baseline", "b", "--candidate", "c")
+    ok(capsys, "claim", "add", "c at most 1", "-e", "e1", "--metric", "c.loss", "--at-most", "1", "--id", "c1")
     ok(capsys, *FREEZE)
-    monkeypatch.delenv("RB_ACTOR")
-    attach(capsys, "top1=0.7612")
-    return session
-
-
-def test_an_asserted_freeze_is_shown_as_asserted_on_the_claim(asserted, capsys):
-    [cav] = [c for c in verdict(capsys)["caveats"] if c["code"] == "asserted_freeze"]
-    assert "human:x" in cav["text"] and "from inside a Claude Code session" in cav["text"] and cav["blocks"]
-
-
-def test_an_asserted_freeze_is_shown_as_asserted_in_the_log(asserted, capsys):
-    main(["log"])
-    assert "human:x (asserted from a Claude Code session) freeze experiment e1" in capsys.readouterr().out
-
-
-def test_an_asserted_freeze_does_not_establish_the_claim(asserted, capsys):
-    """rb cannot stop an agent giving a person's name. It records the call, marks it, and does not count it as a person's:
-    a person at their own terminal is never inside a detected agent session, so only the cheat takes this path."""
-    md = ok(capsys, "context").data["markdown"]
-    assert "c1" not in section(md, "Established")
-    assert "c1" in section(md, "Not established") and "from inside a Claude Code session" in section(md, "Not established")
-    assert rbj(capsys, "status", "--fail-on", "unestablished")[0] == 1
+    as_agent(monkeypatch)
+    attach(capsys, "c.loss=0.5")
+    bad = attach(capsys, "c.loss=1.5")
+    monkeypatch.setenv("RB_ACTOR", "human:jh")
+    code, env = rbj(capsys, "retract", bad, "-m", "outlier")
+    assert code == 2 and env.errors[0].code == "E_HUMAN_ONLY"
+    assert verdict(capsys)["status"] == "mixed"
 
 
 # ---------------------------------------------------------------- cheat: editing .rb/ by hand

@@ -19,8 +19,11 @@ raise `RBError("E_HUMAN_ONLY")` for an agent, carrying the exact `rb` command fo
 """
 from __future__ import annotations
 
+import json
+import numbers
 import shlex
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional, Union
 
@@ -48,6 +51,28 @@ def init(title: str, path: Optional[PathLike] = None, *, id: Optional[str] = Non
 
 def _handoff(*argv: Any) -> str:
     return shlex.join(["rb", *(str(a) for a in argv if a is not None)])
+
+
+@contextmanager
+def _handing_over(*argv: Any):
+    """A person's call refused for an agent carries the rb line for the person, as it does from the CLI."""
+    try:
+        yield
+    except RBError as err:
+        if err.code == "E_HUMAN_ONLY" and "handoff" not in err.extra:
+            cmd = _handoff(*argv)
+            err.extra["handoff"] = {"who": "person", "command": cmd}
+            err.fix = f"Hand this to the person, to run in their own terminal: {cmd}   Do not set or unset RB_ACTOR."
+        raise
+
+
+def _number(name: str, v: Any) -> float:
+    """A metric value: any real number (numpy and torch scalars included), never a bool or text."""
+    if hasattr(v, "item") and not isinstance(v, numbers.Number):
+        v = v.item()
+    if isinstance(v, bool) or not isinstance(v, numbers.Real):
+        raise RBError("E_OBJECT_INVALID", message=f"{name}: evidence holds numbers (got {type(v).__name__}).")
+    return float(v)
 
 
 def _script_command() -> Optional[str]:
@@ -144,7 +169,8 @@ class Experiment:
 
     def add_variant(self, name: str, *, role: str, note: str = "", amend: Optional[str] = None) -> None:
         """role: baseline, candidate, control or ablation. `amend` is a person's reason, on a frozen experiment."""
-        self.state.ledger.add_variant(self.id, name, role, note=note, amend=amend)
+        with _handing_over("variant", "add", self.id, name, "--role", role, *(["--amend", "--why", amend] if amend else [])):
+            self.state.ledger.add_variant(self.id, name, role, note=note, amend=amend)
 
     def claim(self, statement: str, *, metric: str, at_most: Optional[float] = None, at_least: Optional[float] = None,
               equals: Optional[float] = None, tolerance: Optional[float] = None, over: str = "each", min_n: int = 1,
@@ -156,9 +182,11 @@ class Experiment:
             raise RBError("E_OBJECT_INVALID", message="A claim needs exactly one criterion: at_most, at_least, or equals with tolerance.")
         comparator, target = given[0]
         src = parse_source(source, quote, None, locator, None, self.state.root) if source else None
-        c = self.state.ledger.add_claim(statement, metric=metric, comparator=comparator, target=target, tolerance=tolerance,
-                                        experiment=self.id, hypothesis=hypothesis, source=src, over=over, min_n=min_n, noise=noise,
-                                        note=note, amend=amend, id=id)
+        with _handing_over("claim", "add", statement, "-e", self.id, "--metric", metric, f"--{comparator.replace('_', '-')}", target,
+                           *(["--tolerance", tolerance] if tolerance is not None else []), *(["--amend", "--why", amend] if amend else [])):
+            c = self.state.ledger.add_claim(statement, metric=metric, comparator=comparator, target=target, tolerance=tolerance,
+                                            experiment=self.id, hypothesis=hypothesis, source=src, over=over, min_n=min_n, noise=noise,
+                                            note=note, amend=amend, id=id)
         return Claim(self.state, c.id)
 
     def claims(self) -> list["Claim"]:
@@ -167,13 +195,13 @@ class Experiment:
     def attach(self, metrics: Mapping[str, float], *, variant: Optional[str] = None, per_run: Optional[Mapping[str, Any]] = None,
                config: Optional[PathLike] = None, command: Optional[str] = None, commit: Optional[str] = None,
                files: Iterable[PathLike] = (), links: Optional[Mapping[str, str]] = None, again: Optional[str] = None,
-               note: str = "", basis: str = "logged") -> Optional[Evidence]:
-        """Attach numbers now. Returns the evidence, or None when identical evidence is already attached (pass `again`
-        with a reason to attach a deliberate repeat)."""
+               note: str = "") -> Optional[Evidence]:
+        """Attach numbers now, recorded as logged by the code that produced them. Returns the evidence, or None when
+        identical evidence is already attached (pass `again` with a reason to attach a deliberate repeat)."""
         got = self.state.ledger.attach_evidence(
-            self.id, metrics=dict(metrics), variant=variant, per_run=dict(per_run or {}) or None,
+            self.id, metrics={k: _number(k, v) for k, v in dict(metrics).items()}, variant=variant, per_run=dict(per_run or {}) or None,
             config=str(config) if config is not None else None, command=command, commit=commit,
-            files=[str(f) for f in files], links=dict(links or {}), basis=basis, again=again, note=note)
+            files=[str(f) for f in files], links=dict(links or {}), basis="logged", again=again, note=note)
         return got["evidence"] if got.get("duplicate_of") is None else None
 
     def run(self, variant: Optional[str] = None, *, per_run: Optional[Mapping[str, Any]] = None, config: Optional[PathLike] = None,
@@ -233,8 +261,11 @@ class Spec:
         if cited is not None:
             c = Cited(value=parse_value(cited) if isinstance(cited, str) else cited,
                       source=parse_source(cited_source, None, None, None, None, led.root) if cited_source else None)
-        setting, _ = led.set_setting(self.exp.id, full, value, unknown=unknown, source=src, required=required, per_run=True if per_run else None,
-                                     cited=c, note=note, amend=amend, verify=verify)
+        argv = ["spec", "set", self.exp.id, full, *([json.dumps(value) if isinstance(value, list) else value] if value is not None else []),
+                *(["--source", source] if source else []), *(["--amend", "--why", amend] if amend else [])]
+        with _handing_over(*argv):
+            setting, _ = led.set_setting(self.exp.id, full, value, unknown=unknown, source=src, required=required, per_run=True if per_run else None,
+                                         cited=c, note=note, amend=amend, verify=verify)
         return setting
 
     def verify(self, *names: str) -> list[dict]:
@@ -243,7 +274,8 @@ class Spec:
 
     def vary(self, *names: str, amend: Optional[str] = None) -> None:
         """Declare settings the variants differ in on purpose; any other difference is a confound."""
-        self.exp.state.ledger.declare_varies(self.exp.id, names, amend=amend)
+        with _handing_over("spec", "vary", self.exp.id, *names, *(["--amend", "--why", amend] if amend else [])):
+            self.exp.state.ledger.declare_varies(self.exp.id, names, amend=amend)
 
 
 class Claim:
@@ -283,9 +315,7 @@ class Run:
         """Record numbers: `run.log(epe=5.64)` or `run.log({"int8.epe": 5.64})`. The last value logged under a name is the
         one attached."""
         for k, v in {**dict(metrics or {}), **named}.items():
-            if isinstance(v, bool) or not isinstance(v, (int, float)):
-                raise RBError("E_OBJECT_INVALID", message=f"{k}: evidence holds numbers (got {type(v).__name__}).")
-            self.metrics[k] = float(v)
+            self.metrics[k] = _number(k, v)
 
     def artifact(self, path: PathLike) -> None:
         """An output whose hash goes into the evidence."""

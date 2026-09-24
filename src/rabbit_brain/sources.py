@@ -32,12 +32,14 @@ from typing import Any, Optional
 from .investigation import Resolution, Source
 
 NUM = r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?"
-NUMBER_TOKEN = re.compile(rf"(?<![\w.\-+]){NUM}(?![\d.]|[-+]\d|,\d)")
+NUMBER_TOKEN = re.compile(rf"(?<![\w.\-+]){NUM}(?!\d|\.\d|[-+]\d|,\d)")   # a full stop after it ends a sentence, not the number
 THOUSANDS = re.compile(r"(?<![\w.,\-+])[-+]?\d{1,3}(?:,\d{3})+(?![\w.,])")
 BOOL = re.compile(r"(?<![\w.\-])(true|false|True|False|TRUE|FALSE)(?![\w.\-])")
 GROUP = re.compile(r"[\[\(\{]([^\[\]\(\)\{\}]*)[\]\)\}]")
 COMMENT = re.compile(r"^\s*(#|//|%|;|\*|/\*)")
 STRUCTURED = {".yaml": "yaml", ".yml": "yaml", ".json": "json", ".toml": "toml"}
+PROSE = {".txt", ".md", ".rst", ".tex", ".html", ".htm", ""}      # files where '#' and '//' are text, not the start of a comment
+TRAILING_COMMENT = re.compile(r"\s+(?:#|//).*$")
 UNTRACKED_HASH_LIMIT = 16 * 1024 * 1024
 
 
@@ -130,6 +132,13 @@ def full_path(root: Path, path: str) -> Path:
     return p if p.is_absolute() else root / p
 
 
+def _in_state(root: Path, path: str) -> bool:
+    try:
+        return (root / ".rb").resolve() in [(root / path).resolve(), *(root / path).resolve().parents]
+    except OSError:
+        return False
+
+
 def inside_project(root: Path, path: str) -> bool:
     """A source must live in the project: under the directory holding .rb/, or in the git repository that holds it."""
     real = Path(os.path.realpath(full_path(root, path)))
@@ -218,11 +227,32 @@ def parse_structured(text: str, kind: str, name: str) -> Any:
             import yaml
         except ModuleNotFoundError:
             raise Unresolved("E_SOURCE_UNRESOLVED", f"reading {name} needs PyYAML: pip install \"rabbit-brain[yaml]\"")
-        return yaml.safe_load(text)
+        return yaml.load(text, Loader=_yaml_loader())
     except Unresolved:
         raise
     except Exception as exc:  # noqa: BLE001 - any parser's error is "this file does not parse"
         raise Unresolved("E_SOURCE_UNRESOLVED", f"{name} does not parse as {kind.upper()}: {str(exc).splitlines()[0][:160]}")
+
+
+_LOADER: Any = None
+
+
+def _yaml_loader() -> Any:
+    """PyYAML's safe loader, reading numbers the way YAML 1.2 and every training config mean them: `1e-4` is a float
+    (YAML 1.1 wants a dot), and a date stays the text it is."""
+    global _LOADER
+    if _LOADER is None:
+        import yaml
+
+        class Loader(yaml.SafeLoader):
+            pass
+
+        Loader.yaml_implicit_resolvers = {ch: [(tag, rx) for tag, rx in rs if tag != "tag:yaml.org,2002:timestamp"]
+                                          for ch, rs in yaml.SafeLoader.yaml_implicit_resolvers.items()}
+        Loader.add_implicit_resolver("tag:yaml.org,2002:float", re.compile(r"^[-+]?(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9_]+)[eE][-+]?[0-9]+$"),
+                                     list("-+0123456789."))
+        _LOADER = Loader
+    return _LOADER
 
 
 def key_steps(key: str) -> list[str]:
@@ -294,8 +324,8 @@ def key_names(key: str, name: str, term: Optional[str] = None) -> bool:
     """Whether a config key is the setting's own: the same path, the same last segment (`optim.lr` for `lr`), or the
     source's --term. A line that happens to hold the value under another key (`weight_decay: 1e-4` for lr) is not."""
     last = name.split(".")[-1].lower()
-    k = key.lower()
-    return k == name.lower() or k.split(".")[-1] == last or (bool(term) and key_token_in(key.replace(".", " "), str(term)))
+    steps = [x.lower() for x in key_steps(key)]
+    return ".".join(steps) == name.lower() or steps[-1] == last or (bool(term) and key_token_in(" ".join(key_steps(key)), str(term)))
 
 
 def yaml_key_at(text: str, line: int) -> Optional[str]:
@@ -409,18 +439,14 @@ def states(text: str, value: Any) -> bool:
 
 
 def as_value(read: Any) -> Any:
-    """A value read from a structured file, with YAML 1.1's quirk undone: PyYAML reads `1e-4` as text."""
-    if isinstance(read, str) and re.fullmatch(NUM, read.strip()):
-        return _parse_number(read.strip())
+    """A value read from a structured file, as it is: text stays text ("11.10" is not 11.1). YAML's `1e-4` is read as a
+    number by the loader itself."""
     return read
 
 
 def equal(a: Any, b: Any) -> bool:
     """A setting's value against a value read from a file or run: numbers by the rule above, lists element by element in
-    order, everything else exactly. What was read is taken as a number only when the setting is one (YAML reads 1e-4 as
-    text): the text "12.4" is stated by the text "12.4"."""
-    if isinstance(a, (int, float)) and not isinstance(a, bool):
-        b = as_value(b)
+    order, everything else exactly: the text "12.4" is stated by the text "12.4" and not by the number."""
     if isinstance(a, list) or isinstance(b, list):
         return isinstance(a, list) and isinstance(b, list) and len(a) == len(b) and all(equal(x, y) for x, y in zip(a, b))
     if isinstance(a, bool) or isinstance(b, bool):
@@ -461,24 +487,31 @@ def render(value: Any) -> str:
 # ---------------------------------------------------------------- resolving
 
 
-def resolve(source: Source, value: Any, root: Path, name: str, previous: Optional[Resolution] = None) -> Resolution:
+def resolve(source: Source, value: Any, root: Path, name: str, previous: Optional[Resolution] = None, named: bool = True) -> Resolution:
     """Read the source and confirm it states `value` for the setting `name`. Returns what was read; raises Unresolved
     otherwise, including for anything unexpected while reading, so one bad source never stops the others being checked."""
     try:
-        return _resolve(source, value, root, name, previous)
+        return _resolve(source, value, root, name, previous, named)
     except Unresolved:
         raise
     except (OSError, ValueError, KeyError, UnicodeError) as exc:
         raise Unresolved("E_SOURCE_UNRESOLVED", f"{source.label()} could not be read: {type(exc).__name__}: {exc}")
 
 
-def _resolve(source: Source, value: Any, root: Path, name: str, previous: Optional[Resolution]) -> Resolution:
+def _resolve(source: Source, value: Any, root: Path, name: str, previous: Optional[Resolution], named: bool = True) -> Resolution:
+    """`named`: the source has to name the setting (its name or --term) as well as state the value. A cited claim's
+    number is exempt: a paper's table row states 1.43 without the word EPE on it."""
     if not source.checkable():
         if source.kind == "file":
             raise Unresolved("E_SOURCE_UNVERIFIABLE", "a file source needs a key path (file#key), a line (file:LINE) or a quote for rb to check it")
         raise Unresolved("E_SOURCE_UNVERIFIABLE", f"a {source.kind} source records where the value came from but rb cannot check it; save the page in the repository and point at it")
     if source.path and not inside_project(root, str(source.path)):
         raise Unresolved("E_SOURCE_OUTSIDE", f"{source.path} is outside the project, so nobody else can check it: copy it into the repository and commit it")
+    if source.path and _in_state(root, str(source.path)):
+        raise Unresolved("E_SOURCE_OUTSIDE", f"{source.path} is rb's own record in .rb/, which cannot be where a value comes from")
+    step = (key_steps(str(source.pointer))[-1:] or [""])[0] if source.kind == "run" else None
+    if named and source.kind == "run" and step and not key_names(str(source.pointer), name, source.term):
+        raise Unresolved("E_SOURCE_UNRESOLVED", f"{source.path}#{source.pointer} is {step!r}, not {name}: point at {name}'s own entry, or give --term with the name the file uses")
     if source.kind == "run":
         p = run_json_path(root, str(source.path))
         if not p.is_file():
@@ -498,6 +531,8 @@ def _resolve(source: Source, value: Any, root: Path, name: str, previous: Option
     if source.key:
         if kind is None:
             raise Unresolved("E_SOURCE_UNRESOLVED", f"a key path needs a YAML, JSON or TOML file; {source.path} is none of those. Use {source.path}:LINE or --quote")
+        if named and not key_names(source.key, name, source.term):
+            raise Unresolved("E_SOURCE_UNRESOLVED", f"{source.path}#{source.key} is not {name}: point at {name}'s own key, or give --term with the name the file uses")
         doc = parse_structured(text, kind, str(source.path))
         try:
             got = get_key(doc, source.key)
@@ -522,11 +557,17 @@ def _resolve(source: Source, value: Any, root: Path, name: str, previous: Option
     where = f"{source.path}:{found_line}"
     if is_comment(found_text):
         raise Unresolved("E_SOURCE_UNRESOLVED", f"{where} is a comment; a comment does not set a value", candidates=_candidates(lines, value, token))
+    code = Path(str(source.path)).suffix.lower() not in PROSE
+    setting_text = TRAILING_COMMENT.sub("", found_text) if code else found_text     # 'lr = 1e-4  # the paper used 3e-4' sets 1e-4
     if source.quote:
         if source.quote not in found_text and source.line is not None:
             raise Unresolved("E_SOURCE_UNRESOLVED", f"{where} does not contain the quote; it reads: {found_text.strip()[:200]}")
-        haystack = source.quote
+        if named and not key_token_in(setting_text, token):
+            raise Unresolved("E_SOURCE_UNRESOLVED", f"{where} does not name {token!r}: a quote has to be about this setting. Give --term with the "
+                             f"word the text uses for it", candidates=_candidates(lines, value, token))
+        haystack = source.quote if (not code or source.quote in setting_text) else setting_text
     else:
+        found_text = setting_text
         if not key_token_in(found_text, token):
             raise Unresolved("E_SOURCE_UNRESOLVED", f"{where} does not name {token!r}; it reads: {found_text.strip()[:200]}. "
                              f"Point at the line that sets it, give --term with the word the file uses, or --quote the exact text",
@@ -566,7 +607,7 @@ def _candidates(lines: list[str], value: Any, token: str) -> list[dict]:
     return out
 
 
-def recheck(source: Source, value: Any, root: Path, name: str) -> tuple[str, str]:
+def recheck(source: Source, value: Any, root: Path, name: str, named: bool = True) -> tuple[str, str]:
     """How a verified source reads now: ("ok", ""), ("moved", why) when the file changed but still states the value
     (non-blocking; re-verifying refreshes it), ("stale", why) when it no longer states it or cannot be read, or
     ("conflict", why) when it now states a different value. The source is always re-read, at its commit when pinned:
@@ -594,7 +635,7 @@ def recheck(source: Source, value: Any, root: Path, name: str) -> tuple[str, str
     if source.commit and not same_bytes:
         return "stale", f"{source.path} at {source.commit[:12]} does not match what was verified"
     try:
-        resolve(source, value, root, name, previous=res)
+        resolve(source, value, root, name, previous=res, named=named)
     except Unresolved as u:
         if same_bytes:
             return "stale", f"{source.label()} is the file rb verified, yet it does not state {render(value)}: the record of what was read was not made by rb"

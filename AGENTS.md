@@ -21,27 +21,28 @@ Python 3.10 or later. The core depends only on pydantic. `rb` works on your mach
 
 ## The research state (`.rb/`)
 
-`rb` keeps a line of work as JSON files in `.rb/`, one per object. Commit them with the code, and the state travels with the branch. `.rb/log.jsonl` records every write: who made it, through what (`via`: the CLI, the SDK, or MCP), what changed, and the hash of what was written. `rb init` sets git to merge it line by line.
+`rb` keeps a line of work as JSON files in `.rb/`, one per object. Commit them with the code, and the state travels with the branch. `.rb/log.jsonl` records every write: who made it and how `rb` knew, through what (`via`: the CLI, the SDK, or MCP), what changed, and the hash of what was written. `rb init` sets git to merge it line by line. `rb` also keeps a local copy of each write in `.rb/objects/` (gitignored), which `rb doctor --restore` puts back; a write that came from elsewhere is found in git history.
 
 ### The rule: agents propose; rb checks and computes; people decide
 
-- You may add questions, hypotheses, assumptions, experiments and their variants, metrics, settings with their sources, claims, and evidence. You may retract what you added while nothing rests on it.
-- `rb` reads every source it can, and it computes every verdict each time the verdict is read. No verdict is stored. Nothing you write can mark a setting verified. **Never edit `.rb/` by hand.** `rb` compares each file with the hash it logged. An object edited outside `rb`, or written into `.rb/` by hand, stops counting, and `rb doctor` lists it. A file that no longer parses stops commands with `E_STATE_CORRUPT`.
-- Four calls belong to a person:
-  - `rb freeze`
+- You may add questions, hypotheses, assumptions, experiments and their variants, metrics, settings with their sources, claims, and evidence. You may retract what an agent added while nothing rests on it; what a person wrote is theirs to retract.
+- `rb` reads every source it can, and it computes every verdict each time the verdict is read. No verdict is stored. Nothing you write can mark a setting verified. **Never edit `.rb/` by hand.** `rb` compares each file with its last write. While any object is edited, deleted or written into `.rb/` outside `rb`, no claim is established, every `--fail-on` gate fails, and `rb` will not write over that object (`E_STATE_EDITED`). `rb doctor` lists them; `rb doctor --restore` puts back what `rb` last wrote, and a person who wants the change keeps it with `rb doctor --adopt --why "..."`. A file that no longer parses stops commands with `E_STATE_CORRUPT`, and `rb doctor` still runs.
+- These calls belong to a person:
+  - `rb freeze`, and `rb freeze --amend`
   - `rb decide`
-  - `rb retract` of something other objects rest on
+  - `rb retract` of something a person wrote, or that other objects rest on
   - `--amend` on a frozen experiment
+  - `rb doctor --adopt`
 
   From an agent they fail with `E_HUMAN_ONLY`, and `errors[0].handoff.command` holds the exact command line. Give it to the person as it is, to run in their own terminal. Do not set or unset `RB_ACTOR` to get past it.
 
 **Who you are to rb.** Every write records an actor. `rb` works it out in this order:
 
-1. `RB_ACTOR` (`human:<name>` or `agent:<name>`), when set.
-2. An agent runtime it detects: Claude Code by `CLAUDECODE=1`, `AI_AGENT`, Codex by `CODEX_*`, or GitHub Actions.
+1. An agent runtime it detects: Claude Code by `CLAUDECODE=1`, `AI_AGENT`, Codex by `CODEX_SANDBOX` (and its other sandbox variables), or GitHub Actions. Inside one, `RB_ACTOR=agent:<name>` names the agent, and `RB_ACTOR=human:<name>` is ignored: a person's name typed inside an agent session is exactly what an agent would type.
+2. Otherwise `RB_ACTOR` (`human:<name>` or `agent:<name>`), when set.
 3. Otherwise a person, named from git (`user.email`'s local part, else `user.name`), or from the login.
 
-Every command that writes prints who it recorded. `rb` cannot stop a person's name being given inside an agent session. It records the call and stamps it "asserted from a Claude Code session" wherever the call is shown. It does not count such a call as a person's: an asserted freeze, vouch, or claim author fixes nothing. A person at their own terminal is never inside a detected agent session.
+Every command that writes prints who it recorded. A person working in an agent's terminal is recorded as the agent too, and makes their calls from their own terminal, which is what the handoff says.
 
 ### A session, start to finish
 
@@ -88,17 +89,17 @@ A setting belongs either to the whole experiment (`optim.lr`) or to one variant 
 | `file#key.path` | `configs/train.yaml#optim.lr` | YAML needs the `yaml` extra; JSON and TOML need nothing. The value is optional: `rb` reads it. |
 | `file:LINE` | `configs/train.yaml:3` | A YAML line becomes its key path when that key is the setting's own (`optim.lr` for `lr`). |
 | `file` with `--quote "exact text"` | | For prose. Add `--term "learning rate"` when the line calls the setting something else. |
-| `run:PATH#/json/pointer` | | A run directory means its `record.json`. |
+| `run:PATH#/json/pointer` | `run:rb-runs/<id>#/dataset/count` | A run directory means its `record.json`. |
 | `https://...` or `note:text` | | Recorded, but it stays provisional. |
 
-`--commit <sha>` reads the file at that commit, which never goes stale. `--locator "§4.2"` says where a reader finds the value. Paths are relative to where you run the command, and must be inside the project (`E_SOURCE_OUTSIDE` otherwise). `rb spec set <exp> --from <config> --keys "optim.*,model.depth"` records many settings at once from one config, each sourced by its key path. Choose the keys that define the experiment: a key like `log_every_n_steps` should not stop runs counting when it changes.
+`--commit <sha>` reads the file at that commit, which never goes stale. `--locator "§4.2"` says where a reader finds the value. Paths are relative to where you run the command, and must be inside the project and outside `.rb/` (`E_SOURCE_OUTSIDE` otherwise). `rb spec set <exp> --from <config> --keys "optim.*,model.depth"` records many settings at once from one config, each sourced by its key path. Choose the keys that define the experiment: a key like `log_every_n_steps` should not stop runs counting when it changes. A key whose value is not one (a section, an empty value) is skipped and named, before anything is written.
 
 **What "states" means is strict, on purpose.**
 
-- A comment line never verifies.
-- On a prose line, the setting's name (or `--term`) must appear.
-- A number is a standalone token compared exactly. `lr: 0.0001` states `1e-4`, but `resnet50` does not state 50, and `1700000001` does not state 1700000000.
-- Text is a whole token: `adamw` does not state `adam`.
+- **The source must name the setting.** A key (`file#optim.lr`), a run pointer, or the line a quote is on must name it: the same last word (`lr`), or the word given with `--term "learning rate"`. A line that happens to hold the value under another name does not verify it.
+- A comment line never verifies, and in a config or code file a trailing comment is not read: `lr = 1e-4  # the paper used 3e-4` states 1e-4.
+- A number is a standalone token compared exactly. `lr: 0.0001` states `1e-4`, and a sentence ending `... is 0.0001.` states it too, but `resnet50` does not state 50, and `1700000001` does not state 1700000000.
+- Text is a whole token: `adamw` does not state `adam`. Text stays text: the version `"11.10"` is not the number 11.1. YAML's `1e-4` is a number.
 - A list states its elements in order.
 
 When the source states a *different* value, `rb` records a **conflict** on the setting. The conflict blocks its claims, and re-verifying does not clear it. Only setting the value the source states, or a different source, clears it. Every read re-checks every verified setting:
@@ -111,7 +112,7 @@ When the source states a *different* value, `rb` records a **conflict** on the s
 
 A required setting that is unknown or provisional keeps every claim on its experiment from being established. `--optional` says it should not. A person can vouch for a value nobody can check: `rb decide int8/cuda accept -m "read it off the cluster image"`. The vouch covers that value only; a new value needs a new decision, and a setting with no value has nothing to vouch for.
 
-**Per-run settings and cited values.** `--per-run` is for what each run chooses (a seed). Each piece of evidence then gives its own with `--set seed=2`. `--cited 1e-4 --cited-source <where>` records the value a cited source used (a paper, its evaluation code). A difference between the two makes claims that cite a number `not_comparable`.
+**Per-run settings and cited values.** `--per-run` is for what each run chooses (a seed). Each piece of evidence must then give its own with `--set seed=2`, or it is refused. `--cited 1e-4 --cited-source <where>` records the value a cited source used (a paper, its evaluation code). A difference between the two makes claims that cite a number `not_comparable`.
 
 `verified` means the source states the value. It does not mean a run used it. To check that, attach the run's own resolved config with `--config` (below).
 
@@ -121,16 +122,18 @@ A required setting that is unknown or provisional keeps every claim on its exper
 
 ### Claims
 
-`rb claim add "<statement>" -e <exp> --metric <m> <criterion>` takes exactly one criterion: `--at-most X`, `--at-least X`, or `--equals X --tolerance T`. The criterion is fixed when the claim is written. **Write the claim before the run that tests it.** Evidence attached before the claim is exploratory, and it never counts.
+`rb claim add "<statement>" -e <exp> --metric <m> <criterion>` takes exactly one criterion: `--at-most X`, `--at-least X`, or `--equals X --tolerance T`. **Write the claim before the run that tests it.** A criterion counts as fixed when a person wrote it, or, for a claim an agent wrote, when a person freezes (or amends) the experiment after it. Evidence attached before that is exploratory, and it never counts.
 
 `--metric` names a number the evidence reports:
 
 - `epe` reads a number named `epe`;
 - `int8.epe` reads variant `int8`'s number;
 - `candidate.epe` reads the candidate's;
-- `change.epe` reads the candidate's minus the baseline's, from the same piece of evidence.
+- `change.epe` is the candidate's minus the baseline's, worked out by `rb` from the same piece of evidence. Attach the variants' own numbers, not a change you computed; a given `change.epe` that disagrees with them is not read.
 
-`--over each` (the default) means every run must meet the criterion; `--over mean` means their mean must. `--min-n 3` is how many confirmatory runs it takes. `--noise 0.01` is the run-to-run spread. A margin smaller than the noise is **borderline** and blocks. Without `--noise`, `rb` uses twice the standard deviation once there are three runs.
+Two names in one piece of evidence that read as the same metric (an alias and its metric) and disagree are not read either.
+
+`--over each` (the default) means every run must meet the criterion; `--over mean` means their mean must. `--min-n 3` is how many independent confirmatory runs it takes. `--noise 0.01` is the run-to-run spread. A margin smaller than the noise is **borderline** and blocks. Once there are three runs, `rb` also uses twice their standard deviation, whichever is larger: a stated noise never lowers what the runs show. `rb` prints the criterion with its `n` and noise everywhere it shows it, so the person who freezes sees all of it.
 
 A claim with `--source` cites a number someone else stated, such as a paper's table: save the text in the repository and give `--quote` and `--locator`. A file source must state the target, or the claim is refused. Its verdict is `reproduced` or `not_reproduced`.
 
@@ -146,7 +149,7 @@ rb evidence attach <exp> --run <review run id>                          # an rb 
 These options add to any form:
 
 - `--set seed=2` gives the per-run settings.
-- `--config <file>` checks the run's own resolved config against the spec: a Hydra `config.yaml`, a W&B `config.yaml` (its `value:` wrappers are read through), or a `hparams.yaml`. A run whose config gives a setting a different value from the spec is not counted, and says why; a setting the config does not mention is listed as absent.
+- `--config <file>` checks the run's own resolved config against the spec and the `--set` values: a Hydra `config.yaml`, a W&B `config.yaml` (its `value:` wrappers are read through), or a `hparams.yaml`. A run whose config gives a setting a different value is not counted, and says why; a setting the config does not mention is listed as absent, and a config that mentions none of them leaves the run's config unchecked.
 - `--artifact <file>` hashes an output into the evidence.
 - `--link wandb=<url>` records where else the run lives.
 - `--command` records what produced the numbers. `rb` did not run it.
@@ -154,19 +157,21 @@ These options add to any form:
 
 The **receipt** records the actor, the time, and the repository's state *when the evidence is attached*: the commit, and whether the tree had uncommitted changes, with a hash covering the diff and the untracked files (`.rb/` left out). For an `rb review run`, the receipt also keeps the run's own receipt and the hash of its `record.json`. Attach evidence from the tree that produced it.
 
+A review run's baseline and candidate become the experiment's baseline and candidate. When the run's model names are the experiment's variants in the other roles, or the experiment has several candidates, the attach is refused: attach the numbers by variant name instead.
+
 A review run attaches:
 
 - `baseline.<metric>`, `candidate.<metric>` and `change.<metric>`, only when some case had ground truth, because an error that was not measured is not a zero;
 - `cases`, `with_gt`, `regressions`, `improved`, `flagged`, `unstable` and `borderline`.
 
-The same numbers and files attached twice are recognised as a duplicate and not written again. A deliberate repeat takes `--again --why "..."`; it is kept on record and counts once toward a claim. Evidence from `rb review example` or the synthetic adapter is marked synthetic and never counts. Wrong evidence is retracted with a reason, never deleted: `rb retract <id> -m "..."`.
+The same numbers and files attached twice are recognised as a duplicate and not written again. A deliberate repeat takes `--again --why "..."`; it is kept on record, and the same numbers count once toward a claim however they are attached. Evidence from `rb review example` or the synthetic adapter is marked synthetic and never counts. Wrong evidence is retracted with a reason, never deleted: `rb retract <id> -m "..."`.
 
 ### Verdicts, and when a claim is established
 
 `rb` computes a claim's verdict from its evidence every time it is read. Each piece of evidence is an observation with one of three roles:
 
 - **confirmatory**: it counts.
-- **exploratory**: attached before the claim was written, or before the freeze. It is shown, never counted.
+- **exploratory**: attached before a person fixed the claim's criterion: before a person wrote it, or, for a claim an agent wrote, before the person's freeze. It is shown, never counted.
 - **not counted**: synthetic, edited outside `rb`, attached under a spec that has changed since, run with a config that disagrees with the spec, or a repeat of a run already counted (the same numbers again, or the same per-run values such as `seed=1` reporting the same metrics).
 
 The verdict comes from the confirmatory observations alone:
@@ -183,28 +188,35 @@ The verdict comes from the confirmatory observations alone:
 A claim is **established** only when **all** of these hold:
 
 - it is supported or reproduced on confirmatory evidence;
-- **a person fixed the criterion**: a person wrote the claim, or a person froze the experiment after the claim existed;
+- **a person fixed the criterion**: a person wrote the claim, or a person froze (or amended) the experiment after the claim existed;
 - every required setting is verified or vouched for;
 - no conflict, stale source, confound, or change to a frozen spec;
 - the cited source was checked, for a claim that cites one;
 - no observation is borderline;
 - there are at least `--min-n` confirmatory runs;
-- the evidence is not synthetic, and nothing it rests on was edited outside `rb`.
+- the evidence is not synthetic, and nothing in `.rb/` was changed outside `rb`.
 
 Otherwise it is, for example, `supported, not established`, with every reason listed. Report it exactly that way.
 
 ### Freezing, amending, deciding, retracting
 
-**Freezing.** `rb freeze <exp> -m "..."` records the hash of the experiment's spec (its variants, what it varies, every setting's value and whether it is required) and of every claim's criterion. After that, changing any of them fails with `E_FROZEN`. A person can make the change anyway by giving `--amend --why "..."` on the same command; the change, the reason and the hash before and after are kept. Verifying a setting changes nothing. A spec that no longer matches its freeze record, whoever changed it, is reported and blocks its claims. Evidence attached before the freeze is exploratory.
+**Freezing.** `rb freeze <exp> -m "..."` records a hash of everything that decides what the experiment's claims read:
+
+- its variants and what it varies;
+- every setting's value, whether it is required, where its value comes from, and the value a cited source used;
+- every claim's criterion;
+- the catalogue entries the claims' metrics use.
+
+It prints each criterion it locks. After that, changing any of them fails with `E_FROZEN`. A person can make the change anyway by giving `--amend --why "..."` on the same command; the change, the reason and the hash before and after are kept. Verifying a setting changes nothing. A frozen experiment that no longer matches its record (a metric redefined through the catalogue, say) is reported and blocks its claims until a person adopts it as it is with `rb freeze <exp> --amend --why "..."`.
 
 **Deciding.** `rb decide <subject> accept|reject|investigate -m "..."` works on a claim, hypothesis, assumption, question, experiment, or a setting (`<exp>/<name>`):
 
 - A decision on a claim records the verdict at that moment, so the decision is always read against what it was made on. A person may accept a refuted claim, and `rb status` shows both.
 - Accepting or rejecting a hypothesis sets it `accepted` or `rejected`. A verdict alone never does.
 - A question becomes `answered` or `dropped`, and an assumption `assumed` or `violated`.
-- Accepting a setting vouches for its value; rejecting it blocks its claims.
+- Accepting a setting vouches for its value; accepting one that differs between variants accepts that difference, and lapses when a value changes. Rejecting it blocks its claims until the value changes.
 
-**Retracting.** `rb retract <id or exp/name> -m "..."` takes anything back. It stays on record and stops counting. Retracting something other objects rest on is a person's call.
+**Retracting.** `rb retract <id or exp/name> -m "..."` takes anything back: an object, a setting, or a variant (`rb retract int8/fp16`). It stays on record and stops counting. Retracting what a person wrote, or what other objects rest on (a metric a claim reads, evidence a claim counts), is a person's call. On a frozen experiment a retraction is recorded as an amendment. A retracted experiment blocks its claims and takes no more settings, claims or evidence.
 
 ### Reading the state
 
@@ -216,15 +228,15 @@ Otherwise it is, for example, `supported, not established`, with every reason li
 4. each claim with its standing and blocking caveats;
 5. each experiment with its setting counts.
 
-Every item in the two lists says who can act and gives the exact command. Work from **Agent can do**, and hand **Needs a person** to the person. `--fail-on` takes `unestablished`, `untested`, `refuted`, `not_reproduced`, `undecided`, `unknown` or `stale` (repeatable or comma-separated) and exits 1 when any of them applies. An edit made outside `rb` fails any gate.
+Every item in the two lists says who can act and gives the exact command. Work from **Agent can do**, and hand **Needs a person** to the person. `--fail-on` takes `unestablished`, `untested`, `refuted`, `not_reproduced`, `undecided`, `unknown` or `stale` (repeatable or comma-separated) and exits 1 when any of them applies. A decision counts only while the verdict it was made on still stands. While anything in `.rb/` is changed outside `rb`, every gate fails.
 
 The other read commands:
 
 - `rb show <id>` prints one object in full: a claim with its verdict and observations, an experiment with its spec, evidence with its receipt, a setting (`int8/optim.lr`) with its history.
-- `rb compare <exp>` prints the experiment's own table: variants by metrics, the mean over counted evidence, and the change against the baseline, read in the metric's direction.
-- `rb log [-n N] [id]` lists the writes: who, through what, and what changed.
+- `rb compare <exp>` prints the experiment's own table: variants by metrics, the mean over the evidence that counts (each run once, none run with a config that disagrees with the spec), and the change against the baseline, read in the metric's direction.
+- `rb log [-n N] [id]` lists the writes: who, how `rb` knew it, through what, and what changed.
 - `rb context` prints the whole state as a Markdown handoff pack. It is what a fresh session, or a colleague, reads first.
-- `rb doctor` in a project with `.rb/` checks the research state: who you are recorded as, edits made outside `rb`, merge leftovers, and sources outside the repository.
+- `rb doctor` in a project with `.rb/` checks the research state: who you are recorded as, files changed outside `rb` or left mid-merge, files that do not parse, and sources outside the repository. `rb doctor --restore` puts back what `rb` last wrote; `rb doctor --adopt --why "..."` (a person) keeps the changes as they stand.
 - `rb schema <kind>` prints each object's shape. The kinds are `investigation`, `question`, `hypothesis`, `assumption`, `experiment`, `metric`, `claim`, `evidence`, `decision` and `verdict`.
 
 **When you report to a person from this state:**
@@ -244,6 +256,7 @@ import rabbit_brain as rb
 state = rb.open()                                    # the .rb/ here or above; rb.init("...") starts one
 exp = state.experiment("int8")                       # or state.add_experiment("...", baseline="fp32", candidates=["int8"], varies=["precision"])
 exp.spec.set("optim.lr", source="configs/train.yaml#optim.lr")   # read from the file and verified
+exp.spec.set("seed", per_run=True)                   # each run gives its own
 claim = exp.claim("INT8 costs at most 0.05 px EPE", metric="change.epe", at_most=0.05, min_n=3)
 
 with exp.run(seed=2, config="outputs/2/.hydra/config.yaml") as run:
@@ -257,11 +270,11 @@ A run block works like this:
 - Its numbers are attached as one piece of evidence when the block ends without an error, recorded as `logged`.
 - The receipt's command is the script's own command line.
 - A block that raises attaches nothing.
-- The last value logged under a name is the one attached.
+- The last value logged under a name is the one attached. numpy and torch scalars are fine.
 
-`exp.spec.verify()`, `exp.spec.vary(...)`, `exp.attach({...})`, `exp.compare()`, `state.status()` and `state.context()` do what their commands do. The person's calls (`exp.freeze(why=...)`, `state.decide(...)`, `state.retract(...)`) raise `RBError` with `code == "E_HUMAN_ONLY"` for an agent, and `err.extra["handoff"]["command"]` holds the `rb` line for the person.
+`exp.spec.verify()`, `exp.spec.vary(...)`, `exp.attach({...})`, `exp.compare()`, `state.status()` and `state.context()` do what their commands do. The person's calls (`exp.freeze(why=...)`, `state.decide(...)`, `state.retract(...)`, and `amend=` on any change) raise `RBError` with `code == "E_HUMAN_ONLY"` for an agent, and `err.extra["handoff"]["command"]` holds the `rb` line for the person.
 
-`rb mcp` serves the same operations to an agent over the Model Context Protocol (stdio). Each tool is the command of the same name (`context`, `status`, `show`, `compare`, `log`, `question_add`, ..., `spec_set`, `spec_verify`, `spec_vary`, `claim_add`, `evidence_attach`, `retract`, `freeze`, `decide`). It returns the same envelope as `--json`, and there are resources `rb://context`, `rb://status` and `rb://docs`. **Every call on a connection is recorded as `agent:<client name>`, whatever `RB_ACTOR` says,** because a model is making it. So `freeze` and `decide` return `E_HUMAN_ONLY` with `handoff.command` for the person. For Claude Code, add it from the project root: `claude mcp add rabbit-brain -- rb mcp`. `--agent <name>` sets the name when the client sends none.
+`rb mcp` serves the same operations to an agent over the Model Context Protocol (stdio). Each tool is the command of the same name (`context`, `status`, `show`, `compare`, `log`, `question_add`, ..., `spec_set`, `spec_verify`, `spec_vary`, `claim_add`, `evidence_attach`, `retract`, `freeze`, `decide`). It returns the same envelope as `--json`, and there are resources `rb://context`, `rb://status` and `rb://docs`. **Every call on a connection is recorded as `agent:<client name>`, whatever `RB_ACTOR` says,** because a model is making it. So `freeze` and `decide` return `E_HUMAN_ONLY` with `handoff.command` for the person. For Claude Code, add it from the project root: `claude mcp add rabbit-brain -- rb mcp`. `--agent <name>` sets the name recorded, whatever the client sends.
 
 Planned, and not in this version:
 
@@ -560,7 +573,8 @@ A review run's envelope:
 | `E_SOURCE_UNRESOLVED` | the source was read and does not state the value (a different value is recorded as a conflict), or could not be read | fix the path, key, line, quote or commit, or set the value the source states |
 | `E_SOURCE_UNVERIFIABLE` | a url, a note, or a file source with no key, line or quote | point at a config key, a line, a quote in a saved copy, or a run's JSON; or a person vouches: `rb decide <exp>/<name> accept -m "..."` |
 | `E_SOURCE_OUTSIDE` | the source is outside the project, so nobody else can check it | copy it into the repository, commit it, and point `--source` at the copy |
-| `E_STATE_CORRUPT` | a file under `.rb/` is not valid, usually a hand edit or a merge left half done | `rb doctor` lists it; `git diff .rb/`, restore it, and change state with `rb` commands |
+| `E_STATE_EDITED` | an object in `.rb/` was edited, deleted or written by hand, and rb will not write over it | `rb doctor` lists it; `rb doctor --restore` puts back what rb last wrote; if the change is right, a person runs `rb doctor --adopt --why "..."` |
+| `E_STATE_CORRUPT` | a file under `.rb/` is not valid, usually a hand edit or a merge left half done | `rb doctor` lists it; `rb doctor --restore` puts back what rb last wrote |
 | `E_USAGE` | the command line did not parse | `rb <command> --help`; negative numbers are written as they are (`--at-most -0.001`) |
 
 ## Worked examples
@@ -574,9 +588,11 @@ rb context                                           # if .rb/ exists: read it f
 rb init "Does INT8 cost RAFT accuracy on KITTI?"      # otherwise, start it
 rb experiment add "INT8 vs FP32 on KITTI-2015" --id int8 --baseline fp32 --candidate int8 --varies precision
 rb spec set int8 --from configs/eval.yaml --keys "model.*,data.*,eval.iters"
+rb spec set int8 seed --per-run
 rb metric add epe --unit px --minimize
 rb claim add "INT8 costs at most 0.05 px EPE" -e int8 --metric change.epe --at-most 0.05 --min-n 3
 rb freeze int8 -m "..."                              # refused: E_HUMAN_ONLY. Give the person errors[0].handoff.command and wait
+                                                     # (it prints each criterion it locks, so they see what they are signing)
 python scripts/eval.py --precision fp32 --seed 1 ... # then the runs, after the freeze
 rb evidence attach int8 --from out/seed1/metrics.json --set seed=1 --config out/seed1/config.yaml --command "python scripts/eval.py ..."
 rb show <claim id>
@@ -646,6 +662,6 @@ A refused push changes nothing locally; the run is still on disk and still compl
 
 Open `rb-runs/<run_id>/report.md`. The header lists the run id, the `rb` version, the exact command, both checkpoints with their sha256, the environment, the hook status and whether the adapter agreed with the model's own evaluation; the body restates the definitions with the limits in force and lists every case. `record.json` adds the model-code git SHA, the dataset hash, seeds and skipped cases. Re-run the command from the header, or `rb review findings <run_id>` with the same limits, and compare. If what the agent told you differs from the report, the report is right.
 
-For research state: `rb status` and `rb show <id>` are computed from `.rb/`, not from what anyone wrote about it. `rb log` lists every write with its actor and how `rb` knew it (a call made with your name from inside an agent session is marked as such), and `git log -p .rb/` shows every change. A setting is verified only with the text `rb` read, which `rb show <experiment>/<name>` prints. `rb doctor` lists anything edited outside `rb`. It cannot catch someone who edits a file and also rewrites `log.jsonl` to match; git can, so review `git log -p .rb/` for changes to `log.jsonl` other than new lines. If what the agent told you differs from `rb status`, `rb status` is right.
+For research state: `rb status` and `rb show <id>` are computed from `.rb/`, not from what anyone wrote about it. `rb log` lists every write with its actor and how `rb` knew it (inside an agent session your name in `RB_ACTOR` is ignored, and the entry says so), and `git log -p .rb/` shows every change. A setting is verified only with the text `rb` read, which `rb show <experiment>/<name>` prints. `rb doctor` lists anything changed outside `rb`, and `rb doctor --restore` puts back what `rb` wrote. It cannot catch someone who edits a file and also rewrites `log.jsonl` to match; git can, so review `git log -p .rb/` for changes to `log.jsonl` other than new lines. If what the agent told you differs from `rb status`, `rb status` is right.
 
 Re-running on a different machine is a weaker check than it looks, and the report says so where it matters. Same code, same checkpoints, same data, a different GPU or torch build: most cases land on the same numbers to several decimals, a few land far enough apart to cross a limit. On the RAFT examples in this repository, run on two machines, 53 of 200 cases differed by more than 0.01 px and six cases changed what they were called; all six are marked borderline by the first machine's own numbers, without knowing the second machine's. So: a difference on a case the report marks borderline is the machine, not a discrepancy; a difference on any other case, or a different verdict, is worth chasing.

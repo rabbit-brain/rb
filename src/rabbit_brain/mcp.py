@@ -161,7 +161,7 @@ def argv_for(name: str, arguments: dict) -> list[str]:
             continue
         if key == "direction":
             argv.append(f"--{v}")
-        elif v is True:
+        elif v is True and switch:
             argv.append(flag)
         elif isinstance(v, dict):
             for k, x in v.items():

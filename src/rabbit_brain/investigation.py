@@ -183,6 +183,7 @@ class Setting(BaseModel):
     source: Optional[Source] = None
     cited: Optional[Cited] = None
     conflict: Optional[Conflict] = None
+    failed: Optional[str] = Field(default=None, max_length=400)   # why the last check of this source did not verify it
     note: str = Field(default="", max_length=400)
     set_by: str = Field(pattern=ACTOR_PATTERN)
     set_at: str

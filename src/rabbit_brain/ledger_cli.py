@@ -472,7 +472,7 @@ def cmd_claim_add(args: argparse.Namespace, out: Any) -> int:
     _actor_line(out, led)
     out.data.update({"object": _obj("claim", claim), "verdict": v.model_dump(mode="json")})
     if claim.experiment:
-        out.next = [f"rb evidence attach {claim.experiment} {claim.metric}=<value> --command \"<what produced it>\""]
+        out.next = [led._attach_hint(claim)]
     return EXIT_OK
 
 
@@ -1070,7 +1070,8 @@ def context_markdown(led: Ledger, st: dict) -> str:
             if ev.experiment != e.id:
                 continue
             cfg = ev.receipt.config
-            ran = "config unchecked" if cfg is None else ("ran with the spec" if not cfg.mismatches else "ran with a different spec")
+            ran = ("config unchecked" if cfg is None or not (cfg.matches or cfg.mismatches)
+                   else "ran with the spec" if not cfg.mismatches else "ran with a different spec")
             L.append(f"- {ev.id} ({ev.basis}{', synthetic' if ev.synthetic else ''}): " + ", ".join(f"{k}={x:g}" for k, x in sorted(ev.metrics.items())[:6])
                      + (f" · {', '.join(f'{k}={show(x)}' for k, x in ev.per_run.items())}" if ev.per_run else "")
                      + f" · {ran}" + (f" · command: {ev.receipt.command}" if ev.receipt.command else "")

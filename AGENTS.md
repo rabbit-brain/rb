@@ -97,7 +97,7 @@ A setting belongs either to the whole experiment (`optim.lr`) or to one variant 
 **What "states" means is strict, on purpose.**
 
 - **The source must name the setting.** A key (`file#optim.lr`), a run pointer, or the line a quote is on must name it: the same last word (`lr`), or the word given with `--term "learning rate"`. A line that happens to hold the value under another name does not verify it.
-- A comment line never verifies, and in a config or code file a trailing comment is not read: `lr = 1e-4  # the paper used 3e-4` states 1e-4.
+- A comment line never verifies, and in a config or code file a trailing comment is not read: `lr = 1e-4  # the paper used 3e-4` states 1e-4. On a line with several numbers, the setting's is the one nearest its name: in `default=0.01, help="try 0.05"` it is 0.01, and in "the learning rate is 0.01 and weight decay 0.0001" weight decay's is 0.0001. A `--term` must be the words the text uses for the setting, not a word like "the".
 - A number is a standalone token compared exactly. `lr: 0.0001` states `1e-4`, and a sentence ending `... is 0.0001.` states it too, but `resnet50` does not state 50, and `1700000001` does not state 1700000000.
 - Text is a whole token: `adamw` does not state `adam`. Text stays text: the version `"11.10"` is not the number 11.1. YAML's `1e-4` is a number.
 - A list states its elements in order.
@@ -108,7 +108,7 @@ When the source states a *different* value, `rb` records a **conflict** on the s
 - a file that no longer states the value is **stale**, which blocks;
 - a file that now states another value is a **conflict**, which blocks.
 
-`rb spec verify <exp> [names]` re-reads the sources. It exits 1 when any setting it could check did not verify, with `E_SOURCE_UNRESOLVED` per setting in `data.outcome.failures`. A url or a note is reported as not checkable (`E_SOURCE_UNVERIFIABLE`) and stays provisional without failing the command.
+`rb spec verify <exp> [names]` re-reads the sources. A check that fails is recorded on the setting, and `rb status` then asks for a source that states the value rather than the same check again. It exits 1 when any setting it could check did not verify, with `E_SOURCE_UNRESOLVED` per setting in `data.outcome.failures`. A url or a note is reported as not checkable (`E_SOURCE_UNVERIFIABLE`) and stays provisional without failing the command.
 
 A required setting that is unknown or provisional keeps every claim on its experiment from being established. `--optional` says it should not. A person can vouch for a value nobody can check: `rb decide int8/cuda accept -m "read it off the cluster image"`. The vouch covers that value only; a new value needs a new decision, and a setting with no value has nothing to vouch for.
 

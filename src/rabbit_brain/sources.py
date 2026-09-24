@@ -396,6 +396,32 @@ def _numbers(text: str) -> list[Any]:
     return out
 
 
+def _nearest_number(text: str, token: str) -> Any:
+    """The number closest to where the line names the setting: in 'the learning rate is 0.01 and weight decay 0.0001',
+    weight decay's is 0.0001, and in 'default=0.01, help="try 0.05"' the setting's is 0.01, not the one in the help."""
+    names = [m.span() for m in re.finditer(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])", text, flags=re.IGNORECASE)]
+    spans = []
+    for m in NUMBER_TOKEN.finditer(text):
+        if m.start() >= 2 and text[m.start() - 1] == "," and text[m.start() - 2].isdigit():
+            continue
+        try:
+            spans.append((m.span(), _parse_number(m.group(0))))
+        except ValueError:
+            pass
+    spans += [(m.span(), _parse_number(m.group(0))) for m in THOUSANDS.finditer(text)]
+    best = None
+    for (a, b), n in spans:
+        for (x, y) in names:
+            gap = a - y if a >= y else x - b          # a number after the name wins a tie
+            key = (gap, 0 if a >= y else 1)
+            if gap >= 0 and (best is None or key < best[0]):
+                best = (key, n)
+    return None if best is None else best[1]
+
+
+FUNCTION_WORDS = {"the", "and", "for", "with", "our", "this", "that", "are", "was", "were", "from", "into", "all", "use", "used", "using", "set", "value"}
+
+
 def _text_token(value: str, text: str) -> bool:
     if not value.strip():
         return False
@@ -545,6 +571,8 @@ def _resolve(source: Source, value: Any, root: Path, name: str, previous: Option
         line = yaml_line_of(text, source.key) if kind == "yaml" else None
         return Resolution(at=now(), commit=commit, sha256=sha256_bytes(data), line=line, text=f"{source.key}: {render(as_value(got))}"[:400], read=as_value(got))
     lines = split_lines(text)
+    if source.term is not None and (not re.search(r"[A-Za-z]", source.term) or source.term.strip().lower() in FUNCTION_WORDS):
+        raise Unresolved("E_SOURCE_UNRESOLVED", f"--term {source.term!r} names nothing in particular: give the words the text uses for this setting, e.g. \"weight decay\"")
     token = source.term or name.split(".")[-1]
     if source.line is not None:
         found_line, found_text = _line_or_moved(source, lines, previous)
@@ -576,6 +604,11 @@ def _resolve(source: Source, value: Any, root: Path, name: str, previous: Option
     if not states(haystack, value):
         raise Unresolved("E_SOURCE_UNRESOLVED", f"{where} does not state {render(value)}; it reads: {haystack.strip()[:200]}",
                          differs=key_token_in(found_text, token), candidates=_candidates(lines, value, token))
+    if not source.quote and isinstance(value, (int, float)) and not isinstance(value, bool):
+        near = _nearest_number(found_text, token)       # the value must be the setting's own number on the line, not another one on it
+        if near is not None and not _num_equal(value, near):
+            raise Unresolved("E_SOURCE_UNRESOLVED", f"{where} gives {token} {render(near)}, not {render(value)}; it reads: {found_text.strip()[:200]}",
+                             found=near, differs=True, candidates=_candidates(lines, value, token))
     return Resolution(at=now(), commit=commit, sha256=sha256_bytes(data), line=found_line, text=(found_text.strip() or haystack.strip())[:400])
 
 

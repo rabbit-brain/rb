@@ -89,9 +89,12 @@ def _canonical(obj: Any) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-def _run_key(e: Any) -> str:
-    """Two pieces of evidence with the same per-run values reporting the same numbers are one run reported twice."""
-    return "run:" + _canonical({"per_run": e.per_run, "metrics": sorted(e.metrics)})
+def _run_key(e: Any, reads: Optional[str] = None) -> str:
+    """Two pieces of evidence with the same per-run values are one run reported twice: for a claim, when both give the
+    number it reads (an extra metric on the second does not make it a new run); for the whole experiment, when both
+    report the same variants."""
+    what: Any = reads if reads is not None else sorted({k.split(".")[0] for k in e.metrics if "." in k})
+    return "run:" + _canonical({"per_run": e.per_run, "reads": what})
 
 
 def _sha(obj: Any) -> str:
@@ -761,6 +764,7 @@ class Ledger:
             s.source = s.source.model_copy(update={"resolved": res})
             s.status = "verified"
             s.conflict = None
+            s.failed = None
             row.update(after="verified", ok=True, read=res.text, line=res.line, commit=res.commit, sha256=res.sha256, where=s.source.label())
         except Unresolved as u:
             if u.differs:
@@ -769,6 +773,7 @@ class Ledger:
             if u.differs or s.status == "verified":
                 s.status = "provisional"
                 s.source = s.source.model_copy(update={"resolved": None})
+            s.failed = u.reason[:400]
             row.update(after=s.status, ok=False, code=u.code, reason=u.reason, candidates=u.candidates, conflict=s.conflict is not None)
         return row
 
@@ -1266,8 +1271,9 @@ class Ledger:
                     out.append(Caveat(code="vouched", subject=subject, blocks=False, text=f"{name} = {show(s.value)} is provisional · vouched for by {vouch.by} ({vouch.id})"))
                 else:
                     where = f" (source {s.source.label()}, not checkable)" if s.source is not None and not s.source.checkable() else ""
-                    out.append(Caveat(code="provisional", subject=subject, blocks=s.required,
-                                      text=f"{name} = {show(s.value)} is provisional: nobody checked it{where}"))
+                    text = (f"{name} = {show(s.value)} is provisional: rb read {s.source.label() if s.source else 'its source'} and it does not state it ({s.failed})"
+                            if s.failed else f"{name} = {show(s.value)} is provisional: nobody checked it{where}")
+                    out.append(Caveat(code="provisional", subject=subject, blocks=s.required, text=text))
             elif s.status == "verified" and s.source is not None:
                 state, why = recheck(s.source, s.value, self.root, name)
                 if state in ("stale", "conflict"):
@@ -1392,12 +1398,12 @@ class Ledger:
                 role, reason = "exploratory", f"attached before {claim.id} was written"
             elif e.created_at < counts_from or (fixed_by_freeze and e.id in exp.frozen.after_evidence):
                 role, reason = "exploratory", f"attached before a person fixed {claim.id}'s criterion ({exp.id} frozen {exp.frozen.at[:16] if exp.frozen else ''})"
-            elif e.per_run and _run_key(e) in first_of:
-                role, reason = "not_counted", f"repeats {', '.join(f'{k}={show(x)}' for k, x in sorted(e.per_run.items()))} of {first_of[_run_key(e)]}: not an independent run"
+            elif e.per_run and _run_key(e, claim.metric) in first_of:
+                role, reason = "not_counted", f"repeats {', '.join(f'{k}={show(x)}' for k, x in sorted(e.per_run.items()))} of {first_of[_run_key(e, claim.metric)]}: not an independent run"
             if role != "not_counted":
                 first_of.setdefault(same_numbers, e.id)
             if role == "confirmatory" and e.per_run:
-                first_of.setdefault(_run_key(e), e.id)
+                first_of.setdefault(_run_key(e, claim.metric), e.id)
             holds, margin = _judge(claim, value)
             observations.append(Observation(evidence=e.id, value=value, holds=holds, margin=margin, role=role, reason=reason, basis=e.basis, per_run=e.per_run))
         conf = [o for o in observations if o.role == "confirmatory"]
@@ -1626,7 +1632,10 @@ class Ledger:
                 elif cav.code == "unknown_optional":
                     item(owner, "unknown_optional", cav.subject, f"{cav.subject} is unknown (optional)", f"rb spec set {e.id} {name} <value> --source <file#key>{amend}")
                 elif cav.code == "provisional":
-                    if s_ is not None and s_.source is not None and s_.source.checkable():
+                    if s_ is not None and s_.failed:
+                        item(owner, "provisional", cav.subject, f"{cav.subject}: {cav.text}",
+                             f"rb spec set {e.id} {name} <the value> --source <where it is stated>{amend}")
+                    elif s_ is not None and s_.source is not None and s_.source.checkable():
                         item("agent", "provisional", cav.subject, f"{cav.subject}: {cav.text}", f"rb spec verify {e.id} {name}")
                     else:
                         value = shlex.quote(show(s_.value)) if s_ is not None and s_.value is not None else "<value>"

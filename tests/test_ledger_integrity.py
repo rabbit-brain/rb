@@ -389,3 +389,32 @@ def test_receipts_before_the_first_commit_and_with_untracked_changes(lab, capsys
     Path("new_eval.py").write_text("v2", encoding="utf-8")
     second = rbj(capsys, "evidence", "attach", "e1", "--metric", "m=1")[1].data["evidence"]["receipt"]["git"]["diff_sha256"]
     assert first != second
+
+
+def test_every_command_rb_suggests_exists(lab, capsys):
+    """Open items, next hints and error fixes name commands an agent will run as written."""
+    import re
+    from rabbit_brain.cli import build_parser
+    start(capsys)
+    Path("cfg.yaml").write_text("lr: 1e-4\n", encoding="utf-8")
+    rbj(capsys, "question", "add", "q")
+    rbj(capsys, "spec", "set", "e1", "lr", "1e-4", "--source", "cfg.yaml:1")
+    rbj(capsys, "spec", "set", "e1", "seed", "--unknown")
+    rbj(capsys, "spec", "set", "e1", "b", "2", "--source", "cfg.yaml:1", "--verify")
+    rbj(capsys, "claim", "add", "c", "--experiment", "e1", "--metric", "m", "--at-most", "1")
+    code, env = rbj(capsys, "status")
+    texts = [o["what"] for o in env.data["open"]] + list(env.next)
+    for argv in (["experiment", "add", "x2"], ["claim", "add", "y", "--experiment", "e1", "--metric", "m", "--at-most", "1"], ["question", "add", "z"]):
+        texts += rbj(capsys, *argv)[1].next
+    parser = build_parser()
+    names = {n for a in parser._subparsers._group_actions for n in a.choices}
+    groups = {n: {s for a in (sub._subparsers._group_actions if sub._subparsers else []) for s in a.choices}
+              for a in parser._subparsers._group_actions for n, sub in a.choices.items()}
+    seen = 0
+    for text in texts:
+        for cmd, sub in re.findall(r"`?rb ([a-z-]+)(?: ([a-z-]+))?", text):
+            seen += 1
+            assert cmd in names, f"{text!r} names rb {cmd}"
+            if groups.get(cmd):
+                assert sub in groups[cmd], f"{text!r} names rb {cmd} {sub}"
+    assert seen >= 5

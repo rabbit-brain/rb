@@ -719,10 +719,10 @@ class Ledger:
                 if k.value is None and not k.required:
                     open_items.append({"kind": "setting", "id": f"{e.id}.{k.name}", "what": f"{e.id}: {k.name} is unknown (optional)"})
                 elif k.status == "provisional":
-                    how = f"run `rb setting verify {e.id} {k.name}`" if k.source is not None and k.source.verifiable() else "find a file or run that states it"
+                    how = f"run `rb spec verify {e.id} {k.name}`" if k.source is not None and k.source.verifiable() else "find a file or run that states it"
                     open_items.append({"kind": "setting", "id": f"{e.id}.{k.name}", "what": f"{e.id}: {k.name} = {_show(k.value)} is provisional; {how}"})
             for n in stale:
-                open_items.append({"kind": "setting", "id": f"{e.id}.{n}", "what": f"{e.id}: {n} was verified and no longer checks out; run `rb setting verify {e.id} {n}`"})
+                open_items.append({"kind": "setting", "id": f"{e.id}.{n}", "what": f"{e.id}: {n} was verified and no longer checks out; run `rb spec verify {e.id} {n}`"})
         for v in verdicts:
             if v.status == "not_tested":
                 open_items.append({"kind": "claim", "id": v.claim, "what": f"{v.claim} is not tested: {v.statement}"})

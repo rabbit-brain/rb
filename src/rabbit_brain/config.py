@@ -1,4 +1,4 @@
-"""`rb.toml`: one project's runner configuration. Written by `rb init`, read by `rb doctor`, `rb verify-hook` and `rb run`."""
+"""`rb.toml`: one project's runner configuration. Written by `rb review init`, read by `rb review doctor`, `rb review verify-hook` and `rb review run`."""
 from __future__ import annotations
 
 import sys
@@ -35,7 +35,7 @@ class AdapterSection(BaseModel):
     small: bool = False
     mixed_precision: bool = False
     alternate_corr: bool = False
-    reference_cases: int = Field(5, ge=0, le=500)  # cases on which rb run checks the adapter against the model repository's own evaluation (0 = off)
+    reference_cases: int = Field(5, ge=0, le=500)  # cases on which rb review run checks the adapter against the model repository's own evaluation (0 = off)
 
 
 class DatasetSection(BaseModel):
@@ -108,7 +108,7 @@ def render_config(cfg: Config) -> str:
             f"alternate_corr = {'true' if a.alternate_corr else 'false'}            # RAFT's memory-saving correlation (needs its CUDA extension)",
         ]
     lines += [
-        f"reference_cases = {a.reference_cases}               # rb run checks the adapter against the model repository's own evaluation on this many cases first (0 = off)",
+        f"reference_cases = {a.reference_cases}               # rb review run checks the adapter against the model repository's own evaluation on this many cases first (0 = off)",
         "",
         "[dataset]",
         f"name = {_toml_str(d.name)}",

@@ -1,29 +1,28 @@
 # Rabbit Brain
 
-> Release review for iterative perception models (optical flow, stereo, depth, anything that refines an answer over iterations). `pip install rabbit-brain`, then `rb docs`. It runs a candidate checkpoint against the current one on a case set (or reads per-case results you already have), ranks the cases that regressed on error or never settled during refinement, explains each one, renders the evidence, and keeps checks so the next checkpoint gets the same review. Nothing is sent anywhere.
+> The research state for ML work done with coding agents: claims with criteria fixed in advance, settings with where each value came from, evidence with a receipt, kept as plain files in `.rb/` next to the code. Agents propose; `rb` checks the sources and computes the verdicts; people decide. Release review for iterative perception models (optical flow, stereo, depth) is built in as `rb review`, and its runs attach as evidence. `pip install rabbit-brain`, then `rb docs`.
 
-If the model is not already configured for rb, `rb onboard` takes a description of the setup (task, architecture, checkpoints, data layout, labels) and writes the configuration plus either a built-in adapter reference or an adapter scaffold with named TODOs, and an INTEGRATION.md ladder.
+If a project has a `.rb/` directory, an agent runs `rb context` before anything else: it is the state of the work, and it replaces any summary of it. The agent adds questions, hypotheses, experiments with their variants, settings with their sources, claims and evidence; `rb` verifies a setting only by reading its source and finding the value stated there, and computes every claim's verdict from its evidence each time it is read. It must not compute verdicts, regressions or rankings itself.
 
-The prompt to use: "Review candidate checkpoint B against A on this case set with Rabbit Brain." An agent then installs the package, reads AGENTS.md with `rb docs`, and follows the worked example. It must not compute errors, regressions, rankings, stability or verdicts itself; `rb` defines them and records how.
+What an agent must pass on to the person, because a summary that drops it is misleading: a claim's standing exactly as `rb show` prints it (`supported, not established` is not `supported`), every blocking reason, and which settings are provisional rather than verified. Freezing an experiment, deciding, amending a frozen spec and retracting what something rests on are the person's calls; `rb` refuses them from an agent and returns the exact command to hand over (`errors[0].handoff.command`).
 
-What an agent must pass on to the human, because a summary that drops it is misleading: the stability limits are generic heuristics and a starting point, not a property of the model; a case the report marks **borderline** turns on a margin thinner than the difference between two machines and may not survive a re-run elsewhere; and if the receipt says the adapter did not agree with the model repository's own evaluation, or that the check was skipped, that comes first, before any finding. The trajectory diagnostic comes from a paper that is not public yet.
+For a release review: a case the report marks **borderline** turns on a margin thinner than the difference between two machines; the stability limits are generic heuristics; if the receipt says the adapter did not agree with the model repository's own evaluation, that comes first.
 
 ## Docs
 
-- [AGENTS.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/AGENTS.md): the complete manual for agents and humans: the workflow, rb.toml, the trajectory hook, custom adapters (a runnable skeleton), the import format, the JSON output, exit codes, every error code with its fix, what to report to the human, how a human verifies what an agent did.
-- [README.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/README.md): what it does, what it needs, what it does not do, one real evidence sheet.
+- [AGENTS.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/AGENTS.md): the complete manual for agents and humans: the rules, the research-state commands, sources and what "verified" means, when a claim is established, release review, the JSON output, exit codes, every error code with its fix, what to report to the person.
+- [README.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/README.md): what it does, what it does not do, one real evidence sheet.
 - [CHANGELOG.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/CHANGELOG.md): what each version added.
 
 ## Package
 
-- [PyPI: rabbit-brain](https://pypi.org/project/rabbit-brain/): `pip install rabbit-brain` (core, pydantic only), `pip install "rabbit-brain[raft]"` (the RAFT adapter's needs), `pip install "rabbit-brain[evidence]"` (numpy and pillow for evidence sheets with a custom adapter). Python 3.10 or later. CLI: `rb`.
+- [PyPI: rabbit-brain](https://pypi.org/project/rabbit-brain/): `pip install rabbit-brain` (core, pydantic only), `[yaml]` to read YAML configs, `[raft]` for the RAFT review adapter, `[evidence]` for evidence sheets with a custom adapter. Python 3.10 or later. CLI: `rb`. `rb` uploads nothing unless you run `rb workspace push`.
 - [Source](https://github.com/rabbit-brain/rb): Apache-2.0.
 
 ## Examples
 
-- [examples/raft-kitti](https://github.com/rabbit-brain/rb/tree/main/examples/raft-kitti): four real reviews of the official RAFT checkpoints on KITTI-2015 with their receipts, findings and evidence sheets, and the script that reproduces them on a GPU.
+- [examples/raft-kitti](https://github.com/rabbit-brain/rb/tree/main/examples/raft-kitti): four real reviews of the official RAFT checkpoints on KITTI-2015 with their receipts, findings and evidence sheets.
 
 ## Optional
 
-- `rb init --demo` writes a synthetic project so the whole workflow runs on any machine in seconds; every output of it says it is synthetic.
-- `rb share <run>` writes a run's anonymised statistics for the calibration corpus; the human decides whether to send the file.
+- `rb review init --demo` writes a synthetic project so the review workflow runs on any machine in seconds; every output of it says it is synthetic, and evidence from it never counts toward a claim.

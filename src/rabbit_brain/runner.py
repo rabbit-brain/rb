@@ -1,4 +1,4 @@
-"""`rb run`: execute both checkpoints on the case set through the adapter, record trajectories, write the run directory."""
+"""`rb review run`: execute both checkpoints on the case set through the adapter, record trajectories, write the run directory."""
 from __future__ import annotations
 
 import math
@@ -266,7 +266,7 @@ def verify_hook(cfg: Config, checkpoint: Optional[Path], device: Optional[str] =
     elif hasattr(adapter, "new_model"):
         model = adapter.new_model(device)
     else:
-        raise RBError("E_CHECKPOINT_NOT_FOUND", message="rb verify-hook needs --checkpoint for this adapter (only the raft adapter can run with random weights).", fix="Pass --checkpoint <path to one of your checkpoints>.")
+        raise RBError("E_CHECKPOINT_NOT_FOUND", message="rb review verify-hook needs --checkpoint for this adapter (only the raft adapter can run with random weights).", fix="Pass --checkpoint <path to one of your checkpoints>.")
     case: Optional[Case] = None
     try:
         for c in adapter.cases():
@@ -366,7 +366,7 @@ def doctor(cfg: Optional[Config], checkpoints: list[Path], device: Optional[str]
     add("python", True, platform.python_version())
     add("rb", True, __version__)
     if cfg is None:
-        add("config", False, "no rb.toml in the current directory", "rb init --project <name> --adapter raft --model-code ./raft --dataset <path>")
+        add("config", False, "no rb.toml in the current directory", "rb review init --project <name> --adapter raft --model-code ./raft --dataset <path>")
         return checks
     add("config", True, f"project '{cfg.project.name}', task {cfg.project.task}, adapter {cfg.adapter.id or cfg.adapter.module}")
     device = device or cfg.adapter.device
@@ -415,7 +415,7 @@ def doctor(cfg: Optional[Config], checkpoints: list[Path], device: Optional[str]
     archs = {str(ck): getattr(adapter, "architectures", {}).get(str(ck)) for ck in checkpoints if ck.exists()}
     if len(checkpoints) >= 2 and len({a for a in archs.values() if a}) > 1:
         add("architectures", None, "the checkpoints are different architectures: " + ", ".join(f"{Path(k).name} = {v}" for k, v in archs.items() if v) + "; the review compares models, not a retrain")
-    add("hook", None, "not verified yet", "rb verify-hook --checkpoint <path> (run it for each checkpoint)")
+    add("hook", None, "not verified yet", "rb review verify-hook --checkpoint <path> (run it for each checkpoint)")
     if hasattr(adapter, "reference_value"):
-        add("adapter agreement", None, "not verified yet", "rb verify-adapter --checkpoint <path> (rb run checks it on a few cases first)")
+        add("adapter agreement", None, "not verified yet", "rb review verify-adapter --checkpoint <path> (rb review run checks it on a few cases first)")
     return checks

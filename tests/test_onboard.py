@@ -38,7 +38,7 @@ def test_a_raft_family_brief_gets_the_built_in_adapter_and_no_scaffold(workdir):
     cfg = load_config(workdir / "rb.toml")
     assert cfg.adapter.id == "raft" and cfg.adapter.module is None and cfg.adapter.iterations == 12
     md = (workdir / INTEGRATION_NAME).read_text(encoding="utf-8")
-    assert "rb verify-adapter" in md and "rb verify-hook" in md and "rb doctor" in md
+    assert "rb review verify-adapter" in md and "rb review verify-hook" in md and "rb review doctor" in md
 
 
 def test_an_unsupported_brief_gets_a_scaffold_that_imports_and_names_everything(workdir):

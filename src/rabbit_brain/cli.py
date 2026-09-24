@@ -30,7 +30,17 @@ from .stability import case_stability
 from . import runner as runner_mod
 from . import ledger_cli
 
-PLANNED = {"rerun", "open", "serve", "mcp", "reproduce", "publish", "clone"}
+PLANNED = {
+    "paper": ("rb has no paper command yet. To record a paper by hand: save its text in the repository, then "
+              "rb claim add \"...\" -e <exp> --metric <m> --equals <x> --tolerance <t> --source papers/<id>.txt --quote \"...\" --locator \"Table 1\"; "
+              "rb spec set <exp> <name> --unknown for what it does not state."),
+    "open": "rb has no local UI yet: rb status, rb show <id> and rb compare <experiment> read the same state.",
+    "publish": "rb does not publish yet: commit .rb/ and push the repository.",
+    "clone": "rb does not clone investigations yet: clone the repository; .rb/ comes with it.",
+    "rerun": "rb has no rerun command: run the evaluation again with rb review run, then rb evidence attach.",
+    "serve": "rb has no server: rb status, rb show <id> and rb compare <experiment> read the same state.",
+    "reproduce": "rb has no reproduce command yet: rb experiment add --like <experiment> copies a spec to run again.",
+}
 FILTERS = ["flagged", "all", "regressions", "unstable", "improved-unstable", "settled-regressions", "improved", "stable"]
 SORTS = ["priority", "error-change", "candidate-error", "current-error", "late-share", "name"]
 INTEGRATION_HINT = "INTEGRATION.md has the ladder that turns this into a trusted run: doctor, the hook, the adapter check, a five-case run, then the review."
@@ -61,7 +71,7 @@ class Out:
 
     def emit(self, ok: bool = True, errors: Optional[list[dict]] = None) -> None:
         if self.runs_dir_flag:
-            self.next = [n + f" --runs-dir {self.runs_dir_flag}" if n.startswith(("rb findings", "rb case", "rb report", "rb check", "rb runs")) else n for n in self.next]
+            self.next = [n + f" --runs-dir {self.runs_dir_flag}" if n.startswith(("rb review findings", "rb review case", "rb review report", "rb review check", "rb review runs")) else n for n in self.next]
         if self.json_mode:
             data = dict(self.data)
             if self.warnings:
@@ -130,7 +140,7 @@ def cmd_example(args: argparse.Namespace, out: Out) -> int:
         target.write_text(json.dumps(cmp.model_dump(exclude_none=True), indent=2) + "\n", encoding="utf-8")
         out.say(f"Wrote the example comparison (version 1, {len(cmp.cases)} cases) to {target}.")
         out.data = {"path": str(target), "cases": len(cmp.cases)}
-        out.next = [f"rb import {target}", f"rb findings {target}"]
+        out.next = [f"rb review import {target}", f"rb review findings {target}"]
         return EXIT_OK
     return _create_run(cmp, args, out, datetime.now().astimezone(), None, "example")
 
@@ -156,7 +166,7 @@ def _create_run(cmp, args, out: Out, started, path: Optional[Path], fmt: str) ->
     if cmp.source == "example":
         out.say("This is illustrative data with intentional regressions and unstable cases. It is not evidence of any model's performance.")
     out.data = {"run_dir": str(run_dir), "summary": s.model_dump(), "verdict": findings.verdict.model_dump(), "limits": limits.model_dump(), "metric": bundle.metric.model_dump()}
-    out.next = [f"rb findings {run_id} --top 5", f"rb case {run_id} {findings.verdict.start}" if findings.verdict.start else f"rb report {run_id} --print"]
+    out.next = [f"rb review findings {run_id} --top 5", f"rb review case {run_id} {findings.verdict.start}" if findings.verdict.start else f"rb review report {run_id} --print"]
     return EXIT_OK
 
 
@@ -246,9 +256,9 @@ def cmd_findings(args: argparse.Namespace, out: Out) -> int:
     out.data = {**findings.model_dump(exclude={"queue"}), "queue": [q.model_dump() for q in shown], "shown": len(shown), "filter": args.filter, "sort": args.sort}
     ref = out.ref or bundle.run_id
     if shown:
-        out.next = [f"rb case {ref} {shown[0].id}", f"rb check save {ref} {shown[0].id}", f"rb report {ref}"]
+        out.next = [f"rb review case {ref} {shown[0].id}", f"rb review check save {ref} {shown[0].id}", f"rb review report {ref}"]
     else:
-        out.next = [f"rb findings {ref} --filter all", f"rb report {ref}"]
+        out.next = [f"rb review findings {ref} --filter all", f"rb review report {ref}"]
     return EXIT_OK
 
 
@@ -295,8 +305,8 @@ def cmd_case(args: argparse.Namespace, out: Out) -> int:
         if run_dir is None or not run_dir.is_dir():
             raise RBError("E_RUN_NOT_FOUND", message="Evidence needs a run directory (rb-runs/<run_id>), not a loose comparison file.")
         if bundle.source != "run":
-            raise RBError("E_CONFIG_MISSING", message=f"Run {bundle.run_id} was {bundle.source}: rb has only its numbers, not the model or the data, so there is nothing to render. Evidence comes from `rb run` (rb init with the model code and the dataset, then rb run).",
-                          fix="Set up the runner with `rb init --adapter raft --model-code ./raft --dataset <path>` and `rb run` the two checkpoints; then `rb case <run> <id> --render` works.")
+            raise RBError("E_CONFIG_MISSING", message=f"Run {bundle.run_id} was {bundle.source}: rb has only its numbers, not the model or the data, so there is nothing to render. Evidence comes from `rb review run` (rb review init with the model code and the dataset, then rb review run).",
+                          fix="Set up the runner with `rb review init --adapter raft --model-code ./raft --dataset <path>` and `rb review run` the two checkpoints; then `rb review case <run> <id> --render` works.")
         cfg = load_config()
         rendered = render_case(cfg, bundle, q.id, run_dir, device=getattr(args, "device", None))
         chk = rendered["check"]
@@ -309,7 +319,7 @@ def cmd_case(args: argparse.Namespace, out: Out) -> int:
                 "baseline_frames": c.baseline_frames, "candidate_frames": c.candidate_frames, "limits": limits.model_dump(), "metric": bundle.metric.model_dump(),
                 "evidence": rendered or (c.evidence.model_dump() if c.evidence else None)}
     ref = out.ref or bundle.run_id
-    out.next = [f"rb check save {ref} {q.id}", f"rb findings {ref}"] + ([] if rendered or c.evidence or bundle.source != "run" else [f"rb case {ref} {q.id} --render"])
+    out.next = [f"rb review check save {ref} {q.id}", f"rb review findings {ref}"] + ([] if rendered or c.evidence or bundle.source != "run" else [f"rb review case {ref} {q.id} --render"])
     return EXIT_OK
 
 
@@ -331,9 +341,9 @@ def cmd_check_save(args: argparse.Namespace, out: Out) -> int:
         case = next(c for c in bundle.cases if c.id == new.case_id)
         out.say(f"Fails now: {now.reason} It passes once the case is fixed.")
         if case.candidate_error > new.max_error:
-            out.say(f"To accept the candidate's current level instead: rb check save {out.ref or bundle.run_id} {new.case_id} --max-error {to_fixed(case.candidate_error + limits.max_regression)}")
+            out.say(f"To accept the candidate's current level instead: rb review check save {out.ref or bundle.run_id} {new.case_id} --max-error {to_fixed(case.candidate_error + limits.max_regression)}")
     out.data = {"checks_file": str(path), "check": new.model_dump(exclude_none=True), "status_now": now.model_dump(), "total_checks": len(checks.checks)}
-    out.next = [f"rb check run {out.ref or bundle.run_id} --checks {path}", f"rb check list --checks {path}"]
+    out.next = [f"rb review check run {out.ref or bundle.run_id} --checks {path}", f"rb review check list --checks {path}"]
     return EXIT_OK
 
 
@@ -379,7 +389,7 @@ def cmd_check_run(args: argparse.Namespace, out: Out) -> int:
                 # A limit that was declared but not evaluated must not read as one that passed, to a person or to CI.
                 "policy": "incomplete" if unenforced else "complete", "unenforced_limits": unenforced}
     ref = out.ref or bundle.run_id
-    out.next = [f"rb case {ref} {flagged[0].id}" if flagged else f"rb report {ref}"]
+    out.next = [f"rb review case {ref} {flagged[0].id}" if flagged else f"rb review report {ref}"]
     return EXIT_CHECK_FAILED if (failed or unenforced) else EXIT_OK
 
 
@@ -426,7 +436,7 @@ def cmd_share(args: argparse.Namespace, out: Out) -> int:
         out.data = share.model_dump()
         return EXIT_OK
     if run_dir is None:
-        raise RBError("E_RUN_NOT_FOUND", message="rb share needs a run directory (rb-runs/<run_id>) to write share.json into; use --print for a file read in place.")
+        raise RBError("E_RUN_NOT_FOUND", message="rb review share needs a run directory (rb-runs/<run_id>) to write share.json into; use --print for a file read in place.")
     path = write_share(run_dir, share)
     out.say(*consent_text(share, path))
     out.data = {"path": str(path), "cases": len(share.cases), "share_id": share.share_id, "included": list(__import__("rabbit_brain.share", fromlist=["INCLUDED"]).INCLUDED),
@@ -461,7 +471,7 @@ def cmd_report(args: argparse.Namespace, out: Out) -> int:
         html_path = _write_html(args, bundle, run_dir, target, out, checks)
     out.data = {"path": str(target) if target else None, "html": str(html_path) if html_path else None,
                 "markdown": md, "verdict": findings.verdict.model_dump()}
-    out.next = [f"rb findings {out.ref or bundle.run_id}"]
+    out.next = [f"rb review findings {out.ref or bundle.run_id}"]
     return EXIT_OK
 
 
@@ -526,7 +536,7 @@ def cmd_init(args: argparse.Namespace, out: Out) -> int:
                      dataset=DatasetSection(name="synthetic-24", kind="synthetic", cases="all"))
     else:
         if not args.project:
-            raise RBError("E_CONFIG_INVALID", message="rb init needs --project <name> (or --demo).")
+            raise RBError("E_CONFIG_INVALID", message="rb review init needs --project <name> (or --demo).")
         adapter_id = args.adapter or "raft"
         cfg = Config(project=ProjectSection(name=args.project, task=args.task or "flow"),
                      adapter=AdapterSection(id=adapter_id if ":" not in adapter_id else None, module=adapter_id if ":" in adapter_id else None,
@@ -545,9 +555,9 @@ def cmd_init(args: argparse.Namespace, out: Out) -> int:
     out.say(f"Wrote {path} for project '{cfg.project.name}' (adapter {cfg.adapter.id or cfg.adapter.module}); dataset name '{cfg.dataset.name}' (--dataset-name to change it).", gi_line)
     if args.demo:
         out.say("Demo checkpoints: ckpt/synth-current.json and ckpt/synth-candidate.json (synthetic, not a real model).")
-        out.next = ["rb doctor", "rb run --baseline ckpt/synth-current.json --candidate ckpt/synth-candidate.json"]
+        out.next = ["rb review doctor", "rb review run --baseline ckpt/synth-current.json --candidate ckpt/synth-candidate.json"]
     else:
-        out.next = ["rb doctor", "rb verify-hook --checkpoint <path>", "rb run --baseline <ckpt-A> --candidate <ckpt-B>"]
+        out.next = ["rb review doctor", "rb review verify-hook --checkpoint <path>", "rb review run --baseline <ckpt-A> --candidate <ckpt-B>"]
     out.data = {"config_path": str(path), "config": cfg.model_dump(exclude_none=True), "text": text}
     return EXIT_OK
 
@@ -557,14 +567,14 @@ def cmd_onboard(args: argparse.Namespace, out: Out) -> int:
     if not args.brief:
         path = root / BRIEF_NAME
         if path.exists() and not args.force:
-            raise RBError("E_CONFIG_INVALID", message=f"{path} already exists; fill it in and run `rb onboard --brief {path}`, or pass --force to replace it with a fresh template.")
+            raise RBError("E_CONFIG_INVALID", message=f"{path} already exists; fill it in and run `rb review onboard --brief {path}`, or pass --force to replace it with a fresh template.")
         root.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(EXAMPLE_BRIEF.model_dump(exclude_none=True), indent=1) + "\n", encoding="utf-8")
         out.say(f"Wrote {path}: a filled example, so you can see the shape. Replace the values with yours.",
                 "It asks for your task, architecture, framework, where your model code and checkpoints are, how one case is stored, whether you have ground truth, and what decision this review has to support.",
-                "Nothing is sent anywhere, now or later. `rb schema brief` prints the full schema.")
+                "It stays on this machine: rb review onboard only writes local files. `rb schema brief` prints the full schema.")
         out.data = {"brief_path": str(path), "brief": EXAMPLE_BRIEF.model_dump(exclude_none=True)}
-        out.next = [f"rb onboard --brief {path}"]
+        out.next = [f"rb review onboard --brief {path}"]
         return EXIT_OK
     src = Path(args.brief)
     if not src.exists():
@@ -589,7 +599,7 @@ def cmd_onboard(args: argparse.Namespace, out: Out) -> int:
                 "That is the honest state, not a limitation being hidden: nothing can guess your loader, your valid mask or your metric formula.")
     out.say(f"{INTEGRATION_HINT}")
     out.data = result
-    out.next = ["rb doctor"] if result["built_in"] else [f"open {result['dir']}/INTEGRATION.md", "rb docs"]
+    out.next = ["rb review doctor"] if result["built_in"] else [f"open {result['dir']}/INTEGRATION.md", "rb docs"]
     return EXIT_OK
 
 
@@ -602,7 +612,7 @@ def cmd_doctor(args: argparse.Namespace, out: Out) -> int:
         out.say(f"{mark}  {c['check']:<22} {c['detail']}" + (f"\n      → {c['fix']}" if c.get("fix") else ""))
     out.say("", "Environment problems found." if failed else "Ready to run." if cfg else "Not configured.")
     out.data = {"checks": checks, "ok": not failed}
-    out.next = ["rb verify-hook --checkpoint <path>", "rb verify-adapter --checkpoint <path>", "rb run --baseline <ckpt-A> --candidate <ckpt-B>"] if cfg and not failed else ["rb init --project <name> --adapter raft --model-code ./raft --dataset <path>"] if not cfg else []
+    out.next = ["rb review verify-hook --checkpoint <path>", "rb review verify-adapter --checkpoint <path>", "rb review run --baseline <ckpt-A> --candidate <ckpt-B>"] if cfg and not failed else ["rb review init --project <name> --adapter raft --model-code ./raft --dataset <path>"] if not cfg else []
     if failed:
         first = failed[0]
         raise RBError(first.get("code") or "E_DOCTOR", message=f"{len(failed)} check(s) failed; first: {first['check']}: {first['detail']}", fix=first.get("fix"), exit_code=EXIT_ENVIRONMENT)
@@ -620,7 +630,7 @@ def cmd_verify_hook(args: argparse.Namespace, out: Out) -> int:
     for pr in result["problems"]:
         out.say(f"Problem: {pr}")
     out.data = result
-    out.next = ["rb verify-adapter --checkpoint <path>", "rb run --baseline <ckpt-A> --candidate <ckpt-B>"] if result["ok"] else ["rb docs"]
+    out.next = ["rb review verify-adapter --checkpoint <path>", "rb review run --baseline <ckpt-A> --candidate <ckpt-B>"] if result["ok"] else ["rb docs"]
     if not result["ok"]:
         code = "E_HOOK_NOT_REACHABLE" if result["fired"] == 0 else "E_HOOK_LENGTH"
         raise RBError(code, message=result["problems"][0])
@@ -640,7 +650,7 @@ def cmd_verify_adapter(args: argparse.Namespace, out: Out) -> int:
             out.say(f"{r['id']:<20} {r['adapter']:>12.5f} {r['reference']:>12.5f} {r['diff']:>10.2g}{'' if r['agree'] else '   DIFFERS'}")
     if status == "agree":
         out.say(f"Adapter verified: agrees with the reference evaluation on all {result['cases']} cases (max |diff| {result['max_abs_diff']:.2g} {unit}, tolerance {result['tolerance']:g} relative).")
-        out.next = ["rb run --baseline <ckpt-A> --candidate <ckpt-B>"]
+        out.next = ["rb review run --baseline <ckpt-A> --candidate <ckpt-B>"]
     elif status == "not_available":
         out.say(f"Not established: {result.get('note')}", "Add reference_value(model, case) to the adapter: the same per-case error through the model repository's own loader, forward and metric formula.")
         out.next = ["rb docs"]
@@ -657,7 +667,7 @@ def cmd_run(args: argparse.Namespace, out: Out) -> int:
     base = runs_dir(args.runs_dir)
     checks = checks_for(args, cfg.project.name, out)
     quiet = getattr(args, "quiet", False)
-    progress = (lambda msg: print(f"rb run: {msg}", file=sys.stderr)) if not quiet else None
+    progress = (lambda msg: print(f"rb review run: {msg}", file=sys.stderr)) if not quiet else None
     run_dir, bundle, record, findings, _ = runner_mod.run(
         cfg, Path(args.baseline), Path(args.candidate), limits=limits, runs_dir=base, command=out.command_line,
         device=args.device, seed=args.seed, no_trajectories=args.no_trajectories, limit=args.limit,
@@ -694,7 +704,7 @@ def cmd_run(args: argparse.Namespace, out: Out) -> int:
                 "checkpoints": {k: v.model_dump() for k, v in record.checkpoints.items()}, "skipped": skipped, "fail_on": args.fail_on, "failed": failed,
                 "evidence": ev,
                 "policy": "incomplete" if unenforced else "complete", "unenforced_limits": unenforced}
-    out.next = [f"rb findings {bundle.run_id} --top 5", f"rb case {bundle.run_id} {findings.verdict.start}" if findings.verdict.start else f"rb report {bundle.run_id} --print"]
+    out.next = [f"rb review findings {bundle.run_id} --top 5", f"rb review case {bundle.run_id} {findings.verdict.start}" if findings.verdict.start else f"rb review report {bundle.run_id} --print"]
     return EXIT_CHECK_FAILED if (failed or unenforced) else EXIT_OK
 
 
@@ -831,7 +841,7 @@ def cmd_runs(args: argparse.Namespace, out: Out) -> int:
         out.say(f"{row['run_id']:<32} {row.get('baseline', '?')} → {row.get('candidate', '?')} · {row.get('cases', '?')} cases · {row.get('verdict', '(no findings.json)')}")
     out.data = {"runs_dir": str(base), "runs": ids, "details": rows}
     if ids:
-        out.next = [f"rb findings {ids[-1]}"]
+        out.next = [f"rb review findings {ids[-1]}"]
     return EXIT_OK
 
 
@@ -858,24 +868,9 @@ class RBArgumentParser(argparse.ArgumentParser):
         raise UsageError(message, self.format_usage())
 
 
-def build_parser() -> argparse.ArgumentParser:
-    common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--json", action="store_true", help="print one JSON object (the envelope) instead of text")
-    common.add_argument("--runs-dir", default=None, help="where runs live (default rb-runs/, or $RB_RUNS_DIR)")
-    common.add_argument("--verbose", action="store_true", help="show warnings raised by the model code and libraries (they are counted and hidden otherwise)")
-    lim = argparse.ArgumentParser(add_help=False)
-    lim.add_argument("--max-regression", type=float, default=None, help="allowed error increase over the current model, in the metric's unit (default 0.3)")
-    lim.add_argument("--max-late-share", type=float, default=None, help="allowed share of refinement in the last third of iterations (default 0.25)")
-    lim.add_argument("--max-reversals", type=int, default=None, help="allowed number of iterations where the update grew (default 2)")
-    lim.add_argument("--max-last-update", type=float, default=None, help="allowed size of the final update, in the trajectory's unit (off unless set)")
-    lim.add_argument("--max-trajectory-regression", type=float, default=None, help="allowed increase of the candidate's late movement over the current model's on the same case, trajectory unit (rb init sets it to max_regression; off for rb import unless set)")
-    chk = argparse.ArgumentParser(add_help=False)
-    chk.add_argument("--checks", default=None, help="saved checks file (default checks.json in the current directory)")
-
-    p = RBArgumentParser(prog="rb", description="Rabbit Brain: the research state and evidence for ML work done with coding agents, and release review for iterative perception models. Docs for agents and humans: rb docs.")
-    p.add_argument("--version", action="version", version=f"rabbit-brain {__version__}")
-    sub = p.add_subparsers(dest="command", metavar="<command>")
-
+def add_review_parsers(sub, common: argparse.ArgumentParser, lim: argparse.ArgumentParser, chk: argparse.ArgumentParser) -> None:
+    """Release review: compare two checkpoints of an iterative perception model case by case. Registered under
+    `rb review`, and at the top level under the names it shipped with, which stay as unlisted aliases."""
     s = sub.add_parser("import", parents=[common, lim, chk], help="import a version-1 results JSON or a metrics CSV into a new run")
     s.add_argument("file")
     s.add_argument("--project", help="project name (overrides the file's; required for CSV)")
@@ -938,7 +933,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--embed", action="store_true", help="carry evidence images inside the HTML so the file travels on its own")
     s.set_defaults(func=cmd_report)
 
-    s = sub.add_parser("init", parents=[common], help="write rb.toml for this project (or --demo for a synthetic project that runs anywhere)")
+    s = sub.add_parser("init", parents=[common], help="write rb.toml for this project (or --demo for a synthetic project that runs anywhere)")  # rb review init
     s.add_argument("--project", help="project name (saved checks follow it)")
     s.add_argument("--task", default=None, help="flow (default) | stereo | depth | generic")
     s.add_argument("--adapter", default=None, help="raft (default) | synthetic | package.module:Class")
@@ -996,6 +991,55 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--print", action="store_true", help="print the JSON instead of writing share.json")
     s.set_defaults(func=cmd_share)
 
+    s = sub.add_parser("runs", parents=[common], help="list runs")
+    s.set_defaults(func=cmd_runs)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--json", action="store_true", help="print one JSON object (the envelope) instead of text")
+    common.add_argument("--runs-dir", default=None, help="where runs live (default rb-runs/, or $RB_RUNS_DIR)")
+    common.add_argument("--verbose", action="store_true", help="show warnings raised by the model code and libraries (they are counted and hidden otherwise)")
+    lim = argparse.ArgumentParser(add_help=False)
+    lim.add_argument("--max-regression", type=float, default=None, help="allowed error increase over the current model, in the metric's unit (default 0.3)")
+    lim.add_argument("--max-late-share", type=float, default=None, help="allowed share of refinement in the last third of iterations (default 0.25)")
+    lim.add_argument("--max-reversals", type=int, default=None, help="allowed number of iterations where the update grew (default 2)")
+    lim.add_argument("--max-last-update", type=float, default=None, help="allowed size of the final update, in the trajectory's unit (off unless set)")
+    lim.add_argument("--max-trajectory-regression", type=float, default=None, help="allowed increase of the candidate's late movement over the current model's on the same case, trajectory unit (rb init sets it to max_regression; off for rb review import unless set)")
+    chk = argparse.ArgumentParser(add_help=False)
+    chk.add_argument("--checks", default=None, help="saved checks file (default checks.json in the current directory)")
+
+    research_common = argparse.ArgumentParser(add_help=False)
+    research_common.add_argument("--json", action="store_true", help="print one JSON object (the envelope) instead of text")
+    research_common.add_argument("--runs-dir", default=None, help=argparse.SUPPRESS)
+    research_common.add_argument("--verbose", action="store_true", help=argparse.SUPPRESS)
+
+    p = RBArgumentParser(prog="rb", description=DESCRIPTION)
+    p.add_argument("--version", action="version", version=f"rabbit-brain {__version__}")
+    sub = p.add_subparsers(dest="command", metavar="<command>")
+
+    # research state: rb init starts it; with release-review flags (--project, --demo, ...) it still writes rb.toml
+    s = sub.add_parser("init", parents=[common], help="start the research state (.rb/) here; with --project or --demo, set up release review (rb review init)")
+    s.add_argument("title", nargs="?", default=None, help="what you are trying to establish (default: this directory's name)")
+    s.add_argument("--id", default=None, help="a short id for the investigation (default: from the title)")
+    for flag in RELEASE_INIT_FLAGS:
+        s.add_argument(flag, default=None, type=int if flag == "--iterations" else str, help=argparse.SUPPRESS)
+    for flag in RELEASE_INIT_SWITCHES:
+        s.add_argument(flag, action="store_true", help=argparse.SUPPRESS)
+    s.set_defaults(func=cmd_init_router)
+    s = sub.add_parser("doctor", parents=[common], help="with .rb/ here: check the research state; otherwise release review's environment check")
+    s.add_argument("--checkpoint", action="append", default=None, help="checkpoint path to check (release review)")
+    s.add_argument("--device", default=None)
+    s.set_defaults(func=cmd_doctor_router)
+    ledger_cli.add_parsers(sub, common, research_common)
+
+    add_review_parsers(_Skip(sub, {"init", "doctor"}), common, lim, chk)
+    r = sub.add_parser("review", help="release review: compare two checkpoints case by case; its runs attach as evidence")
+    rsub = r.add_subparsers(dest="review_command", metavar="<command>", required=True)
+    add_review_parsers(rsub, common, lim, chk)
+
+    s = sub.add_parser("mcp", help="serve the research state to an agent over MCP (stdio); every call is recorded as the agent's")
+    s.add_argument("--agent", default=None, help="the agent's name in the record (default: the MCP client's name)")
     s = sub.add_parser("docs", parents=[common], help="print AGENTS.md (or --errors for the error table)")
     s.add_argument("--errors", action="store_true")
     s.set_defaults(func=cmd_docs)
@@ -1003,9 +1047,6 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("schema", parents=[common], help="print a JSON Schema, the minimal example, or the full example")
     s.add_argument("name", choices=[*SCHEMAS.keys(), "example", "full-example", "csv"])
     s.set_defaults(func=cmd_schema)
-
-    s = sub.add_parser("runs", parents=[common], help="list runs")
-    s.set_defaults(func=cmd_runs)
 
     s = sub.add_parser("plans", parents=[common], help="what a workspace costs (no token needed)")
     s.set_defaults(func=cmd_plans)
@@ -1021,14 +1062,73 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("run", help="a run id, a run directory, or a bundle.json")
     w.set_defaults(func=cmd_workspace_push)
 
-    ledger_cli.add_parsers(sub, common)
-
     s = sub.add_parser("version", parents=[common], help="print the version")
     s.set_defaults(func=cmd_version)
     return p
 
 
-COMMANDS = ["init", "onboard", "doctor", "verify-hook", "verify-adapter", "run", "import", "example", "findings", "case", "check save", "check run", "check list", "check rm", "report", "share", "docs", "schema", "runs", "version", *ledger_cli.LEDGER_COMMANDS]
+REVIEW_COMMANDS = ["init", "onboard", "doctor", "verify-hook", "verify-adapter", "run", "import", "example", "findings", "case",
+                   "check save", "check run", "check list", "check rm", "report", "share", "runs"]
+COMMANDS = [*ledger_cli.LEDGER_COMMANDS, "doctor", *[f"review {c}" for c in REVIEW_COMMANDS], "mcp", "docs", "schema", "version", "plans", "workspace status", "workspace checkout", "workspace push"]
+RELEASE_INIT_FLAGS = ["--project", "--task", "--adapter", "--model-code", "--dataset", "--dataset-name", "--kind", "--iterations", "--device"]
+RELEASE_INIT_SWITCHES = ["--small", "--demo", "--force"]
+DESCRIPTION = ("Research state for ML work done with coding agents: claims with criteria, settings with sources, evidence with receipts. "
+               "Agents propose; rb checks and computes verdicts; you decide. Built in: release review for iterative perception models. "
+               "Docs for agents and humans: rb docs.")
+
+HELP_GROUPS = [
+    ("Research state", ["init", "question", "hypothesis", "assumption", "experiment", "variant", "metric", "spec", "claim", "evidence",
+                        "freeze", "decide", "retract", "status", "show", "compare", "log", "context", "doctor"]),
+    ("Release review (built in; its runs attach as evidence)", ["review"]),
+    ("For agents", ["mcp"]),
+    ("Reference", ["docs", "schema", "version"]),
+    ("Account (optional; talks to rabbitbrain.ai)", ["plans", "workspace"]),
+]
+
+
+class _Skip:
+    """Registers subparsers on `sub` except the named ones, which the top level defines itself."""
+
+    def __init__(self, sub, skip: set[str]) -> None:
+        self.sub, self.skip = sub, skip
+
+    def add_parser(self, name, **kwargs):
+        if name in self.skip:
+            return argparse.ArgumentParser(add_help=False)
+        kwargs["help"] = argparse.SUPPRESS
+        return self.sub.add_parser(name, **kwargs)
+
+
+def print_help(parser: argparse.ArgumentParser) -> None:
+    helps = {}
+    for action in parser._subparsers._group_actions:
+        for ca in action._choices_actions:
+            helps[ca.dest] = ca.help
+    lines = ["usage: rb <command> [...]", "", DESCRIPTION, ""]
+    for title, names in HELP_GROUPS:
+        lines.append(f"{title}:")
+        for n in names:
+            lines.append(f"  {n:<12} {helps.get(n) or ''}")
+        lines.append("")
+    lines.append("rb <command> --help for its arguments. Start: rb init \"<what you are trying to establish>\", then rb context.")
+    print("\n".join(lines))
+
+
+def cmd_init_router(args: argparse.Namespace, out: "Out") -> int:
+    release = any(getattr(args, f.lstrip("-").replace("-", "_"), None) not in (None, False) for f in RELEASE_INIT_FLAGS + RELEASE_INIT_SWITCHES)
+    if release:
+        if args.title:
+            raise RBError("E_USAGE", message="rb init takes a title for research state, or release-review flags (--project, --demo, ...), not both.")
+        print("rb init: this form is now rb review init; it keeps working.", file=sys.stderr)
+        return cmd_init(args, out)
+    return ledger_cli.cmd_init(args, out)
+
+
+def cmd_doctor_router(args: argparse.Namespace, out: "Out") -> int:
+    from .ledger import Ledger, find_root
+    if args.checkpoint or find_root() is None:
+        return cmd_doctor(args, out)
+    return ledger_cli.cmd_research_doctor(args, out, Ledger.open())
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -1036,11 +1136,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     json_mode = "--json" in argv
     parser = build_parser()
     if not argv or argv[0] in ("-h", "--help"):
-        parser.print_help()
+        print_help(parser)
         return EXIT_OK
+    if argv[0] == "mcp" and not {"-h", "--help"} & set(argv):
+        try:
+            args = parser.parse_args(argv)
+        except (SystemExit, UsageError) as exc:
+            print(f"rb mcp: {getattr(exc, 'message', exc)}", file=sys.stderr)
+            return EXIT_INVALID
+        from .mcp import serve
+        return serve(agent=args.agent)   # stdout is the protocol: nothing else may print there
     if argv[0] in PLANNED:
         out = Out(argv[0], json_mode)
-        err = RBError("E_NOT_AVAILABLE", message=f"`rb {argv[0]}` is not part of rabbit-brain {__version__}.")
+        err = RBError("E_NOT_AVAILABLE", message=f"`rb {argv[0]}` is not part of rabbit-brain {__version__}.", fix=PLANNED[argv[0]])
         if not json_mode:
             print(f"rb {argv[0]}: {err.message} {err.fix}", file=sys.stderr)
         out.emit(ok=False, errors=[err.to_dict()])
@@ -1058,12 +1166,16 @@ def main(argv: Optional[list[str]] = None) -> int:
             print(exc.usage.rstrip("\n"), file=sys.stderr)
             print(f"rb {command}: {exc.message}", file=sys.stderr)
         return EXIT_INVALID
-    if args.command == "check" and not getattr(args, "check_command", None):
-        parser.parse_args(["check", "--help"])
+    in_review = args.command == "review"
+    if (args.command == "check" or (in_review and args.review_command == "check")) and not getattr(args, "check_command", None):
+        parser.parse_args([*(["review"] if in_review else []), "check", "--help"])
         return EXIT_OK
-    command = args.command + (f" {args.check_command}" if args.command == "check" else "")
-    if getattr(args, "sub_command", None):
-        command += f" {args.sub_command}"
+    parts = [args.command] + ([args.review_command] if in_review else [])
+    if getattr(args, "check_command", None):
+        parts.append(args.check_command)
+    elif getattr(args, "sub_command", None):
+        parts.append(args.sub_command)
+    command = " ".join(parts)
     out = Out(command, getattr(args, "json", False))
     out.command_line = shlex.join(["rb", *argv])  # quoted where needed, so the receipt's command pastes back
     out.runs_dir_flag = getattr(args, "runs_dir", None)
@@ -1084,6 +1196,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         out.emit(ok=code in (EXIT_OK, EXIT_CHECK_FAILED))
         return code
     except RBError as err:
+        handoff = None
+        if err.code == "E_HUMAN_ONLY":
+            handoff = shlex.join(["rb", *(a for a in argv if a != "--json")])  # the line the person runs: text, not an envelope
+            err.extra["handoff"] = {"who": "person", "command": handoff}
+        if handoff:
+            err.fix = f"Hand this to the person, to run in their own terminal: {handoff}   Do not set or unset RB_ACTOR."
         if not out.json_mode:
             print(f"rb {command}: {err.message}", file=sys.stderr)
             for pr in err.problems:

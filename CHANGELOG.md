@@ -1,14 +1,85 @@
 # Changelog
 
-## 0.5.0 (unreleased): the research state, and the review readable without the terminal
-- **Research state in `.rb/`.** The questions a line of work is asking, its hypotheses and assumptions, the experiments that test them with their spec (every setting, and where its value came from), claims with a criterion, the evidence attached to them, and the decisions people made: plain JSON files next to the code, one per object, plus `log.jsonl` with every write and who made it. Commands: `rb investigation init`, `rb question add`, `rb hypothesis add`, `rb assumption add`, `rb experiment add`, `rb spec set|verify`, `rb claim add`, `rb evidence attach|retract`, `rb freeze`, `rb decide`, `rb status`, `rb show`, `rb context`. Python: `rabbit_brain.Ledger`. `rb schema` prints every object.
-- **You and your agents propose; rb verifies; people decide.** A setting anyone gives is `provisional`. Only `rb spec verify` makes it `verified`: it reads the file line, the quote, the file at a pinned commit (in the file's own repository), or the JSON pointer into a run's `record.json`, and the value has to be stated there, strictly: numbers as standalone tokens compared exactly (an integer only by the same integer), text as a whole token, lists in order. It stores the commit, the file's hash and what it read, and re-checks them on every read, so a changed file or a hand-edited value shows as stale. A claim's verdict is computed from the evidence on every read and never stored: `supported`/`refuted` for your own criteria, `reproduced`/`diverged` for a number someone else stated (a paper's table, checked against its source when the source is a file), `contested`, `not_tested`. A claim is **established** only when the evidence meets it, no required setting is unknown, no verified source has changed, a frozen spec still matches its freeze record, and the evidence is not only synthetic. Freezing, deciding, retracting and amending are refused when `RB_ACTOR` says the actor is an agent.
-- **Unknown is a value, and it blocks.** `rb spec set <exp> seed --unknown` records a setting nobody has found; a claim on that experiment can be `supported` and still not established, and `rb status --fail-on unestablished` exits 1 on it. This is 0.3.0's rule that an unevaluated limit fails the gate, applied to the whole experiment.
-- **Pre-registration as a command.** `rb freeze <exp>` hashes the spec (baseline, candidate, setting values and whether each is required, claim criteria). After it, changing a setting or adding a claim needs `--amend "<reason>"` from a person and is kept with the hash before and after; a spec changed any other way is reported and blocks its claims. Every observation says whether its evidence came before the freeze, under the current setup, or under a setup changed since, and whether the claim was written after the evidence it is judged on.
-- **Evidence from anything, with a receipt.** `rb evidence attach <exp> --run <run>` takes an rb run's summary (`candidate.<metric>`, `baseline.<metric>`, `change.<metric>`, `with_gt`, `regressions`, `flagged`, ...) with its own receipt and the hash of its `record.json`; a run with no ground truth attaches no error numbers. `--metric name=value` and `--from metrics.json` take numbers from any evaluator. Every attachment records the actor and the repository's state at that moment: the commit and whether the tree had uncommitted changes, with a hash covering the diff and the untracked files, leaving `.rb/` out. Wrong evidence is retracted with a reason, never deleted.
-- **The handoff.** `rb status` lists what is open (unknown and provisional settings, stale sources, drifted specs, untested claims, supported claims that are not established, refuted claims nobody has decided on, open questions, hypotheses nothing tests) and `rb context` prints the state as the Markdown a fresh agent session reads first. `AGENTS.md` tells an agent to read it before anything else and to report "supported, not established" as exactly that.
-- Writes are serialised with a lock on `.rb/`, so two agents recording at once cannot lose evidence or undo a freeze. A command line that does not parse now answers `--json` with an `E_USAGE` envelope, and a negative number in scientific notation (`--at-most -1e-3`) is read as a value.
-- Planned, and answering `E_NOT_AVAILABLE` until they exist: `rb mcp`, `rb reproduce`, `rb publish`, `rb clone`.
+## 0.5.0 (unreleased): Rabbit Brain keeps the research state; release review becomes its first source of evidence
+
+- **What the product is now.** Rabbit Brain keeps the research state of ML work done with coding agents, in `.rb/` next to the code:
+  - claims with a criterion fixed in advance;
+  - experiments with their variants, and every setting with where its value came from;
+  - evidence with a receipt;
+  - what a person decided.
+
+  Agents propose; `rb` checks the sources and computes the verdicts; people decide. Release review is built in as `rb review ...`, and a review run attaches to an experiment as evidence. The old top-level forms (`rb run`, `rb findings`, `rb init --project ...`) still work; help and docs use `rb review`.
+- **Commands:**
+  - `rb init "<title>"`
+  - `rb question|hypothesis|assumption add`
+  - `rb experiment add`, `rb variant add`
+  - `rb metric add`
+  - `rb spec set|verify|vary`
+  - `rb claim add`, `rb evidence attach`
+  - `rb freeze`, `rb decide`, `rb retract`
+  - `rb status`, `rb show`, `rb compare`, `rb log`, `rb context`
+  - `rb doctor`
+
+  Ids are a kind letter and four random characters (`q67pn`), so two branches never mint the same one. `.rb/log.jsonl` merges line by line.
+- **Who made each write.** Every write records an actor, found from `RB_ACTOR`, else from an agent runtime `rb` detects (Claude Code, Codex, `AI_AGENT`, GitHub Actions), else from git. The v1 rule rested on the agent setting `RB_ACTOR` itself; now an agent is recognised by default. Four calls belong to a person:
+  - freezing;
+  - deciding;
+  - amending a frozen spec;
+  - retracting what something rests on.
+
+  From an agent they are refused with `E_HUMAN_ONLY`, and the error carries `handoff.command`, the exact line for the person to run. A person's name given inside an agent session is recorded and stamped "asserted from" that session wherever it is shown. It is not counted as a person's call: an asserted freeze, vouch or claim author fixes nothing, and a person can freeze again over an asserted freeze.
+- **Experiments compare variants.** Each variant has a role: baseline, candidate, control or ablation. A setting belongs to the experiment or to one variant (`int8.precision`). `--varies` (or `rb spec vary`) declares what differs on purpose. **Any other difference between variants is a confound, and it blocks.** `rb compare <exp>` prints the experiment's own table: variants by metrics, with the change against the baseline read in each metric's direction from the catalogue (`rb metric add epe --unit px --minimize --alias endpoint_error`).
+- **Settings: provisional until checked, and checked on the spot.** `rb spec set` verifies by default. It reads config files by key path (`configs/train.yaml#optim.lr`; YAML, JSON, TOML), and a YAML `file:LINE` becomes its key path. `--from config.yaml --keys "optim.*"` records many settings at once.
+  - A comment line never verifies, and a prose line needs the setting's name or `--term`.
+  - A source that states a *different* value is recorded as a conflict, which blocks, and which re-verifying never clears.
+  - The words are now `unknown`, `provisional` (was `inferred`), `verified` and `inherited`.
+  - `--per-run` settings (seeds) take their value from each piece of evidence (`--set seed=2`).
+  - `--cited` records the value a cited paper used, and a difference makes its claims `not_comparable`.
+  - A person vouches for a value nobody can check with `rb decide <exp>/<name> accept`.
+- **When a claim is established.** `rb` computes the verdict from the evidence each time it is read:
+  - `untested`;
+  - `supported` or `refuted`;
+  - `reproduced` or `not_reproduced`, for a cited number;
+  - `mixed`;
+  - `not_comparable`;
+  - `inherited`.
+
+  **Established** needs all of the following:
+  - a person fixed the criterion (a person wrote the claim, or froze the experiment after it existed);
+  - required settings verified or vouched for;
+  - no conflict, stale source, confound or spec drift;
+  - the cited source checked;
+  - no borderline margin (within `--noise`, or twice the run-to-run sd);
+  - at least `--min-n` runs;
+  - no synthetic evidence, and no edit outside `rb`.
+
+  Evidence attached before its claim, or before the freeze, is exploratory and never counts. Evidence run with a config that disagrees with the spec (`--config`) is not counted.
+- **Evidence with a receipt.** `rb evidence attach <exp>` takes any of:
+  - `name=value` numbers, with `--variant`;
+  - `--from metrics.json|yaml|toml`;
+  - `--run` for an `rb review` run.
+
+  The receipt records the actor, how `rb` knew it, and the repository's state when the evidence was attached (the commit, and a hash covering the diff and the untracked files). With `--commit` it also records the commit that produced the numbers. An identical attachment is recognised and not written twice, unless it is `--again --why`.
+- **Hand edits are detected.** `rb` logs the hash of every file it writes. An object edited outside `rb` stops counting, fails every `--fail-on` gate, and is listed by `rb doctor`. A file that no longer parses is `E_STATE_CORRUPT` (was `E_LEDGER_CORRUPT`).
+- **Output for agents.** In `--json` output:
+  - `data.object` carries the object with its `kind` and `id`;
+  - `data.outcome` carries `passed` and `failures`;
+  - counts are named `*_count`;
+  - `data.actor` says who `rb` recorded.
+
+  `rb status` sorts what is open into **Needs a person** and **Agent can do**, each item with the exact command. `rb context` is the Markdown handoff a fresh session reads first, with a "Report it like this" line.
+- New error codes: `E_SOURCE_OUTSIDE` (a source outside the project cannot be checked by anyone else) and `E_USAGE` (a command line that does not parse answers `--json` with an envelope). A negative number in scientific notation (`--at-most -1e-3`) is read as a value.
+- **Honesty.** "Nothing leaves this machine" is gone from the docs and the package. `rb` works on your machine and uploads nothing unless you run `rb workspace push`. Your adapter and model code run with your permissions.
+- **From Python.** `import rabbit_brain as rb` gives you:
+  - `rb.open()` and `rb.init()`;
+  - `state.experiment(id)`, with `exp.spec.set|verify|vary`, `exp.claim(...)`, `claim.verdict()`, `exp.compare()`;
+  - `state.status()` and `state.context()`;
+  - `with exp.run(seed=2, config=...) as run: run.log(epe=...)`, which attaches what the block logged when it ends without an error. The receipt's command is the script's own; the basis is `logged`; a block that raises attaches nothing.
+
+  Every write is recorded `via: sdk`. The person's calls raise `RBError("E_HUMAN_ONLY")` with the handoff.
+- **`rb mcp`.** The research state over the Model Context Protocol (stdio), with no new dependency. Each tool runs the CLI command of the same name, with the same envelope and rules. Resources are `rb://context`, `rb://status` and `rb://docs`. Every call on a connection is recorded as `agent:<client name>`, whatever `RB_ACTOR` says, so `freeze` and `decide` return the command for the person.
+- Planned, and answering `E_NOT_AVAILABLE` with what to do today: `rb paper`, `rb open`, `rb publish`, `rb clone`.
+- `pip install "rabbit-brain[yaml]"` adds pyyaml for YAML configs.
 - `rb report <run> --open` writes `report.html` beside `report.md` and opens it. One self-contained file: the viewer's script and stylesheet are inlined and the comparison travels with it, because the file is opened from disk and `file://` blocks a fetch of a sibling. Nothing loads over the network and no part of the run is uploaded. `--html [PATH]` writes it without opening a browser, which is the form for CI and for an agent.
 - Evidence images are referenced beside the file, so a run's sheets are not duplicated into every report. `--embed` carries them inside it instead, for a single file to attach to a pull request. A report written outside the run directory embeds them automatically, because the relative paths would not resolve there, and says so.
 - It is the same viewer the website runs, given local data. **Two implementations of the same arithmetic, held together by a test:** `tests/test_conformance.py` runs the website's `lib/comparison.ts` and this package's `stability.py` over the same fixtures and fails on any difference, in a verdict, a count, a per-case label, the queue order, or a saved check's status or wording. Four divergences found on the way in, all of which would have shown a reader a different answer than `report.md`:

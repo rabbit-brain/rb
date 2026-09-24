@@ -27,7 +27,7 @@ def test_agent_flow(workdir, capsys):
     assert code == 0 and env.ok and env.command == "example" and env.run_id
     run_id = env.run_id
     assert env.data["summary"]["regressions"] == 3 and env.data["summary"]["flagged"] == 5
-    assert env.data["verdict"]["start"] == "aisle-042" and env.next[0].startswith(f"rb findings {run_id}")
+    assert env.data["verdict"]["start"] == "aisle-042" and env.next[0].startswith(f"rb review findings {run_id}")
     for name in ("bundle.json", "record.json", "findings.json", "report.md"):
         assert (workdir / "rb-runs" / run_id / name).exists()
 
@@ -71,7 +71,7 @@ def test_agent_flow(workdir, capsys):
 def test_human_output_and_next(workdir, capsys):
     code, out, err = run(capsys, "example")
     assert code == 0 and "Verdict: Not ready: 3 error regressions, 2 unstable cases that pass on error. Start with aisle-042." in out
-    assert "\nNext: rb findings " in out
+    assert "\nNext: rb review findings " in out
     run_id = re.search(r"rb-runs/(\S+)/", out).group(1)
     code, out, _ = run(capsys, "findings", run_id)
     assert "5 of 12 cases shown" in out and "aisle-042" in out
@@ -86,7 +86,7 @@ def test_v1_file_read_in_place(workdir, capsys):
     code, env, _ = run_json(capsys, "example", "--write", "ex.json")
     assert code == 0 and Path("ex.json").exists()
     code, env, _ = run_json(capsys, "findings", "ex.json", "--top", "1")
-    assert code == 0 and env.data["queue"][0]["id"] == "aisle-042" and env.next[0] == "rb case ex.json aisle-042"
+    assert code == 0 and env.data["queue"][0]["id"] == "aisle-042" and env.next[0] == "rb review case ex.json aisle-042"
     assert not (workdir / "rb-runs").exists(), "reading a file in place writes nothing"
     code, env, _ = run_json(capsys, "import", "ex.json")
     assert code == 0 and (workdir / "rb-runs").exists()

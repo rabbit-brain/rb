@@ -45,7 +45,7 @@ def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequen
     if run.source == "example":
         source_line = "Illustrative example data. No model inference was performed.\n\n"
     elif run.source == "run":
-        source_line = "Evaluated by rb run: both checkpoints were run on the case set and the trajectories recorded by the adapter.\n\n"
+        source_line = "Evaluated by rb review run: both checkpoints were run on the case set and the trajectories recorded by the adapter.\n\n"
     else:
         source_line = "Imported evaluation results.\n\n"
     extra_limits = ""
@@ -76,7 +76,7 @@ def report_core(run: Union[ComparisonV1, Bundle], limits: Limits, checks: Sequen
     shown = ranked if len(ranked) <= max_rows else ranked[:max(max_rows, s.flagged)]  # every flagged case, then the top of the rest
     rows = "\n".join(row(c) for c in shown)
     if len(shown) < len(ranked):
-        rows += f"\n\n{len(ranked) - len(shown)} more cases, none of them flagged: all cases are in bundle.json and `rb findings <run> --filter all`."
+        rows += f"\n\n{len(ranked) - len(shown)} more cases, none of them flagged: all cases are in bundle.json and `rb review findings <run> --filter all`."
     check_lines = "\n".join(
         f"- {c.case_id}: candidate error ≤ {to_fixed(c.max_error)} {unit}{f', late revision ≤ {pct(c.max_late_share)}' if c.max_late_share is not None else ''}{f', reversals ≤ {c.max_reversals}' if c.max_reversals is not None else ''}: {evaluate_check(c, run, unit).status}"
         for c in checks
@@ -195,16 +195,16 @@ def report_markdown(bundle: Bundle, record: Optional[Record], findings: Findings
     verdict = f"## Verdict\n\n{findings.verdict.line}\n"
     reproduce = (
         "## Reproduce\n\n"
-        f"- Ranked queue under the same limits: `rb findings {bundle.run_id} --max-regression {plain(findings.limits.max_regression)} --max-late-share {plain(findings.limits.max_late_share)} --max-reversals {findings.limits.max_reversals}"
+        f"- Ranked queue under the same limits: `rb review findings {bundle.run_id} --max-regression {plain(findings.limits.max_regression)} --max-late-share {plain(findings.limits.max_late_share)} --max-reversals {findings.limits.max_reversals}"
         + (f" --max-trajectory-regression {plain(findings.limits.max_trajectory_regression)}" if findings.limits.max_trajectory_regression is not None else "")
         + (f" --max-last-update {plain(findings.limits.max_last_update)}" if findings.limits.max_last_update is not None else "") + "`\n"
-        f"- One case with its evidence and reasoning: `rb case {bundle.run_id} <case_id>`\n"
-        f"- Saved checks against this run: `rb check run {bundle.run_id} --checks checks.json`\n"
+        f"- One case with its evidence and reasoning: `rb review case {bundle.run_id} <case_id>`\n"
+        f"- Saved checks against this run: `rb review check run {bundle.run_id} --checks checks.json`\n"
         "- Definitions: `rb docs`. Schemas: `rb schema bundle|findings|checks|record`.\n"
     )
     convergence = convergence_section(bundle, findings.limits) if bundle.source != "example" else ""   # any run with trajectories, imported ones included
     with_evidence = [c for c in bundle.cases if c.evidence]
     evidence = ""
     if with_evidence:
-        evidence = "## Evidence\n\n" + "\n".join(f"- {c.id}: `{c.evidence.dir}/case.png`" for c in with_evidence) + "\n\nEach case.png stacks the inputs, both flow fields with ground truth when present, the error maps, the per-iteration filmstrips and the trajectory plot; the caption says whether re-running the case reproduced the run's numbers. `rb case <run> <case_id> --render` makes one for any case.\n\n"
+        evidence = "## Evidence\n\n" + "\n".join(f"- {c.id}: `{c.evidence.dir}/case.png`" for c in with_evidence) + "\n\nEach case.png stacks the inputs, both flow fields with ground truth when present, the error maps, the per-iteration filmstrips and the trajectory plot; the caption says whether re-running the case reproduced the run's numbers. `rb review case <run> <case_id> --render` makes one for any case.\n\n"
     return f"{title}\n\n" + "\n".join(prov) + "\n\n" + verdict + "\n" + body + "\n" + convergence + evidence + reproduce

@@ -398,7 +398,7 @@ def filmstrip_scale(strips: list) -> float:
 
 def render_case(cfg, bundle: Bundle, case_id: str, run_dir: Path, device: Optional[str] = None, models: Optional[dict] = None) -> dict:
     """Re-run both checkpoints on one case and write the evidence PNGs. Returns {"dir": ..., "files": [...], "check": {...}}.
-    `models` may carry already-loaded models keyed "baseline"/"candidate" to avoid reloading during `rb run`."""
+    `models` may carry already-loaded models keyed "baseline"/"candidate" to avoid reloading during `rb review run`."""
     np, Image, ImageDraw, _ = _deps()
     from .adapters import load_adapter
     from .fmt import to_fixed

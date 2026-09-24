@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rabbit-brain"
-version = "0.4.0"
-description = "Release review for iterative perception models: rank the cases that regressed or never settled, keep checks for the next checkpoint."
+version = "0.5.0.dev0"
+description = "The research state for ML work done with coding agents: claims with criteria, settings with sources, evidence with receipts. Agents propose; rb checks and computes verdicts; you decide. Release review for iterative perception models built in."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Jhet Chan" }]
-keywords = ["optical-flow", "stereo", "depth", "evaluation", "regression-testing", "model-release", "RAFT", "perception", "ci", "agents"]
+keywords = ["ml-research", "experiment-tracking", "reproducibility", "provenance", "coding-agents", "agents", "evaluation", "claims", "optical-flow", "RAFT", "model-release", "ci"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -29,7 +29,8 @@ classifiers = [
 dependencies = ["pydantic>=2.5,<3", "tomli>=2; python_version < '3.11'"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "build>=1.2", "twine>=5"]
+dev = ["pytest>=8", "build>=1.2", "twine>=5", "pyyaml>=6"]
+yaml = ["pyyaml>=6"]
 raft = ["torch", "torchvision", "numpy", "opencv-python-headless", "scipy", "pillow"]
 evidence = ["numpy", "pillow"]
 

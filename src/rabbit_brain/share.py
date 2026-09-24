@@ -1,6 +1,6 @@
-"""`rb share`: the anonymised statistics of a run, as a file the human can send to the calibration corpus.
+"""`rb review share`: the anonymised statistics of a run, as a file the human can send to the calibration corpus.
 
-Nothing leaves the machine. `rb share <run>` writes `rb-runs/<run>/share.json`, prints exactly what is in it and what is
+The command sends nothing. `rb review share <run>` writes `rb-runs/<run>/share.json`, prints exactly what is in it and what is
 not, and says how to send it. The corpus is what calibrates the generic limits per model family ("on RAFT-family
 models, late movement above X predicts a real regression with precision Y"); every contribution is one run's numbers.
 

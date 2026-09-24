@@ -1,6 +1,6 @@
 """Data contracts. Every command's inputs and outputs are pydantic models; `rb schema` prints them as JSON Schema.
 
-Version 1 (the workspace / kit format, unchanged) is the input contract for `rb import`.
+Version 1 (the workspace / kit format, unchanged) is the input contract for `rb review import`.
 Version 2 (bundle) is what a run directory holds: the same per-case fields plus derived stability,
 flags, a generalised metric object and an evaluation record.
 """
@@ -259,7 +259,7 @@ StabilityOutcome = Literal["unstable", "settled", "not_assessed"]
 
 
 class CaseV2(CaseV1):
-    """A version-1 case plus derived fields. Derived fields are recomputed by `rb findings` when limits change.
+    """A version-1 case plus derived fields. Derived fields are recomputed by `rb review findings` when limits change.
     Errors may be null for unlabeled cases (`has_gt` false): stability is still assessed, error is not."""
     model_config = ConfigDict(extra="ignore")
     baseline_error: Optional[float] = Field(default=None, ge=0, le=SCORE_MAX)  # type: ignore[assignment]
@@ -457,7 +457,7 @@ class CheckV2(BaseModel):
     max_reversals: Optional[int] = Field(default=None, ge=0, le=64)
     from_run: Optional[str] = None
     created: Optional[str] = None
-    unit: Optional[str] = None          # the metric's unit when the check was saved, so `rb check list` can say it
+    unit: Optional[str] = None          # the metric's unit when the check was saved, so `rb review check list` can say it
     note: str = Field(default="", max_length=400)
 
 

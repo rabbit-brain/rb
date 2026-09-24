@@ -1,6 +1,6 @@
 """The local HTML report: the same viewer the website uses, written to a file you can open.
 
-`rb report <run> --open` writes `report.html` next to `report.md`. It is one self-contained document:
+`rb review report <run> --open` writes `report.html` next to `report.md`. It is one self-contained document:
 the viewer's script and stylesheet are inlined, and the comparison travels with it as a JSON block.
 That is not tidiness, it is a requirement. The file is opened from disk, and on `file://` a fetch of
 a sibling file is blocked, so anything the page needs must already be in it.
@@ -124,7 +124,7 @@ def _data_uri(path: Path) -> Optional[str]:
 
 
 def evidence_map(run_dir: Optional[Path], embed: bool = False) -> dict:
-    """Rendered sheets by case id, for whatever `rb case --render` has already written."""
+    """Rendered sheets by case id, for whatever `rb review case --render` has already written."""
     if run_dir is None:
         return {}
     root = run_dir / "evidence"
@@ -152,7 +152,7 @@ def build(bundle: Bundle, run_dir: Optional[Path] = None, embed: bool = False, c
     if not TEMPLATE.is_file():
         raise FileNotFoundError(
             "This build of rabbit-brain does not include the report viewer. "
-            "Reinstall from a released wheel, or run `rb report` without --open for the markdown receipt."
+            "Reinstall from a released wheel, or run `rb review report` without --open for the markdown receipt."
         )
     payload = {"run": comparison_json(bundle), "limits": limits_json(bundle.limits), "checks": checks_json(checks),
                "notice": notice_for(bundle.limits), "evidence": evidence_map(run_dir, embed)}

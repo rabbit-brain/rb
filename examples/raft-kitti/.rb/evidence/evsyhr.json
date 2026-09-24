@@ -1,0 +1,138 @@
+{
+  "created_by": "agent:claude-code",
+  "created_at": "2026-09-24T09:16:38.205+00:00",
+  "via": "cli",
+  "asserted_from": null,
+  "retracted": null,
+  "id": "evsyhr",
+  "experiment": "sintel",
+  "metrics": {
+    "cases": 200.0,
+    "with_gt": 200.0,
+    "regressions": 1.0,
+    "improved": 164.0,
+    "flagged": 1.0,
+    "unstable": 0.0,
+    "borderline": 0.0,
+    "things.mean_endpoint_error": 5.403328458070755,
+    "sintel.mean_endpoint_error": 1.5243704691901803,
+    "change.mean_endpoint_error": -3.8789579888805745
+  },
+  "per_run": {},
+  "run": "rb-runs/20260918-1852-raft-sintel",
+  "files": [],
+  "links": {},
+  "basis": "run",
+  "spec_sha256": "20faa31b7e5ba342fb74b1a0699347391c41f910b5102191644ff713914b42bf",
+  "settings": {
+    "iterations": 12,
+    "max_regression": 0.3,
+    "dataset.cases": 200,
+    "model_code.sha": "2888e15a51fa41140771d3f498ed8023cff098d1",
+    "things.checkpoint_sha256": "fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1",
+    "sintel.checkpoint_sha256": "90630d2e7d488a0d3ccb5e8194524850c4c05c732ea4ff99799822c7fa5c5cbf"
+  },
+  "spec_frozen": false,
+  "synthetic": false,
+  "fingerprint": "bf2e449153ae51f500d3c014facc12877c3eed70f98706c45ea2efcbd98a290e",
+  "receipt": {
+    "at": "2026-09-24T09:16:38.193+00:00",
+    "actor": "agent:claude-code",
+    "actor_via": "detected:CLAUDECODE",
+    "via": "cli",
+    "rb_version": "0.5.0.dev0",
+    "command": "rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-sintel.pth (runpod.sh, 18 Sep 2026)",
+    "attached": {
+      "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+      "branch": "claude/dreamy-curie-rt6di1",
+      "dirty": false
+    },
+    "produced": {
+      "commit": "2888e15a51fa41140771d3f498ed8023cff098d1",
+      "from": "record.json"
+    },
+    "environment": {
+      "python": "3.11.15",
+      "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39"
+    },
+    "run_record": {
+      "run_id": "20260918-1852-raft-sintel",
+      "source": "run",
+      "metric": {
+        "id": "mean_endpoint_error",
+        "name": "mean endpoint error",
+        "unit": "px",
+        "lower_is_better": true
+      },
+      "review_verdict": "Not ready: 1 error regression. Start with 000145_10.",
+      "record_sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
+      "command": "rb run --baseline raft/models/raft-things.pth --candidate raft/models/raft-sintel.pth --quiet",
+      "checkpoints": {
+        "baseline": {
+          "name": "raft-things",
+          "checkpoint": "raft/models/raft-things.pth",
+          "sha256": "fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1"
+        },
+        "candidate": {
+          "name": "raft-sintel",
+          "checkpoint": "raft/models/raft-sintel.pth",
+          "sha256": "90630d2e7d488a0d3ccb5e8194524850c4c05c732ea4ff99799822c7fa5c5cbf"
+        }
+      },
+      "dataset": {
+        "name": "kitti2015-train",
+        "count": 200,
+        "case_list_hash": "f3eebc6dbd5b8a55"
+      },
+      "model_code": {
+        "path": "raft",
+        "sha": "2888e15a51fa41140771d3f498ed8023cff098d1",
+        "dirty": false
+      },
+      "seeds": {
+        "python": 0,
+        "numpy": 0,
+        "torch": 0
+      },
+      "environment": {
+        "python": "3.11.10",
+        "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.35",
+        "rb_version": "0.2.0.dev1",
+        "torch": "2.4.1+cu124",
+        "cuda": "12.4",
+        "cuda_available": true,
+        "gpu": "NVIDIA RTX A5000",
+        "device": "cuda"
+      },
+      "adapter": {
+        "id": "raft",
+        "version": "0.2.0.dev1",
+        "model_code": "raft",
+        "git_sha": {
+          "sha": "2888e15a51fa41140771d3f498ed8023cff098d1",
+          "dirty": false
+        },
+        "iterations": 12,
+        "small": false,
+        "mixed_precision": false,
+        "alternate_corr": false,
+        "hook": "forward hook on model.update_block (output index 2 = delta_flow, scaled by 8 to image pixels)",
+        "architectures": {
+          "raft/models/raft-things.pth": "raft",
+          "raft/models/raft-sintel.pth": "raft"
+        }
+      }
+    },
+    "config": {
+      "path": "record.json",
+      "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
+      "matches": [
+        "iterations",
+        "model_code.sha"
+      ],
+      "mismatches": [],
+      "absent": []
+    }
+  },
+  "note": ""
+}

@@ -1,0 +1,254 @@
+{
+  "created_by": "agent:claude-code",
+  "created_at": "2026-09-24T09:16:35.898+00:00",
+  "via": "cli",
+  "asserted_from": null,
+  "retracted": null,
+  "id": "sintel",
+  "title": "raft-things vs raft-sintel, 200 KITTI-2015 training pairs",
+  "hypotheses": [
+    "sintel-safe"
+  ],
+  "varies": [
+    "checkpoint_sha256"
+  ],
+  "variants": [
+    {
+      "name": "things",
+      "role": "baseline",
+      "settings": [
+        {
+          "name": "checkpoint_sha256",
+          "value": "fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1",
+          "status": "verified",
+          "required": true,
+          "per_run": false,
+          "source": {
+            "kind": "run",
+            "path": "rb-runs/20260918-1852-raft-sintel",
+            "key": null,
+            "line": null,
+            "quote": null,
+            "term": null,
+            "commit": null,
+            "pointer": "/checkpoints/baseline/sha256",
+            "url": null,
+            "locator": null,
+            "note": "",
+            "resolved": {
+              "at": "2026-09-24T09:16:37.621+00:00",
+              "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+              "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
+              "line": null,
+              "text": "\"fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1\"",
+              "read": "fcfa4125d6418f4de95d84aec20a3c5f4e205101715a79f193243c186ac9a7e1"
+            }
+          },
+          "cited": null,
+          "conflict": null,
+          "note": "",
+          "set_by": "agent:claude-code",
+          "set_at": "2026-09-24T09:16:37.617+00:00",
+          "via": "cli",
+          "retracted": null
+        }
+      ],
+      "note": "",
+      "created_by": "agent:claude-code",
+      "created_at": "2026-09-24T09:16:35.898+00:00",
+      "via": "cli",
+      "retracted": null
+    },
+    {
+      "name": "sintel",
+      "role": "candidate",
+      "settings": [
+        {
+          "name": "checkpoint_sha256",
+          "value": "90630d2e7d488a0d3ccb5e8194524850c4c05c732ea4ff99799822c7fa5c5cbf",
+          "status": "verified",
+          "required": true,
+          "per_run": false,
+          "source": {
+            "kind": "run",
+            "path": "rb-runs/20260918-1852-raft-sintel",
+            "key": null,
+            "line": null,
+            "quote": null,
+            "term": null,
+            "commit": null,
+            "pointer": "/checkpoints/candidate/sha256",
+            "url": null,
+            "locator": null,
+            "note": "",
+            "resolved": {
+              "at": "2026-09-24T09:16:37.900+00:00",
+              "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+              "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
+              "line": null,
+              "text": "\"90630d2e7d488a0d3ccb5e8194524850c4c05c732ea4ff99799822c7fa5c5cbf\"",
+              "read": "90630d2e7d488a0d3ccb5e8194524850c4c05c732ea4ff99799822c7fa5c5cbf"
+            }
+          },
+          "cited": null,
+          "conflict": null,
+          "note": "",
+          "set_by": "agent:claude-code",
+          "set_at": "2026-09-24T09:16:37.896+00:00",
+          "via": "cli",
+          "retracted": null
+        }
+      ],
+      "note": "",
+      "created_by": "agent:claude-code",
+      "created_at": "2026-09-24T09:16:35.898+00:00",
+      "via": "cli",
+      "retracted": null
+    }
+  ],
+  "settings": [
+    {
+      "name": "iterations",
+      "value": 12,
+      "status": "verified",
+      "required": true,
+      "per_run": false,
+      "source": {
+        "kind": "file",
+        "path": "rb.toml",
+        "key": "adapter.iterations",
+        "line": null,
+        "quote": null,
+        "term": null,
+        "commit": null,
+        "pointer": null,
+        "url": null,
+        "locator": null,
+        "note": "",
+        "resolved": {
+          "at": "2026-09-24T09:16:36.485+00:00",
+          "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+          "sha256": "dcb2cb2337b30d80bdd1a680927f6d268ca1dd7ce8780e1c9edf824deee0849e",
+          "line": null,
+          "text": "adapter.iterations: 12",
+          "read": 12
+        }
+      },
+      "cited": null,
+      "conflict": null,
+      "note": "",
+      "set_by": "agent:claude-code",
+      "set_at": "2026-09-24T09:16:36.475+00:00",
+      "via": "cli",
+      "retracted": null
+    },
+    {
+      "name": "max_regression",
+      "value": 0.3,
+      "status": "verified",
+      "required": true,
+      "per_run": false,
+      "source": {
+        "kind": "file",
+        "path": "rb.toml",
+        "key": "limits.max_regression",
+        "line": null,
+        "quote": null,
+        "term": null,
+        "commit": null,
+        "pointer": null,
+        "url": null,
+        "locator": null,
+        "note": "",
+        "resolved": {
+          "at": "2026-09-24T09:16:36.780+00:00",
+          "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+          "sha256": "dcb2cb2337b30d80bdd1a680927f6d268ca1dd7ce8780e1c9edf824deee0849e",
+          "line": null,
+          "text": "limits.max_regression: 0.3",
+          "read": 0.3
+        }
+      },
+      "cited": null,
+      "conflict": null,
+      "note": "",
+      "set_by": "agent:claude-code",
+      "set_at": "2026-09-24T09:16:36.770+00:00",
+      "via": "cli",
+      "retracted": null
+    },
+    {
+      "name": "dataset.cases",
+      "value": 200,
+      "status": "verified",
+      "required": true,
+      "per_run": false,
+      "source": {
+        "kind": "run",
+        "path": "rb-runs/20260918-1852-raft-sintel",
+        "key": null,
+        "line": null,
+        "quote": null,
+        "term": null,
+        "commit": null,
+        "pointer": "/dataset/count",
+        "url": null,
+        "locator": null,
+        "note": "",
+        "resolved": {
+          "at": "2026-09-24T09:16:37.056+00:00",
+          "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+          "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
+          "line": null,
+          "text": "200",
+          "read": 200
+        }
+      },
+      "cited": null,
+      "conflict": null,
+      "note": "",
+      "set_by": "agent:claude-code",
+      "set_at": "2026-09-24T09:16:37.052+00:00",
+      "via": "cli",
+      "retracted": null
+    },
+    {
+      "name": "model_code.sha",
+      "value": "2888e15a51fa41140771d3f498ed8023cff098d1",
+      "status": "verified",
+      "required": true,
+      "per_run": false,
+      "source": {
+        "kind": "run",
+        "path": "rb-runs/20260918-1852-raft-sintel",
+        "key": null,
+        "line": null,
+        "quote": null,
+        "term": null,
+        "commit": null,
+        "pointer": "/adapter/git_sha/sha",
+        "url": null,
+        "locator": null,
+        "note": "",
+        "resolved": {
+          "at": "2026-09-24T09:16:37.338+00:00",
+          "commit": "03d12f73c704e721555108667e272c6574d03ca4",
+          "sha256": "01513181490f02e026e29ca3ee69b9f9bb41113fd3095eb01d6de40d65d25f1d",
+          "line": null,
+          "text": "\"2888e15a51fa41140771d3f498ed8023cff098d1\"",
+          "read": "2888e15a51fa41140771d3f498ed8023cff098d1"
+        }
+      },
+      "cited": null,
+      "conflict": null,
+      "note": "",
+      "set_by": "agent:claude-code",
+      "set_at": "2026-09-24T09:16:37.334+00:00",
+      "via": "cli",
+      "retracted": null
+    }
+  ],
+  "frozen": null,
+  "amendments": [],
+  "note": ""
+}

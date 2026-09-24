@@ -51,3 +51,16 @@ Every `report.md` ends with the per-model distribution of the trajectory statist
 - `rb-runs/20260918-1854-raft-kitti/evidence/000079_10/case-1400.jpg`: raft-things gets the cars wrong (yellow and red on every car in its error map) and raft-kitti fixes them (blue on the same cars in the error-change tile). The "unstable" flag is visible in the candidate's last three tiles: its update grows again in iterations 10 to 12 (0.47, 0.55, 0.66 px), at the left road edge and the far right, while raft-things keeps shrinking.
 
 The scales on those sheets were set on these images: a single near pole had been dictating the flow, error and filmstrip scales, so flow colour now saturates at the 95th percentile with square-root saturation, heat maps run to the 99th percentile capped at four times the mean, and every tile label says its scale.
+
+## The same reviews as research state (`.rb/`)
+
+`.rb/` in this directory holds the question these runs were for, as Rabbit Brain 0.5 keeps it. There is one experiment, `sintel`: raft-things against raft-sintel, varying the checkpoint. Six of its settings were verified against `rb.toml` and the run's own `record.json`: iterations, the regression limit, the 200 cases, the RAFT commit, and both checkpoint hashes. The raft-sintel review is attached as evidence, and there are two claims, "lowers mean EPE by at least 3 px" and "regresses on no case".
+
+An agent built it, after the runs, so `rb status` says both claims are **untested**. The review was attached before the claims were written, which makes it exploratory: it meets the first claim and misses the second (one regression, 000145_10), and neither counts. The criteria were written by an agent, so they wait on a person's freeze. What would establish them is a person running `rb freeze sintel` and a new run attached after it.
+
+```sh
+cd examples/raft-kitti
+rb status              # what is established (nothing), what needs a person (the freeze), what an agent can do
+rb compare sintel      # things 5.403 px vs sintel 1.524 px, -3.88, better
+rb show no-regressions # the exploratory observation that misses, and why it does not count
+```

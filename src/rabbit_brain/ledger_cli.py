@@ -525,8 +525,15 @@ def cmd_evidence_attach(args: argparse.Namespace, out: Any) -> int:
     _actor_line(out, led)
     unread = led.unread_metrics(led.load("experiment", ev.experiment), [ev], claims)
     out.data.update({"object": _obj("evidence", ev), "verdicts": [v.model_dump(mode="json") for v in verdicts], "unclaimed_metrics": unread})
-    out.next = [f"rb show {v.claim}" for v in verdicts][:3] or [f'rb claim add "<what it should show>" -e {ev.experiment} --metric {sorted(ev.metrics)[0]} --at-most <x>   (write the claim before the next run)']
+    from .ledger import RUN_COUNTS
+    pick = sorted(ev.metrics, key=lambda k: (k in RUN_COUNTS, not k.startswith("change."), k))[0]
+    out.next = [f"rb show {v.claim}" for v in verdicts][:3] or [f'rb claim add "<what it should show>" -e {ev.experiment} --metric {pick} --at-most <x>   (write the claim before the next run)']
     return EXIT_OK
+
+
+def _short(text: str, width: int = 16) -> str:
+    """A long value (a checkpoint hash) in a table cell: its start, enough to tell the rows apart."""
+    return text if len(text) <= width else text[: width - 1] + "…"
 
 
 def _again(args: argparse.Namespace) -> Optional[str]:
@@ -867,7 +874,7 @@ def cmd_compare(args: argparse.Namespace, out: Any) -> int:
     heads = ["variant", "role", *t["varies"]] + [m["name"] + (f" ({m['unit']})" if m["unit"] else "") + ("" if m["declared"] else "*") for m in t["metrics"]]
     rows = []
     for r in t["rows"]:
-        cells = [r["variant"], r["role"], *[show(r["varies"].get(n)) for n in t["varies"]]]
+        cells = [r["variant"], r["role"], *[_short(show(r["varies"].get(n))) for n in t["varies"]]]
         for m in t["metrics"]:
             c = r["metrics"].get(m["name"])
             if c is None:

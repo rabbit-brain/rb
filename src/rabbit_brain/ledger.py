@@ -1357,7 +1357,16 @@ class Ledger:
         for a in assumptions:
             if a.status == "open":
                 item("person", "unchecked_assumption", a.id, f"{a.id} is not checked: {a.text}", f'rb decide {a.id} accept|reject --why "..."')
-        items.sort(key=lambda i: {"person": 0, "agent": 1, "anyone": 2}[i["who"]])
+        merged: dict[tuple[str, str], dict] = {}      # one command that clears several items is listed once
+        for it in items:
+            key = (it["who"], it["do"])
+            if key in merged and it["subject"] not in merged[key]["subject"].split(", "):
+                first = merged[key]
+                first["subject"] += f", {it['subject']}"
+                first["what"] = f"{first['subject']}: " + first["what"].split(": ", 1)[-1]
+            else:
+                merged.setdefault(key, dict(it))
+        items = sorted(merged.values(), key=lambda i: {"person": 0, "agent": 1, "anyone": 2}[i["who"]])
         exp_rows = []
         for e in experiments:
             counts = {k: 0 for k in ("verified", "provisional", "unknown", "inherited", "per_run")}

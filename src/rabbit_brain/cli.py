@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import sys
 import traceback
@@ -837,6 +838,26 @@ def cmd_runs(args: argparse.Namespace, out: Out) -> int:
 # ---------------------------------------------------------------- parser
 
 
+class UsageError(Exception):
+    """argparse could not read the command line. main() turns it into an E_USAGE envelope under --json."""
+
+    def __init__(self, message: str, usage: str) -> None:
+        super().__init__(message)
+        self.message, self.usage = message, usage
+
+
+class RBArgumentParser(argparse.ArgumentParser):
+    """argparse, except that a usage error is raised for main() to report (an agent with --json gets an envelope, not a
+    bare usage line on stderr), and a negative number in scientific notation (--at-most -1e-3) is a value, not an option."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._negative_number_matcher = re.compile(r"^-(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$")
+
+    def error(self, message: str) -> None:  # type: ignore[override]
+        raise UsageError(message, self.format_usage())
+
+
 def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="print one JSON object (the envelope) instead of text")
@@ -851,7 +872,7 @@ def build_parser() -> argparse.ArgumentParser:
     chk = argparse.ArgumentParser(add_help=False)
     chk.add_argument("--checks", default=None, help="saved checks file (default checks.json in the current directory)")
 
-    p = argparse.ArgumentParser(prog="rb", description="Rabbit Brain: the research state and evidence for ML work done with coding agents, and release review for iterative perception models. Docs for agents and humans: rb docs.")
+    p = RBArgumentParser(prog="rb", description="Rabbit Brain: the research state and evidence for ML work done with coding agents, and release review for iterative perception models. Docs for agents and humans: rb docs.")
     p.add_argument("--version", action="version", version=f"rabbit-brain {__version__}")
     sub = p.add_subparsers(dest="command", metavar="<command>")
 
@@ -1026,8 +1047,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         return EXIT_INVALID
     try:
         args = parser.parse_args(argv)
-    except SystemExit as exc:  # argparse already printed usage
+    except SystemExit as exc:  # --help printed and exited
         return int(exc.code) if isinstance(exc.code, int) else EXIT_INVALID
+    except UsageError as exc:
+        command = " ".join(a for a in argv[:2] if not a.startswith("-")) or "rb"
+        err = RBError("E_USAGE", message=exc.message)
+        if json_mode:
+            Out(command, True).emit(ok=False, errors=[err.to_dict()])
+        else:
+            print(exc.usage.rstrip("\n"), file=sys.stderr)
+            print(f"rb {command}: {exc.message}", file=sys.stderr)
+        return EXIT_INVALID
     if args.command == "check" and not getattr(args, "check_command", None):
         parser.parse_args(["check", "--help"])
         return EXIT_OK

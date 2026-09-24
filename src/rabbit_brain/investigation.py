@@ -4,12 +4,12 @@ object.
 
 Two rules shape every object in this module.
 
-1. **The researcher sets the knobs; the tool sets the statuses.** Anyone, a person or an agent, may propose a knob's
-   value, and the knob is then `inferred`. It becomes `verified` only when `rb` itself resolves its source and finds the
+1. **You and your agents propose; rb verifies; people decide.** Anyone may give a setting's value, and it is then
+   `provisional`: it stands for now and has not been checked. It becomes `verified` only when `rb` itself resolves its source and finds the
    value stated there, and the resolution (commit, file hash, the line as read) is stored so a later change is
    detectable. A claim's verdict is never stored at all: it is computed from the evidence every time it is read.
-2. **Unknown is a value.** A knob nobody has found is `unknown`, and every verdict on an experiment with an unknown or
-   unverified knob names it. Nothing unknown reads as settled, which is the rule `rb check run` already applies to a
+2. **Unknown is a value.** A setting nobody has found is `unknown`, and every verdict on an experiment with an unknown or
+   unverified setting names it. Nothing unknown reads as settled, which is the rule `rb check run` already applies to a
    limit that was declared and not evaluated.
 """
 from __future__ import annotations
@@ -21,14 +21,14 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, Stri
 
 LEDGER_VERSION = 1
 ID_PATTERN = r"^[a-zA-Z0-9_.-]{1,80}$"             # the same id rule as models.py, restated because models.py imports this module
-ACTOR_PATTERN = r"^(human|agent|tool):[A-Za-z0-9_.@+-]{1,80}$"
-NAME_PATTERN = r"^[A-Za-z0-9_.:/-]{1,80}$"          # knob and metric names: lr, optimizer.betas, cuda/version, candidate.mean_epe
+ACTOR_PATTERN = r"^(human|agent):[A-Za-z0-9_.@+-]{1,80}$"
+NAME_PATTERN = r"^[A-Za-z0-9_.:/-]{1,80}$"          # setting and metric names: lr, optimizer.betas, cuda/version, candidate.mean_epe
 TEXT = 1000
 
 Scalar = Union[StrictBool, StrictInt, StrictFloat, StrictStr]
-KnobValue = Optional[Union[Scalar, list[Scalar]]]
+SettingValue = Optional[Union[Scalar, list[Scalar]]]
 
-KnobStatus = Literal["unknown", "inferred", "verified", "imported"]
+SettingStatus = Literal["unknown", "provisional", "verified", "imported"]
 Comparator = Literal["within", "at_most", "at_least"]
 ClaimOrigin = Literal["own", "source", "imported"]
 VerdictStatus = Literal["not_tested", "supported", "refuted", "reproduced", "diverged", "contested", "imported"]
@@ -44,13 +44,13 @@ def _finite(v: float, name: str) -> float:
 
 
 class Resolution(BaseModel):
-    """What `rb knob verify` found when it read the source. Written by the tool only."""
+    """What `rb spec verify` found when it read the source. Written by the tool only."""
     model_config = ConfigDict(extra="forbid")
     at: str
     commit: Optional[str] = None      # the commit the file was read at; None means an uncommitted working-tree file
     sha256: str                       # of the file as read, so a later change to it is detectable
     line: Optional[int] = None        # where the value was found
-    text: str = Field(default="", max_length=400)   # the line, or the JSON value, as read
+    text: str = Field(min_length=1, max_length=400)   # the line, or the JSON value, as read; re-checked against the value on every read
 
 
 class Source(BaseModel):
@@ -59,8 +59,8 @@ class Source(BaseModel):
     `file`: a path (relative to the directory holding `.rb/`) with a line, a quote, or both, optionally at a commit. A
     paper's text saved as a file is a file source; `locator` says where a reader finds it ("§4.2", "Table 3, row 4").
     `run`: a JSON file (a run directory means its `record.json`) and a JSON pointer into it, e.g. `/seeds/torch`.
-    `url` and `note` record where a value came from but cannot be checked mechanically, so a knob resting on one stays
-    `inferred`."""
+    `url` and `note` record where a value came from but cannot be checked mechanically, so a setting resting on one stays
+    `provisional`."""
     model_config = ConfigDict(extra="forbid")
     kind: Literal["file", "run", "url", "note"]
     path: Optional[str] = Field(default=None, min_length=1, max_length=400)
@@ -109,31 +109,44 @@ class Source(BaseModel):
         return f"{s} ({self.locator})" if self.locator else s
 
 
-# ---------------------------------------------------------------- knobs and experiments
+# ---------------------------------------------------------------- settings and experiments
 
 
-class Knob(BaseModel):
+class Setting(BaseModel):
     """One setting an experiment depends on: a learning rate, a seed, a CUDA version, a preprocessing choice, a checkpoint.
-    `required` knobs that are unknown block the experiment's claims from being read as settled; an optional one is
+    `required` settings that are unknown block the experiment's claims from being read as settled; an optional one is
     recorded and reported but does not block."""
     model_config = ConfigDict(extra="forbid")
     name: str = Field(pattern=NAME_PATTERN)
-    value: KnobValue = None
-    status: KnobStatus = "unknown"
+    value: SettingValue = None
+    status: SettingStatus = "unknown"
     required: bool = True
     source: Optional[Source] = None
     note: str = Field(default="", max_length=400)
     set_by: str = Field(pattern=ACTOR_PATTERN)
     set_at: str
 
+    @field_validator("value")
+    @classmethod
+    def _no_blank_text(cls, v: SettingValue) -> SettingValue:
+        items = v if isinstance(v, list) else [v]
+        if isinstance(v, list) and not v:
+            raise ValueError("an empty list is not a value; record a setting nobody has found as unknown")
+        for x in items:
+            if isinstance(x, str) and not x.strip():
+                raise ValueError("empty text is not a value; record a setting nobody has found as unknown")
+            if isinstance(x, float) and not math.isfinite(x):
+                raise ValueError("a value must be a finite number")
+        return v
+
     @model_validator(mode="after")
-    def _consistent(self) -> "Knob":
+    def _consistent(self) -> "Setting":
         if self.status == "unknown" and self.value is not None:
-            raise ValueError(f"knob {self.name}: an unknown knob has no value")
-        if self.status in ("inferred", "verified") and self.value is None:
-            raise ValueError(f"knob {self.name}: {self.status} without a value; a knob nobody has found is unknown")
+            raise ValueError(f"setting {self.name}: an unknown setting has no value")
+        if self.status in ("provisional", "verified", "imported") and self.value is None:
+            raise ValueError(f"setting {self.name}: {self.status} without a value; a setting nobody has found is unknown")
         if self.status == "verified" and (self.source is None or self.source.resolved is None):
-            raise ValueError(f"knob {self.name}: verified without a resolved source. Only `rb knob verify` sets verified, and it stores what it read")
+            raise ValueError(f"setting {self.name}: verified without a resolved source. Only `rb spec verify` sets verified, and it stores what it read")
         return self
 
 
@@ -156,8 +169,8 @@ class Amendment(BaseModel):
 
 
 class Experiment(BaseModel):
-    """What would test a hypothesis: the baseline, the candidate and the knobs. Its claims point at it; its evidence is
-    attached to it. Once frozen, a change to the spec (a knob's value, a claim's criterion) needs a stated reason and is
+    """What would test a hypothesis: the baseline, the candidate and the settings. Its claims point at it; its evidence is
+    attached to it. Once frozen, a change to the spec (a setting's value, a claim's criterion) needs a stated reason and is
     kept as an amendment, which is pre-registration as a command."""
     model_config = ConfigDict(extra="forbid")
     id: str = Field(pattern=ID_PATTERN)
@@ -165,24 +178,24 @@ class Experiment(BaseModel):
     tests: list[str] = Field(default_factory=list)       # hypothesis ids
     baseline: Optional[str] = Field(default=None, max_length=200)
     candidate: Optional[str] = Field(default=None, max_length=200)
-    knobs: list[Knob] = Field(default_factory=list)
+    settings: list[Setting] = Field(default_factory=list)
     frozen: Optional[Freeze] = None
     amendments: list[Amendment] = Field(default_factory=list)
     note: str = Field(default="", max_length=TEXT)
     created_by: str = Field(pattern=ACTOR_PATTERN)
     created_at: str
 
-    @field_validator("knobs")
+    @field_validator("settings")
     @classmethod
-    def _unique(cls, v: list[Knob]) -> list[Knob]:
+    def _unique(cls, v: list[Setting]) -> list[Setting]:
         names = [k.name for k in v]
         dup = sorted({n for n in names if names.count(n) > 1})
         if dup:
-            raise ValueError(f"duplicate knob names: {', '.join(dup)}")
+            raise ValueError(f"duplicate setting names: {', '.join(dup)}")
         return v
 
-    def knob(self, name: str) -> Optional[Knob]:
-        return next((k for k in self.knobs if k.name == name), None)
+    def setting(self, name: str) -> Optional[Setting]:
+        return next((k for k in self.settings if k.name == name), None)
 
 
 # ---------------------------------------------------------------- claims and evidence
@@ -213,6 +226,11 @@ class Claim(BaseModel):
     @classmethod
     def _target(cls, v: float) -> float:
         return _finite(v, "target")
+
+    @field_validator("tolerance")
+    @classmethod
+    def _tolerance(cls, v: Optional[float]) -> Optional[float]:
+        return None if v is None else _finite(v, "tolerance")
 
     @model_validator(mode="after")
     def _criterion(self) -> "Claim":
@@ -270,7 +288,8 @@ class Evidence(BaseModel):
     run: Optional[str] = None
     files: list[FileRef] = Field(default_factory=list)
     links: dict[str, str] = Field(default_factory=dict)
-    spec_sha256: str                      # the experiment's spec when this was attached
+    spec_sha256: str                      # the experiment's whole spec when this was attached
+    setup_sha256: Optional[str] = None    # the part of it the evidence depends on: baseline, candidate, settings (not the claims)
     spec_frozen: bool                     # whether the experiment was frozen at that moment
     synthetic: bool = False               # from rb's built-in example or demo data, which is not evidence about any model
     receipt: Receipt
@@ -366,7 +385,8 @@ class Observation(BaseModel):
     holds: bool
     margin: float                 # how far inside (positive) or outside (negative) the criterion
     borderline: bool              # moving the criterion by a tenth would change the call
-    spec: Literal["current", "amended_since", "before_freeze"]
+    spec: Literal["current", "changed_since", "amended_since", "before_freeze"]   # the setup the evidence was produced under, against the experiment's now
+    post_hoc: bool = False        # the claim was written after this evidence was attached
 
 
 class ClaimVerdict(BaseModel):
@@ -377,10 +397,10 @@ class ClaimVerdict(BaseModel):
     criterion: str
     origin: ClaimOrigin
     status: VerdictStatus
-    established: bool = False       # supported or reproduced, with no required knob unknown, no stale source and not only example data
+    established: bool = False       # supported or reproduced, with no required setting unknown, no stale source and not only example data
     observations: list[Observation] = Field(default_factory=list)
     conditions: list[str] = Field(default_factory=list)    # what the verdict rests on that is not established
-    blocking: list[str] = Field(default_factory=list)      # required knobs still unknown
+    blocking: list[str] = Field(default_factory=list)      # required settings still unknown
     without_metric: list[str] = Field(default_factory=list)   # evidence on the experiment that does not report this metric
     retracted: list[str] = Field(default_factory=list)
     decision: Optional[str] = None                         # the latest decision on this claim, if any

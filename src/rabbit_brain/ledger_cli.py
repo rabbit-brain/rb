@@ -70,7 +70,12 @@ def root_relative(path: str, root: Path) -> str:
     try:
         return full.relative_to(root).as_posix()
     except ValueError:
-        return str(full)
+        pass
+    from .sources import git_top
+    top = git_top(root)
+    if top is not None and (full == top or top in full.parents):     # elsewhere in the same repository: stays relative, so it works in any clone
+        return Path(os.path.relpath(full, root)).as_posix()
+    return str(full)
 
 
 def parse_source(spec: Optional[str], quote: Optional[str], commit: Optional[str], locator: Optional[str], term: Optional[str], root: Path) -> Optional[Source]:
@@ -286,7 +291,7 @@ def cmd_spec_set(args: argparse.Namespace, out: Any) -> int:
     required = False if args.optional else (True if args.required else None)
     name = f"{args.variant}.{args.name}" if args.variant else args.name
     if value is None and not args.unknown and not args.per_run and source is not None and (
-            source.key or source.kind == "run" or (source.line and structured_kind(str(source.path)) == "yaml")):
+            source.key or source.kind == "run" or source.line):
         value = _read_value(led, source, name)
     setting, row = led.set_setting(args.experiment, name, value, unknown=args.unknown, source=source, required=required,
                                    per_run=True if args.per_run else None, cited=cited, note=args.note, amend=_amend(args), verify=not args.no_verify)
@@ -319,6 +324,15 @@ def _read_value(led: Ledger, source: Source, name: str) -> Any:
         data, _ = read_file(led.root, str(source.path), source.commit)
         text = data.decode("utf-8", errors="replace")
         key = source.key
+        if key is None and source.line and structured_kind(str(source.path)) != "yaml":
+            from .sources import TRAILING_COMMENT, _nearest_number, split_lines
+            lines = split_lines(text)
+            if source.line > len(lines):
+                raise RBError("E_SOURCE_UNRESOLVED", message=f"{source.path} has {len(lines)} lines, not {source.line}.")
+            got = _nearest_number(TRAILING_COMMENT.sub("", lines[source.line - 1]), source.term or name.split(".")[-1])
+            if got is None:
+                raise RBError("E_SOURCE_UNRESOLVED", message=f"{source.label()} names no number for {name}; give the value: rb spec set <exp> {name} <value> --source {source.label()}")
+            return got
         if key is None and source.line:
             key = yaml_key_at(text, source.line)
             if key is None:
@@ -500,8 +514,16 @@ def cmd_evidence_attach(args: argparse.Namespace, out: Any) -> int:
     per_run = parse_pairs(args.set, "--set", numeric=False)
     files = [root_relative(f, led.root) for f in args.artifact or []]
     basis = "typed"
+    if args.keys and not args.from_file:
+        raise RBError("E_OBJECT_INVALID", message="--keys chooses which numbers --from takes; give --from <file>.")
     if args.from_file:
         nums, skipped = metrics_from_file(Path(args.from_file))
+        if args.keys:              # a results file also holds per-case numbers; take the ones the claims are about
+            patterns = [p.strip() for item in args.keys for p in item.split(",") if p.strip()]
+            nums = {k: v for k, v in nums.items() if any(fnmatch.fnmatchcase(k, p) for p in patterns)}
+            skipped = [k for k in skipped if any(fnmatch.fnmatchcase(k, p) for p in patterns)]
+            if not nums:
+                raise RBError("E_OBJECT_INVALID", message=f"--keys {', '.join(patterns)} matches no number in {args.from_file}.")
         overlap = sorted(set(nums) & set(metrics))
         if overlap:
             raise RBError("E_OBJECT_INVALID", message=f"NAME=VALUE and --from both give {', '.join(overlap)}.")
@@ -1212,7 +1234,7 @@ def context_markdown(led: Ledger, st: dict) -> str:
             cfg = ev.receipt.config
             ran = ("config unchecked" if cfg is None or not (cfg.matches or cfg.mismatches)
                    else "ran with the spec" if not cfg.mismatches else "ran with a different spec")
-            L.append(f"- {ev.id} ({ev.basis}{', synthetic' if ev.synthetic else ''}): " + ", ".join(f"{k}={x:g}" for k, x in sorted(ev.metrics.items())[:6])
+            L.append(f"- {ev.id} ({ev.basis}{', synthetic' if ev.synthetic else ''}): " + ", ".join(f"{k}={x:g}" for k, x in sorted(ev.metrics.items())[:12]) + (f" and {len(ev.metrics) - 12} more (rb show {ev.id})" if len(ev.metrics) > 12 else "")
                      + (f" · {', '.join(f'{k}={show(x)}' for k, x in ev.per_run.items())}" if ev.per_run else "")
                      + f" · {ran}" + (f" · command: {ev.receipt.command}" if ev.receipt.command else "")
                      + (f" · produced at {ev.receipt.produced.get('commit')[:12]}" if ev.receipt.produced.get("commit") else "") + (f" · {ev.note}" if ev.note else ""))
@@ -1392,6 +1414,7 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser, research_common: argp
     s.add_argument("--metric", action="append", default=None, help=argparse.SUPPRESS)
     s.add_argument("--variant", default=None, help="the variant these numbers are for: epe=5.64 becomes <variant>.epe")
     s.add_argument("--from", dest="from_file", default=None, metavar="FILE", help="a JSON/YAML/TOML object of metric names to numbers (nested keys join with dots)")
+    s.add_argument("--keys", action="append", default=None, help="with --from: only these numbers, glob patterns, e.g. \"summary.*\" (the file is still hashed whole)")
     s.add_argument("--run", default=None, help="an rb review run id, run directory, bundle.json, or results file")
     s.add_argument("--config", default=None, help="the run's own resolved config (Hydra, W&B config.yaml, hparams.yaml): checks it ran with the spec")
     s.add_argument("--set", action="append", default=None, metavar="NAME=VALUE", help="a per-run setting this run used, e.g. seed=2")

@@ -957,3 +957,29 @@ def test_the_confound_hint_run_as_written_clears_the_confound(lab, capsys, froze
     ok(capsys, *shlex.split(command)[1:])
     blocking = [c for c in ok(capsys, "show", "e1")["caveats"] if c["code"] == "confound" and c["blocks"]]
     assert blocking == [], (command, blocking)
+
+
+def test_evidence_from_a_results_file_takes_only_the_keys_asked_for(project, capsys):
+    """A results file also holds per-case numbers; --keys takes the summary a claim reads, and the file is hashed whole."""
+    int8_experiment(capsys)
+    Path("results.json").write_text(json.dumps({"summary": {"delta_epe": 0.0486, "n": 100, "ok": True},
+                                                "cases": {"a": {"epe": 1.0}, "b": {"epe": 2.0}}}), encoding="utf-8")
+    data = ok(capsys, "evidence", "attach", "e1", "--from", "results.json", "--keys", "summary.*")
+    assert data["object"]["metrics"] == {"summary.delta_epe": 0.0486, "summary.n": 100}
+    assert data["object"]["files"][0]["path"] == "results.json"
+    refused(capsys, 2, "E_OBJECT_INVALID", "evidence", "attach", "e1", "--from", "results.json", "--keys", "nothing.*")
+
+
+def test_a_code_line_gives_its_value_when_none_is_typed(project, capsys):
+    int8_experiment(capsys)
+    Path("rule.py").write_text("THETA = 0.7017  # frozen on the configuration half\nZ = 1.645\n", encoding="utf-8")
+    s = ok(capsys, "spec", "set", "e1", "stop.theta", "--source", "rule.py:1")["object"]
+    assert s["value"] == 0.7017 and s["status"] == "verified"
+    refused(capsys, 2, "E_SOURCE_UNRESOLVED", "spec", "set", "e1", "stop.alpha", "--source", "rule.py:2")
+
+
+def test_rb_output_piped_into_head_exits_quietly(project, capsys):
+    int8_experiment(capsys)
+    import subprocess, sys
+    r = subprocess.run(f"{sys.executable} -m rabbit_brain.cli status | head -1", shell=True, capture_output=True, text=True)
+    assert "Traceback" not in r.stderr and r.stdout.strip()

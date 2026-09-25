@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import sys
@@ -1149,6 +1150,17 @@ def _queue_request(argv: list[str], why: str) -> Optional[str]:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    try:
+        return _main(argv)
+    except BrokenPipeError:        # rb ... | head: the reader left early, which is not an error
+        try:
+            os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        except OSError:
+            pass
+        return EXIT_OK
+
+
+def _main(argv: Optional[list[str]] = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     json_mode = "--json" in argv
     parser = build_parser()
@@ -1230,6 +1242,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                 print(f"  → {err.fix}", file=sys.stderr)
         out.emit(ok=False, errors=[err.to_dict()])
         return err.exit_code
+    except BrokenPipeError:
+        raise
     except Exception as exc:  # pragma: no cover - last resort
         traceback.print_exc(file=sys.stderr)
         err = RBError("E_INTERNAL", message=f"{type(exc).__name__}: {exc}", exit_code=EXIT_ENVIRONMENT)

@@ -1,0 +1,20 @@
+{
+  "created_by": "agent:claude-code",
+  "created_at": "2026-09-25T11:08:36.001+00:00",
+  "via": "cli",
+  "retracted": null,
+  "id": "k12-all",
+  "statement": "The run covers all 194 labelled pairs",
+  "experiment": "k12",
+  "hypothesis": null,
+  "metric": "summary.n",
+  "comparator": "equals",
+  "target": 194.0,
+  "tolerance": 0.0,
+  "over": "each",
+  "min_n": 1,
+  "noise": null,
+  "origin": "own",
+  "source": null,
+  "note": "PREREG-fresh-cases.md:31"
+}

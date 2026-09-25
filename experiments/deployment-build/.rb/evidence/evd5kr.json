@@ -1,0 +1,66 @@
+{
+  "created_by": "agent:claude-code",
+  "created_at": "2026-09-25T11:09:03.695+00:00",
+  "via": "cli",
+  "retracted": null,
+  "id": "evd5kr",
+  "experiment": "mixed",
+  "metrics": {
+    "b1.auroc_restricted": 0.437,
+    "b1.prec10_restricted": 0.4,
+    "b1.prec20_restricted": 0.65,
+    "rb.auroc_restricted": 0.444,
+    "rb.prec10_restricted": 0.5,
+    "rb.prec20_restricted": 0.6,
+    "rb-corrected.auroc_restricted": 0.446,
+    "rb-corrected.prec10_restricted": 0.4,
+    "rb-corrected.prec20_restricted": 0.6
+  },
+  "per_run": {},
+  "run": null,
+  "files": [],
+  "links": {
+    "protocol": "../../docs/deployment-experiment.md"
+  },
+  "basis": "typed",
+  "spec_sha256": "d3c8fad38bd405b03e1538dd68be78acbc9a70f34c60e2101e2a86dbd5feae13",
+  "settings": {
+    "split.seed": 20260920,
+    "holdout.sha256": "87e13bca14354a0270dba0def43eada789d59f40df6cb79ce4f744200cffc1ed",
+    "selection.b1_threshold": 0.0295,
+    "rb_score": "late_update",
+    "reference.iterations": 12,
+    "build.iterations": 12,
+    "build.mixed_precision": true,
+    "checkpoint.sha256": null
+  },
+  "spec_frozen": false,
+  "synthetic": false,
+  "fingerprint": "6194c6d6937a9cdbc3163b85e917e315520f34f68d3c132a16971031496119b0",
+  "receipt": {
+    "at": "2026-09-25T11:09:03.674+00:00",
+    "actor": "agent:claude-code",
+    "actor_via": "detected:CLAUDECODE",
+    "via": "cli",
+    "rb_version": "0.5.0.dev0",
+    "command": "transcribed from docs/deployment-experiment.md section 12, amendment 2 results table (source JSONs on the pod at /workspace/exp/ablation/)",
+    "attached": {
+      "commit": "781547f7e89154cb2190367a9cde198168d08f8e",
+      "branch": "claude/dreamy-curie-rt6di1",
+      "dirty": true,
+      "diff_sha256": "8722003d7a275998eeb20102cb9ecfadeccc584fd9bc2c01df5bae168f1ac898",
+      "untracked": 0
+    },
+    "produced": {
+      "commit": null,
+      "from": "unknown"
+    },
+    "environment": {
+      "python": "3.11.15",
+      "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39"
+    },
+    "run_record": null,
+    "config": null
+  },
+  "note": ""
+}

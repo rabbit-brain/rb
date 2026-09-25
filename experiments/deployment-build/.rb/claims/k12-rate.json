@@ -1,0 +1,20 @@
+{
+  "created_by": "agent:claude-code",
+  "created_at": "2026-09-25T11:08:36.492+00:00",
+  "via": "cli",
+  "retracted": null,
+  "id": "k12-rate",
+  "statement": "Prediction: more than 58% of KITTI-2012 cases stop at iteration 8",
+  "experiment": "k12",
+  "hypothesis": "h2",
+  "metric": "summary.continued",
+  "comparator": "at_most",
+  "target": 81.0,
+  "tolerance": null,
+  "over": "each",
+  "min_n": 1,
+  "noise": null,
+  "origin": "own",
+  "source": null,
+  "note": "PREREG-fresh-cases.md:79. More than 58% of 194 stop means at least 113 stop, so at most 81 continue"
+}

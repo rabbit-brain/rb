@@ -1,0 +1,82 @@
+{
+  "created_by": "agent:claude-code",
+  "created_at": "2026-09-25T11:08:39.581+00:00",
+  "via": "cli",
+  "retracted": null,
+  "id": "evt4pz",
+  "experiment": "holdout15",
+  "metrics": {
+    "summary.n": 100.0,
+    "summary.continued": 42.0,
+    "summary.mean_iterations": 9.68,
+    "summary.mean_epe_policy": 5.675590786933899,
+    "summary.mean_epe_baseline": 5.62697109490633,
+    "summary.delta_epe": 0.048619692027568995,
+    "summary.total_latency_policy_s": 2.5081287901848555,
+    "summary.total_latency_baseline_s": 2.886826165020466,
+    "summary.measured_saving_frac": 0.1311812188154134,
+    "summary.controller_cost_median_s": 7.489463314414024e-05
+  },
+  "per_run": {},
+  "run": null,
+  "files": [
+    {
+      "path": "results/gpu_policy.json",
+      "sha256": "b7c5fb99ee4f467e269bd3f96d0aaa41dedfda69ebae45e3080e76864a7b1642",
+      "bytes": 38130
+    }
+  ],
+  "links": {
+    "results": "RESULTS-gpu.md"
+  },
+  "basis": "file",
+  "spec_sha256": "280778328aebe23ede801102c4c807853c81a9ffcdd7c57ffe7fc6fa065d0081",
+  "settings": {
+    "frozen_rule.sha256": "0345a0292038c3cb2e57bb68fc87d81ed278b24a6801c961d274f7d53c9f8c2b",
+    "gpu_policy_run.sha256": "ce46c5a00b8d222ff14af15987c72b8dbdde4c39023aac6807b03c200565b442",
+    "rounds": 5,
+    "dataset.pairs": 100,
+    "checkpoint": "raft-things.pth",
+    "mixed_precision": false,
+    "alternate_corr": false,
+    "batch": 1,
+    "checkpoint.sha256": null,
+    "stop.theta": 0.7017,
+    "stop.z": 1.645,
+    "stop.branch_at": 8,
+    "stop.max_iters": 12,
+    "stop.allowance_px": 0.05,
+    "stop.scale": 8.0,
+    "holdout.sha256": "87e13bca14354a0270dba0def43eada789d59f40df6cb79ce4f744200cffc1ed",
+    "split.seed": 20260920
+  },
+  "spec_frozen": false,
+  "synthetic": false,
+  "fingerprint": "1203285d884023bd1c99bc98b413758ddc647c8f0603dd161492d25b6e733a38",
+  "receipt": {
+    "at": "2026-09-25T11:08:39.561+00:00",
+    "actor": "agent:claude-code",
+    "actor_via": "detected:CLAUDECODE",
+    "via": "cli",
+    "rb_version": "0.5.0.dev0",
+    "command": "python gpu_policy_run.py --cases holdout-cases.txt --rounds 5 (RTX 4090, 2026-09-20)",
+    "attached": {
+      "commit": "781547f7e89154cb2190367a9cde198168d08f8e",
+      "branch": "claude/dreamy-curie-rt6di1",
+      "dirty": true,
+      "diff_sha256": "8722003d7a275998eeb20102cb9ecfadeccc584fd9bc2c01df5bae168f1ac898",
+      "untracked": 0
+    },
+    "produced": {
+      "commit": null,
+      "from": "unknown"
+    },
+    "environment": {
+      "python": "3.11.15",
+      "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39"
+    },
+    "run_record": null,
+    "config": null
+  },
+  "note": ""
+}

@@ -1,0 +1,20 @@
+{
+  "created_by": "agent:claude-code",
+  "created_at": "2026-09-25T11:08:35.517+00:00",
+  "via": "cli",
+  "retracted": null,
+  "id": "k12-pass",
+  "statement": "PASS: over all 194 KITTI-2012 pairs the rule's mean EPE is at most 0.05 px above fixed 12",
+  "experiment": "k12",
+  "hypothesis": "h2",
+  "metric": "summary.delta_epe",
+  "comparator": "at_most",
+  "target": 0.05,
+  "tolerance": null,
+  "over": "each",
+  "min_n": 1,
+  "noise": null,
+  "origin": "own",
+  "source": null,
+  "note": "PREREG-fresh-cases.md:56. One run, one look; the number is gpu_policy_run.py's own summary.delta_epe"
+}

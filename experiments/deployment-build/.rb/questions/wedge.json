@@ -1,0 +1,9 @@
+{
+  "created_by": "agent:claude-code",
+  "created_at": "2026-09-25T11:07:14.810+00:00",
+  "via": "cli",
+  "retracted": null,
+  "id": "wedge",
+  "text": "When a team ships the same checkpoint through a faster build, do trajectory features pick the cases worth inspecting better than a plain comparison of the two builds' outputs?",
+  "status": "open"
+}

@@ -1053,7 +1053,7 @@ def cmd_compare(args: argparse.Namespace, out: Any) -> int:
         for m in t["metrics"]:
             c = r["metrics"].get(m["name"])
             if c is None:
-                cells.append("—")
+                cells.append("-")
                 continue
             txt = f"{c['mean']:.4g}"
             if "delta" in c:

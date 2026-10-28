@@ -372,7 +372,8 @@ pub fn versions(root: &Path) -> Vec<Version> {
     out.lines()
         .filter_map(|l| l.trim().split_once(' '))
         .filter(|(sha, _)| sha.len() >= 40 && sha.chars().all(|c| c.is_ascii_hexdigit()))
-        .map(|(sha, at)| Version { sha: sha.to_string(), committed: at.to_string() })
+        // newer git writes UTC as Z in %cI, older git as +00:00: one form whatever the git
+        .map(|(sha, at)| Version { sha: sha.to_string(), committed: at.strip_suffix('Z').map_or_else(|| at.to_string(), |t| format!("{t}+00:00")) })
         .collect()
 }
 

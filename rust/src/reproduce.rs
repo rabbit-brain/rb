@@ -1675,7 +1675,7 @@ mod tests {
 
     fn git(root: &Path, args: &[&str]) -> String {
         let out = Command::new("git")
-            .args(["-c", "user.email=ana@example.org", "-c", "user.name=ana", "-c", "commit.gpgsign=false"])
+            .args(["-c", "user.email=ana@example.org", "-c", "user.name=ana", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false"])
             .args(args)
             .current_dir(root)
             .output()

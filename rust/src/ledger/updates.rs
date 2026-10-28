@@ -594,16 +594,17 @@ mod tests {
     #[test]
     fn the_installer_is_never_one_a_checkout_puts_on_path() {
         let root = std::env::temp_dir().join(format!("rb-installer-{}-{:08x}", std::process::id(), crate::rng::os_randbits(32)));
+        let file = if cfg!(windows) { "rb-test-installer.exe" } else { "rb-test-installer" };
         let repo_bin = root.join("repo/bin");
         std::fs::create_dir_all(&repo_bin).unwrap();
         std::fs::create_dir_all(root.join("repo/.git")).unwrap();
-        std::fs::write(repo_bin.join("rb-test-installer"), b"").unwrap();
+        std::fs::write(repo_bin.join(file), b"").unwrap();
         let own_bin = root.join("home/bin");
         std::fs::create_dir_all(&own_bin).unwrap();
         let path = std::env::join_paths([repo_bin.clone(), PathBuf::from("relative/bin"), own_bin.clone()]).unwrap();
         assert_eq!(installer_on("rb-test-installer", &path), None, "only a checkout's folder holds it");
-        std::fs::write(own_bin.join("rb-test-installer"), b"").unwrap();
-        assert_eq!(installer_on("rb-test-installer", &path), Some(own_bin.join("rb-test-installer")));
+        std::fs::write(own_bin.join(file), b"").unwrap();
+        assert_eq!(installer_on("rb-test-installer", &path), Some(own_bin.join(file)));
         let _ = std::fs::remove_dir_all(&root);
     }
 

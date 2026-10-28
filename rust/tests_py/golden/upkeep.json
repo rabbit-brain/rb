@@ -1,0 +1,793 @@
+{
+ "steps": [
+  {
+   "run": "init upkeep --no-agents",
+   "exit": 0,
+   "out": [
+    "Project 'upkeep' started: @BASE@/work/.rb",
+    "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
+    "",
+    "Then paste this line into your agent's chat:",
+    "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "question add 'Is it fast?' --id q1",
+   "exit": 0,
+   "out": [
+    "q1: Is it fast?",
+    "",
+    "Next: rb experiment add \"<what would answer it>\" -q q1 --hypothesis \"<what you expect>\"",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment add 'fast vs slow' --id e1 -q q1 --baseline slow --candidate fast",
+   "exit": 0,
+   "out": [
+    "Experiment e1: fast vs slow \u00b7 slow (baseline) vs fast (candidate) \u00b7 under q1",
+    "  Planned: nothing in the record tests it yet, and it shows as a planned direction until its first run or analysis.",
+    "  Made 2 variants: slow (baseline), fast (candidate); a setting of one is rb spec set e1 slow.<setting> <value>.",
+    "",
+    "Next: rb spec set e1 --from <config.yaml> --keys \"<the keys that define it>\"  \u00b7  rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "metric add wall_s --minimize --unit s",
+   "exit": 0,
+   "out": [
+    "Metric wall_s (s): lower is better",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "resource add data1 --type dataset --name 'data one'",
+   "exit": 0,
+   "out": [
+    "Resource data1: data one (dataset) \u00b7 lost",
+    "  No copy is recorded anywhere; record where it comes from with --source, --url or --recipe",
+    "",
+    "Next: rb run add <experiment> ... --input data1",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "run add e1 slow.wall_s=10 fast.wall_s=7 --input data1:eval",
+   "exit": 0,
+   "out": [
+    "runp5h4s6 on e1: fast.wall_s=7, slow.wall_s=10",
+    "  read data1 (eval)",
+    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "",
+    "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric fast.wall_s --at-most <x>   (write the criterion before the next run)",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt --check",
+   "exit": 0,
+   "out": [
+    "8 files: 0 not canonical.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt --check --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"fmt\",",
+    " \"data\": {",
+    "  \"files\": 8,",
+    "  \"changed\": [],",
+    "  \"broken\": [],",
+    "  \"check\": true",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt --check",
+   "exit": 1,
+   "out": [
+    "8 files: 1 not canonical.",
+    "  @BASE@/work/.rb/experiments/e1/experiment.yaml",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt --check .rb/questions",
+   "exit": 0,
+   "out": [
+    "1 file: 0 not canonical.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt .rb/experiments/e1/experiment.yaml",
+   "exit": 0,
+   "out": [
+    "1 file: 1 rewritten.",
+    "  .rb/experiments/e1/experiment.yaml",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt",
+   "exit": 0,
+   "out": [
+    "8 files: 0 rewritten.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"fmt\",",
+    " \"data\": {",
+    "  \"files\": 8,",
+    "  \"changed\": [],",
+    "  \"broken\": [],",
+    "  \"check\": false",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "status",
+   "exit": 0,
+   "out": [
+    "upkeep",
+    "",
+    "Is it fast? (open)",
+    "  No criterion is linked directly to this question.",
+    "  fast vs slow \u00b7 open",
+    "",
+    "Criteria: none yet",
+    "",
+    "Nothing to do (1)",
+    "  - e1: runs report fast.wall_s, slow.wall_s, which no recorded criterion reads",
+    "",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "",
+    "Experiments",
+    "  e1      fast vs slow \u00b7 open \u00b7 slow (baseline) vs fast (candidate) \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 1",
+    "          to run again: code missing \u00b7 environment ok \u00b7 eval (data1) missing",
+    "",
+    "Runs: 1 recorded on 1 experiment \u00b7 every receipt is what rb wrote",
+    "",
+    "Resources",
+    "  data1        dataset \u00b7 data one \u00b7 lost \u00b7 name only: no hash, digest or version recorded",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt loose",
+   "exit": 1,
+   "out": [
+    "loose/bin.yaml: not UTF-8 text (the byte 0xff at offset 3)",
+    "loose/dir.yaml: Is a directory",
+    "loose/two.yaml:1:4: yes is true or false to some YAML parsers and text to others; write true or false, or quote it for text: \"yes\"",
+    "5 files: 2 rewritten, 3 not Rabbit Brain YAML.",
+    "  loose/deep/three.yaml",
+    "  loose/one.yaml",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt loose --json",
+   "exit": 1,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"fmt\",",
+    " \"data\": {",
+    "  \"files\": 5,",
+    "  \"changed\": [],",
+    "  \"broken\": [",
+    "   {",
+    "    \"path\": \"loose/bin.yaml\",",
+    "    \"error\": \"loose/bin.yaml: not UTF-8 text (the byte 0xff at offset 3)\",",
+    "    \"fix\": \"Save the file as UTF-8.\"",
+    "   },",
+    "   {",
+    "    \"path\": \"loose/dir.yaml\",",
+    "    \"error\": \"loose/dir.yaml: Is a directory\",",
+    "    \"fix\": \"\"",
+    "   },",
+    "   {",
+    "    \"path\": \"loose/two.yaml\",",
+    "    \"error\": \"loose/two.yaml:1:4: yes is true or false to some YAML parsers and text to others; write true or false, or quote it for text: \\\"yes\\\"\",",
+    "    \"fix\": \"write true or false, or quote it for text: \\\"yes\\\"\"",
+    "   }",
+    "  ],",
+    "  \"check\": false",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "fmt loose/missing.yaml",
+   "exit": 1,
+   "out": [
+    "loose/missing.yaml: No such file or directory",
+    "1 file: 0 rewritten, 1 not Rabbit Brain YAML.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 0,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"doctor\",",
+    " \"data\": {",
+    "  \"checks\": [",
+    "   {",
+    "    \"check\": \"actor\",",
+    "    \"ok\": true,",
+    "    \"detail\": \"human:t, from git-email\"",
+    "   }",
+    "  ],",
+    "  \"outcome\": {",
+    "   \"passed\": true,",
+    "   \"failures\": []",
+    "  }",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 1,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    "FAIL edited_outside_rb: .rb/questions/q1.yaml: question q1 differs from what rb wrote: it was edited outside rb",
+    "     \u2192 rb doctor --restore puts back what rb last wrote; if the change is right, rb doctor --adopt --why \"...\" takes it",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor --restore --adopt",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb doctor: rb doctor takes --restore or --adopt, not both.",
+    "  \u2192 `rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --.",
+    ""
+   ]
+  },
+  {
+   "run": "doctor --adopt",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb doctor: rb doctor --adopt needs --why \"<reason>\": the reason is what the adoption records.",
+    "  \u2192 Do what the message says; `rb <command> --help` lists the arguments and `rb schema <kind>` prints a record's shape (experiment, criterion, run, ...).",
+    ""
+   ]
+  },
+  {
+   "run": "doctor --adopt --why 'clarify the question' --seen nowhere",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb doctor: --seen takes PATH@SHA256 (or PATH@deleted), got 'nowhere'.",
+    "  \u2192 `rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --.",
+    ""
+   ]
+  },
+  {
+   "run": "doctor --adopt --why 'clarify the question' --seen .rb/questions/q1.yaml@0000",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb doctor: The files are not what was reviewed.",
+    "  - .rb/questions/q1.yaml changed after the review",
+    "  \u2192 Look again: `rb doctor` lists every file changed outside rb as it is now.",
+    ""
+   ]
+  },
+  {
+   "run": "doctor --adopt --why 'clarify the question' --words 'keep my wording'",
+   "exit": 0,
+   "out": [
+    "adopted .rb/questions/q1.yaml: adopted as it stands",
+    "ok   actor: agent:claude-code, from detected:CLAUDECODE",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 0,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor --restore",
+   "exit": 0,
+   "out": [
+    "restored .rb/metrics/wall_s.yaml: restored to what rb last wrote",
+    "ok   actor: human:t, from git-email",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor --restore",
+   "exit": 0,
+   "out": [
+    "Nothing to restore: every record is what rb last wrote.",
+    "ok   actor: human:t, from git-email",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 1,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    "FAIL merge_conflict: .rb/questions/q2.yaml has conflict markers",
+    "     \u2192 resolve it by keeping both sides' changes, which rb reads as its own; where both sides changed one value, keep the side with the later write (the other stays in log.jsonl); then rb doctor again",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 1,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    "FAIL corrupt: .rb/questions/q3.yaml is not a valid question: created_by: Field required; created_at: Field required; and 1 more",
+    "     \u2192 rb doctor --restore puts back what rb last wrote; if the change is right, rb doctor --adopt --why \"...\" takes it",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor --json",
+   "exit": 1,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"doctor\",",
+    " \"data\": {",
+    "  \"checks\": [",
+    "   {",
+    "    \"check\": \"actor\",",
+    "    \"ok\": true,",
+    "    \"detail\": \"human:t, from git-email\"",
+    "   },",
+    "   {",
+    "    \"check\": \"corrupt\",",
+    "    \"ok\": false,",
+    "    \"detail\": \".rb/questions/q3.yaml is not a valid question: created_by: Field required; created_at: Field required; and 1 more\",",
+    "    \"fix\": \"rb doctor --restore puts back what rb last wrote; if the change is right, rb doctor --adopt --why \\\"...\\\" takes it\"",
+    "   }",
+    "  ],",
+    "  \"outcome\": {",
+    "   \"passed\": false,",
+    "   \"failures\": [",
+    "    {",
+    "     \"check\": \"corrupt\",",
+    "     \"ok\": false,",
+    "     \"detail\": \".rb/questions/q3.yaml is not a valid question: created_by: Field required; created_at: Field required; and 1 more\",",
+    "     \"fix\": \"rb doctor --restore puts back what rb last wrote; if the change is right, rb doctor --adopt --why \\\"...\\\" takes it\"",
+    "    }",
+    "   ]",
+    "  }",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 1,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    "FAIL corrupt: .rb/questions/q4.yaml:4:7: this [ never closes; close it with ]",
+    "     \u2192 rb doctor --restore puts back what rb last wrote; if the change is right, rb doctor --adopt --why \"...\" takes it",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 1,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    "FAIL edited_outside_rb: .rb/resources/data1.yaml: resource data1 was deleted outside rb",
+    "     \u2192 rb doctor --restore puts back what rb last wrote; if the change is right, rb doctor --adopt --why \"...\" takes it",
+    "FAIL dangling: run runp5h4s6 names resource data1, which is missing",
+    "     \u2192 rb doctor --restore puts back what rb last wrote; if the change is right, rb doctor --adopt --why \"...\" takes it",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor --restore",
+   "exit": 0,
+   "out": [
+    "restored .rb/resources/data1.yaml: restored to what rb last wrote",
+    "ok   actor: human:t, from git-email",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 0,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 1,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    "FAIL state_newer: .rb/questions/q5.yaml is format 9; this rb reads format 1: it was written by a newer rb",
+    "     \u2192 pip install --upgrade rabbit-brain",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "doctor",
+   "exit": 0,
+   "out": [
+    "ok   actor: human:t, from git-email",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  }
+ ],
+ "files": {
+  ".rb/.gitattributes": [
+   "* -text",
+   "log.jsonl merge=union",
+   ""
+  ],
+  ".rb/.gitignore": [
+   ".lock",
+   "*.tmp",
+   "cache/",
+   "journal/",
+   ""
+  ],
+  ".rb/cache/objects/33/331816459c124535a4ed7ea080588f64553aee4ea8d98729abdf3eb3cbff3a9a.json.gz": {
+   "sha256": "b1836f87aa042bfbe23e09a7721b468e92921216ca14dc41c010601ae448283f",
+   "bytes": 175
+  },
+  ".rb/cache/objects/35/35c38dead66715b457341a5ee985ae83019839ba6c3b9437e066bb13d14cf174.json.gz": {
+   "sha256": "38c16d78a67f1c4335e387bded5144e1c1439f4a067dbb4914d0243a23e9a485",
+   "bytes": 117
+  },
+  ".rb/cache/objects/57/57ddf013b2b9232154139d4e43d19f6a8d1bb54a4c94cf01887713a849626d6f.json.gz": {
+   "sha256": "9f70b360c6407821ecac7b94804b5077270cc09482aff93c38757422006875f2",
+   "bytes": 132
+  },
+  ".rb/cache/objects/bc/bc7753b5bce6998c312e028e16dde8a67094f72aad80b25b79228bb0d2ef85d7.json.gz": {
+   "sha256": "da51d320729a778401a987268a5f5962ba0f451d08d3a5ccccd1ec652711de83",
+   "bytes": 171
+  },
+  ".rb/cache/objects/cb/cbd98ed695571ab72f6148ef0ddde75ba20efd3ff8a6b1cb9860634205f8b3c0.json.gz": {
+   "sha256": "77f04e8dda5329ac97f05d242014aff73f90a55de36a33338aaa7c0b1fa3cc24",
+   "bytes": 115
+  },
+  ".rb/cache/objects/cd/cdee8a4190ca7dfcea8ecda7661e677b97295740e523bc227ed4723584e5c956.json.gz": {
+   "sha256": "037a990eb43f99241ec0c3dbfe1434310f164c59174a8b81d1bd3f30c38433bb",
+   "bytes": 117
+  },
+  ".rb/cache/objects/d2/d24a5229466de7ee20e26110faa6f052e409eff0eeda4d312cb6c711262d075a.json.gz": {
+   "sha256": "81d09d4d0da72823dafbf0ac6524e99f01a354998f5734bb69c52c8e0ebea6ff",
+   "bytes": 154
+  },
+  ".rb/cache/objects/dd/dd89d41e084046bccca40366fa55f0218f4eae0cc66f0f945b6bba200d7cac31.json.gz": {
+   "sha256": "5b160c1a444b1ba76d33248fda5de877dfe362f6f80018aad45b31ffaa7946bd",
+   "bytes": 1051
+  },
+  ".rb/cache/objects/e5/e5a5783e7c4096230023c7bb4dae122472ef4f15f7b40ac80a7ef81ef1f64359.json.gz": {
+   "sha256": "a14466299d3630abb8c89bd47ba252a5d32bd2aad07afbc44c55b455a9e02a45",
+   "bytes": 116
+  },
+  ".rb/experiments/e1/experiment.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: e1",
+   "uid: exp_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: fast vs slow",
+   "questions:",
+   "  - q1",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/runs/runp5h4s6.yaml": [
+   "rb: 1",
+   "kind: run",
+   "id: runp5h4s6",
+   "uid: run_01M3VNBWG0GK37F0M3GMH9W716",
+   "experiment: e1",
+   "metrics:",
+   "  slow.wall_s: 10.0",
+   "  fast.wall_s: 7.0",
+   "produced_basis: recorded",
+   "inputs:",
+   "  - resource: data1",
+   "    role: eval",
+   "    availability: lost",
+   "basis: typed",
+   "spec_sha256: 3768801d9088ded496dac73803d6e5a385d25380f4cba38752d594c2560da3d5",
+   "arm_specs:",
+   "  slow: ba9004f12d2713aaae0975ef07673a37eed43e90e937c883ab856f5ae3b7e35b",
+   "  fast: 7f74462f668e8d4ca6fa4f9f9adac25a317513412f3598e2ded73f84ceac70e3",
+   "spec_frozen: false",
+   "synthetic: false",
+   "fingerprint: 55770d8f91526d3bfd7537cc13c9394beaa2d5ec0d056dfe7f9f2b8621f8e65f",
+   "receipt:",
+   "  at: \"2026-10-01T12:00:00.000+00:00\"",
+   "  actor: human:t",
+   "  actor_via: git-email",
+   "  via: cli",
+   "  rb_version: 0.0.0",
+   "  attached:",
+   "    commit: null",
+   "    branch: main",
+   "    dirty: false",
+   "  produced:",
+   "    commit: null",
+   "    from: unknown",
+   "  environment:",
+   "    python: 3.12.1",
+   "    platform: Linux-6.1.0-x86_64-with-glibc2.39",
+   "    rb: 0.0.0",
+   "    torch: 2.4.1",
+   "    numpy: 2.0.2",
+   "    pydantic: 2.9.2",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/variants/fast.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: fast",
+   "role: candidate",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/variants/slow.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: slow",
+   "role: baseline",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/log.jsonl": [
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"upkeep\", \"sha256\": \"d24a5229466de7ee20e26110faa6f052e409eff0eeda4d312cb6c711262d075a\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"upkeep\", \"head\": \"\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"question\", \"id\": \"q1\", \"sha256\": \"cbd98ed695571ab72f6148ef0ddde75ba20efd3ff8a6b1cb9860634205f8b3c0\", \"path\": \".rb/questions/q1.yaml\", \"detail\": {\"parent\": null}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"331816459c124535a4ed7ea080588f64553aee4ea8d98729abdf3eb3cbff3a9a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/slow\", \"path\": \".rb/experiments/e1/variants/slow.yaml\", \"sha256\": \"e5a5783e7c4096230023c7bb4dae122472ef4f15f7b40ac80a7ef81ef1f64359\"}, {\"kind\": \"variant\", \"id\": \"e1/fast\", \"path\": \".rb/experiments/e1/variants/fast.yaml\", \"sha256\": \"cdee8a4190ca7dfcea8ecda7661e677b97295740e523bc227ed4723584e5c956\"}], \"detail\": {\"variants\": [\"slow\", \"fast\"], \"like\": null, \"questions\": [\"q1\"], \"changed_parts\": {\"e1\": {\"variant:slow\": \"baseline\", \"variant:fast\": \"candidate\", \"question:q1\": \"q1\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"metric\", \"id\": \"wall_s\", \"sha256\": \"57ddf013b2b9232154139d4e43d19f6a8d1bb54a4c94cf01887713a849626d6f\", \"path\": \".rb/metrics/wall_s.yaml\"}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"data1\", \"sha256\": \"bc7753b5bce6998c312e028e16dde8a67094f72aad80b25b79228bb0d2ef85d7\", \"path\": \".rb/resources/data1.yaml\", \"detail\": {\"type\": \"dataset\", \"name\": \"data one\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"dd89d41e084046bccca40366fa55f0218f4eae0cc66f0f945b6bba200d7cac31\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"slow.wall_s\": 10.0, \"fast.wall_s\": 7.0}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"agent:claude-code\", \"actor_via\": \"detected:CLAUDECODE\", \"via\": \"cli\", \"op\": \"adopt\", \"kind\": \"question\", \"id\": \"q1\", \"agent\": {\"name\": \"claude-code\", \"provider\": \"anthropic\", \"provider_from\": \"inferred\"}, \"words\": \"keep my wording\", \"sha256\": \"35c38dead66715b457341a5ee985ae83019839ba6c3b9437e066bb13d14cf174\", \"path\": \".rb/questions/q1.yaml\", \"detail\": {\"why\": \"clarify the question\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"restore\", \"kind\": \"metric\", \"id\": \"wall_s\", \"sha256\": \"57ddf013b2b9232154139d4e43d19f6a8d1bb54a4c94cf01887713a849626d6f\", \"path\": \".rb/metrics/wall_s.yaml\"}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"restore\", \"kind\": \"resource\", \"id\": \"data1\", \"sha256\": \"bc7753b5bce6998c312e028e16dde8a67094f72aad80b25b79228bb0d2ef85d7\", \"path\": \".rb/resources/data1.yaml\"}",
+   ""
+  ],
+  ".rb/metrics/wall_s.yaml": [
+   "rb: 1",
+   "kind: metric",
+   "id: wall_s",
+   "unit: s",
+   "direction: minimize",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/project.yaml": [
+   "rb: 1",
+   "kind: project",
+   "id: upkeep",
+   "uid: prj_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: upkeep",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/questions/q1.yaml": [
+   "rb: 1",
+   "kind: question",
+   "id: q1",
+   "text: Is it faster?",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   "# keep this comment",
+   ""
+  ],
+  ".rb/resources/data1.yaml": [
+   "rb: 1",
+   "kind: resource",
+   "id: data1",
+   "uid: res_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "type: dataset",
+   "name: data one",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  "loose/bin.yaml": {
+   "sha256": "14457c12b477a87eaa8001a304b4f2a03d9ef3694ce3d910e6a661744d176455",
+   "bytes": 5
+  },
+  "loose/deep/three.yaml": [
+   "x:",
+   "  - 1",
+   "  - 2",
+   ""
+  ],
+  "loose/one.yaml": [
+   "b: 2",
+   "a: 1",
+   ""
+  ],
+  "loose/two.yaml": [
+   "a: yes",
+   ""
+  ]
+ }
+}

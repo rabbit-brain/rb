@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+releases/
+*.tar.gz
+
+.DS_Store
+
+# the Rust core's build output
+rust/target/
+
+# editors and local tooling
+.idea/
+.vscode/
+*.swp
+node_modules/
+/package-lock.json
+.env
+.env.*
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/

@@ -1,0 +1,847 @@
+path	type	phase	today	tier
+contract	string	c	new: shell/model.rs (M0)	both
+surface	string	c	new: shell/model.rs (M0)	both
+tier	string	c	new: M0 from view::Reader; shell/tier.rs holds the table in 1b	both
+rb_version	string	today	webui state payload	both
+at	string	today	webui state payload	both
+digest	string	today	Ledger::state_digest; 4a adds the journal key	live
+escaped	bool	today	webui drawn()	both
+project	object	today	Home.title, Home.project_id	both
+project.id	string	today	Home.title, Home.project_id	both
+project.title	string	today	Home.title, Home.project_id	both
+project.parent	string	M5	project.yaml parent where http::is_address, as http::shareable says it; "" otherwise	both
+home	object	today	view::home (Home)	both
+home.counts	object	1b	status counts (ledger/views.rs), not on Home today	both
+home.counts.questions	number	1b	status counts (ledger/views.rs), not on Home today	both
+home.counts.experiments	number	1b	status counts (ledger/views.rs), not on Home today	both
+home.counts.criteria	number	1b	status counts (ledger/views.rs), not on Home today	both
+home.counts.runs	number	1b	status counts (ledger/views.rs), not on Home today	both
+home.counts.retracted	number	1b	status counts (ledger/views.rs), not on Home today	both
+home.counts.analyses	number	1b	status counts (ledger/views.rs), not on Home today	both
+home.counts.resources	number	1b	status counts (ledger/views.rs), not on Home today	both
+home.counts.calls	number	1b	status counts (ledger/views.rs), not on Home today	both
+home.counts.writes	number	1b	status counts (ledger/views.rs), not on Home today	both
+home.last_write	object	1b	place.last_write (places.rs)	both
+home.last_write.at	string	1b	place.last_write (places.rs)	both
+home.latest	object	5H	new: history.rs	both
+home.latest.head	string	5H	new: history.rs	both
+home.latest.calls_made	number	5H	new: history.rs	both
+home.latest.line	string	5H	new: history.rs	both
+home.made	object	1b	new: counted from findings' timing and receipts	both
+home.made.criteria	number	1b	new: counted from findings' timing and receipts	both
+home.made.after_evidence	number	1b	new: counted from findings' timing and receipts	both
+home.made.runs	number	1b	new: counted from findings' timing and receipts	both
+home.made.with_command	number	1b	new: counted from findings' timing and receipts	both
+home.made.line	string	1b	new: counted from findings' timing and receipts	both
+home.began	string	today	view::home (Home)	both
+home.scope	string	today	view::home (Home)	both
+home.scope_short	string	today	view::home (Home)	both
+home.uncited	number	today	view::home (Home)	both
+home.uncited_line	string	today	view::home (Home)	both
+home.uncited_short	string	today	view::home (Home)	both
+home.found	list	today	view::home (Home)	both
+home.found[]	object	today	view::home (Home)	both
+home.found[].request_id	string	today	view::home (Home)	both
+home.found[].title	string	today	view::home (Home)	both
+home.found[].hint	string	today	view::home (Home)	both
+home.found[].at	string	today	view::home (Home)	both
+home.found[].argv	list	today	view::home (Home)	both
+home.found[].argv[]	string	today	view::home (Home)	both
+home.found_total	number	today	len(Home.found)	both
+home.unplaced	list	today	view::home (Home)	both
+home.unplaced[]	string	today	view::home (Home)	both
+home.quiet	string	1a	Home.quiet, reworded	both
+home.waiting_line	string	today	view.rs waiting_said	both
+home.tally	list	today	view::home (Home)	both
+home.tally[]	list	today	view::home (Home)	both
+home.tally[][]	number|string	today	view::home (Home)	both
+home.muted	list	today	view::home (Home)	both
+home.muted[]	string	today	view::home (Home)	both
+home.open_line	string	today	view::home (Home)	both
+home.notes	list	today	Home.notes (split into id, at, text in M0)	both
+home.notes[]	object	today	Home.notes (split into id, at, text in M0)	both
+home.notes[].id	string	today	Home.notes (split into id, at, text in M0)	both
+home.notes[].at	string	today	Home.notes (split into id, at, text in M0)	both
+home.notes[].text	string	today	Home.notes (split into id, at, text in M0)	both
+home.tree	list	today	view::home (Home)	both
+home.tree[]	object	today	view::home (Home)	both
+home.tree[].kind	string	today	view::home (Home)	both
+home.tree[].id	string	today	view::home (Home)	both
+home.tree[].label	string	today	view::home (Home)	both
+home.tree[].standing	string	today	view::home (Home)	both
+home.tree[].depth	number	today	view::home (Home)	both
+home.tree[].muted	list	today	view::home (Home)	both
+home.tree[].muted[]	string	today	view::home (Home)	both
+home.standing	list	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[]	object	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].question	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].text	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].state	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].state_word	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].line	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].reasons	list	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].reasons[]	object	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].reasons[].kind	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].reasons[].text	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].reasons[].criteria	list	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].reasons[].criteria[]	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].tallies	list	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].tallies[]	object	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].tallies[].state	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].tallies[].n	number	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].tallies[].label	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].tallies[].criteria	list	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].tallies[].criteria[]	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].interpretation	object	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].interpretation.line	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].interpretation.text	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].interpretation.holds	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].interpretation.confirmed	bool	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.integrity	object	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.integrity.parts	list	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.integrity.parts[]	object	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.integrity.parts[].kind	string	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.integrity.parts[].n	number	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.integrity.parts[].of	number	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.integrity.parts[].line	string	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.integrity.parts[].ids	list	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.integrity.parts[].ids[]	string	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.integrity.affects	string	M6	model.rs integrity_of: what weakens the whole body of evidence, each part with its numbers and ids	both
+home.queue	list	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+home.queue[]	object	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+home.queue[].kind	string	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+home.queue[].title	string	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+home.queue[].reader_title	string	PV	model.rs queue_of: what stands, for a reader, with no verb to act on first	both
+home.queue[].detail	string	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+home.queue[].target	string	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+home.queue[].targets	list	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+home.queue[].targets[]	string	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+home.queue[].action	string	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+home.queue[].rank	number	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+your_call	object	1a	new: Home.calls count, one source	both
+your_call.n	number	1a	new: Home.calls count, one source	both
+your_call.first	string	1a	new: Home.calls count, one source	both
+calls	list	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[]	object	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].subject	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].kind	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].code	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].label	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].title	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].question	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].what	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].reason	object	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].reason.label	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].reason.detail	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].reason.also	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].do	string	M5	the open item's own command, as rb status gives it	both
+calls[].actions	list	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].actions[]	object	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].actions[].action	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].actions[].label	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].actions[].argv	list	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].actions[].argv[]	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].actions[].line	string	1a	Home.calls today: subject, label, title, text, command, at	both
+calls[].actions[].consequence	string	1a	Home.calls today: subject, label, title, text, command, at	both
+made_calls	list	1a	call_line and why_said (ledger/mod.rs)	both
+made_calls[]	object	1a	call_line and why_said (ledger/mod.rs)	both
+made_calls[].subject	string	1a	call_line and why_said (ledger/mod.rs)	both
+made_calls[].question	string	1a	call_line and why_said (ledger/mod.rs)	both
+made_calls[].at	string	1a	call_line and why_said (ledger/mod.rs)	both
+made_calls[].verb	string	1a	call_line and why_said (ledger/mod.rs)	both
+made_calls[].line	string	1a	call_line and why_said (ledger/mod.rs)	both
+made_calls[].note	string	1a	call_line and why_said (ledger/mod.rs)	both
+pending	object	today	Home.pending, confirm_all_line, designs_line	both
+pending.rows	list	today	Home.pending, confirm_all_line, designs_line	both
+pending.rows[]	object	today	Home.pending, confirm_all_line, designs_line	both
+pending.rows[].id	string	today	Home.pending, confirm_all_line, designs_line	both
+pending.rows[].kind	string	today	Home.pending, confirm_all_line, designs_line	both
+pending.rows[].subject	string	today	Home.pending, confirm_all_line, designs_line	both
+pending.rows[].text	string	today	Home.pending, confirm_all_line, designs_line	both
+pending.rows[].confirm	string	today	Home.pending, confirm_all_line, designs_line	both
+pending.rows[].lines	list	today	Home.pending, confirm_all_line, designs_line	both
+pending.rows[].lines[]	string	today	Home.pending, confirm_all_line, designs_line	both
+pending.confirm_all	null|object	today	Home.pending, confirm_all_line, designs_line	both
+pending.confirm_all.line	string	today	Home.pending, confirm_all_line, designs_line	both
+pending.confirm_all.confirm	string	today	Home.pending, confirm_all_line, designs_line	both
+pending.designs_line	string	today	Home.pending, confirm_all_line, designs_line	both
+open_items	list	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[]	object	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].code	string	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].head	string	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].n	number	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].under	string	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].items	list	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].items[]	object	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].items[].subject	string	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].items[].code	string	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].items[].what	string	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].items[].units	string	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].items[].criteria	list	1a	status open[] (who != human); counts only today (agent_line)	both
+open_items[].items[].criteria[]	string	1a	status open[] (who != human); counts only today (agent_line)	both
+questions	list	today	QuestionBrief	both
+questions[]	object	today	QuestionBrief	both
+questions[].id	string	today	QuestionBrief	both
+questions[].text	string	today	QuestionBrief	both
+questions[].status	string	today	QuestionBrief	both
+questions[].depth	number	today	QuestionBrief	both
+questions[].parent	null|string	today	QuestionBrief	both
+questions[].rollup	string	today	QuestionBrief	both
+questions[].lead	object	1b	new: overview.lead	both
+questions[].lead.kind	string	1b	new: overview.lead	both
+questions[].lead.index	number	1b	new: overview.lead	both
+questions[].lead.text	string	1b	new: overview.lead	both
+questions[].lead.active	bool	1b	new: overview.lead	both
+questions[].lead.confirmed	bool	1b	new: overview.lead	both
+questions[].more	number	1b	new	both
+questions[].no_rule	string	1b	new: FIX2, a question no rule is linked to in one reading, its card's line too; "" where a rule is linked	both
+questions[].overview	object	today	QuestionBrief	both
+questions[].overview.headline	string	today	QuestionBrief	both
+questions[].overview.tone	string	today	QuestionBrief	both
+questions[].overview.interpretations	list	today	QuestionBrief	both
+questions[].overview.interpretations[]	object	today	QuestionBrief	both
+questions[].overview.interpretations[].text	string	today	QuestionBrief	both
+questions[].overview.interpretations[].active	bool	today	QuestionBrief	both
+questions[].overview.interpretations[].confirmed	bool	today	view.rs interpretations	both
+questions[].overview.interpretations[].criteria	list	today	QuestionBrief	both
+questions[].overview.interpretations[].criteria[]	string	today	QuestionBrief	both
+questions[].overview.interpretations[].holds	string	1b	new	both
+questions[].overview.interpretations[].calls	list	M5	view.rs interpretations: the latest call on each of its criteria, as its line says it	both
+questions[].overview.interpretations[].calls[]	string	M5	view.rs interpretations: the latest call on each of its criteria, as its line says it	both
+questions[].overview.interpretations[].declared	string	today	QuestionBrief	both
+questions[].overview.limits	list	today	QuestionBrief	both
+questions[].overview.limits[]	object	today	QuestionBrief	both
+questions[].overview.limits[].label	string	today	QuestionBrief	both
+questions[].overview.limits[].criteria	list	today	QuestionBrief	both
+questions[].overview.limits[].criteria[]	string	today	QuestionBrief	both
+questions[].overview.limits[].relations	list	1b	new: indexes into overview.relations of the relations that raise the limit	both
+questions[].overview.limits[].relations[]	number	1b	new: indexes into overview.relations of the relations that raise the limit	both
+questions[].overview.relations	list	today	view.rs relations; a lead of kind relation indexes this list	both
+questions[].overview.relations[]	object	today	view.rs relations; a lead of kind relation indexes this list	both
+questions[].overview.relations[].summary	string	today	view.rs relations; a lead of kind relation indexes this list	both
+questions[].overview.relations[].outcome	string	today	view.rs relations; a lead of kind relation indexes this list	both
+questions[].overview.relations[].comparisons	list	today	view.rs relations; a lead of kind relation indexes this list	both
+questions[].overview.relations[].comparisons[]	object	today	view.rs relations; a lead of kind relation indexes this list	both
+questions[].overview.relations[].comparisons[].source	string	today	view.rs relations; a lead of kind relation indexes this list	both
+questions[].overview.relations[].comparisons[].target	string	today	view.rs relations; a lead of kind relation indexes this list	both
+questions[].overview.relations[].declarations	list	R7	new: relations::declared, as declared, with no writer	both
+questions[].overview.relations[].declarations[]	object	R7	new: relations::declared, as declared, with no writer	both
+questions[].overview.relations[].declarations[].criterion	string	R7	new: relations::declared, as declared, with no writer	both
+questions[].overview.relations[].declarations[].kind	string	R7	new: relations::declared, as declared, with no writer	both
+questions[].overview.relations[].declarations[].target	string	R7	new: relations::declared, as declared, with no writer	both
+questions[].overview.relations[].declarations[].orientation	string	R7	new: relations::declared, as declared, with no writer	both
+questions[].overview.relations[].declarations[].declared_at	string	R7	new: relations::declared, as declared, with no writer	both
+questions[].overview.relations[].declarations[].why	string	R7	new: relations::declared, as declared, with no writer	both
+questions[].overview.relations[].declarations[].words	string	R7	new: relations::declared, as declared, with no writer	live
+questions[].overview.evidence_count	number	today	QuestionBrief	both
+questions[].overview.unmapped_count	number	today	QuestionBrief	both
+questions[].findings	list	today	QuestionBrief	both
+questions[].findings[]	string	today	QuestionBrief	both
+questions[].experiments	list	today	QuestionBrief	both
+questions[].experiments[]	string	today	QuestionBrief	both
+questions[].calls	list	1a	overview.calls today, each once in 1a	both
+questions[].calls[]	string	1a	overview.calls today, each once in 1a	both
+questions[].made_calls	list	1a	call_line	both
+questions[].made_calls[]	string	1a	call_line	both
+questions[].next_step	string	1c	new: QuestionBrief.next_step from next[]	both
+questions[].changed	list	today	QuestionBrief	both
+questions[].changed[]	string	today	QuestionBrief	both
+questions[].still_open	list	today	QuestionBrief	both
+questions[].still_open[]	string	today	QuestionBrief	both
+questions[].ruled	list	today	QuestionBrief	both
+questions[].ruled[]	string	today	QuestionBrief	both
+questions[].summary	list	today	QuestionBrief	both
+questions[].summary[]	string	today	QuestionBrief	both
+questions[].state	string	M6	rb's state of the question	both
+questions[].tallies	list	M6	model.rs tallies_of, the criteria linked to it	both
+questions[].tallies[]	object	M6	model.rs tallies_of, the criteria linked to it	both
+questions[].tallies[].state	string	M6	model.rs tallies_of, the criteria linked to it	both
+questions[].tallies[].n	number	M6	model.rs tallies_of, the criteria linked to it	both
+questions[].tallies[].label	string	M6	model.rs tallies_of, the criteria linked to it	both
+questions[].tallies[].criteria	list	M6	model.rs tallies_of, the criteria linked to it	both
+questions[].tallies[].criteria[]	string	M6	model.rs tallies_of, the criteria linked to it	both
+questions[].compact	string	M6	the compact row: state and tallies	both
+unfiled	object	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.line	string	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.criteria	list	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.criteria[]	string	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.calls	list	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.calls[]	string	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.experiments	list	M5	experiments filed under no question (rb status's "Not filed under a question")	both
+unfiled.experiments[]	string	M5	experiments filed under no question (rb status's "Not filed under a question")	both
+unfiled.open_items	list	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.open_items[]	object	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.open_items[].subject	string	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.open_items[].code	string	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.open_items[].what	string	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.open_items[].units	string	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.open_items[].criteria	list	1a	new: unfiled group (calls at ':unfiled' today)	both
+unfiled.open_items[].criteria[]	string	1a	new: unfiled group (calls at ':unfiled' today)	both
+findings	object	today	FindingLine	both
+findings.{id}	object	today	FindingLine	both
+findings.{id}.criterion_id	string	today	FindingLine	both
+findings.{id}.experiment	string	today	status findings[]	both
+findings.{id}.statement	string	today	FindingLine	both
+findings.{id}.role	string	today	FindingLine	both
+findings.{id}.standing	string	today	FindingLine	both
+findings.{id}.good	bool	today	FindingLine	both
+findings.{id}.rule	string	today	FindingLine	both
+findings.{id}.sentence	string	today	FindingLine	both
+findings.{id}.numbers	string	today	FindingLine	both
+findings.{id}.row	object	today	FindingLine	both
+findings.{id}.row.metric	string	today	FindingLine	both
+findings.{id}.row.value	string	today	FindingLine	both
+findings.{id}.row.criterion	string	today	FindingLine	both
+findings.{id}.row.margin	string	today	FindingLine	both
+findings.{id}.row.runs	number	today	FindingLine	both
+findings.{id}.row.standing	string	today	FindingLine	both
+findings.{id}.row.why	string	today	FindingLine	both
+findings.{id}.row.good	bool	today	FindingLine	both
+findings.{id}.row.negative	bool	today	FindingLine	both
+findings.{id}.reading	object	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.estimate	null|number	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.lo	null|number	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.hi	null|number	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.level	null|number	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.method	string	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.n	number	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.unit	string	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.estimate_text	string	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.interval_text	string	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.unit_text	string	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.result	string	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.unit_said	string	P4B	model.rs: the unit as a sentence says it (points for a difference of percentages)	both
+findings.{id}.check_band	object	1b	the criterion's rule (status), for the figure (2b)	both
+findings.{id}.check_band.comparator	string	1b	the criterion's rule (status), for the figure (2b)	both
+findings.{id}.check_band.target	number	1b	the criterion's rule (status), for the figure (2b)	both
+findings.{id}.check_band.tolerance	null|number	1b	the criterion's rule (status), for the figure (2b)	both
+findings.{id}.units_line	string	1b	new	both
+findings.{id}.rule_detail	string	1b	why_rule (ledger/findings.rs)	both
+findings.{id}.unit_amended	null|object	1b	new: amendments after the lock	both
+findings.{id}.says	object	today	FindingLine	both
+findings.{id}.says.{key}	list|string	today	FindingLine	both
+findings.{id}.observations	list	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.observations[]	object	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.observations[].run	string	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.observations[].arm	string	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.observations[].unit	string	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.observations[].per_run	object	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.observations[].per_run.{key}	string	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.observations[].value_text	string	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.observations[].counted	bool	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.observations[].reason	string	1a	status findings[].observations, dropped by FindingLine today	both
+findings.{id}.source	object	1a	comparison.source	both
+findings.{id}.source.kind	string	1a	comparison.source	both
+findings.{id}.source.id	string	1a	comparison.source	both
+findings.{id}.design_cells	list	1a	comparison.design.cells	both
+findings.{id}.rests_on	object	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.interpretations	list	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.interpretations[]	object	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.interpretations[].question	string	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.interpretations[].active	bool	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.interpretations[].confirmed	bool	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.interpretations[].text	string	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.question_links	list	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.question_links[]	string	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.relations_out	list	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.relations_out[]	object	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.relations_out[].kind	string	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.relations_out[].criterion	string	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.relations_in	list	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.relations_in[]	object	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.relations_in[].kind	string	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.relations_in[].criterion	string	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.rests_on.call	string	1a	graph.rs (SS calls it FindingLine.rests_on: what rests on this)	both
+findings.{id}.your_words	string	today	FindingLine	live
+findings.{id}.observed	string	today	FindingLine	live
+findings.{id}.observed_short	string	today	FindingLine	live
+findings.{id}.observed_places	list	today	FindingLine	live
+findings.{id}.observed_places[]	object	today	FindingLine	live
+findings.{id}.observed_places[].id	string	today	FindingLine	live
+findings.{id}.observed_places[].label	string	today	FindingLine	live
+findings.{id}.other_code	string	today	FindingLine	both
+findings.{id}.receipt_rows	list	1b	finding.declared and the Criterion (SS 5.1 receipts), as rows	both
+findings.{id}.receipt_rows[]	list	1b	finding.declared and the Criterion (SS 5.1 receipts), as rows	both
+findings.{id}.receipt_rows[][]	list|string	1b	finding.declared and the Criterion (SS 5.1 receipts), as rows	both
+findings.{id}.receipt_rows[][][]	string	1b	finding.declared and the Criterion (SS 5.1 receipts), as rows	both
+findings.{id}.cited	null|object	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
+findings.{id}.state	string	M6	assess::rule_word	both
+findings.{id}.state_label	string	M6	the rule word after a count	both
+findings.{id}.subject_label	string	M6	model.rs arm_label, a baseline labelled as one	both
+findings.{id}.reference_label	string	M6	model.rs arm_label, or the cited number	both
+findings.{id}.reading_short	string	M6	the compact row's reading, arms labelled	both
+findings.{id}.verdict	string	P4B	model.rs verdict: the rule's one sentence (status word, reading, result class in words, distance from its number)	both
+findings.{id}.tags	list	M6	at most two ontology tags	both
+findings.{id}.reads_baseline	bool	M6	it reads the baseline or control arm alone	both
+findings.{id}.cited.path	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
+findings.{id}.cited.line	number	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
+findings.{id}.cited.locator	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
+findings.{id}.cited.quote	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
+findings.{id}.cited.commit	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
+findings.{id}.cited.sha256	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
+findings.{id}.tags[]	string	M6	at most two ontology tags	both
+findings.{id}.says.{key}[]	string	today	FindingLine	both
+findings.{id}.unit_amended.at	string	1b	new: amendments after the lock	both
+findings.{id}.unit_amended.setting	string	1b	new: amendments after the lock	both
+findings.{id}.unit_amended.was	string	1b	new: amendments after the lock	both
+findings.{id}.unit_amended.now	string	1b	new: amendments after the lock	both
+findings.{id}.unit_amended.amendment	string	1b	new: amendments after the lock	both
+findings.{id}.unit_amended.line	string	1b	new: amendments after the lock	both
+findings.{id}.unit_amended.why	string	1b	new: amendments after the lock	both
+findings.{id}.design_cells[]	object	1a	comparison.design.cells	both
+findings.{id}.design_cells[].key	string	1a	comparison.design.cells	both
+findings.{id}.design_cells[].estimate_text	string	1a	comparison.design.cells	both
+findings.{id}.design_cells[].runs	list	1a	comparison.design.cells	both
+findings.{id}.design_cells[].runs[]	string	1a	comparison.design.cells	both
+findings.{id}.design_cells[].outside	bool	1a	comparison.design.cells	both
+findings.{id}.design_cells[].interval_text	string	M5	the cell's interval as rb says it	both
+findings.{id}.design_cells[].n	number	M5	the cell's units	both
+findings.{id}.design_cells[].unit	string	M5	what a unit is, as n says	both
+experiments	list	today	ExperimentBrief	both
+experiments[]	object	today	ExperimentBrief	both
+experiments[].id	string	today	ExperimentBrief	both
+experiments[].title	string	today	ExperimentBrief	both
+experiments[].short_title	string	1b	new	both
+experiments[].state	string	today	ExperimentBrief	both
+experiments[].who_line	string	today	Card.who_line (object_card)	both
+experiments[].arms	string	today	ExperimentBrief	both
+experiments[].varies	list	today	ExperimentBrief	both
+experiments[].varies[]	string	today	ExperimentBrief	both
+experiments[].counted	number	today	ExperimentBrief	both
+experiments[].runs	number	today	ExperimentBrief	both
+experiments[].hypothesis	string	today	ExperimentBrief	both
+experiments[].purpose	string	today	ExperimentBrief	both
+experiments[].why_part	list|null	today	ExperimentBrief	both
+experiments[].why_part[]	string	today	ExperimentBrief	both
+experiments[].gate_parts	list	today	ExperimentBrief	both
+experiments[].gate_words_said	string	today	ExperimentBrief	both
+experiments[].notes	list	today	ExperimentBrief	both
+experiments[].notes[]	string	today	ExperimentBrief	both
+experiments[].note_ids	list	today	ExperimentBrief	both
+experiments[].note_ids[]	string	today	ExperimentBrief	both
+experiments[].relations	list	today	ExperimentBrief	both
+experiments[].relations[]	string	today	ExperimentBrief	both
+experiments[].relation_lines	list	M5	view::relation_lines, the card's line for each relation	both
+experiments[].relation_lines[]	string	M5	view::relation_lines, the card's line for each relation	both
+experiments[].settings_line	string	M5	view::settings_of, the card's settings line	both
+experiments[].tally	list	M5	view::experiment_tally, the experiment's rule counts as home.tally	both
+experiments[].tally[]	list	M5	view::experiment_tally, the experiment's rule counts as home.tally	both
+experiments[].tally[][]	number|string	M5	view::experiment_tally, the experiment's rule counts as home.tally	both
+experiments[].muted	list	M5	view::experiment_tally, the met rules' words drawn muted, as home.muted	both
+experiments[].muted[]	string	M5	view::experiment_tally, the met rules' words drawn muted, as home.muted	both
+experiments[].folder	string	today	ExperimentBrief	both
+experiments[].repo_brief	string	today	ExperimentBrief	both
+experiments[].design	object	today	ExperimentBrief	both
+experiments[].design.standing	string	today	ExperimentBrief	both
+experiments[].design.pending	bool	today	ExperimentBrief	both
+experiments[].design.confirm	string	today	ExperimentBrief	both
+experiments[].design.lines	list	today	ExperimentBrief	both
+experiments[].design.lines[]	string	today	ExperimentBrief	both
+experiments[].design.not_recorded	list	today	ExperimentBrief	both
+experiments[].findings	list	today	ExperimentBrief	both
+experiments[].findings[]	string	today	ExperimentBrief	both
+experiments[].run_ids	list	today	status experiments[].run_ids	both
+experiments[].run_ids[]	string	today	status experiments[].run_ids	both
+experiments[].table	object	today	ExperimentBrief	both
+experiments[].table.metrics	list	today	ExperimentBrief	both
+experiments[].table.metrics[]	object	today	ExperimentBrief	both
+experiments[].table.metrics[].name	string	today	ExperimentBrief	both
+experiments[].table.metrics[].unit	string	today	ExperimentBrief	both
+experiments[].table.varies	list	today	ExperimentBrief	both
+experiments[].table.varies[]	string	today	ExperimentBrief	both
+experiments[].table.conditions	list	today	ExperimentBrief	both
+experiments[].table.unit	string	PV	rb compare's cell_unit: what a grid's cell counts, within its column	both
+experiments[].table.rows	list	today	ExperimentBrief	both
+experiments[].table.rows[]	object	today	ExperimentBrief	both
+experiments[].table.rows[].variant	string	today	ExperimentBrief	both
+experiments[].table.rows[].role	string	today	ExperimentBrief	both
+experiments[].table.rows[].varies	object	today	ExperimentBrief	both
+experiments[].table.rows[].varies.{key}	string	today	ExperimentBrief	both
+experiments[].table.rows[].where	object	today	ExperimentBrief	both
+experiments[].table.rows[].unvaried	object	PV	rb compare: settings the variants hold apart that the experiment does not declare varied	both
+experiments[].table.rows[].unvaried.{key}	string	PV	rb compare: settings the variants hold apart that the experiment does not declare varied	both
+experiments[].table.rows[].metrics	object	today	ExperimentBrief	both
+experiments[].table.rows[].metrics.{key}	object	today	ExperimentBrief	both
+experiments[].table.rows[].metrics.{key}.mean	number	today	ExperimentBrief	both
+experiments[].table.rows[].metrics.{key}.n	number	today	ExperimentBrief	both
+experiments[].table.rows[].metrics.{key}.read_by	list	today	ExperimentBrief	both
+experiments[].table.rows[].metrics.{key}.delta	null|number	M5	rb compare's change against the baseline	both
+experiments[].table.rows[].metrics.{key}.better	bool|null	M5	rb compare's better	both
+experiments[].table.rows[].metrics.{key}.paired	bool	M5	rb compare's paired	both
+experiments[].table.rows[].metrics.{key}.primary	bool	M5	rb compare's primary	both
+experiments[].table.rows[].metrics.{key}.said	string	M5	rb compare's said	both
+experiments[].table.rows[].metrics.{key}.basis	string	M5	rb compare's basis	both
+experiments[].table.rows[].metrics.{key}.differs_in	list	M5	rb compare's differs_in	both
+experiments[].table.rows[].metrics.{key}.differs_in[]	string	M5	rb compare's differs_in	both
+experiments[].table.rows[].metrics.{key}.other_code	string	M5	rb compare's other_code	both
+experiments[].table.rows[].metrics.{key}.runs	number	PV	rb compare: how many runs the cell's mean is over	both
+experiments[].table.rows[].metrics.{key}.run_ids	list	PV	rb compare: the runs the cell's mean is over	both
+experiments[].table.rows[].metrics.{key}.run_ids[]	string	PV	rb compare: the runs the cell's mean is over	both
+experiments[].table.rows[].metrics.{key}.count_said	string	PV	rb compare: what the cell rests on, as a grid says it (3 seeds, 1 run)	both
+experiments[].table.rows[].metrics.{key}.criteria	list	PV	rb compare: the rules that read the cell's change	both
+experiments[].table.rows[].metrics.{key}.lo	null|number	PV	rb compare: the change's interval within its column, where the units pair	both
+experiments[].table.rows[].metrics.{key}.hi	null|number	PV	rb compare: the change's interval within its column, where the units pair	both
+experiments[].table.rows[].metrics.{key}.level	null|number	PV	rb compare: the change's interval within its column, where the units pair	both
+experiments[].table.rows[].metrics.{key}.no_interval	string	PV	rb compare: why the change has no interval, in plain words	both
+experiments[].table.rows[].metrics.{key}.in_column	bool	PV	rb compare: false where the baseline holds a setting the experiment does not declare varied otherwise	both
+experiments[].table.rows[].metrics.{key}.read_by[]	object	today	ExperimentBrief	both
+experiments[].table.rows[].metrics.{key}.read_by[].criterion	string	today	ExperimentBrief	both
+experiments[].table.rows[].metrics.{key}.read_by[].reads	string	today	ExperimentBrief	both
+experiments[].table.rows[].metrics.{key}.criteria[]	string	PV	rb compare: the rules that read the cell's change	both
+experiments[].rerun	list	today	ExperimentBrief	both
+experiments[].rerun[]	object	today	ExperimentBrief	both
+experiments[].rerun[].state	string	today	ExperimentBrief	both
+experiments[].rerun[].what	string	today	ExperimentBrief	both
+experiments[].reproduce	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.ready_line	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.ready	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.ready[]	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.ready[].state	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.ready[].label	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.ready[].text	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.ready[].refs	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.ready[].refs[]	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[]	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[].n	number	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[].what	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[].label	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[].refs	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[].refs[]	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[].command	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[].from	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[].runnable	bool	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.per_run	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.per_run.keys	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.per_run.keys[]	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.per_run.by_arm	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.per_run.by_arm.{key}	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.per_run.by_arm.{key}[]	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.per_run.by_arm.{key}[].run	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.per_run.by_arm.{key}[].{key}	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.shared	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.shared[]	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.shared[].name	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.shared[].value	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.shared[].source	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.shared[].status	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.by_arm	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.by_arm.{key}	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.by_arm.{key}[]	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.by_arm.{key}[].name	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.by_arm.{key}[].value	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.by_arm.{key}[].source	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.by_arm.{key}[].status	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.unknown	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.unknown[]	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.counts	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.counts.verified	number	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.counts.unknown	number	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.command_as_given	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.command_as_given.recorded	number	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.command_as_given.runs	number	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.command_as_given.line	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.made	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.made[]	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.made[].run	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.made[].maker	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.made[].resource	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.made[].command	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.made[].from	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.made[].line	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.script	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.commands	list	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.commands[]	object	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.commands[].run	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.commands[].command	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.commands[].observed	bool	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.prompt	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].amendments	list	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[]	object	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].id	string	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].at	string	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].line	string	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].changes	list	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].changes[]	object	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].changes[].setting	string	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].changes[].was	string	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].changes[].now	string	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].why	string	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].refs	list	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].amendments[].refs[]	string	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
+experiments[].compares	string	M6	model.rs compares, arms labelled	both
+experiments[].gate_parts[]	list	today	ExperimentBrief	both
+experiments[].gate_parts[][]	string	today	ExperimentBrief	both
+experiments[].design.not_recorded[]	string	today	ExperimentBrief	both
+experiments[].table.conditions[]	string	today	ExperimentBrief	both
+experiments[].table.rows[].where.{key}	string	today	ExperimentBrief	both
+runs	object	today	RunRow (by and session never enter)	both
+runs.{id}	object	today	RunRow (by and session never enter)	both
+runs.{id}.run_id	string	today	RunRow (by and session never enter)	both
+runs.{id}.experiment_id	string	today	RunRow (by and session never enter)	both
+runs.{id}.label	string	1b	new	both
+runs.{id}.named	string	M8	contract 1.9 (FIX8): model.rs run_names, the run as every line names it: run <label>, told apart from a run whose label reads the same by when it was recorded	both
+runs.{id}.at	string	1b	receipt.at	both
+runs.{id}.when	string	today	RunRow (by and session never enter)	both
+runs.{id}.produced	string	today	RunRow (by and session never enter)	both
+runs.{id}.metrics_text	string	1b	new: rb's %.6g	both
+runs.{id}.per_run_text	string	today	run values as k=v (view.rs)	both
+runs.{id}.results	string	today	RunRow (by and session never enter)	both
+runs.{id}.note	string	today	RunRow (by and session never enter)	both
+runs.{id}.receipt_rows	list	1b	receipt_card and run_facts today, as prose	both
+runs.{id}.receipt_rows[]	list	1b	receipt_card and run_facts today, as prose	both
+runs.{id}.receipt_rows[][]	list|string	1b	receipt_card and run_facts today, as prose	both
+runs.{id}.receipt_rows[][][]	string	1b	receipt_card and run_facts today, as prose	both
+runs.{id}.command	object	1b	command kinds (support.rs)	both
+runs.{id}.command.text	string	1b	command kinds (support.rs)	both
+runs.{id}.command.kind	string	1b	command kinds (support.rs)	both
+runs.{id}.counts_toward	list	1a	graph.rs	both
+runs.{id}.counts_toward[]	object	1a	graph.rs	both
+runs.{id}.counts_toward[].criterion	string	1a	graph.rs	both
+runs.{id}.counts_toward[].counted	bool	1a	graph.rs	both
+runs.{id}.counts_toward[].reason	string	1a	graph.rs	both
+runs.{id}.counts_toward[].via	string	1a	graph.rs	both
+runs.{id}.same_bytes	list	1a	graph.rs	both
+runs.{id}.same_bytes[]	object	1a	graph.rs	both
+runs.{id}.same_bytes[].run	string	1a	graph.rs	both
+runs.{id}.same_bytes[].experiment	string	1a	graph.rs	both
+runs.{id}.same_bytes[].retracted	bool	1a	graph.rs	both
+runs.{id}.same_bytes[].made	list	1a	graph.rs	both
+runs.{id}.made	list	1a	run outputs	both
+runs.{id}.made[]	string	1a	run outputs	both
+runs.{id}.retracted	null|object	today	retraction_words	both
+runs.{id}.observed_in	null|object	today	RunRow (by and session never enter)	live
+runs.{id}.recorded_in	null|object	4b	places (webui)	live
+runs.{id}.reproduce	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.ready_line	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.ready	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.ready[]	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.ready[].state	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.ready[].label	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.ready[].text	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.ready[].refs	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.ready[].refs[]	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[]	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[].what	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[].label	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[].refs	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[].refs[]	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[].command	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[].from	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[].runnable	bool	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[].n	number	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.per_run	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.per_run.keys	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.per_run.keys[]	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.per_run.by_arm	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.per_run.by_arm.{key}	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.per_run.by_arm.{key}[]	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.per_run.by_arm.{key}[].run	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.per_run.by_arm.{key}[].{key}	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.shared	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.shared[]	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.shared[].name	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.shared[].value	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.shared[].source	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.shared[].status	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.by_arm	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.by_arm.{key}	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.by_arm.{key}[]	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.by_arm.{key}[].name	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.by_arm.{key}[].value	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.by_arm.{key}[].source	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.by_arm.{key}[].status	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.unknown	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.unknown[]	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.counts	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.counts.verified	number	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.counts.unknown	number	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.command_as_given	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.command_as_given.recorded	number	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.command_as_given.runs	number	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.command_as_given.line	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.made	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.made[]	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.made[].run	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.made[].maker	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.made[].resource	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.made[].command	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.made[].from	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.made[].line	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.script	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.commands	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.prompt	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.retracted.at	string	today	retraction_words	both
+runs.{id}.retracted.line	string	today	retraction_words	both
+runs.{id}.retracted.why	string	today	retraction_words	both
+runs.{id}.observed_in.label	string	today	RunRow (by and session never enter)	live
+runs.{id}.observed_in.label_short	string	today	RunRow (by and session never enter)	live
+runs.{id}.observed_in.commit	string	today	RunRow (by and session never enter)	live
+runs.{id}.observed_in.dirty	bool	today	RunRow (by and session never enter)	live
+runs.{id}.observed_in.gone	bool	today	RunRow (by and session never enter)	live
+runs.{id}.observed_in.place	string	today	RunRow (by and session never enter)	live
+runs.{id}.recorded_in.place	string	4b	places (webui)	live
+runs.{id}.recorded_in.label	string	4b	places (webui)	live
+runs.{id}.recorded_in.href	string	4b	places (webui)	live
+runs.{id}.reproduce.commands[]	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.commands[].run	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.commands[].command	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.commands[].observed	bool	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.same_bytes[].made[]	string	1a	graph.rs	both
+resources	object	today	ResourceRow	both
+resources.{id}	object	today	ResourceRow	both
+resources.{id}.resource_id	string	today	ResourceRow	both
+resources.{id}.name	string	today	ResourceRow	both
+resources.{id}.type	string	today	ResourceRow	both
+resources.{id}.role	string	1c	new: input role words	both
+resources.{id}.availability	string	today	ResourceRow	both
+resources.{id}.where	list	today	ResourceRow	both
+resources.{id}.where[]	string	today	ResourceRow	both
+resources.{id}.where_short	list	today	ResourceRow	live
+resources.{id}.where_short[]	string	today	ResourceRow	live
+resources.{id}.identity	string	today	ResourceRow	both
+resources.{id}.exact	bool	today	ResourceRow	both
+resources.{id}.how	string	today	ResourceRow	both
+resources.{id}.acquisition	null|object	1c	computed on read from Acquisition.recipe	both
+resources.{id}.acquisition.command	string	1c	computed on read from Acquisition.recipe	both
+resources.{id}.acquisition.from	string	1c	computed on read from Acquisition.recipe	both
+resources.{id}.read_by	object	1a	cmds/reading.rs read/made split	both
+resources.{id}.read_by.runs	list	1a	cmds/reading.rs read/made split	both
+resources.{id}.read_by.runs[]	object	1a	cmds/reading.rs read/made split	both
+resources.{id}.read_by.runs[].run	string	1a	cmds/reading.rs read/made split	both
+resources.{id}.read_by.runs[].experiment	string	1a	cmds/reading.rs read/made split	both
+resources.{id}.read_by.analyses	list	1a	cmds/reading.rs read/made split	both
+resources.{id}.read_by.analyses[]	string	1a	cmds/reading.rs read/made split	both
+resources.{id}.made_by	list	1a	run outputs	both
+resources.{id}.rests_on	object	1a	graph.rs	both
+resources.{id}.rests_on.criteria	list	1a	graph.rs	both
+resources.{id}.rests_on.criteria[]	string	1a	graph.rs	both
+resources.{id}.rests_on.by_question	object	1a	graph.rs	both
+resources.{id}.rests_on.by_question.{key}	list	1a	graph.rs	both
+resources.{id}.rests_on.by_question.{key}[]	string	1a	graph.rs	both
+resources.{id}.url	string	today	ResourceRow	both
+resources.{id}.made_by[]	object	1a	run outputs	both
+resources.{id}.made_by[].run	string	1a	run outputs	both
+resources.{id}.made_by[].experiment	string	1a	run outputs	both
+analyses	object	today	status analyses (no card today: /card.json 404)	both
+analyses.{id}	object	today	status analyses (no card today: /card.json 404)	both
+analyses.{id}.id	string	today	status analyses (no card today: /card.json 404)	both
+analyses.{id}.title	string	today	status analyses (no card today: /card.json 404)	both
+analyses.{id}.recorded	string	today	status analyses (no card today: /card.json 404)	both
+analyses.{id}.reads	list	today	status analyses (no card today: /card.json 404)	both
+analyses.{id}.reads[]	string	today	status analyses (no card today: /card.json 404)	both
+analyses.{id}.used_by	list	1a	graph.rs	both
+analyses.{id}.used_by[]	string	1a	graph.rs	both
+analyses.{id}.script	string	today	status analyses (no card today: /card.json 404)	both
+analyses.{id}.sha256	string	today	status analyses (no card today: /card.json 404)	both
+history	object	5H	new: history.rs over delta::wrote	both
+history.summary	string	5H	new: history.rs over delta::wrote	both
+history.log	list	today	Ledger::log_entries, screen form with no actor (M0)	both
+history.log[]	object	today	Ledger::log_entries, screen form with no actor (M0)	both
+history.log[].at	string	today	Ledger::log_entries, screen form with no actor (M0)	both
+history.log[].op	string	today	Ledger::log_entries, screen form with no actor (M0)	both
+history.log[].sentence	string	today	Ledger::log_entries, screen form with no actor (M0)	both
+history.log[].refs	list	today	Ledger::log_entries, screen form with no actor (M0)	both
+history.log[].refs[]	string	today	Ledger::log_entries, screen form with no actor (M0)	both
+history.log[].log_index	number	today	Ledger::log_entries, screen form with no actor (M0)	both
+history.sittings	list	5H	new: history.rs over delta::wrote	both
+history.sittings[]	object	5H	new: history.rs over delta::wrote	both
+history.sittings[].first	string	5H	new: history.rs over delta::wrote	both
+history.sittings[].last	string	5H	new: history.rs over delta::wrote	both
+history.sittings[].n	number	5H	new: history.rs over delta::wrote	both
+history.sittings[].calls	number	5H	new: history.rs over delta::wrote	both
+history.sittings[].head	string	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines	list	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines[]	object	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines[].first	string	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines[].last	string	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines[].n	number	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines[].sentence	string	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines[].refs	list	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines[].refs[]	string	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines[].why	string	5H	new: history.rs over delta::wrote	both
+history.sittings[].lines[].note	string	5H	history.rs: a session's reason apart from why (contract 1.2)	both
+history.sittings[].lines[].log_index	number	5H	new: history.rs over delta::wrote	both
+places	object	today	webui place, places, versions, elsewhere	live
+places.place	object	today	webui place, places, versions, elsewhere	live
+places.place.id	string	today	webui place, places, versions, elsewhere	live
+places.place.label	string	today	webui place, places, versions, elsewhere	live
+places.place.path	string	today	webui place, places, versions, elsewhere	live
+places.place.start	bool	today	webui place, places, versions, elsewhere	live
+places.place.read_only	bool	today	webui place, places, versions, elsewhere	live
+places.place.version	null|object	today	webui place, places, versions, elsewhere	live
+places.place.line	string	today	places.rs place line	live
+places.places	list	today	webui place, places, versions, elsewhere	live
+places.places[]	object	today	webui place, places, versions, elsewhere	live
+places.places[].id	string	today	webui place, places, versions, elsewhere	live
+places.places[].label	string	today	webui place, places, versions, elsewhere	live
+places.places[].can_show	bool	today	webui place, places, versions, elsewhere	live
+places.places[].why_not	string	today	webui place, places, versions, elsewhere	live
+places.versions	list	today	webui place, places, versions, elsewhere	live
+places.versions[]	object	today	webui place, places, versions, elsewhere	live
+places.versions[].sha	string	today	webui place, places, versions, elsewhere	live
+places.versions[].at	string	today	webui place, places, versions, elsewhere	live
+places.versions[].subject	string	today	webui place, places, versions, elsewhere	live
+places.scope_bar	null|object	4b	new	live
+places.elsewhere	list	today	webui place, places, versions, elsewhere	live
+places.elsewhere[]	object	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].place	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].label	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].path	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].said	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].adds	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].can_show	bool	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].why_not	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].waiting	object	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].waiting.n	number	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].waiting.list	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].pending	list	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].pending[]	object	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].pending[].id	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].pending[].kind	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].pending[].subject	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].pending[].text	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].pending[].confirm	string	today	webui place, places, versions, elsewhere	live
+places.elsewhere[].pending[].lines	list	today	webui place, places, versions, elsewhere	live
+citations	object	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}	object	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.key	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.raw	list	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.raw[]	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.path	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.name	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.folder	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.line	number	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.end	number	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.label	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.commit	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.commit_short	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.read	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.sha256	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.tracked	bool	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.quoted	bool	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.lines	list	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.lines[]	object	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.lines[].n	number	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.lines[].text	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.lines[].cited	bool	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.cut	number	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.missing	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.not_quoted	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.open_url	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	live
+citations.{key}.cited_by	list	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.cited_by[]	object	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.cited_by[].kind	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+citations.{key}.cited_by[].id	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+places.scope_bar.line	string	4b	new	live
+places.scope_bar.back	string	4b	new	live
+places.scope_bar.href	string	4b	new	live
+places.scope_bar.withheld	string	4b	new	live
+places.place.version.sha	string	today	webui place, places, versions, elsewhere	live
+places.place.version.at	string	today	webui place, places, versions, elsewhere	live
+places.place.version.subject	string	today	webui place, places, versions, elsewhere	live
+places.place.version.shown	string	today	webui place, places, versions, elsewhere	live
+reproduce_url	string	today	rb export --url	owner

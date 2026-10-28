@@ -1,0 +1,211 @@
+{
+ "steps": [
+  {
+   "run": "reconcile",
+   "exit": 0,
+   "out": [
+    "The repository (no commit yet): 0 results folders. No record here yet.",
+    "Nothing to compile: no results folder (out/, outputs/, results/, eval-out/, metrics/) holds a report or a results file yet.",
+    "",
+    "Start the record anyway: rb init \"The project's own title\"",
+    "",
+    "To record the work already done: rb docs --start.",
+    "",
+    "Next: rb init \"The project's own title\"  \u00b7  rb docs --start",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "reconcile --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"reconcile\",",
+    " \"data\": {",
+    "  \"repository\": {",
+    "   \"commit\": null,",
+    "   \"branch\": null,",
+    "   \"guides\": [],",
+    "   \"project_checks\": [],",
+    "   \"folders\": []",
+    "  },",
+    "  \"read\": {},",
+    "  \"applied\": null,",
+    "  \"recorded\": [],",
+    "  \"not_recorded\": [],",
+    "  \"found\": [],",
+    "  \"unplaced\": [],",
+    "  \"uncited_changes\": [],",
+    "  \"uncited_from_head\": null,",
+    "  \"scan\": null,",
+    "  \"looked_in\": [",
+    "   \"out/\",",
+    "   \"outputs/\",",
+    "   \"results/\",",
+    "   \"eval-out/\",",
+    "   \"metrics/\"",
+    "  ],",
+    "  \"record\": null,",
+    "  \"would_start\": {",
+    "   \"root\": \"@BASE@/work\",",
+    "   \"title\": \"The project's own title\",",
+    "   \"from\": \"README.md:1\"",
+    "  }",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [",
+    "  \"rb init \\\"The project's own title\\\"\",",
+    "  \"rb docs --start\"",
+    " ],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "reconcile",
+   "exit": 0,
+   "out": [
+    "The repository (no commit yet): 1 results folder. No record here yet.",
+    "",
+    "outputs/sweep/ holds results files nothing records yet. With no report of its own it is no experiment: rb run add <experiment> --from <its file> records a run from it.",
+    "",
+    "No results folder here holds a report, so rb reconcile --apply would add no experiment. Start the record: rb init \"The project's own title\"",
+    "",
+    "To record the work already done: rb docs --start.",
+    "",
+    "Next: rb init \"The project's own title\"  \u00b7  rb docs --start",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "reconcile --apply",
+   "exit": 0,
+   "out": [
+    "Started the record in @BASE@/work/.rb, titled \"The project's own title\" (README.md:1). Commit .rb/ with the code.",
+    "",
+    "For the agents here:",
+    "  No agent's instructions here yet. rb skill add puts rb's for one: --claude (Claude Code), --agents-md (Codex and others), --cursor",
+    "",
+    "The repository (no commit yet): 1 results folder.",
+    "",
+    "Kept in the record: nothing changed.",
+    "",
+    "outputs/sweep/ holds results files no recorded run named. With no report of its own it is no experiment: rb run add <experiment> --from <its file> records a run from it.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "status",
+   "exit": 0,
+   "out": [
+    "The project's own title \u00b7 the-project-s-own-title",
+    "",
+    "Nothing recorded yet. Start: rb question add \"<what are you trying to find out?>\", then rb experiment add \"<what you are testing>\" -q <question> --hypothesis \"<what you expect>\" --baseline <name> --candidate <name>",
+    "",
+    "Criteria: none yet",
+    "",
+    "Can be done now (2)",
+    "  - No question is recorded, and the repository holds work already done: 1 results folder",
+    "      rb docs --start   (how to record the work already done)",
+    "  - outputs/sweep/ holds results no recorded experiment reads yet",
+    "      rb reconcile",
+    "",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "",
+    "Next: rb docs --start   (how to record the work already done)  \u00b7  rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "reconcile --apply",
+   "exit": 0,
+   "out": [
+    "The repository (no commit yet): 1 results folder.",
+    "",
+    "Kept in the record: nothing changed.",
+    "",
+    "outputs/sweep/ holds results files no recorded run named. With no report of its own it is no experiment: rb run add <experiment> --from <its file> records a run from it.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  }
+ ],
+ "files": {
+  ".rb/.gitattributes": [
+   "* -text",
+   "log.jsonl merge=union",
+   ""
+  ],
+  ".rb/.gitignore": [
+   ".lock",
+   "*.tmp",
+   "cache/",
+   "journal/",
+   ""
+  ],
+  ".rb/cache/hashes.json": [
+   "{\"@BASE@/work/outputs/sweep/results.json\": [14, 1790852403000000000, \"3f634fb14b06d8a8518d7b640e873387c0c9cd943e40c78c2868e6b03f1f1892\"]}"
+  ],
+  ".rb/cache/objects/e5/e50e9f82edd5fd345b4483328aac865ba030c16039475a3f6bb013404a89b096.json.gz": {
+   "sha256": "d1984a6dc9b97ab41cd8da403df6784e46517b43ea712211ef89671084c6c832",
+   "bytes": 188
+  },
+  ".rb/log.jsonl": [
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"the-project-s-own-title\", \"sha256\": \"e50e9f82edd5fd345b4483328aac865ba030c16039475a3f6bb013404a89b096\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"The project's own title\", \"head\": \"\"}}",
+   ""
+  ],
+  ".rb/project.yaml": [
+   "rb: 1",
+   "kind: project",
+   "id: the-project-s-own-title",
+   "uid: prj_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: The project's own title",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  "README.md": [
+   "# The project's own title",
+   "",
+   "Words.",
+   ""
+  ],
+  "RUNNING.md": [
+   "# How to run",
+   "",
+   "```",
+   "python3 scripts/check_sweep.py",
+   "```",
+   ""
+  ],
+  "outputs/sweep/results.json": [
+   "{\"loss\": 0.5}",
+   ""
+  ],
+  "scripts/check_sweep.py": [
+   "print('ok')",
+   ""
+  ]
+ }
+}

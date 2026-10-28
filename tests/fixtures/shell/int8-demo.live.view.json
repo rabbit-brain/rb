@@ -1,0 +1,1953 @@
+{
+  "contract": "rb-shell-view/1.9",
+  "surface": "open",
+  "tier": "live",
+  "rb_version": "0.6.0",
+  "at": "2026-10-19 09:41 UTC",
+  "digest": "7c1e40b2a9d35f6e",
+  "escaped": true,
+  "project": {"id": "int8-resnet50", "title": "INT8 ResNet-50 on ImageNet", "parent": ""},
+  "home": {
+    "counts": {"questions": 2, "experiments": 2, "criteria": 6, "runs": 9, "retracted": 1, "analyses": 1, "resources": 4, "calls": 4, "writes": 47},
+    "last_write": {"at": "2026-10-19 09:40 UTC"},
+    "latest": {"head": "2026-10-19 · 09:25 to 09:40 UTC · 4 writes", "calls_made": 0, "line": "Latest changes: 2026-10-19 · 09:25 to 09:40 UTC · 4 writes · no calls made"},
+    "made": {"criteria": 6, "after_evidence": 2, "runs": 8, "with_command": 1, "line": "2 of 6 rules were written after their results came in · 1 of 8 runs records its command (as given)"},
+    "began": "Recorded since 2026-10-06, after 1 of its 8 runs was made; what came before it is Retrospective",
+    "scope": "rb looks at results/, configs/ and results/runs.db; it last looked 2026-10-19 09:40 UTC. It does not read code or docs, and it does not see commands not run under rb journal run.",
+    "scope_short": "rb looked 2026-10-19 09:40 UTC at results/, configs/ and results/runs.db",
+    "uncited": 1,
+    "uncited_line": "1 changed file nothing in the record cites: configs/calib.yaml, changed since 3f2a9c1.",
+    "uncited_short": "1 changed file nothing cites",
+    "found": [
+      {
+        "request_id": "f7q2",
+        "title": "Record results/seed4/metrics.json on e1",
+        "hint": "in the repository, not in the record",
+        "at": "2026-10-19 09:38 UTC",
+        "argv": ["rb", "run", "add", "e1", "--from", "results/seed4/metrics.json"]
+      }
+    ],
+    "found_total": 1,
+    "unplaced": [],
+    "quiet": "4 calls wait on you.",
+    "waiting_line": "2 calls and 2 designs wait for your confirmation, listed apart",
+    "tally": [["meets", 3], ["misses", 2], ["not reproduced", 1]],
+    "muted": [],
+    "open_line": "Also open: 3 items that need no decision · 1 setting unknown",
+    "notes": [{"id": "n1", "at": "2026-10-16", "text": "the eval box flag was online=1 during the seed 2 run; the javascript: link in the team wiki is stale."}],
+    "tree": [
+      {
+        "kind": "question",
+        "id": "q1",
+        "label": "Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1 on ImageNet?",
+        "standing": "OPEN · 3 criteria met · 1 not reproduced",
+        "depth": 0,
+        "muted": []
+      },
+      {"kind": "question", "id": "q1a", "label": "How many calibration images does INT8 need?", "standing": "OPEN · 1 criterion not met", "depth": 1, "muted": []},
+      {"kind": "experiment", "id": "e1", "label": "int8 against fp32", "standing": "design not confirmed", "depth": 0, "muted": []},
+      {"kind": "experiment", "id": "e2", "label": "calibration set size", "standing": "design not confirmed", "depth": 0, "muted": []}
+    ],
+    "standing": [{"question": "q1", "text": "Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1 on ImageNet?", "state": "open", "state_word": "Open", "line": "No answer yet: the fp32 baseline doesn't match its cited number, and 2 experiment designs wait for your confirmation.", "reasons": [{"kind": "baseline", "text": "the fp32 baseline doesn't match its cited number", "criteria": ["c2"]}, {"kind": "design", "text": "2 experiment designs wait for your confirmation", "criteria": []}], "tallies": [{"state": "meets", "n": 3, "label": "3 met", "criteria": ["c1", "c3", "c4"]}, {"state": "not reproduced", "n": 1, "label": "1 not reproduced", "criteria": ["c2"]}], "interpretation": {"line": "Your reading: INT8 post-training quantization keeps ResNet-50 within a third of a point of FP32 top-1, its 2 rules met", "text": "INT8 post-training quantization keeps ResNet-50 within a third of a point of FP32 top-1.", "holds": "its 2 rules met", "confirmed": true}}],
+    "integrity": {"parts": [{"kind": "after_evidence", "n": 2, "of": 6, "line": "2 of 6 rules were written after their results came in.", "ids": ["c2", "c6"]}, {"kind": "without_command", "n": 7, "of": 8, "line": "7 of 8 runs have no command from when they ran.", "ids": ["runs1", "runs2b", "runsql7", "runc128", "runc512", "runc1024", "runc2048"]}, {"kind": "retracted", "n": 1, "of": 9, "line": "1 run was retracted.", "ids": ["runs2"]}], "affects": "Treat them as a record of what happened, not as a test planned in advance."},
+    "queue": [{"kind": "baseline", "title": "Review the fp32 baseline mismatch", "reader_title": "The fp32 baseline doesn't match its cited number (0.7597 against 0.7613)", "detail": "observed 0.7597 top1 · cited 0.7613 top1", "target": "c2", "targets": ["c2"], "action": "Review", "rank": 1}, {"kind": "call", "title": "Choose whether calibration set size: how many images INT8 needs continues", "reader_title": "Whether calibration set size: how many images INT8 needs continues is not decided", "detail": "1 of 4 units, in 4 design cells, is below -0.01 (calib_images=128)", "target": "e2", "targets": ["e2"], "action": "Review", "rank": 2}, {"kind": "call", "title": "Review: int8 latency is at most 0.6 of fp32 on the T4", "reader_title": "int8 latency is at most 0.6 of fp32 on the T4: rule not met", "detail": "not met · int8 against the fp32 baseline: 0.64 latency ratio", "target": "c6", "targets": ["c6"], "action": "Review", "rank": 2}, {"kind": "call", "title": "Review: the ONNX export holds onnx_top1", "reader_title": "the ONNX export holds onnx_top1: rule met", "detail": "met · int8 against the fp32 baseline: -0.0003 onnx_top1", "target": "c3", "targets": ["c3"], "action": "Review", "rank": 2}, {"kind": "design", "title": "Confirm 2 experiment designs", "reader_title": "The designs of 2 experiments are not confirmed", "detail": "int8 against fp32 · calibration set size", "target": "e1", "targets": ["e1", "e2"], "action": "Review", "rank": 3}, {"kind": "pending_call", "title": "Confirm the proposed call to accept: the ONNX export holds onnx_top1", "reader_title": "The proposed call to accept is not confirmed: the ONNX export holds onnx_top1", "detail": "", "target": "dec7", "targets": ["dec7"], "action": "Review", "rank": 4}, {"kind": "pending_call", "title": "Confirm the past call to park: int8", "reader_title": "The past call to park is not confirmed: int8", "detail": "2026-05-07", "target": "dec4", "targets": ["dec4"], "action": "Review", "rank": 4}, {"kind": "found", "title": "Record a result found in the repository", "reader_title": "A result found in the repository is not recorded", "detail": "for int8 against fp32", "target": "f7q2", "targets": ["f7q2"], "action": "Inspect", "rank": 5}, {"kind": "uncited", "title": "Inspect a changed file nothing in the record cites", "reader_title": "A changed file nothing in the record cites: calib.yaml", "detail": "calib.yaml", "target": "", "targets": [], "action": "Inspect", "rank": 5}]
+  },
+  "your_call": {"n": 4, "first": "c2"},
+  "calls": [
+    {
+      "subject": "c2",
+      "kind": "criterion",
+      "code": "undecided",
+      "label": "Review this result",
+      "title": "fp32 top1 matches the published 76.13",
+      "question": "q1",
+      "what": "c2: estimate 0.7597 outside 0.7613 ± 0.001",
+      "reason": {"label": "Not reproduced", "detail": "estimate 0.7597 outside 0.7613 ± 0.001", "also": "on the estimate, not across the whole interval"},
+      "do": "rb decide c2 accept|reject|investigate --why \"...\"",
+      "actions": [
+        {"action": "accept", "label": "Accept", "argv": ["rb", "decide", "c2", "accept", "--why", "‹why›"], "line": "rb decide c2 accept --why '‹why›'", "consequence": "accepted ‹day›: ‹why›"},
+        {"action": "reject", "label": "Reject", "argv": ["rb", "decide", "c2", "reject", "--why", "‹why›"], "line": "rb decide c2 reject --why '‹why›'", "consequence": "rejected ‹day›: ‹why›"},
+        {
+          "action": "investigate",
+          "label": "Investigate",
+          "argv": ["rb", "decide", "c2", "investigate", "--why", "‹why›"],
+          "line": "rb decide c2 investigate --why '‹why›'",
+          "consequence": "investigating since ‹day›: ‹why›"
+        }
+      ]
+    },
+    {
+      "subject": "c3",
+      "kind": "criterion",
+      "code": "undecided",
+      "label": "Review this result",
+      "title": "the ONNX export holds onnx_top1",
+      "question": "q1",
+      "what": "c3: 1 seed",
+      "reason": {"label": "Too little evidence", "detail": "1 run · criterion met", "also": ""},
+      "do": "rb decide c3 accept|reject|investigate --why \"...\"",
+      "actions": [
+        {"action": "accept", "label": "Accept", "argv": ["rb", "decide", "c3", "accept", "--why", "‹why›"], "line": "rb decide c3 accept --why '‹why›'", "consequence": "accepted ‹day›: ‹why›"},
+        {"action": "reject", "label": "Reject", "argv": ["rb", "decide", "c3", "reject", "--why", "‹why›"], "line": "rb decide c3 reject --why '‹why›'", "consequence": "rejected ‹day›: ‹why›"},
+        {
+          "action": "investigate",
+          "label": "Investigate",
+          "argv": ["rb", "decide", "c3", "investigate", "--why", "‹why›"],
+          "line": "rb decide c3 investigate --why '‹why›'",
+          "consequence": "investigating since ‹day›: ‹why›"
+        }
+      ]
+    },
+    {
+      "subject": "e2",
+      "kind": "experiment",
+      "code": "gate_missed",
+      "label": "Choose whether this work continues",
+      "title": "calibration set size",
+      "question": "q1a",
+      "what": "e2: gate missed: c5 criterion not met",
+      "reason": {"label": "Gate missed", "detail": "1 of 4 units, in 4 design cells, is below -0.01 (calib_images=128)", "also": ""},
+      "do": "rb decide e2 park|continue|stop --why \"...\" --revisit \"<when to look again>\"",
+      "actions": [
+        {
+          "action": "park",
+          "label": "Park",
+          "argv": ["rb", "decide", "e2", "park", "--why", "‹why›", "--revisit", "‹when to look again›"],
+          "line": "rb decide e2 park --why '‹why›' --revisit '‹when to look again›'",
+          "consequence": "parked ‹day›: ‹why›"
+        },
+        {
+          "action": "continue",
+          "label": "Continue",
+          "argv": ["rb", "decide", "e2", "continue", "--why", "‹why›"],
+          "line": "rb decide e2 continue --why '‹why›'",
+          "consequence": "continued ‹day›: ‹why›"
+        },
+        {"action": "stop", "label": "Stop", "argv": ["rb", "decide", "e2", "stop", "--why", "‹why›"], "line": "rb decide e2 stop --why '‹why›'", "consequence": "stopped ‹day›: ‹why›"}
+      ]
+    },
+    {
+      "subject": "c6",
+      "kind": "criterion",
+      "code": "undecided",
+      "label": "Review this result",
+      "title": "int8 latency is at most 0.6 of fp32 on the T4",
+      "question": ":unfiled",
+      "what": "c6: estimate 0.64 outside at most 0.6",
+      "reason": {"label": "Criterion not met", "detail": "estimate 0.64 outside at most 0.6", "also": ""},
+      "do": "rb decide c6 accept|reject|investigate --why \"...\"",
+      "actions": [
+        {"action": "accept", "label": "Accept", "argv": ["rb", "decide", "c6", "accept", "--why", "‹why›"], "line": "rb decide c6 accept --why '‹why›'", "consequence": "accepted ‹day›: ‹why›"},
+        {"action": "reject", "label": "Reject", "argv": ["rb", "decide", "c6", "reject", "--why", "‹why›"], "line": "rb decide c6 reject --why '‹why›'", "consequence": "rejected ‹day›: ‹why›"},
+        {
+          "action": "investigate",
+          "label": "Investigate",
+          "argv": ["rb", "decide", "c6", "investigate", "--why", "‹why›"],
+          "line": "rb decide c6 investigate --why '‹why›'",
+          "consequence": "investigating since ‹day›: ‹why›"
+        }
+      ]
+    }
+  ],
+  "made_calls": [
+    {"subject": "c1", "question": "q1", "at": "2026-10-14", "verb": "accepted", "line": "accepted 2026-10-14: holds on all three seeds · \"ship it once seed 3 lands\"", "note": ""},
+    {
+      "subject": "c4",
+      "question": "q1",
+      "at": "2026-10-15",
+      "verb": "accepted",
+      "line": "accepted 2026-10-15 · note: per-class drop stays under 2 points · not confirmed",
+      "note": "per-class drop stays under 2 points"
+    }
+  ],
+  "pending": {
+    "rows": [
+      {
+        "id": "dec7",
+        "kind": "proposed",
+        "subject": "c3",
+        "text": "accept c3, proposed, not made · note: one seed is enough for the export check\\u200b · not confirmed",
+        "confirm": "rb confirm dec7",
+        "lines": []
+      },
+      {
+        "id": "dec4",
+        "kind": "past",
+        "subject": "int8",
+        "text": "park int8 (2026-05-07): notes.md:3: \"We pause INT8 until the calibration set is fixed\" · a past call mentioned, not confirmed",
+        "confirm": "rb confirm dec4",
+        "lines": []
+      },
+      {
+        "id": "e1",
+        "kind": "design",
+        "subject": "",
+        "text": "e1 int8 against fp32: design not confirmed; changed since you confirmed it",
+        "confirm": "rb confirm e1@94f795b74f5c70ba3498c4807b76ba626686b2d790367050cfd631ec0c813d1b",
+        "lines": ["hypothesis: was \"int8 loses under 1 point\", now \"int8 loses under 0.5 points\""]
+      },
+      {
+        "id": "e2",
+        "kind": "design",
+        "subject": "",
+        "text": "e2 calibration set size: design not confirmed, with its gate",
+        "confirm": "rb confirm e2@fd981c33ec987d5611ba865019a19aadfc47c866b7e62ae523916f9193514aed",
+        "lines": [
+          "variants: calib_images 128, 512, 1024, 2048",
+          "criterion c5: change.top1 at least -0.01 in every cell",
+          "gate: if it holds, ship int8 calibrated on 512 images; if not, keep fp32 for serving",
+          "why: not recorded"
+        ]
+      }
+    ],
+    "confirm_all": null,
+    "designs_line": "The design of 2 experiments is not confirmed: rb confirm lists them."
+  },
+  "open_items": [
+    {
+      "code": "late",
+      "head": "Declared after the evidence existed: each reading is not prospective",
+      "n": 1,
+      "under": "With each criterion, how many of its units were produced before it was declared.",
+      "items": [{"subject": "e1", "code": "late", "what": "e1: 1 criterion was declared after its evidence existed", "units": "c2 3 of 3 units", "criteria": ["c2"]}]
+    },
+    {
+      "code": "setting_unknown",
+      "head": "Optional settings still unknown",
+      "n": 1,
+      "under": "",
+      "items": [{"subject": "e1", "code": "setting_unknown", "what": "e1: quant_backend is not recorded", "units": "", "criteria": []}]
+    }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "text": "Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1 on ImageNet?",
+      "status": "OPEN · no call yet",
+      "depth": 0,
+      "parent": null,
+      "rollup": "linked here: 3 criteria met · 1 not reproduced",
+      "lead": {"kind": "interpretation", "index": 0, "text": "INT8 post-training quantization keeps ResNet-50 within a third of a point of FP32 top-1.", "active": true, "confirmed": true},
+      "more": 0,
+      "no_rule": "",
+      "overview": {
+        "headline": "Evidence available for review",
+        "tone": "dim",
+        "interpretations": [
+          {
+            "text": "INT8 post-training quantization keeps ResNet-50 within a third of a point of FP32 top-1.",
+            "active": true,
+            "confirmed": true,
+            "criteria": ["c1", "c4"],
+            "holds": "its 2 rules met",
+            "calls": ["Call on c1: accepted 2026-10-14: holds on all three seeds · \"ship it once seed 3 lands\"", "Call on c4: accepted 2026-10-15 · note: per-class drop stays under 2 points · not confirmed"],
+            "declared": "declared 2026-10-15 09:09 UTC; why: c1 and c4 hold on three seeds"
+          }
+        ],
+        "limits": [{"label": "Retrospective", "criteria": ["c2"], "relations": []}, {"label": "Uncertainty remains", "criteria": ["c3"], "relations": []}],
+        "relations": [],
+        "evidence_count": 4,
+        "unmapped_count": 0
+      },
+      "findings": ["c1", "c2", "c3", "c4"],
+      "experiments": ["e1"],
+      "calls": ["c2", "c3"],
+      "made_calls": ["c1", "c4"],
+      "next_step": "run one more onnx_top1 measurement on int8 against fp32 and record it in rb",
+      "changed": [],
+      "still_open": ["c3 rests on 1 seed"],
+      "ruled": [],
+      "summary": [],
+      "state": "open",
+      "tallies": [{"state": "meets", "n": 3, "label": "3 met", "criteria": ["c1", "c3", "c4"]}, {"state": "not reproduced", "n": 1, "label": "1 not reproduced", "criteria": ["c2"]}],
+      "compact": "open · 3 met · 1 not reproduced"
+    },
+    {
+      "id": "q1a",
+      "text": "How many calibration images does INT8 need?",
+      "status": "OPEN · no call yet",
+      "depth": 1,
+      "parent": "q1",
+      "rollup": "linked here: 1 criterion not met",
+      "lead": {"kind": "interpretation", "index": 0, "text": "Calibration size matters only below 512 images.", "active": true, "confirmed": false},
+      "more": 0,
+      "no_rule": "",
+      "overview": {
+        "headline": "Measured differences; uncertainty remains",
+        "tone": "dim",
+        "interpretations": [
+          {
+            "text": "Calibration size matters only below 512 images.",
+            "active": true,
+            "confirmed": false,
+            "criteria": ["c5"],
+            "holds": "its rule not met",
+            "calls": [],
+            "declared": "declared 2026-10-19 09:30 UTC; why: only the 128-image cell misses"
+          }
+        ],
+        "limits": [{"label": "Fixed design cells", "criteria": ["c5"], "relations": []}],
+        "relations": [],
+        "evidence_count": 1,
+        "unmapped_count": 0
+      },
+      "findings": ["c5"],
+      "experiments": ["e2"],
+      "calls": ["e2"],
+      "made_calls": [],
+      "next_step": "run one more top1 measurement on calibration set size, at calib_images=256, and record it in rb",
+      "changed": [],
+      "still_open": [],
+      "ruled": [],
+      "summary": [],
+      "state": "open",
+      "tallies": [{"state": "misses", "n": 1, "label": "1 not met", "criteria": ["c5"]}],
+      "compact": "open · 1 not met"
+    }
+  ],
+  "unfiled": {
+    "line": "Work not filed under a question",
+    "criteria": ["c6"],
+    "calls": ["c6"],
+    "experiments": [],
+    "open_items": [{"subject": "c6", "code": "late", "what": "c6 was declared after its evidence existed", "units": "1 of 1 unit", "criteria": ["c6"]}]
+  },
+  "findings": {
+    "c1": {
+      "criterion_id": "c1",
+      "experiment": "e1",
+      "statement": "int8 holds top1 within 1 point of fp32",
+      "role": "primary",
+      "standing": "criterion met",
+      "good": true,
+      "rule": "change.top1 at least -0.01",
+      "sentence": "int8 holds top1 within 1 point of fp32: criterion met",
+      "numbers": "-0.0029 [-0.0046, -0.0012]",
+      "row": {
+        "metric": "change.top1",
+        "value": "-0.0029 [-0.0046, -0.0012]",
+        "criterion": "at least -0.01",
+        "margin": "margin 0.0071",
+        "runs": 3,
+        "standing": "criterion met",
+        "why": "",
+        "good": true,
+        "negative": false
+      },
+      "reading": {
+        "estimate": -0.0029,
+        "lo": -0.0046,
+        "hi": -0.0012,
+        "level": 0.95,
+        "method": "paired t by seed",
+        "n": 3,
+        "unit": "seed",
+        "estimate_text": "-0.0029",
+        "interval_text": "[-0.0046, -0.0012]",
+        "unit_text": "top1",
+        "result": "loss",
+        "unit_said": ""
+      },
+      "check_band": {"comparator": "at least", "target": -0.01, "tolerance": null},
+      "units_line": "3 runs · 3 seeds per arm · 1 run not counted",
+      "rule_detail": "",
+      "unit_amended": null,
+      "says": {"timing": "declared before the evidence", "rule": "criterion met: estimate -0.0029 at least -0.01", "units": "3 seeds", "comparison": "int8 against fp32, paired by seed"},
+      "observations": [
+        {"run": "runs1", "arm": "", "unit": "seed=1", "per_run": {"seed": "1", "one_cycle": "1"}, "value_text": "-0.0029", "counted": true, "reason": ""},
+        {"run": "runs2b", "arm": "", "unit": "seed=2", "per_run": {"seed": "2", "one_cycle": "1"}, "value_text": "-0.0031", "counted": true, "reason": ""},
+        {"run": "runs3", "arm": "", "unit": "seed=3", "per_run": {"seed": "3", "one_cycle": "1"}, "value_text": "-0.0027", "counted": true, "reason": ""}
+      ],
+      "source": {"kind": "runs", "id": ""},
+      "design_cells": [],
+      "rests_on": {
+        "interpretations": [{"question": "q1", "active": true, "confirmed": true, "text": "INT8 post-training quantization keeps ResNet-50 within a third of a point of FP32 top-1."}],
+        "question_links": ["q1"],
+        "relations_out": [],
+        "relations_in": [],
+        "call": "accepted 2026-10-14: holds on all three seeds · \"ship it once seed 3 lands\""
+      },
+      "your_words": "\"ship it once seed 3 lands\"",
+      "observed": "1 of 3 runs was recorded in exp-b · /home/ana/int8-resnet50/.worktrees/b",
+      "observed_short": "1 of 3 runs was recorded in exp-b · .worktrees/b",
+      "observed_places": [{"id": "exp-b", "label": "exp-b · .worktrees/b"}],
+      "other_code": "",
+      "receipt_rows": [
+        ["declared", "2026-10-06 10:10 UTC", []],
+        ["locked", "2026-10-06 10:20 UTC, with e1", ["e1"]],
+        ["experiment", "e1 · primary", ["e1"]],
+        ["metric", "change.top1: int8 against fp32, paired by seed", []],
+        ["method", "paired t by seed · 95% interval", []],
+        ["question link", "q1 · 2026-10-06 10:14 UTC", ["q1"]]
+      ],
+      "cited": null,
+      "state": "meets",
+      "state_label": "met",
+      "subject_label": "int8",
+      "reference_label": "fp32 baseline",
+      "reading_short": "int8 against the fp32 baseline: -0.0029 [-0.0046, -0.0012] top1",
+      "verdict": "Met: int8 is 0.0029 below fp32 (-0.0046 to -0.0012). A real loss, but 0.0071 past the -0.01 the rule asks for.",
+      "tags": [],
+      "reads_baseline": false
+    },
+    "c2": {
+      "criterion_id": "c2",
+      "experiment": "e1",
+      "statement": "fp32 top1 matches the published 76.13",
+      "role": "secondary",
+      "standing": "not reproduced",
+      "good": false,
+      "rule": "top1 of fp32 within 0.001 of 0.7613",
+      "sentence": "fp32 top1 matches the published 76.13: not reproduced",
+      "numbers": "0.7597 [0.7591, 0.7603]",
+      "row": {
+        "metric": "fp32.top1",
+        "value": "0.7597 [0.7591, 0.7603]",
+        "criterion": "within 0.001 of 0.7613",
+        "margin": "margin -0.0006",
+        "runs": 3,
+        "standing": "not reproduced",
+        "why": "estimate 0.7597 outside 0.7613 ± 0.001",
+        "good": false,
+        "negative": true
+      },
+      "reading": {
+        "estimate": 0.7597,
+        "lo": 0.7591,
+        "hi": 0.7603,
+        "level": 0.95,
+        "method": "mean over seeds",
+        "n": 3,
+        "unit": "seed",
+        "estimate_text": "0.7597",
+        "interval_text": "[0.7591, 0.7603]",
+        "unit_text": "top1",
+        "result": "measured",
+        "unit_said": ""
+      },
+      "check_band": {"comparator": "within", "target": 0.7613, "tolerance": 0.001},
+      "units_line": "3 runs · 1 run not counted",
+      "rule_detail": "estimate 0.7597 outside 0.7613 ± 0.001",
+      "unit_amended": null,
+      "says": {
+        "timing": "declared after the evidence existed: 3 of 3 units",
+        "rule": "not reproduced: estimate 0.7597 outside 0.7613 ± 0.001",
+        "units": "3 seeds",
+        "comparison": "fp32 against the cited number",
+        "source": "README.md:14 · \"ResNet-50 v1.5 reaches 76.13% top-1\""
+      },
+      "observations": [
+        {"run": "runs1", "arm": "fp32", "unit": "seed=1", "per_run": {"seed": "1", "one_cycle": "1"}, "value_text": "0.7598", "counted": true, "reason": ""},
+        {"run": "runs2b", "arm": "fp32", "unit": "seed=2", "per_run": {"seed": "2", "one_cycle": "1"}, "value_text": "0.7594", "counted": true, "reason": ""},
+        {"run": "runs3", "arm": "fp32", "unit": "seed=3", "per_run": {"seed": "3", "one_cycle": "1"}, "value_text": "0.7599", "counted": true, "reason": ""}
+      ],
+      "source": {"kind": "runs", "id": ""},
+      "design_cells": [],
+      "rests_on": {"interpretations": [], "question_links": ["q1"], "relations_out": [], "relations_in": [], "call": ""},
+      "your_words": "",
+      "observed": "1 of 3 runs was recorded in exp-b · /home/ana/int8-resnet50/.worktrees/b",
+      "observed_short": "1 of 3 runs was recorded in exp-b · .worktrees/b",
+      "observed_places": [{"id": "exp-b", "label": "exp-b · .worktrees/b"}],
+      "other_code": "",
+      "receipt_rows": [
+        ["declared", "2026-10-13 15:00 UTC", []],
+        ["locked", "2026-10-13 15:00 UTC, with amendment e1:am:2", ["e1:am:2"]],
+        ["experiment", "e1 · secondary · cited", ["e1"]],
+        ["metric", "fp32.top1", []],
+        ["reference", "0.7613 ± 0.001", []],
+        ["method", "mean over seeds · 95% interval", []],
+        ["source", "README.md:14 · read at commit 3f2a9c1 · sha256 9d41c07be2a3", []],
+        ["question link", "q1 · 2026-10-13 15:02 UTC", ["q1"]]
+      ],
+      "cited": {"path": "README.md", "line": 14, "locator": "", "quote": "ResNet-50 v1.5 reaches 76.13% top-1", "commit": "3f2a9c1", "sha256": "9d41c07be2a3"},
+      "state": "not reproduced",
+      "state_label": "not reproduced",
+      "subject_label": "fp32 baseline",
+      "reference_label": "cited 0.7613 top1",
+      "reading_short": "fp32 baseline: observed 0.7597 top1 · cited 0.7613 top1",
+      "verdict": "Not reproduced: fp32 is 0.7597 (0.7591 to 0.7603). One arm measured on its own. It is 0.0016 from the cited 0.7613, outside its ± 0.001.",
+      "tags": ["retrospective"],
+      "reads_baseline": true
+    },
+    "c3": {
+      "criterion_id": "c3",
+      "experiment": "e1",
+      "statement": "the ONNX export holds onnx_top1",
+      "role": "secondary",
+      "standing": "criterion met",
+      "good": true,
+      "rule": "change.onnx_top1 at least -0.01",
+      "sentence": "the ONNX export holds onnx_top1: criterion met",
+      "numbers": "-0.0003 (point only)",
+      "row": {"metric": "change.onnx_top1", "value": "-0.0003", "criterion": "at least -0.01", "margin": "margin 0.0097", "runs": 1, "standing": "criterion met", "why": "", "good": true, "negative": false},
+      "reading": {
+        "estimate": -0.0003,
+        "lo": null,
+        "hi": null,
+        "level": null,
+        "method": "one run",
+        "n": 1,
+        "unit": "seed",
+        "estimate_text": "-0.0003",
+        "interval_text": "",
+        "unit_text": "onnx_top1",
+        "result": "point only",
+        "unit_said": ""
+      },
+      "check_band": {"comparator": "at least", "target": -0.01, "tolerance": null},
+      "units_line": "1 run",
+      "rule_detail": "",
+      "unit_amended": null,
+      "says": {"timing": "declared before the evidence", "rule": "criterion met: estimate -0.0003 at least -0.01", "units": "1 seed", "comparison": "int8 against fp32", "caveats": ["single_unit: 1 seed"]},
+      "observations": [{"run": "runs1", "arm": "", "unit": "seed=1", "per_run": {"seed": "1", "one_cycle": "1"}, "value_text": "-0.0003", "counted": true, "reason": ""}],
+      "source": {"kind": "runs", "id": ""},
+      "design_cells": [],
+      "rests_on": {"interpretations": [], "question_links": ["q1"], "relations_out": [], "relations_in": [], "call": ""},
+      "your_words": "",
+      "observed": "",
+      "observed_short": "",
+      "observed_places": [],
+      "other_code": "",
+      "receipt_rows": [
+        ["declared", "2026-10-06 10:11 UTC", []],
+        ["locked", "2026-10-06 10:20 UTC, with e1", ["e1"]],
+        ["experiment", "e1 · secondary", ["e1"]],
+        ["metric", "change.onnx_top1: int8 against fp32", []],
+        ["method", "one run · no interval from 1 seed", []],
+        ["question link", "q1 · 2026-10-06 10:15 UTC", ["q1"]]
+      ],
+      "cited": null,
+      "state": "meets",
+      "state_label": "met",
+      "subject_label": "int8",
+      "reference_label": "fp32 baseline",
+      "reading_short": "int8 against the fp32 baseline: -0.0003 onnx_top1",
+      "verdict": "Met on its estimate: int8 is 0.00030 below fp32. There is no interval yet. It is 0.0097 past the -0.01 the rule asks for.",
+      "tags": ["uncertainty_remains"],
+      "reads_baseline": false
+    },
+    "c4": {
+      "criterion_id": "c4",
+      "experiment": "e1",
+      "statement": "the per-class top1 drop stays under 2 points for at least 99% of classes",
+      "role": "secondary",
+      "standing": "criterion met",
+      "good": true,
+      "rule": "share_under_2pt at least 0.99",
+      "sentence": "the per-class top1 drop stays under 2 points for at least 99% of classes: criterion met",
+      "numbers": "0.994",
+      "row": {"metric": "share_under_2pt", "value": "0.994", "criterion": "at least 0.99", "margin": "margin 0.004", "runs": 3, "standing": "criterion met", "why": "", "good": true, "negative": false},
+      "reading": {
+        "estimate": 0.994,
+        "lo": null,
+        "hi": null,
+        "level": null,
+        "method": "analysis a1",
+        "n": 3,
+        "unit": "run",
+        "estimate_text": "0.994",
+        "interval_text": "",
+        "unit_text": "share",
+        "result": "measured",
+        "unit_said": "share"
+      },
+      "check_band": {"comparator": "at least", "target": 0.99, "tolerance": null},
+      "units_line": "analysis a1 · reads 3 runs",
+      "rule_detail": "",
+      "unit_amended": null,
+      "says": {"timing": "declared before the evidence", "rule": "criterion met: 0.994 at least 0.99", "units": "3 runs", "comparison": "the reading comes from analysis a1"},
+      "observations": [],
+      "source": {"kind": "analysis", "id": "a1"},
+      "design_cells": [],
+      "rests_on": {
+        "interpretations": [{"question": "q1", "active": true, "confirmed": true, "text": "INT8 post-training quantization keeps ResNet-50 within a third of a point of FP32 top-1."}],
+        "question_links": ["q1"],
+        "relations_out": [],
+        "relations_in": [],
+        "call": "accepted 2026-10-15 · note: per-class drop stays under 2 points · not confirmed"
+      },
+      "your_words": "",
+      "observed": "",
+      "observed_short": "",
+      "observed_places": [],
+      "other_code": "",
+      "receipt_rows": [
+        ["declared", "2026-10-06 10:12 UTC", []],
+        ["locked", "2026-10-06 10:20 UTC, with e1", ["e1"]],
+        ["experiment", "e1 · secondary", ["e1"]],
+        ["metric", "share_under_2pt", []],
+        ["method", "analysis a1 · no interval", ["a1"]],
+        ["question link", "q1 · 2026-10-06 10:16 UTC", ["q1"]]
+      ],
+      "cited": null,
+      "state": "meets",
+      "state_label": "met",
+      "subject_label": "int8",
+      "reference_label": "",
+      "reading_short": "int8: 0.994 share",
+      "verdict": "Met on its estimate: int8 is 0.994 share. One arm measured on its own. It is 0.0040 share past the 0.99 share the rule asks for.",
+      "tags": [],
+      "reads_baseline": false
+    },
+    "c5": {
+      "criterion_id": "c5",
+      "experiment": "e2",
+      "statement": "int8 stays within 1 point of fp32 at every calibration size",
+      "role": "gate",
+      "standing": "criterion not met",
+      "good": false,
+      "rule": "change.top1 at least -0.01 in every cell",
+      "sentence": "int8 stays within 1 point of fp32 at every calibration size: criterion not met",
+      "numbers": "1 of 4 cells outside",
+      "row": {
+        "metric": "change.top1",
+        "value": "-0.0041 to -0.0184",
+        "criterion": "at least -0.01 in every cell",
+        "margin": "",
+        "runs": 4,
+        "standing": "criterion not met",
+        "why": "1 of 4 units, in 4 design cells, is below -0.01 (calib_images=128)",
+        "good": false,
+        "negative": true
+      },
+      "reading": {
+        "estimate": null,
+        "lo": null,
+        "hi": null,
+        "level": null,
+        "method": "fixed design cells",
+        "n": 4,
+        "unit": "design cell",
+        "estimate_text": "",
+        "interval_text": "",
+        "unit_text": "top1",
+        "result": "",
+        "unit_said": ""
+      },
+      "check_band": {"comparator": "at least", "target": -0.01, "tolerance": null},
+      "units_line": "4 runs",
+      "rule_detail": "1 of 4 units, in 4 design cells, is below -0.01 (calib_images=128)",
+      "unit_amended": {
+        "at": "2026-10-19 09:25 UTC",
+        "setting": "population.unit",
+        "was": "run",
+        "now": "calib_images",
+        "amendment": "e2:am:1",
+        "line": "unit amended after the lock: run -> calib_images, 2026-10-19 09:25 UTC",
+        "why": "the cells are the unit"
+      },
+      "says": {
+        "timing": "declared before the evidence",
+        "rule": "criterion not met: 1 of 4 units, in 4 design cells, is below -0.01 (calib_images=128)",
+        "units": "4 design cells",
+        "comparison": "int8 against fp32 by calib_images"
+      },
+      "observations": [
+        {"run": "runc128", "arm": "", "unit": "calib_images=128", "per_run": {"calib_images": "128"}, "value_text": "-0.0184", "counted": true, "reason": ""},
+        {"run": "runc512", "arm": "", "unit": "calib_images=512", "per_run": {"calib_images": "512"}, "value_text": "-0.0043", "counted": true, "reason": ""},
+        {"run": "runc1024", "arm": "", "unit": "calib_images=1024", "per_run": {"calib_images": "1024"}, "value_text": "-0.0041", "counted": true, "reason": ""},
+        {"run": "runc2048", "arm": "", "unit": "calib_images=2048", "per_run": {"calib_images": "2048"}, "value_text": "-0.0042", "counted": true, "reason": ""}
+      ],
+      "source": {"kind": "runs", "id": ""},
+      "design_cells": [
+        {"key": "calib_images=128", "estimate_text": "-0.0184", "runs": ["runc128"], "outside": true, "interval_text": "", "n": 1, "unit": "calib_images"},
+        {"key": "calib_images=512", "estimate_text": "-0.0043", "runs": ["runc512"], "outside": false, "interval_text": "", "n": 1, "unit": "calib_images"},
+        {"key": "calib_images=1024", "estimate_text": "-0.0041", "runs": ["runc1024"], "outside": false, "interval_text": "", "n": 1, "unit": "calib_images"},
+        {"key": "calib_images=2048", "estimate_text": "-0.0042", "runs": ["runc2048"], "outside": false, "interval_text": "", "n": 1, "unit": "calib_images"}
+      ],
+      "rests_on": {
+        "interpretations": [{"question": "q1a", "active": true, "confirmed": false, "text": "Calibration size matters only below 512 images."}],
+        "question_links": ["q1a"],
+        "relations_out": [],
+        "relations_in": [],
+        "call": ""
+      },
+      "your_words": "",
+      "observed": "",
+      "observed_short": "",
+      "observed_places": [],
+      "other_code": "",
+      "receipt_rows": [
+        ["declared", "2026-10-13 14:28 UTC", []],
+        ["locked", "2026-10-13 14:40 UTC, with e2", ["e2"]],
+        ["amended", "2026-10-19 09:25 UTC: unit run -> calib_images", ["e2:am:1"]],
+        ["experiment", "e2 · gate", ["e2"]],
+        ["metric", "change.top1 by calib_images", []],
+        ["method", "fixed design cells · no interval", []],
+        ["question link", "q1a · 2026-10-13 14:36 UTC", ["q1a"]]
+      ],
+      "cited": null,
+      "state": "misses",
+      "state_label": "not met",
+      "subject_label": "int8",
+      "reference_label": "fp32 baseline",
+      "reading_short": "no reading yet",
+      "verdict": "Not met: 1 of 4 units, in 4 design cells, is below -0.01 (calib_images=128).",
+      "tags": [],
+      "reads_baseline": false
+    },
+    "c6": {
+      "criterion_id": "c6",
+      "experiment": "e1",
+      "statement": "int8 latency is at most 0.6 of fp32 on the T4",
+      "role": "secondary",
+      "standing": "criterion not met",
+      "good": false,
+      "rule": "ratio.latency_ms at most 0.6",
+      "sentence": "int8 latency is at most 0.6 of fp32 on the T4: criterion not met",
+      "numbers": "0.64",
+      "row": {
+        "metric": "ratio.latency_ms",
+        "value": "0.64",
+        "criterion": "at most 0.6",
+        "margin": "margin -0.04",
+        "runs": 1,
+        "standing": "criterion not met",
+        "why": "estimate 0.64 outside at most 0.6",
+        "good": false,
+        "negative": true
+      },
+      "reading": {
+        "estimate": 0.64,
+        "lo": null,
+        "hi": null,
+        "level": null,
+        "method": "one run",
+        "n": 1,
+        "unit": "run",
+        "estimate_text": "0.64",
+        "interval_text": "",
+        "unit_text": "latency ratio",
+        "result": "point only",
+        "unit_said": ""
+      },
+      "check_band": {"comparator": "at most", "target": 0.6, "tolerance": null},
+      "units_line": "1 run",
+      "rule_detail": "estimate 0.64 outside at most 0.6",
+      "unit_amended": null,
+      "says": {"timing": "declared after the evidence existed: 1 of 1 unit", "rule": "criterion not met: estimate 0.64 outside at most 0.6", "units": "1 run", "comparison": "int8 against fp32"},
+      "observations": [{"run": "runsql7", "arm": "int8 / fp32", "unit": "run", "per_run": {}, "value_text": "0.64", "counted": true, "reason": ""}],
+      "source": {"kind": "runs", "id": ""},
+      "design_cells": [],
+      "rests_on": {"interpretations": [], "question_links": [], "relations_out": [], "relations_in": [], "call": ""},
+      "your_words": "",
+      "observed": "",
+      "observed_short": "",
+      "observed_places": [],
+      "other_code": "",
+      "receipt_rows": [
+        ["declared", "2026-10-12 08:06 UTC", []],
+        ["locked", "2026-10-12 08:06 UTC, with amendment e1:am:1", ["e1:am:1"]],
+        ["experiment", "e1 · secondary", ["e1"]],
+        ["metric", "ratio.latency_ms: int8 over fp32", []],
+        ["method", "one run · no interval from 1 run", []]
+      ],
+      "cited": null,
+      "state": "misses",
+      "state_label": "not met",
+      "subject_label": "int8",
+      "reference_label": "fp32 baseline",
+      "reading_short": "int8 against the fp32 baseline: 0.64 latency ratio",
+      "verdict": "Not met: the ratio of int8 to fp32 is 0.64. There is no interval yet. It is 0.04 over the 0.6 the rule allows.",
+      "tags": ["retrospective", "uncertainty_remains"],
+      "reads_baseline": false
+    }
+  },
+  "experiments": [
+    {
+      "id": "e1",
+      "title": "int8 against fp32",
+      "short_title": "int8 against fp32",
+      "state": "locked",
+      "who_line": "locked 2026-10-06 10:20 UTC: the spec and criteria are locked; a later change is recorded as an amendment.",
+      "arms": "fp32 (baseline) · int8 (candidate)",
+      "varies": ["quant"],
+      "counted": 3,
+      "runs": 5,
+      "hypothesis": "int8 loses under 0.5 points",
+      "purpose": "",
+      "why_part": ["why", "serving cost on the T4"],
+      "gate_parts": [],
+      "gate_words_said": "",
+      "notes": [],
+      "note_ids": [],
+      "relations": [],
+      "relation_lines": [],
+      "settings_line": "settings: 2 per-run · 1 unknown · 3 verified",
+      "tally": [["meets", 3], ["misses", 1], ["not reproduced", 1]],
+      "muted": [],
+      "folder": "results/",
+      "repo_brief": "commit not recorded",
+      "design": {
+        "standing": "design not confirmed",
+        "pending": true,
+        "confirm": "rb confirm e1@94f795b74f5c70ba3498c4807b76ba626686b2d790367050cfd631ec0c813d1b",
+        "lines": ["changed since you confirmed it: hypothesis, was \"int8 loses under 1 point\", now \"int8 loses under 0.5 points\""],
+        "not_recorded": []
+      },
+      "findings": ["c1", "c2", "c3", "c4", "c6"],
+      "run_ids": ["runs1", "runs2", "runs2b", "runs3", "runsql7"],
+      "table": {
+        "metrics": [{"name": "top1", "unit": ""}, {"name": "onnx_top1", "unit": ""}, {"name": "latency_ms", "unit": "ms"}],
+        "varies": ["quant"],
+        "conditions": [],
+        "unit": "seed",
+        "rows": [
+          {
+            "variant": "fp32",
+            "role": "baseline",
+            "varies": {"quant": "fp32"},
+            "where": {},
+            "unvaried": {},
+            "metrics": {"top1": {"mean": 0.7597, "n": 3, "read_by": [], "delta": null, "better": null, "paired": false, "primary": false, "said": "", "basis": "", "differs_in": [], "other_code": "", "runs": 3, "run_ids": ["runs1", "runs2b", "runs3"], "count_said": "3 seeds", "criteria": [], "lo": null, "hi": null, "level": null, "no_interval": "", "in_column": true}, "onnx_top1": {"mean": 0.7569, "n": 1, "read_by": [], "delta": null, "better": null, "paired": false, "primary": false, "said": "", "basis": "", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runs1"], "count_said": "1 run", "criteria": [], "lo": null, "hi": null, "level": null, "no_interval": "", "in_column": true}, "latency_ms": {"mean": 6.1, "n": 1, "read_by": [], "delta": null, "better": null, "paired": false, "primary": false, "said": "", "basis": "", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runsql7"], "count_said": "1 run", "criteria": [], "lo": null, "hi": null, "level": null, "no_interval": "", "in_column": true}}
+          },
+          {
+            "variant": "int8",
+            "role": "candidate",
+            "varies": {"quant": "int8"},
+            "where": {},
+            "unvaried": {},
+            "metrics": {
+              "top1": {"mean": 0.7568, "n": 3, "read_by": [{"criterion": "c1", "reads": "-0.0029 [-0.0046, -0.0012]"}], "delta": -0.0029, "better": false, "paired": true, "primary": true, "said": "-0.0029", "basis": "", "differs_in": [], "other_code": "", "runs": 3, "run_ids": ["runs1", "runs2b", "runs3"], "count_said": "3 seeds", "lo": -0.0046, "hi": -0.0012, "level": 0.95, "criteria": ["c1"], "no_interval": "", "in_column": true},
+              "onnx_top1": {"mean": 0.7566, "n": 1, "read_by": [{"criterion": "c3", "reads": "-0.0003"}], "delta": -0.0003, "better": false, "paired": true, "primary": false, "said": "", "basis": "n=1", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runs1"], "count_said": "1 run", "no_interval": "1 seed, so no interval", "in_column": true, "criteria": ["c3"], "lo": null, "hi": null, "level": null},
+              "latency_ms": {"mean": 3.9, "n": 1, "read_by": [{"criterion": "c6", "reads": "0.64"}], "delta": -2.2, "better": true, "paired": true, "primary": false, "said": "", "basis": "n=1", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runsql7"], "count_said": "1 run", "no_interval": "1 seed, so no interval", "in_column": true, "criteria": ["c6"], "lo": null, "hi": null, "level": null}
+            }
+          }
+        ]
+      },
+      "rerun": [
+        {"state": "ok", "what": "evaluation data · imagenet-val"},
+        {"state": "ok", "what": "training data · imagenet-calib-512"},
+        {"state": "partial", "what": "settings: quant_backend unknown"},
+        {"state": "unknown", "what": "code: no run names its commit"}
+      ],
+      "reproduce": {
+        "ready_line": "to run again: ✓ 2 ok · ◐ 1 partial · ○ 1 unknown",
+        "ready": [
+          {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
+          {"state": "ok", "label": "training data", "text": "training data · imagenet-calib-512, which fp32 and int8 · seed 1 read to make the model", "refs": ["imagenet-calib-512", "runs1"]},
+          {"state": "partial", "label": "settings", "text": "settings: seed and one_cycle per run; quant_backend unknown", "refs": []},
+          {"state": "unknown", "label": "code", "text": "code: unknown · no run names its commit", "refs": []}
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "what": "get the evaluation data",
+            "label": "evaluation data · imagenet-val",
+            "refs": ["imagenet-val"],
+            "command": "python get_data.py --split val",
+            "from": "scripts/README.md:5",
+            "runnable": true
+          },
+          {
+            "n": 2,
+            "what": "get the calibration images",
+            "label": "training data · imagenet-calib-512",
+            "refs": ["imagenet-calib-512"],
+            "command": "python get_data.py --calib 512",
+            "from": "scripts/README.md:6",
+            "runnable": true
+          },
+          {
+            "n": 3,
+            "what": "make the int8 model",
+            "label": "made by fp32 and int8 · seed 1",
+            "refs": ["runs1", "ckpt-int8-s1"],
+            "command": "python quantize.py --seed 1 --calib 512",
+            "from": "scripts/README.md:8",
+            "runnable": true
+          },
+          {"n": 4, "what": "evaluate each arm", "label": "command (as given): recorded for 2 of 4 runs", "refs": ["runs3", "runsql7"], "command": "", "from": "", "runnable": false}
+        ],
+        "per_run": {
+          "keys": ["seed", "one_cycle"],
+          "by_arm": {
+            "fp32": [{"run": "runs1", "seed": "1", "one_cycle": "1"}, {"run": "runs2b", "seed": "2", "one_cycle": "1"}, {"run": "runs3", "seed": "3", "one_cycle": "1"}],
+            "int8": [{"run": "runs1", "seed": "1", "one_cycle": "1"}, {"run": "runs2b", "seed": "2", "one_cycle": "1"}, {"run": "runs3", "seed": "3", "one_cycle": "1"}]
+          }
+        },
+        "settings": {
+          "shared": [{"name": "batch_size", "value": "256", "source": "configs/eval.yaml:3", "status": "verified"}],
+          "by_arm": {
+            "int8": [{"name": "quant", "value": "int8", "source": "configs/int8.yaml:1", "status": "verified"}],
+            "fp32": [{"name": "quant", "value": "fp32", "source": "configs/fp32.yaml:1", "status": "verified"}]
+          },
+          "unknown": ["quant_backend"],
+          "counts": {"verified": 3, "unknown": 1}
+        },
+        "command_as_given": {"recorded": 2, "runs": 4, "line": "2 of 4 runs record their command (as given)"},
+        "made": [
+          {
+            "run": "runs1",
+            "maker": "runs1",
+            "resource": "ckpt-int8-s1",
+            "command": "python quantize.py --seed 1 --calib 512",
+            "from": "scripts/README.md:8",
+            "line": "fp32 and int8 · seed 1: made ckpt-int8-s1."
+          }
+        ],
+        "script": "# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · no run names its commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# training data · imagenet-calib-512 · scripts/README.md:6\npython get_data.py --calib 512\n# per run: seed 1 · one cycle 1\n# settings: batch_size=256 quant=int8\n# command (as given): python train.py --seed 3 --quant int8 (fp32 and int8 · seed 3, observed)\n# command (as given): python bench.py --t4 (fp32 and int8 · results/runs.db row 7, given later, not observed)\n# fp32 and int8 · seed 1: made ckpt-int8-s1. How to get it again:\npython quantize.py --seed 1 --calib 512\n",
+        "commands": [{"run": "runs3", "command": "python train.py --seed 3 --quant int8", "observed": true}, {"run": "runsql7", "command": "python bench.py --t4", "observed": false}],
+        "prompt": "run one more onnx_top1 measurement on int8 against fp32 and record it in rb"
+      },
+      "amendments": [
+        {"id": "e1:am:1", "at": "2026-10-12 08:06 UTC", "line": "amended after the lock: criterion c6 added", "changes": [{"setting": "criteria", "was": "", "now": "c6"}], "why": "", "refs": ["c6"]},
+        {"id": "e1:am:2", "at": "2026-10-13 15:00 UTC", "line": "amended after the lock: criterion c2 added", "changes": [{"setting": "criteria", "was": "", "now": "c2"}], "why": "", "refs": ["c2"]},
+        {
+          "id": "e1:am:3",
+          "at": "2026-10-19 09:12 UTC",
+          "line": "amended after the lock: hypothesis",
+          "changes": [{"setting": "hypothesis", "was": "int8 loses under 1 point", "now": "int8 loses under 0.5 points"}],
+          "why": "",
+          "refs": []
+        }
+      ],
+      "compares": "int8 against the fp32 baseline"
+    },
+    {
+      "id": "e2",
+      "title": "calibration set size: how many images INT8 needs",
+      "short_title": "calibration set size",
+      "state": "locked",
+      "who_line": "locked 2026-10-13 14:40 UTC: the spec and criteria are locked; a later change is recorded as an amendment.",
+      "arms": "fp32 (baseline) · int8 (candidate) · by calib_images",
+      "varies": ["calib_images"],
+      "counted": 4,
+      "runs": 4,
+      "hypothesis": "",
+      "purpose": "find the smallest calibration set that keeps int8 within a point",
+      "why_part": null,
+      "gate_parts": [["holds", "ship int8 calibrated on 512 images"], ["not", "keep fp32 for serving"], ["standing", "gate · not confirmed"]],
+      "gate_words_said": "",
+      "notes": [],
+      "note_ids": [],
+      "relations": [],
+      "relation_lines": [],
+      "settings_line": "settings: 1 per-run · 1 verified",
+      "tally": [["gate missed", 1]],
+      "muted": [],
+      "folder": "results/calib/",
+      "repo_brief": "commit 3f2a9c1 · tree dirty",
+      "design": {
+        "standing": "design not confirmed",
+        "pending": true,
+        "confirm": "rb confirm e2@fd981c33ec987d5611ba865019a19aadfc47c866b7e62ae523916f9193514aed",
+        "lines": ["design not confirmed · list it to confirm: rb confirm e2"],
+        "not_recorded": ["why"]
+      },
+      "findings": ["c5"],
+      "run_ids": ["runc128", "runc512", "runc1024", "runc2048"],
+      "table": {
+        "metrics": [{"name": "top1", "unit": ""}],
+        "varies": ["quant"],
+        "conditions": ["calib_images"],
+        "unit": "seed",
+        "rows": [
+          {"variant": "fp32", "role": "baseline", "varies": {"quant": "fp32"}, "where": {"calib_images": "128"}, "unvaried": {}, "metrics": {"top1": {"mean": 0.7597, "n": 1, "read_by": [], "delta": null, "better": null, "paired": false, "primary": false, "said": "", "basis": "", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runc128"], "count_said": "1 run", "criteria": [], "lo": null, "hi": null, "level": null, "no_interval": "", "in_column": true}}},
+          {"variant": "fp32", "role": "baseline", "varies": {"quant": "fp32"}, "where": {"calib_images": "512"}, "unvaried": {}, "metrics": {"top1": {"mean": 0.7597, "n": 1, "read_by": [], "delta": null, "better": null, "paired": false, "primary": false, "said": "", "basis": "", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runc512"], "count_said": "1 run", "criteria": [], "lo": null, "hi": null, "level": null, "no_interval": "", "in_column": true}}},
+          {"variant": "fp32", "role": "baseline", "varies": {"quant": "fp32"}, "where": {"calib_images": "1024"}, "unvaried": {}, "metrics": {"top1": {"mean": 0.7597, "n": 1, "read_by": [], "delta": null, "better": null, "paired": false, "primary": false, "said": "", "basis": "", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runc1024"], "count_said": "1 run", "criteria": [], "lo": null, "hi": null, "level": null, "no_interval": "", "in_column": true}}},
+          {"variant": "fp32", "role": "baseline", "varies": {"quant": "fp32"}, "where": {"calib_images": "2048"}, "unvaried": {}, "metrics": {"top1": {"mean": 0.7597, "n": 1, "read_by": [], "delta": null, "better": null, "paired": false, "primary": false, "said": "", "basis": "", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runc2048"], "count_said": "1 run", "criteria": [], "lo": null, "hi": null, "level": null, "no_interval": "", "in_column": true}}},
+          {
+            "variant": "int8",
+            "role": "candidate",
+            "varies": {"quant": "int8"},
+            "where": {"calib_images": "128"},
+            "unvaried": {},
+            "metrics": {"top1": {"mean": 0.7413, "n": 1, "read_by": [{"criterion": "c5", "reads": "-0.0184"}], "delta": -0.0184, "better": false, "paired": true, "primary": false, "said": "", "basis": "n=1", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runc128"], "count_said": "1 run", "no_interval": "1 seed, so no interval", "in_column": true, "criteria": ["c5"], "lo": null, "hi": null, "level": null}}
+          },
+          {
+            "variant": "int8",
+            "role": "candidate",
+            "varies": {"quant": "int8"},
+            "where": {"calib_images": "512"},
+            "unvaried": {},
+            "metrics": {"top1": {"mean": 0.7554, "n": 1, "read_by": [{"criterion": "c5", "reads": "-0.0043"}], "delta": -0.0043, "better": false, "paired": true, "primary": false, "said": "", "basis": "n=1", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runc512"], "count_said": "1 run", "no_interval": "1 seed, so no interval", "in_column": true, "criteria": ["c5"], "lo": null, "hi": null, "level": null}}
+          },
+          {
+            "variant": "int8",
+            "role": "candidate",
+            "varies": {"quant": "int8"},
+            "where": {"calib_images": "1024"},
+            "unvaried": {},
+            "metrics": {"top1": {"mean": 0.7556, "n": 1, "read_by": [{"criterion": "c5", "reads": "-0.0041"}], "delta": -0.0041, "better": false, "paired": true, "primary": false, "said": "", "basis": "n=1", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runc1024"], "count_said": "1 run", "no_interval": "1 seed, so no interval", "in_column": true, "criteria": ["c5"], "lo": null, "hi": null, "level": null}}
+          },
+          {
+            "variant": "int8",
+            "role": "candidate",
+            "varies": {"quant": "int8"},
+            "where": {"calib_images": "2048"},
+            "unvaried": {},
+            "metrics": {"top1": {"mean": 0.7555, "n": 1, "read_by": [{"criterion": "c5", "reads": "-0.0042"}], "delta": -0.0042, "better": false, "paired": true, "primary": false, "said": "", "basis": "n=1", "differs_in": [], "other_code": "", "runs": 1, "run_ids": ["runc2048"], "count_said": "1 run", "no_interval": "1 seed, so no interval", "in_column": true, "criteria": ["c5"], "lo": null, "hi": null, "level": null}}
+          }
+        ]
+      },
+      "rerun": [{"state": "ok", "what": "evaluation data · imagenet-val"}, {"state": "unknown", "what": "code: commit 3f2a9c1, tree dirty"}],
+      "reproduce": {
+        "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
+        "ready": [
+          {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val", "refs": ["imagenet-val"]},
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "what": "get the evaluation data",
+            "label": "evaluation data · imagenet-val",
+            "refs": ["imagenet-val"],
+            "command": "python get_data.py --split val",
+            "from": "scripts/README.md:5",
+            "runnable": true
+          }
+        ],
+        "per_run": {
+          "keys": ["calib_images"],
+          "by_arm": {"int8": [{"run": "runc128", "calib_images": "128"}, {"run": "runc512", "calib_images": "512"}, {"run": "runc1024", "calib_images": "1024"}, {"run": "runc2048", "calib_images": "2048"}]}
+        },
+        "settings": {"shared": [], "by_arm": {}, "unknown": [], "counts": {"verified": 1, "unknown": 0}},
+        "command_as_given": {"recorded": 0, "runs": 4, "line": "no run records its command (as given)"},
+        "made": [
+          {
+            "run": "runc512",
+            "maker": "runs1",
+            "resource": "ckpt-int8-s1",
+            "command": "python quantize.py --seed 1 --calib 512",
+            "from": "scripts/README.md:8",
+            "line": "fp32 and int8 · calib images 512: the same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1."
+          }
+        ],
+        "script": "# Recipe, from what the record holds. rb did not run these commands.\n# code: commit 3f2a9c1 · tree dirty (when recorded, not when run)\npython get_data.py --split val\n# command (as given): not recorded\n",
+        "commands": [],
+        "prompt": "run one more top1 measurement on calibration set size, at calib_images=256, and record it in rb"
+      },
+      "amendments": [
+        {
+          "id": "e2:am:1",
+          "at": "2026-10-19 09:25 UTC",
+          "line": "unit amended after the lock: run -> calib_images",
+          "changes": [{"setting": "population.unit", "was": "run", "now": "calib_images"}],
+          "why": "the cells are the unit",
+          "refs": ["c5"]
+        }
+      ],
+      "compares": "int8 against the fp32 baseline"
+    }
+  ],
+  "runs": {
+    "runs1": {
+      "run_id": "runs1",
+      "experiment_id": "e1",
+      "label": "fp32 and int8 · seed 1",
+      "named": "run fp32 and int8 · seed 1",
+      "at": "2026-10-06 10:28 UTC",
+      "when": "2026-10-06",
+      "produced": "2026-10-06",
+      "metrics_text": "fp32: top1=0.7598 onnx_top1=0.7569 · int8: top1=0.7569 onnx_top1=0.7566",
+      "per_run_text": "seed=1 · one_cycle=1",
+      "results": "results/seed1/metrics.json",
+      "note": "",
+      "receipt_rows": [
+        ["run", "recorded 2026-10-06 10:28 UTC", []],
+        ["produced", "2026-10-06 10:26 UTC (reported)", []],
+        ["results", "results/seed1/metrics.json · sha256 44d9a7356c16", []],
+        ["repository", "when recorded, not when run: commit 3f2a9c1 · tree clean", []],
+        ["command", "command (as given): not recorded", []],
+        ["outputs", "ckpt-int8-s1", ["ckpt-int8-s1"]],
+        ["environment", "python 3.11.9 · torch 2.4.1", []],
+        ["platform", "Linux-6.8.0-x86_64", []]
+      ],
+      "command": {"text": "", "kind": "not recorded"},
+      "counts_toward": [
+        {"criterion": "c1", "counted": true, "reason": "", "via": ""},
+        {"criterion": "c2", "counted": true, "reason": "", "via": ""},
+        {"criterion": "c3", "counted": true, "reason": "", "via": ""},
+        {"criterion": "c4", "counted": true, "reason": "", "via": "a1"}
+      ],
+      "same_bytes": [{"run": "runc512", "experiment": "e2", "retracted": false, "made": []}],
+      "made": ["ckpt-int8-s1"],
+      "retracted": null,
+      "observed_in": null,
+      "recorded_in": null,
+      "reproduce": {
+        "ready_line": "to run again: ✓ 2 ok · ◐ 1 partial · ○ 1 unknown",
+        "ready": [
+          {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
+          {"state": "ok", "label": "training data", "text": "training data · imagenet-calib-512, which fp32 and int8 · seed 1 read to make the model", "refs": ["imagenet-calib-512", "runs1"]},
+          {"state": "partial", "label": "settings", "text": "settings: seed=1 one_cycle=1; quant_backend unknown", "refs": []},
+          {"state": "unknown", "label": "code", "text": "code: unknown · the run was made before it was recorded, and names no commit", "refs": []}
+        ],
+        "steps": [
+          {
+            "what": "get the evaluation data",
+            "label": "evaluation data · imagenet-val",
+            "refs": ["imagenet-val"],
+            "command": "python get_data.py --split val",
+            "from": "scripts/README.md:5",
+            "runnable": true,
+            "n": 1
+          },
+          {
+            "what": "get the calibration images",
+            "label": "training data · imagenet-calib-512",
+            "refs": ["imagenet-calib-512"],
+            "command": "python get_data.py --calib 512",
+            "from": "scripts/README.md:6",
+            "runnable": true,
+            "n": 2
+          },
+          {
+            "what": "make the int8 model",
+            "label": "made by fp32 and int8 · seed 1",
+            "refs": ["runs1", "ckpt-int8-s1"],
+            "command": "python quantize.py --seed 1 --calib 512",
+            "from": "scripts/README.md:8",
+            "runnable": true,
+            "n": 3
+          },
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runs1"], "command": "", "from": "", "runnable": false, "n": 4}
+        ],
+        "per_run": {"keys": ["seed", "one_cycle"], "by_arm": {"fp32": [{"run": "runs1", "seed": "1", "one_cycle": "1"}], "int8": [{"run": "runs1", "seed": "1", "one_cycle": "1"}]}},
+        "settings": {
+          "shared": [{"name": "batch_size", "value": "256", "source": "configs/eval.yaml:3", "status": "verified"}],
+          "by_arm": {
+            "int8": [{"name": "quant", "value": "int8", "source": "configs/int8.yaml:1", "status": "verified"}],
+            "fp32": [{"name": "quant", "value": "fp32", "source": "configs/fp32.yaml:1", "status": "verified"}]
+          },
+          "unknown": ["quant_backend"],
+          "counts": {"verified": 3, "unknown": 1}
+        },
+        "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
+        "made": [
+          {
+            "run": "runs1",
+            "maker": "runs1",
+            "resource": "ckpt-int8-s1",
+            "command": "python quantize.py --seed 1 --calib 512",
+            "from": "scripts/README.md:8",
+            "line": "fp32 and int8 · seed 1: made ckpt-int8-s1."
+          }
+        ],
+        "script": "# Reproduce a run of e1 · fp32 and int8 · seed 1\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# training data · imagenet-calib-512 · scripts/README.md:6\npython get_data.py --calib 512\n# per run: seed 1 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n# fp32 and int8 · seed 1: made ckpt-int8-s1. How to get it again:\npython quantize.py --seed 1 --calib 512\n",
+        "commands": [],
+        "prompt": ""
+      }
+    },
+    "runs2": {
+      "run_id": "runs2",
+      "experiment_id": "e1",
+      "label": "fp32 and int8 · seed 2",
+      "named": "run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC",
+      "at": "2026-10-06 10:32 UTC",
+      "when": "2026-10-06",
+      "produced": "2026-10-06",
+      "metrics_text": "fp32: top1=0.7671 · int8: top1=0.7569",
+      "per_run_text": "seed=2 · one_cycle=1",
+      "results": "results/seed2/metrics.json",
+      "note": "",
+      "receipt_rows": [
+        ["run", "recorded 2026-10-06 10:32 UTC", []],
+        ["results", "results/seed2/metrics.json · sha256 9b0e11d2f7a4", []],
+        ["command", "command (as given): not recorded", []],
+        ["platform", "Linux-6.8.0-x86_64", []]
+      ],
+      "command": {"text": "", "kind": "not recorded"},
+      "counts_toward": [{"criterion": "c1", "counted": false, "reason": "retracted: evaluated on the train split", "via": ""}, {"criterion": "c2", "counted": false, "reason": "retracted: evaluated on the train split", "via": ""}],
+      "same_bytes": [],
+      "made": [],
+      "retracted": {"at": "2026-10-13", "line": "retracted: evaluated on the train split", "why": "evaluated on the train split"},
+      "observed_in": null,
+      "recorded_in": null,
+      "reproduce": {
+        "ready_line": "to run again: ◐ 1 partial · ○ 1 unknown",
+        "ready": [
+          {"state": "partial", "label": "settings", "text": "settings: seed=2 one_cycle=1; quant_backend unknown", "refs": []},
+          {"state": "unknown", "label": "code", "text": "code: unknown · the run was made before it was recorded, and names no commit", "refs": []}
+        ],
+        "steps": [{"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runs2"], "command": "", "from": "", "runnable": false, "n": 1}],
+        "per_run": {"keys": ["seed", "one_cycle"], "by_arm": {"fp32": [{"run": "runs2", "seed": "2", "one_cycle": "1"}], "int8": [{"run": "runs2", "seed": "2", "one_cycle": "1"}]}},
+        "settings": {
+          "shared": [{"name": "batch_size", "value": "256", "source": "configs/eval.yaml:3", "status": "verified"}],
+          "by_arm": {
+            "int8": [{"name": "quant", "value": "int8", "source": "configs/int8.yaml:1", "status": "verified"}],
+            "fp32": [{"name": "quant", "value": "fp32", "source": "configs/fp32.yaml:1", "status": "verified"}]
+          },
+          "unknown": ["quant_backend"],
+          "counts": {"verified": 3, "unknown": 1}
+        },
+        "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
+        "made": [],
+        "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2 · recorded 2026-10-06 10:32 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
+        "commands": [],
+        "prompt": ""
+      }
+    },
+    "runs2b": {
+      "run_id": "runs2b",
+      "experiment_id": "e1",
+      "label": "fp32 and int8 · seed 2",
+      "named": "run fp32 and int8 · seed 2, recorded 2026-10-13 14:12 UTC",
+      "at": "2026-10-13 14:12 UTC",
+      "when": "2026-10-13",
+      "produced": "2026-10-13",
+      "metrics_text": "fp32: top1=0.7594 · int8: top1=0.7563",
+      "per_run_text": "seed=2 · one_cycle=1",
+      "results": "results/seed2-val/metrics.json",
+      "note": "replaces runs2",
+      "receipt_rows": [
+        ["run", "recorded 2026-10-13 14:12 UTC", []],
+        ["results", "results/seed2-val/metrics.json · sha256 1c7e55a0b3d9", []],
+        ["command", "command (as given): not recorded", []],
+        ["platform", "Linux-6.8.0-x86_64", []]
+      ],
+      "command": {"text": "", "kind": "not recorded"},
+      "counts_toward": [{"criterion": "c1", "counted": true, "reason": "", "via": ""}, {"criterion": "c2", "counted": true, "reason": "", "via": ""}, {"criterion": "c4", "counted": true, "reason": "", "via": "a1"}],
+      "same_bytes": [],
+      "made": [],
+      "retracted": null,
+      "observed_in": null,
+      "recorded_in": null,
+      "reproduce": {
+        "ready_line": "to run again: ✓ 1 ok · ◐ 1 partial · ○ 1 unknown",
+        "ready": [
+          {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
+          {"state": "partial", "label": "settings", "text": "settings: seed=2 one_cycle=1; quant_backend unknown", "refs": []},
+          {"state": "unknown", "label": "code", "text": "code: unknown · the run was made before it was recorded, and names no commit", "refs": []}
+        ],
+        "steps": [
+          {
+            "what": "get the evaluation data",
+            "label": "evaluation data · imagenet-val",
+            "refs": ["imagenet-val"],
+            "command": "python get_data.py --split val",
+            "from": "scripts/README.md:5",
+            "runnable": true,
+            "n": 1
+          },
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runs2b"], "command": "", "from": "", "runnable": false, "n": 2}
+        ],
+        "per_run": {"keys": ["seed", "one_cycle"], "by_arm": {"fp32": [{"run": "runs2b", "seed": "2", "one_cycle": "1"}], "int8": [{"run": "runs2b", "seed": "2", "one_cycle": "1"}]}},
+        "settings": {
+          "shared": [{"name": "batch_size", "value": "256", "source": "configs/eval.yaml:3", "status": "verified"}],
+          "by_arm": {
+            "int8": [{"name": "quant", "value": "int8", "source": "configs/int8.yaml:1", "status": "verified"}],
+            "fp32": [{"name": "quant", "value": "fp32", "source": "configs/fp32.yaml:1", "status": "verified"}]
+          },
+          "unknown": ["quant_backend"],
+          "counts": {"verified": 3, "unknown": 1}
+        },
+        "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
+        "made": [],
+        "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2 · recorded 2026-10-13 14:12 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
+        "commands": [],
+        "prompt": ""
+      }
+    },
+    "runs3": {
+      "run_id": "runs3",
+      "experiment_id": "e1",
+      "label": "fp32 and int8 · seed 3",
+      "named": "run fp32 and int8 · seed 3",
+      "at": "2026-10-13 14:51 UTC",
+      "when": "2026-10-13",
+      "produced": "2026-10-13",
+      "metrics_text": "fp32: top1=0.7599 · int8: top1=0.7572",
+      "per_run_text": "seed=3 · one_cycle=1",
+      "results": "results/seed3/metrics.json",
+      "note": "",
+      "receipt_rows": [
+        ["run", "recorded 2026-10-13 14:51 UTC", []],
+        ["results", "results/seed3/metrics.json · sha256 5f20c8e91ab4", []],
+        ["command", "observed by rb journal run · exit 0: python train.py --seed 3 --quant int8", []],
+        ["platform", "Linux-6.8.0-x86_64", []]
+      ],
+      "command": {"text": "python train.py --seed 3 --quant int8", "kind": "observed"},
+      "counts_toward": [{"criterion": "c1", "counted": true, "reason": "", "via": ""}, {"criterion": "c2", "counted": true, "reason": "", "via": ""}, {"criterion": "c4", "counted": true, "reason": "", "via": "a1"}],
+      "same_bytes": [],
+      "made": [],
+      "retracted": null,
+      "observed_in": {
+        "label": "recorded in exp-b · /home/ana/int8-resnet50/.worktrees/b at 5d1e0a7",
+        "label_short": "recorded in exp-b · .worktrees/b at 5d1e0a7",
+        "commit": "5d1e0a7",
+        "dirty": false,
+        "gone": false,
+        "place": "exp-b"
+      },
+      "recorded_in": {"place": "exp-b", "label": "exp-b · .worktrees/b", "href": "#run-runs3&place=exp-b"},
+      "reproduce": {
+        "ready_line": "to run again: ✓ 1 ok · ◐ 1 partial · ○ 1 unknown",
+        "ready": [
+          {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
+          {"state": "partial", "label": "settings", "text": "settings: seed=3 one_cycle=1; quant_backend unknown", "refs": []},
+          {"state": "unknown", "label": "code", "text": "code: unknown · the run was made before it was recorded, and names no commit", "refs": []}
+        ],
+        "steps": [
+          {
+            "what": "get the evaluation data",
+            "label": "evaluation data · imagenet-val",
+            "refs": ["imagenet-val"],
+            "command": "python get_data.py --split val",
+            "from": "scripts/README.md:5",
+            "runnable": true,
+            "n": 1
+          },
+          {
+            "what": "evaluate both arms",
+            "label": "command (as given): observed by rb journal run",
+            "refs": ["runs3"],
+            "command": "python train.py --seed 3 --quant int8",
+            "from": "runs3",
+            "runnable": true,
+            "n": 2
+          }
+        ],
+        "per_run": {"keys": ["seed", "one_cycle"], "by_arm": {"fp32": [{"run": "runs3", "seed": "3", "one_cycle": "1"}], "int8": [{"run": "runs3", "seed": "3", "one_cycle": "1"}]}},
+        "settings": {
+          "shared": [{"name": "batch_size", "value": "256", "source": "configs/eval.yaml:3", "status": "verified"}],
+          "by_arm": {
+            "int8": [{"name": "quant", "value": "int8", "source": "configs/int8.yaml:1", "status": "verified"}],
+            "fp32": [{"name": "quant", "value": "fp32", "source": "configs/fp32.yaml:1", "status": "verified"}]
+          },
+          "unknown": ["quant_backend"],
+          "counts": {"verified": 3, "unknown": 1}
+        },
+        "command_as_given": {"recorded": 1, "runs": 1, "line": "the run records its command (as given): observed by rb journal run"},
+        "made": [],
+        "script": "# Reproduce a run of e1 · fp32 and int8 · seed 3\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: seed 3 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given), observed by rb journal run:\npython train.py --seed 3 --quant int8\n",
+        "commands": [{"run": "runs3", "command": "python train.py --seed 3 --quant int8", "observed": true}],
+        "prompt": ""
+      }
+    },
+    "runsql7": {
+      "run_id": "runsql7",
+      "experiment_id": "e1",
+      "label": "fp32 and int8 · results/runs.db row 7",
+      "named": "run fp32 and int8 · results/runs.db row 7",
+      "at": "2026-10-12 08:02 UTC",
+      "when": "2026-10-12",
+      "produced": "2026-10-04",
+      "metrics_text": "fp32: latency_ms=6.1 · int8: latency_ms=3.9",
+      "per_run_text": "",
+      "results": "results/runs.db · row 7",
+      "note": "",
+      "receipt_rows": [
+        ["run", "recorded 2026-10-12 08:02 UTC", []],
+        ["produced", "2026-10-04 (reported by row 7)", []],
+        ["results", "SQLite results/runs.db · table runs · row 7 · columns fp32_latency_ms, int8_latency_ms", []],
+        ["repository", "repository when recorded, not when run", []],
+        ["file", "file written 2026-10-12, after the run", []],
+        ["command", "command (as given): given later, not observed", []],
+        ["platform", "Linux-6.8.0-x86_64", []]
+      ],
+      "command": {"text": "python bench.py --t4", "kind": "given later, not observed"},
+      "counts_toward": [{"criterion": "c6", "counted": true, "reason": "", "via": ""}],
+      "same_bytes": [],
+      "made": [],
+      "retracted": null,
+      "observed_in": null,
+      "recorded_in": null,
+      "reproduce": {
+        "ready_line": "to run again: ◐ 1 partial · ○ 1 unknown",
+        "ready": [
+          {"state": "partial", "label": "settings", "text": "settings: none recorded for this run; quant_backend unknown", "refs": []},
+          {"state": "unknown", "label": "code", "text": "code: unknown · the run was made before it was recorded, and names no commit", "refs": []}
+        ],
+        "steps": [{"what": "measure both arms", "label": "command (as given): given later, not observed", "refs": ["runsql7"], "command": "python bench.py --t4", "from": "runsql7", "runnable": true, "n": 1}],
+        "per_run": {"keys": [], "by_arm": {}},
+        "settings": {
+          "shared": [{"name": "batch_size", "value": "256", "source": "configs/eval.yaml:3", "status": "verified"}],
+          "by_arm": {
+            "int8": [{"name": "quant", "value": "int8", "source": "configs/int8.yaml:1", "status": "verified"}],
+            "fp32": [{"name": "quant", "value": "fp32", "source": "configs/fp32.yaml:1", "status": "verified"}]
+          },
+          "unknown": ["quant_backend"],
+          "counts": {"verified": 3, "unknown": 1}
+        },
+        "command_as_given": {"recorded": 1, "runs": 1, "line": "the run records its command (as given): given later, not observed"},
+        "made": [],
+        "script": "# Reproduce a run of e1 · fp32 and int8 · results/runs.db row 7\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given), given later, not observed:\npython bench.py --t4\n",
+        "commands": [{"run": "runsql7", "command": "python bench.py --t4", "observed": false}],
+        "prompt": ""
+      }
+    },
+    "runc128": {
+      "run_id": "runc128",
+      "experiment_id": "e2",
+      "label": "fp32 and int8 · calib_images 128",
+      "named": "run fp32 and int8 · calib_images 128",
+      "at": "2026-10-13 14:44 UTC",
+      "when": "2026-10-13",
+      "produced": "2026-10-13",
+      "metrics_text": "fp32: top1=0.7597 · int8: top1=0.7413",
+      "per_run_text": "calib_images=128",
+      "results": "results/calib/128.json",
+      "note": "",
+      "receipt_rows": [["run", "recorded 2026-10-13 14:44 UTC", []], ["results", "results/calib/128.json · sha256 2a64e0f9c1d7", []], ["command", "command (as given): not recorded", []]],
+      "command": {"text": "", "kind": "not recorded"},
+      "counts_toward": [{"criterion": "c5", "counted": true, "reason": "", "via": ""}],
+      "same_bytes": [],
+      "made": [],
+      "retracted": null,
+      "observed_in": null,
+      "recorded_in": null,
+      "reproduce": {
+        "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
+        "ready": [
+          {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+        ],
+        "steps": [
+          {
+            "what": "get the evaluation data",
+            "label": "evaluation data · imagenet-val",
+            "refs": ["imagenet-val"],
+            "command": "python get_data.py --split val",
+            "from": "scripts/README.md:5",
+            "runnable": true,
+            "n": 1
+          },
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc128"], "command": "", "from": "", "runnable": false, "n": 2}
+        ],
+        "per_run": {"keys": ["calib_images"], "by_arm": {"int8": [{"run": "runc128", "calib_images": "128"}]}},
+        "settings": {"shared": [], "by_arm": {}, "unknown": [], "counts": {"verified": 1, "unknown": 0}},
+        "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
+        "made": [],
+        "script": "# Reproduce a run of e2 · fp32 and int8 · calib_images 128\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 128\n# command (as given): not recorded\n",
+        "commands": [],
+        "prompt": ""
+      }
+    },
+    "runc512": {
+      "run_id": "runc512",
+      "experiment_id": "e2",
+      "label": "fp32 and int8 · calib images 512",
+      "named": "run fp32 and int8 · calib images 512",
+      "at": "2026-10-13 14:46 UTC",
+      "when": "2026-10-13",
+      "produced": "2026-10-13",
+      "metrics_text": "fp32: top1=0.7597 · int8: top1=0.7554",
+      "per_run_text": "calib_images=512",
+      "results": "results/calib/512.json",
+      "note": "",
+      "receipt_rows": [["run", "recorded 2026-10-13 14:46 UTC", []], ["results", "results/calib/512.json · sha256 a346fc2bfdfa", []], ["command", "command (as given): not recorded", []]],
+      "command": {"text": "", "kind": "not recorded"},
+      "counts_toward": [{"criterion": "c5", "counted": true, "reason": "", "via": ""}],
+      "same_bytes": [{"run": "runs1", "experiment": "e1", "retracted": false, "made": ["ckpt-int8-s1"]}],
+      "made": [],
+      "retracted": null,
+      "observed_in": null,
+      "recorded_in": null,
+      "reproduce": {
+        "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
+        "ready": [
+          {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+        ],
+        "steps": [
+          {
+            "what": "get the evaluation data",
+            "label": "evaluation data · imagenet-val",
+            "refs": ["imagenet-val"],
+            "command": "python get_data.py --split val",
+            "from": "scripts/README.md:5",
+            "runnable": true,
+            "n": 1
+          },
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc512"], "command": "", "from": "", "runnable": false, "n": 2}
+        ],
+        "per_run": {"keys": ["calib_images"], "by_arm": {"int8": [{"run": "runc512", "calib_images": "512"}]}},
+        "settings": {"shared": [], "by_arm": {}, "unknown": [], "counts": {"verified": 1, "unknown": 0}},
+        "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
+        "made": [
+          {
+            "run": "runc512",
+            "maker": "runs1",
+            "resource": "ckpt-int8-s1",
+            "command": "python quantize.py --seed 1 --calib 512",
+            "from": "scripts/README.md:8",
+            "line": "The same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1."
+          }
+        ],
+        "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 512\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 512\n# command (as given): not recorded\n# the same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1\n# how to get it again · scripts/README.md:8\npython quantize.py --seed 1 --calib 512\n",
+        "commands": [],
+        "prompt": ""
+      }
+    },
+    "runc1024": {
+      "run_id": "runc1024",
+      "experiment_id": "e2",
+      "label": "fp32 and int8 · calib_images 1024",
+      "named": "run fp32 and int8 · calib_images 1024",
+      "at": "2026-10-13 14:48 UTC",
+      "when": "2026-10-13",
+      "produced": "2026-10-13",
+      "metrics_text": "fp32: top1=0.7597 · int8: top1=0.7556",
+      "per_run_text": "calib_images=1024",
+      "results": "results/calib/1024.json",
+      "note": "",
+      "receipt_rows": [["run", "recorded 2026-10-13 14:48 UTC", []], ["results", "results/calib/1024.json · sha256 7d18b4c02e95", []], ["command", "command (as given): not recorded", []]],
+      "command": {"text": "", "kind": "not recorded"},
+      "counts_toward": [{"criterion": "c5", "counted": true, "reason": "", "via": ""}],
+      "same_bytes": [],
+      "made": [],
+      "retracted": null,
+      "observed_in": null,
+      "recorded_in": null,
+      "reproduce": {
+        "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
+        "ready": [
+          {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+        ],
+        "steps": [
+          {
+            "what": "get the evaluation data",
+            "label": "evaluation data · imagenet-val",
+            "refs": ["imagenet-val"],
+            "command": "python get_data.py --split val",
+            "from": "scripts/README.md:5",
+            "runnable": true,
+            "n": 1
+          },
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc1024"], "command": "", "from": "", "runnable": false, "n": 2}
+        ],
+        "per_run": {"keys": ["calib_images"], "by_arm": {"int8": [{"run": "runc1024", "calib_images": "1024"}]}},
+        "settings": {"shared": [], "by_arm": {}, "unknown": [], "counts": {"verified": 1, "unknown": 0}},
+        "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
+        "made": [],
+        "script": "# Reproduce a run of e2 · fp32 and int8 · calib_images 1024\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 1024\n# command (as given): not recorded\n",
+        "commands": [],
+        "prompt": ""
+      }
+    },
+    "runc2048": {
+      "run_id": "runc2048",
+      "experiment_id": "e2",
+      "label": "fp32 and int8 · calib_images 2048",
+      "named": "run fp32 and int8 · calib_images 2048",
+      "at": "2026-10-13 14:50 UTC",
+      "when": "2026-10-13",
+      "produced": "2026-10-13",
+      "metrics_text": "fp32: top1=0.7597 · int8: top1=0.7555",
+      "per_run_text": "calib_images=2048",
+      "results": "results/calib/2048.json",
+      "note": "",
+      "receipt_rows": [["run", "recorded 2026-10-13 14:50 UTC", []], ["results", "results/calib/2048.json · sha256 e95c3a1f60b2", []], ["command", "command (as given): not recorded", []]],
+      "command": {"text": "", "kind": "not recorded"},
+      "counts_toward": [{"criterion": "c5", "counted": true, "reason": "", "via": ""}],
+      "same_bytes": [],
+      "made": [],
+      "retracted": null,
+      "observed_in": null,
+      "recorded_in": null,
+      "reproduce": {
+        "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
+        "ready": [
+          {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+        ],
+        "steps": [
+          {
+            "what": "get the evaluation data",
+            "label": "evaluation data · imagenet-val",
+            "refs": ["imagenet-val"],
+            "command": "python get_data.py --split val",
+            "from": "scripts/README.md:5",
+            "runnable": true,
+            "n": 1
+          },
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc2048"], "command": "", "from": "", "runnable": false, "n": 2}
+        ],
+        "per_run": {"keys": ["calib_images"], "by_arm": {"int8": [{"run": "runc2048", "calib_images": "2048"}]}},
+        "settings": {"shared": [], "by_arm": {}, "unknown": [], "counts": {"verified": 1, "unknown": 0}},
+        "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
+        "made": [],
+        "script": "# Reproduce a run of e2 · fp32 and int8 · calib_images 2048\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 2048\n# command (as given): not recorded\n",
+        "commands": [],
+        "prompt": ""
+      }
+    }
+  },
+  "resources": {
+    "imagenet-val": {
+      "resource_id": "imagenet-val",
+      "name": "ImageNet validation set",
+      "type": "dataset",
+      "role": "evaluation data",
+      "availability": "available",
+      "where": ["data/imagenet/val"],
+      "where_short": ["data/imagenet/val"],
+      "identity": "sha256 of the file list",
+      "exact": true,
+      "how": "python get_data.py --split val",
+      "acquisition": {"command": "python get_data.py --split val", "from": "scripts/README.md:5"},
+      "read_by": {
+        "runs": [
+          {"run": "runs1", "experiment": "e1"},
+          {"run": "runs2b", "experiment": "e1"},
+          {"run": "runs3", "experiment": "e1"},
+          {"run": "runc128", "experiment": "e2"},
+          {"run": "runc512", "experiment": "e2"},
+          {"run": "runc1024", "experiment": "e2"},
+          {"run": "runc2048", "experiment": "e2"}
+        ],
+        "analyses": ["a1"]
+      },
+      "made_by": [],
+      "rests_on": {"criteria": ["c1", "c2", "c3", "c4", "c5"], "by_question": {"q1": ["c1", "c2", "c3", "c4"], "q1a": ["c5"]}},
+      "url": ""
+    },
+    "imagenet-calib-512": {
+      "resource_id": "imagenet-calib-512",
+      "name": "512 calibration images",
+      "type": "dataset",
+      "role": "training data",
+      "availability": "available",
+      "where": ["data/imagenet/calib512"],
+      "where_short": ["data/imagenet/calib512"],
+      "identity": "sha256 of the file list",
+      "exact": true,
+      "how": "python get_data.py --calib 512",
+      "acquisition": {"command": "python get_data.py --calib 512", "from": "scripts/README.md:6"},
+      "read_by": {"runs": [{"run": "runs1", "experiment": "e1"}, {"run": "runc512", "experiment": "e2"}], "analyses": []},
+      "made_by": [],
+      "rests_on": {"criteria": ["c1", "c2", "c3", "c4", "c5"], "by_question": {"q1": ["c1", "c2", "c3", "c4"], "q1a": ["c5"]}},
+      "url": ""
+    },
+    "resnet50-fp32": {
+      "resource_id": "resnet50-fp32",
+      "name": "ResNet-50 v1.5 FP32 weights",
+      "type": "checkpoint",
+      "role": "training data",
+      "availability": "available",
+      "where": ["models/resnet50_fp32.pt"],
+      "where_short": ["models/resnet50_fp32.pt"],
+      "identity": "sha256 0e4b9a71c2d8",
+      "exact": true,
+      "how": "",
+      "acquisition": null,
+      "read_by": {"runs": [{"run": "runs1", "experiment": "e1"}], "analyses": []},
+      "made_by": [],
+      "rests_on": {"criteria": ["c1", "c2", "c3", "c4"], "by_question": {"q1": ["c1", "c2", "c3", "c4"]}},
+      "url": "https://example.org/resnet50_fp32.pt"
+    },
+    "ckpt-int8-s1": {
+      "resource_id": "ckpt-int8-s1",
+      "name": "int8 checkpoint, seed 1",
+      "type": "checkpoint",
+      "role": "",
+      "availability": "available",
+      "where": ["models/int8_s1.pt"],
+      "where_short": ["models/int8_s1.pt"],
+      "identity": "sha256 a346fc2bfdfa",
+      "exact": true,
+      "how": "python quantize.py --seed 1 --calib 512",
+      "acquisition": {"command": "python quantize.py --seed 1 --calib 512", "from": "scripts/README.md:8"},
+      "read_by": {"runs": [], "analyses": []},
+      "made_by": [{"run": "runs1", "experiment": "e1"}],
+      "rests_on": {"criteria": [], "by_question": {}},
+      "url": ""
+    }
+  },
+  "analyses": {
+    "a1": {
+      "id": "a1",
+      "title": "per-class accuracy, int8 against fp32",
+      "recorded": "analysis · recorded 2026-10-13 14:56 UTC · basis per-class top1 over 1000 classes",
+      "reads": ["runs1", "runs2b", "runs3"],
+      "used_by": ["c4"],
+      "script": "analysis/per_class.py",
+      "sha256": "61be0c94d7a2"
+    }
+  },
+  "history": {
+    "summary": "47 writes in the log",
+    "log": [
+      {"at": "2026-10-19 09:40 UTC", "op": "decide", "sentence": "mentioned a past call on int8, from notes.md:3", "refs": ["notes.md"], "log_index": 46},
+      {"at": "2026-10-19 09:35 UTC", "op": "decide", "sentence": "proposed a call: accept c3, not made", "refs": ["c3"], "log_index": 45},
+      {"at": "2026-10-19 09:30 UTC", "op": "file", "sentence": "recorded an interpretation on q1a, not confirmed", "refs": ["q1a"], "log_index": 44},
+      {"at": "2026-10-19 09:25 UTC", "op": "amend", "sentence": "amended e2 after locking it: unit run -> calib_images", "refs": ["e2"], "log_index": 43},
+      {"at": "2026-10-19 09:12 UTC", "op": "amend", "sentence": "amended e1 after locking it: hypothesis", "refs": ["e1"], "log_index": 42},
+      {"at": "2026-10-16 07:30 UTC", "op": "note", "sentence": "added a note on e1", "refs": ["e1", "n1"], "log_index": 41},
+      {"at": "2026-10-15 09:09 UTC", "op": "file", "sentence": "recorded an interpretation on q1", "refs": ["q1"], "log_index": 40},
+      {"at": "2026-10-15 09:05 UTC", "op": "confirm", "sentence": "confirmed a call: accepted c4", "refs": ["c4"], "log_index": 39},
+      {"at": "2026-10-14 16:40 UTC", "op": "decide", "sentence": "proposed a call: accept c4, not made", "refs": ["c4"], "log_index": 38},
+      {"at": "2026-10-14 08:30 UTC", "op": "decide", "sentence": "made a call: accepted c1", "refs": ["c1"], "log_index": 37},
+      {"at": "2026-10-13 15:02 UTC", "op": "file", "sentence": "filed c2 under q1", "refs": ["c2", "q1"], "log_index": 36},
+      {"at": "2026-10-13 15:00 UTC", "op": "amend", "sentence": "amended e1 after locking it: criterion c2 added", "refs": ["e1", "c2"], "log_index": 35},
+      {"at": "2026-10-13 14:56 UTC", "op": "analyze", "sentence": "recorded analysis a1 on e1", "refs": ["a1"], "log_index": 34},
+      {"at": "2026-10-13 14:51 UTC", "op": "record", "sentence": "record run fp32 and int8 · seed 3", "refs": ["runs3"], "log_index": 33},
+      {"at": "2026-10-13 14:50 UTC", "op": "record", "sentence": "record run fp32 and int8 · calib_images 2048", "refs": ["runc2048"], "log_index": 32},
+      {"at": "2026-10-13 14:48 UTC", "op": "record", "sentence": "record run fp32 and int8 · calib_images 1024", "refs": ["runc1024"], "log_index": 31},
+      {"at": "2026-10-13 14:46 UTC", "op": "record", "sentence": "record run fp32 and int8 · calib images 512", "refs": ["runc512"], "log_index": 30},
+      {"at": "2026-10-13 14:44 UTC", "op": "record", "sentence": "record run fp32 and int8 · calib_images 128", "refs": ["runc128"], "log_index": 29},
+      {"at": "2026-10-13 14:40 UTC", "op": "freeze", "sentence": "locked e2", "refs": ["e2"], "log_index": 28},
+      {"at": "2026-10-13 14:36 UTC", "op": "file", "sentence": "filed c5 under q1a", "refs": ["c5", "q1a"], "log_index": 27},
+      {"at": "2026-10-13 14:34 UTC", "op": "file", "sentence": "filed e2 under q1a", "refs": ["e2", "q1a"], "log_index": 26},
+      {"at": "2026-10-13 14:31 UTC", "op": "gate", "sentence": "set the gate of e2", "refs": ["e2"], "log_index": 25},
+      {"at": "2026-10-13 14:28 UTC", "op": "add", "sentence": "added criterion c5 on e2", "refs": ["c5"], "log_index": 24},
+      {"at": "2026-10-13 14:24 UTC", "op": "spec_set", "sentence": "specified e2: int8 by calib_images 128, 512, 1024, 2048", "refs": ["e2"], "log_index": 23},
+      {"at": "2026-10-13 14:20 UTC", "op": "add", "sentence": "added experiment e2: calibration set size: how many images INT8 needs", "refs": ["e2"], "log_index": 22},
+      {"at": "2026-10-13 14:16 UTC", "op": "add", "sentence": "added question q1a under q1", "refs": ["q1a", "q1"], "log_index": 21},
+      {"at": "2026-10-13 14:12 UTC", "op": "record", "sentence": "record run fp32 and int8 · seed 2, recorded 2026-10-13 14:12 UTC", "refs": ["runs2b", "runs2"], "log_index": 20},
+      {"at": "2026-10-13 14:10 UTC", "op": "retract", "sentence": "retract run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC", "refs": ["runs2"], "log_index": 19},
+      {"at": "2026-10-12 08:06 UTC", "op": "amend", "sentence": "amended e1 after locking it: criterion c6 added", "refs": ["e1", "c6"], "log_index": 18},
+      {"at": "2026-10-12 08:02 UTC", "op": "record", "sentence": "record run fp32 and int8 · results/runs.db row 7", "refs": ["runsql7"], "log_index": 17},
+      {"at": "2026-10-06 10:32 UTC", "op": "record", "sentence": "record run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC", "refs": ["runs2"], "log_index": 16},
+      {"at": "2026-10-06 10:28 UTC", "op": "record", "sentence": "record run fp32 and int8 · seed 1", "refs": ["runs1", "ckpt-int8-s1"], "log_index": 15},
+      {"at": "2026-10-06 10:24 UTC", "op": "confirm", "sentence": "confirmed the design of e1", "refs": ["e1"], "log_index": 14},
+      {"at": "2026-10-06 10:20 UTC", "op": "freeze", "sentence": "locked e1", "refs": ["e1"], "log_index": 13},
+      {"at": "2026-10-06 10:19 UTC", "op": "add", "sentence": "added resource resnet50-fp32", "refs": ["resnet50-fp32"], "log_index": 12},
+      {"at": "2026-10-06 10:18 UTC", "op": "add", "sentence": "added resource imagenet-calib-512", "refs": ["imagenet-calib-512"], "log_index": 11},
+      {"at": "2026-10-06 10:17 UTC", "op": "add", "sentence": "added resource imagenet-val", "refs": ["imagenet-val"], "log_index": 10},
+      {"at": "2026-10-06 10:16 UTC", "op": "file", "sentence": "filed c4 under q1", "refs": ["c4", "q1"], "log_index": 9},
+      {"at": "2026-10-06 10:15 UTC", "op": "file", "sentence": "filed c3 under q1", "refs": ["c3", "q1"], "log_index": 8},
+      {"at": "2026-10-06 10:14 UTC", "op": "file", "sentence": "filed c1 under q1", "refs": ["c1", "q1"], "log_index": 7},
+      {"at": "2026-10-06 10:12 UTC", "op": "add", "sentence": "added criterion c4 on e1", "refs": ["c4"], "log_index": 6},
+      {"at": "2026-10-06 10:11 UTC", "op": "add", "sentence": "added criterion c3 on e1", "refs": ["c3"], "log_index": 5},
+      {"at": "2026-10-06 10:10 UTC", "op": "add", "sentence": "added criterion c1 on e1", "refs": ["c1"], "log_index": 4},
+      {"at": "2026-10-06 10:08 UTC", "op": "spec_set", "sentence": "specified e1: fp32 against int8, paired by seed", "refs": ["e1"], "log_index": 3},
+      {"at": "2026-10-06 10:06 UTC", "op": "add", "sentence": "added experiment e1: int8 against fp32", "refs": ["e1"], "log_index": 2},
+      {"at": "2026-10-06 10:04 UTC", "op": "add", "sentence": "added question q1", "refs": ["q1"], "log_index": 1},
+      {"at": "2026-10-06 10:02 UTC", "op": "init", "sentence": "started the record: INT8 ResNet-50 on ImageNet", "refs": [], "log_index": 0}
+    ],
+    "sittings": [
+      {
+        "first": "2026-10-19 09:25 UTC",
+        "last": "2026-10-19 09:40 UTC",
+        "n": 4,
+        "calls": 0,
+        "head": "2026-10-19 · 09:25 to 09:40 UTC · 4 writes · no calls made",
+        "lines": [
+          {
+            "first": "2026-10-19 09:25 UTC",
+            "last": "2026-10-19 09:25 UTC",
+            "n": 1,
+            "sentence": "amended e2 after locking it: unit run -> calib_images",
+            "refs": ["e2"],
+            "why": "the cells are the unit",
+            "note": "",
+            "log_index": 43
+          },
+          {
+            "first": "2026-10-19 09:30 UTC",
+            "last": "2026-10-19 09:30 UTC",
+            "n": 1,
+            "sentence": "recorded an interpretation on q1a, not confirmed",
+            "refs": ["q1a"],
+            "why": "",
+            "note": "only the 128-image cell misses",
+            "log_index": 44
+          },
+          {
+            "first": "2026-10-19 09:35 UTC",
+            "last": "2026-10-19 09:35 UTC",
+            "n": 1,
+            "sentence": "proposed a call: accept c3, not made",
+            "refs": ["c3"],
+            "why": "",
+            "note": "one seed is enough for the export check\\u200b",
+            "log_index": 45
+          },
+          {"first": "2026-10-19 09:40 UTC", "last": "2026-10-19 09:40 UTC", "n": 1, "sentence": "mentioned a past call on int8, from notes.md:3", "refs": ["notes.md"], "why": "", "note": "", "log_index": 46}
+        ]
+      },
+      {
+        "first": "2026-10-19 09:12 UTC",
+        "last": "2026-10-19 09:12 UTC",
+        "n": 1,
+        "calls": 0,
+        "head": "2026-10-19 · 09:12 UTC · 1 write · no calls made",
+        "lines": [{"first": "2026-10-19 09:12 UTC", "last": "2026-10-19 09:12 UTC", "n": 1, "sentence": "amended e1 after locking it: hypothesis", "refs": ["e1"], "why": "", "note": "", "log_index": 42}]
+      },
+      {
+        "first": "2026-10-16 07:30 UTC",
+        "last": "2026-10-16 07:30 UTC",
+        "n": 1,
+        "calls": 0,
+        "head": "2026-10-16 · 07:30 UTC · 1 write · no calls made",
+        "lines": [{"first": "2026-10-16 07:30 UTC", "last": "2026-10-16 07:30 UTC", "n": 1, "sentence": "added a note on e1", "refs": ["e1", "n1"], "why": "", "note": "", "log_index": 41}]
+      },
+      {
+        "first": "2026-10-15 09:05 UTC",
+        "last": "2026-10-15 09:09 UTC",
+        "n": 2,
+        "calls": 1,
+        "head": "2026-10-15 · 09:05 to 09:09 UTC · 2 writes · 1 call made",
+        "lines": [
+          {
+            "first": "2026-10-15 09:05 UTC",
+            "last": "2026-10-15 09:05 UTC",
+            "n": 1,
+            "sentence": "confirmed a call: accepted c4",
+            "refs": ["c4"],
+            "why": "",
+            "note": "per-class drop stays under 2 points",
+            "log_index": 39
+          },
+          {
+            "first": "2026-10-15 09:09 UTC",
+            "last": "2026-10-15 09:09 UTC",
+            "n": 1,
+            "sentence": "recorded an interpretation on q1",
+            "refs": ["q1"],
+            "why": "c1 and c4 hold on three seeds",
+            "note": "",
+            "log_index": 40
+          }
+        ]
+      },
+      {
+        "first": "2026-10-14 16:40 UTC",
+        "last": "2026-10-14 16:40 UTC",
+        "n": 1,
+        "calls": 0,
+        "head": "2026-10-14 · 16:40 UTC · 1 write · no calls made",
+        "lines": [
+          {
+            "first": "2026-10-14 16:40 UTC",
+            "last": "2026-10-14 16:40 UTC",
+            "n": 1,
+            "sentence": "proposed a call: accept c4, not made",
+            "refs": ["c4"],
+            "why": "",
+            "note": "per-class drop stays under 2 points",
+            "log_index": 38
+          }
+        ]
+      },
+      {
+        "first": "2026-10-14 08:30 UTC",
+        "last": "2026-10-14 08:30 UTC",
+        "n": 1,
+        "calls": 1,
+        "head": "2026-10-14 · 08:30 UTC · 1 write · 1 call made",
+        "lines": [{"first": "2026-10-14 08:30 UTC", "last": "2026-10-14 08:30 UTC", "n": 1, "sentence": "made a call: accepted c1", "refs": ["c1"], "why": "holds on all three seeds", "note": "", "log_index": 37}]
+      },
+      {
+        "first": "2026-10-13 14:10 UTC",
+        "last": "2026-10-13 15:02 UTC",
+        "n": 18,
+        "calls": 0,
+        "head": "2026-10-13 · 14:10 to 15:02 UTC · 18 writes · no calls made",
+        "lines": [
+          {"first": "2026-10-13 14:10 UTC", "last": "2026-10-13 14:10 UTC", "n": 1, "sentence": "retracted runs2", "refs": ["runs2"], "why": "evaluated on the train split", "note": "", "log_index": 19},
+          {"first": "2026-10-13 14:12 UTC", "last": "2026-10-13 14:12 UTC", "n": 1, "sentence": "recorded runs2b on e1, replacing runs2", "refs": ["runs2b", "runs2"], "why": "", "note": "", "log_index": 20},
+          {"first": "2026-10-13 14:16 UTC", "last": "2026-10-13 14:16 UTC", "n": 1, "sentence": "added question q1a under q1", "refs": ["q1a", "q1"], "why": "", "note": "", "log_index": 21},
+          {
+            "first": "2026-10-13 14:20 UTC",
+            "last": "2026-10-13 14:20 UTC",
+            "n": 1,
+            "sentence": "added experiment e2: calibration set size: how many images INT8 needs",
+            "refs": ["e2"],
+            "why": "",
+            "note": "",
+            "log_index": 22
+          },
+          {"first": "2026-10-13 14:24 UTC", "last": "2026-10-13 14:24 UTC", "n": 1, "sentence": "specified e2: int8 by calib_images 128, 512, 1024, 2048", "refs": ["e2"], "why": "", "note": "", "log_index": 23},
+          {"first": "2026-10-13 14:28 UTC", "last": "2026-10-13 14:28 UTC", "n": 1, "sentence": "added criterion c5 on e2", "refs": ["c5"], "why": "", "note": "", "log_index": 24},
+          {"first": "2026-10-13 14:31 UTC", "last": "2026-10-13 14:31 UTC", "n": 1, "sentence": "set the gate of e2", "refs": ["e2"], "why": "", "note": "", "log_index": 25},
+          {"first": "2026-10-13 14:34 UTC", "last": "2026-10-13 14:36 UTC", "n": 2, "sentence": "filed e2 and c5 under q1a", "refs": ["e2", "q1a", "c5"], "why": "", "note": "", "log_index": 26},
+          {"first": "2026-10-13 14:40 UTC", "last": "2026-10-13 14:40 UTC", "n": 1, "sentence": "locked e2", "refs": ["e2"], "why": "", "note": "", "log_index": 28},
+          {
+            "first": "2026-10-13 14:44 UTC",
+            "last": "2026-10-13 14:51 UTC",
+            "n": 5,
+            "sentence": "recorded 5 runs: runc128, runc512, runc1024, runc2048, runs3",
+            "refs": ["runc128", "runc512", "runc1024", "runc2048", "runs3"],
+            "why": "",
+            "note": "",
+            "log_index": 29
+          },
+          {"first": "2026-10-13 14:56 UTC", "last": "2026-10-13 14:56 UTC", "n": 1, "sentence": "recorded analysis a1 on e1", "refs": ["a1"], "why": "", "note": "", "log_index": 34},
+          {"first": "2026-10-13 15:00 UTC", "last": "2026-10-13 15:00 UTC", "n": 1, "sentence": "amended e1 after locking it: criterion c2 added", "refs": ["e1", "c2"], "why": "", "note": "", "log_index": 35},
+          {"first": "2026-10-13 15:02 UTC", "last": "2026-10-13 15:02 UTC", "n": 1, "sentence": "filed c2 under q1", "refs": ["c2", "q1"], "why": "", "note": "", "log_index": 36}
+        ]
+      },
+      {
+        "first": "2026-10-12 08:02 UTC",
+        "last": "2026-10-12 08:06 UTC",
+        "n": 2,
+        "calls": 0,
+        "head": "2026-10-12 · 08:02 to 08:06 UTC · 2 writes · no calls made",
+        "lines": [
+          {"first": "2026-10-12 08:02 UTC", "last": "2026-10-12 08:02 UTC", "n": 1, "sentence": "recorded runsql7 on e1, from results/runs.db row 7", "refs": ["runsql7"], "why": "", "note": "", "log_index": 17},
+          {"first": "2026-10-12 08:06 UTC", "last": "2026-10-12 08:06 UTC", "n": 1, "sentence": "amended e1 after locking it: criterion c6 added", "refs": ["e1", "c6"], "why": "", "note": "", "log_index": 18}
+        ]
+      },
+      {
+        "first": "2026-10-06 10:02 UTC",
+        "last": "2026-10-06 10:32 UTC",
+        "n": 17,
+        "calls": 0,
+        "head": "2026-10-06 · 10:02 to 10:32 UTC · 17 writes · no calls made",
+        "lines": [
+          {"first": "2026-10-06 10:02 UTC", "last": "2026-10-06 10:02 UTC", "n": 1, "sentence": "started the record: INT8 ResNet-50 on ImageNet", "refs": [], "why": "", "note": "", "log_index": 0},
+          {"first": "2026-10-06 10:04 UTC", "last": "2026-10-06 10:04 UTC", "n": 1, "sentence": "added question q1", "refs": ["q1"], "why": "", "note": "", "log_index": 1},
+          {"first": "2026-10-06 10:06 UTC", "last": "2026-10-06 10:06 UTC", "n": 1, "sentence": "added experiment e1: int8 against fp32", "refs": ["e1"], "why": "", "note": "", "log_index": 2},
+          {"first": "2026-10-06 10:08 UTC", "last": "2026-10-06 10:08 UTC", "n": 1, "sentence": "specified e1: fp32 against int8, paired by seed", "refs": ["e1"], "why": "", "note": "", "log_index": 3},
+          {"first": "2026-10-06 10:10 UTC", "last": "2026-10-06 10:12 UTC", "n": 3, "sentence": "added 3 criteria on e1: c1, c3, c4", "refs": ["c1", "c3", "c4"], "why": "", "note": "", "log_index": 4},
+          {"first": "2026-10-06 10:14 UTC", "last": "2026-10-06 10:16 UTC", "n": 3, "sentence": "filed c1, c3 and c4 under q1", "refs": ["c1", "q1", "c3", "c4"], "why": "", "note": "", "log_index": 7},
+          {
+            "first": "2026-10-06 10:17 UTC",
+            "last": "2026-10-06 10:19 UTC",
+            "n": 3,
+            "sentence": "added 3 resources: imagenet-val, imagenet-calib-512, resnet50-fp32",
+            "refs": ["imagenet-val", "imagenet-calib-512", "resnet50-fp32"],
+            "why": "",
+            "note": "",
+            "log_index": 10
+          },
+          {"first": "2026-10-06 10:20 UTC", "last": "2026-10-06 10:20 UTC", "n": 1, "sentence": "locked e1", "refs": ["e1"], "why": "", "note": "", "log_index": 13},
+          {"first": "2026-10-06 10:24 UTC", "last": "2026-10-06 10:24 UTC", "n": 1, "sentence": "confirmed the design of e1", "refs": ["e1"], "why": "", "note": "", "log_index": 14},
+          {"first": "2026-10-06 10:28 UTC", "last": "2026-10-06 10:32 UTC", "n": 2, "sentence": "recorded 2 runs: runs1, runs2", "refs": ["runs1", "ckpt-int8-s1", "runs2"], "why": "", "note": "", "log_index": 15}
+        ]
+      }
+    ]
+  },
+  "places": {
+    "place": {
+      "id": "main",
+      "label": "main · ~/int8-resnet50",
+      "path": "/home/ana/int8-resnet50",
+      "start": true,
+      "read_only": false,
+      "version": null,
+      "line": "main · ~/int8-resnet50 · 2 record files not committed"
+    },
+    "places": [{"id": "main", "label": "main · ~/int8-resnet50", "can_show": true, "why_not": ""}, {"id": "exp-b", "label": "exp-b · .worktrees/b", "can_show": true, "why_not": ""}],
+    "versions": [{"sha": "3f2a9c1", "at": "2026-10-13 15:02 UTC", "subject": "the record, as of e2"}],
+    "scope_bar": null,
+    "elsewhere": [
+      {
+        "place": "exp-b",
+        "label": "exp-b · .worktrees/b",
+        "path": "/home/ana/int8-resnet50/.worktrees/b",
+        "said": "1 run · last write 2026-10-18 16:02 UTC",
+        "adds": "1 run not merged here",
+        "can_show": true,
+        "why_not": "",
+        "waiting": {"n": 1, "list": "cd /home/ana/int8-resnet50/.worktrees/b && rb status"},
+        "pending": [
+          {
+            "id": "dec9",
+            "kind": "proposed",
+            "subject": "c1",
+            "text": "accept c1, proposed, not made · note: seed 5 agrees · not confirmed",
+            "confirm": "cd /home/ana/int8-resnet50/.worktrees/b && rb confirm dec9",
+            "lines": []
+          }
+        ]
+      }
+    ]
+  },
+  "citations": {
+    "notes.md:3": {"key": "notes.md:3", "raw": ["notes.md:3"], "path": "notes.md", "name": "notes.md", "folder": "", "line": 3, "end": 3, "label": "notes.md · line 3", "commit": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "commit_short": "3f2a9c1", "read": "read at commit 3f2a9c1", "sha256": "4be0c2d91f7a6e3b8c5d0a2f9e1b7c4d6a8f3e0b5c2d9a7f1e4b8c6d3a0f5e2b", "tracked": true, "quoted": true, "lines": [{"n": 2, "text": "", "cited": false}, {"n": 3, "text": "2026-05-07: We pause INT8 until the calibration set is fixed.", "cited": true}, {"n": 4, "text": "", "cited": false}], "cut": 0, "missing": "", "not_quoted": "", "open_url": "vscode://file/home/ana/int8-resnet50/notes.md:3", "cited_by": [{"kind": "call", "id": "dec4"}]},
+    "README.md:14": {"key": "README.md:14", "raw": ["README.md:14"], "path": "README.md", "name": "README.md", "folder": "", "line": 14, "end": 14, "label": "README.md · line 14", "commit": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "commit_short": "3f2a9c1", "read": "read at commit 3f2a9c1", "sha256": "9d41c07be2a3f0c6a4b1e8d27f5c3a9b0e6d1f48c2a7b5e9d3f0c1a8b6e4d2f7", "tracked": true, "quoted": true, "lines": [{"n": 13, "text": "", "cited": false}, {"n": 14, "text": "ResNet-50 v1.5 reaches 76.13% top-1 on the ImageNet validation set.", "cited": true}, {"n": 15, "text": "", "cited": false}], "cut": 0, "missing": "", "not_quoted": "", "open_url": "vscode://file/home/ana/int8-resnet50/README.md:14", "cited_by": [{"kind": "criterion", "id": "c2"}]},
+    "scripts/README.md:5": {"key": "scripts/README.md:5", "raw": ["scripts/README.md:5"], "path": "scripts/README.md", "name": "README.md", "folder": "scripts/", "line": 5, "end": 5, "label": "scripts/README.md · line 5", "commit": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "commit_short": "3f2a9c1", "read": "read at commit 3f2a9c1", "sha256": "a7c3e9f1b5d2084c6e1a9f3b7d5c0e8a2f4b6d9c1e3a5f7b0d2c4e6a8f1b3d5c", "tracked": true, "quoted": true, "lines": [{"n": 4, "text": "", "cited": false}, {"n": 5, "text": "python get_data.py --split val", "cited": true}, {"n": 6, "text": "python get_data.py --calib 512", "cited": false}], "cut": 0, "missing": "", "not_quoted": "", "open_url": "vscode://file/home/ana/int8-resnet50/scripts/README.md:5", "cited_by": []},
+    "scripts/README.md:6": {"key": "scripts/README.md:6", "raw": ["scripts/README.md:6"], "path": "scripts/README.md", "name": "README.md", "folder": "scripts/", "line": 6, "end": 6, "label": "scripts/README.md · line 6", "commit": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "commit_short": "3f2a9c1", "read": "read at commit 3f2a9c1", "sha256": "a7c3e9f1b5d2084c6e1a9f3b7d5c0e8a2f4b6d9c1e3a5f7b0d2c4e6a8f1b3d5c", "tracked": true, "quoted": true, "lines": [{"n": 5, "text": "python get_data.py --split val", "cited": false}, {"n": 6, "text": "python get_data.py --calib 512", "cited": true}, {"n": 7, "text": "", "cited": false}], "cut": 0, "missing": "", "not_quoted": "", "open_url": "vscode://file/home/ana/int8-resnet50/scripts/README.md:6", "cited_by": []},
+    "scripts/README.md:8": {"key": "scripts/README.md:8", "raw": ["scripts/README.md:8"], "path": "scripts/README.md", "name": "README.md", "folder": "scripts/", "line": 8, "end": 8, "label": "scripts/README.md · line 8", "commit": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "commit_short": "3f2a9c1", "read": "read at commit 3f2a9c1", "sha256": "a7c3e9f1b5d2084c6e1a9f3b7d5c0e8a2f4b6d9c1e3a5f7b0d2c4e6a8f1b3d5c", "tracked": true, "quoted": true, "lines": [{"n": 7, "text": "", "cited": false}, {"n": 8, "text": "python quantize.py --seed 1 --calib 512", "cited": true}, {"n": 9, "text": "python eval.py --seed 1", "cited": false}], "cut": 0, "missing": "", "not_quoted": "", "open_url": "vscode://file/home/ana/int8-resnet50/scripts/README.md:8", "cited_by": []},
+    "configs/eval.yaml:3": {"key": "configs/eval.yaml:3", "raw": ["configs/eval.yaml:3"], "path": "configs/eval.yaml", "name": "eval.yaml", "folder": "configs/", "line": 3, "end": 3, "label": "configs/eval.yaml · line 3", "commit": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "commit_short": "3f2a9c1", "read": "read at commit 3f2a9c1", "sha256": "e2b4d6f8a0c1e3f5b7d9a1c3e5f7b9d0a2c4e6f8b1d3a5c7e9f0b2d4a6c8e1f3", "tracked": true, "quoted": true, "lines": [{"n": 2, "text": "data: imagenet-val", "cited": false}, {"n": 3, "text": "batch_size: 256", "cited": true}], "cut": 0, "missing": "", "not_quoted": "", "open_url": "vscode://file/home/ana/int8-resnet50/configs/eval.yaml:3", "cited_by": []},
+    "configs/int8.yaml:1": {"key": "configs/int8.yaml:1", "raw": ["configs/int8.yaml:1"], "path": "configs/int8.yaml", "name": "int8.yaml", "folder": "configs/", "line": 1, "end": 1, "label": "configs/int8.yaml · line 1", "commit": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "commit_short": "3f2a9c1", "read": "read at commit 3f2a9c1", "sha256": "1c3e5a7f9b0d2c4e6a8f1b3d5c7e9a0f2b4d6c8e1a3f5b7d9c0e2a4f6b8d1c3e", "tracked": true, "quoted": true, "lines": [{"n": 1, "text": "quant: int8", "cited": true}, {"n": 2, "text": "backend: fbgemm", "cited": false}], "cut": 0, "missing": "", "not_quoted": "", "open_url": "vscode://file/home/ana/int8-resnet50/configs/int8.yaml:1", "cited_by": []},
+    "configs/fp32.yaml:1": {"key": "configs/fp32.yaml:1", "raw": ["configs/fp32.yaml:1"], "path": "configs/fp32.yaml", "name": "fp32.yaml", "folder": "configs/", "line": 1, "end": 1, "label": "configs/fp32.yaml · line 1", "commit": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "commit_short": "3f2a9c1", "read": "read at commit 3f2a9c1", "sha256": "5f7b9d1c3e0a2f4b6d8c1e3a5f7b9d0c2e4a6f8b1d3c5e7a9f0b2d4c6e8a1f3b", "tracked": true, "quoted": true, "lines": [{"n": 1, "text": "quant: fp32", "cited": true}], "cut": 0, "missing": "", "not_quoted": "", "open_url": "vscode://file/home/ana/int8-resnet50/configs/fp32.yaml:1", "cited_by": []}
+  }
+}

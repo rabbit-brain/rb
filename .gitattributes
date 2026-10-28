@@ -1,0 +1,12 @@
+# The same bytes on every system. rb builds its manual, its command line and its pages into the binary, and the tests
+# hold what it says to the files here, so no checkout may rewrite a line ending (git on Windows does by default).
+* text=auto eol=lf
+
+# generated files: collapsed in diffs
+rust/src/cli_spec.json linguist-generated
+rust/src/schemas.json linguist-generated
+rust/src/assets/mcp.json linguist-generated
+rust/src/record_gen.rs linguist-generated
+rust/src/errors_table.rs linguist-generated
+schema/rb-v1.schema.json linguist-generated
+rust/tests_py/golden/** linguist-generated

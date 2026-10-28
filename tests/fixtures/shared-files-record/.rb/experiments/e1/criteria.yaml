@@ -1,0 +1,28 @@
+rb: 1
+kind: criteria
+experiment: e1
+criteria:
+  - id: c1
+    statement: wide beats base
+    metric: change.top1
+    comparator: at_least
+    target: 0.01
+    over: mean
+    role: primary
+    min_n: 1
+    origin: own
+    created_by: human:t
+    created_at: "2026-10-01T14:07:13.196+00:00"
+    via: cli
+  - id: c2
+    statement: wide holds top1
+    metric: wide.top1
+    comparator: at_least
+    target: 0.7
+    over: mean
+    role: primary
+    min_n: 1
+    origin: own
+    created_by: human:t
+    created_at: "2026-10-01T14:07:13.478+00:00"
+    via: cli

@@ -1,0 +1,96 @@
+name: build wheels
+
+# Downloadable trial packages without a release. The tag workflow uses the same builder.
+# On a public repository the files are downloadable as soon as they upload, before the scan job checks them.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-x86_64, os: ubuntu-24.04, target: x86_64, manylinux: "2014" }
+          - { platform: linux-aarch64, os: ubuntu-24.04-arm, target: aarch64, manylinux: "2014" }
+          - { platform: macos-aarch64, os: macos-14, target: aarch64, manylinux: auto }
+          - { platform: macos-x86_64, os: macos-15-intel, target: x86_64, manylinux: auto }
+          - { platform: windows-x86_64, os: windows-latest, target: x86_64, manylinux: auto }
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: "1"
+      DO_NOT_TRACK: "1"
+    steps:
+      - name: Say when the wheels carry no analytics destination
+        if: ${{ !vars.RB_POSTHOG_KEY || !vars.RB_POSTHOG_HOST }}
+        run: echo "::warning::The repository variables RB_POSTHOG_KEY and RB_POSTHOG_HOST are not both set, so these wheels carry no analytics destination; a tester who opts in sends nothing unless they name one."
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Build the precompiled wheel
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b  # v1.51.0
+        env:
+          RB_POSTHOG_KEY: ${{ vars.RB_POSTHOG_KEY }}
+          RB_POSTHOG_HOST: ${{ vars.RB_POSTHOG_HOST }}
+        with:
+          maturin-version: v1.15.0   # the maturin the wheels were last built and checked with; move it on purpose
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --locked --out dist
+          # Linux builds run in a manylinux container, which needs these passed explicitly.
+          docker-options: -e RB_POSTHOG_KEY -e RB_POSTHOG_HOST
+      - name: Install and use the wheel outside the checkout
+        run: python .github/scripts/smoke-wheel.py dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: wheel-${{ matrix.platform }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b  # v1.51.0
+        with:
+          maturin-version: v1.15.0
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  # A trial run's files are checked against the release denylist in a job of its own, which installs nothing and is
+  # the only one to receive the secret, in its last step; the build jobs above run third-party build scripts and never
+  # do. A release checks the same files in publish.yml's own scan job, and passes this workflow no secret, so here the
+  # check runs only when the workflow is started by hand. It runs when a build fails too: the other builds' files are
+  # uploaded all the same, and the check reads whatever was.
+  scan:
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' }}
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: The content check's own tests
+        run: python3 -I -S .github/scripts/test-public-content.py
+      - name: Check the committed files and every unpacked wheel and sdist member
+        env:
+          RB_RELEASE_DENYLIST: ${{ secrets.RB_RELEASE_DENYLIST }}
+        run: python3 -I -S .github/scripts/check-public-content.py --source . --artifacts dist

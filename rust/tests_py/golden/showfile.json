@@ -1,0 +1,703 @@
+{
+ "steps": [
+  {
+   "run": "init t --no-agents",
+   "exit": 0,
+   "out": [
+    "Project 't' started: @BASE@/work/.rb",
+    "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
+    "",
+    "Then paste this line into your agent's chat:",
+    "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment add x --id e1 --baseline base --candidate wide",
+   "exit": 0,
+   "out": [
+    "Experiment e1: x \u00b7 base (baseline) vs wide (candidate)",
+    "  Planned: nothing in the record tests it yet, and it shows as a planned direction until its first run or analysis.",
+    "  Made 2 variants: base (baseline), wide (candidate); a setting of one is rb spec set e1 base.<setting> <value>.",
+    "",
+    "Next: rb spec set e1 --from <config.yaml> --keys \"<the keys that define it>\"  \u00b7  rb criterion add \"<what it should show>\" -e e1 -q <question> --metric <name> --at-most <x>",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "criterion add 'wide holds' -e e1 --metric wide.top1 --at-least 0.6 --id c1",
+   "exit": 0,
+   "out": [
+    "c1: wide holds",
+    "  wide.top1 \u2265 0.6 \u00b7 primary \u00b7 on e1",
+    "  declared; no evidence recorded yet",
+    "",
+    "Next: rb run add e1 wide.top1=<value> --command \"...\"",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "show m.yaml",
+   "exit": 1,
+   "out": [
+    "{",
+    "  \"rb\": 1,",
+    "  \"kind\": \"metric\",",
+    "  \"id\": \"m\",",
+    "  \"unit\": 5,",
+    "  \"direction\": \"sideways\",",
+    "  \"aliases\": \"a\"",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb show: m.yaml reads, but is not a valid metric: created_by: Field required; created_at: Field required; unit: Input should be a valid string; and 2 more",
+    ""
+   ]
+  },
+  {
+   "run": "show m.yaml --json",
+   "exit": 1,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"show\",",
+    " \"data\": {",
+    "  \"path\": \"m.yaml\",",
+    "  \"kind\": \"metric\",",
+    "  \"record\": {",
+    "   \"rb\": 1,",
+    "   \"kind\": \"metric\",",
+    "   \"id\": \"m\",",
+    "   \"unit\": 5,",
+    "   \"direction\": \"sideways\",",
+    "   \"aliases\": \"a\"",
+    "  },",
+    "  \"canonical\": \"{\\\"aliases\\\":\\\"a\\\",\\\"direction\\\":\\\"sideways\\\",\\\"id\\\":\\\"m\\\",\\\"kind\\\":\\\"metric\\\",\\\"rb\\\":1,\\\"unit\\\":5}\",",
+    "  \"content_sha256\": \"f9668545fc755539be6548d79c3937599abb9107e4556b826c5a519eb54a1537\",",
+    "  \"valid\": false,",
+    "  \"problems\": [",
+    "   \"created_by: Field required\",",
+    "   \"created_at: Field required\",",
+    "   \"unit: Input should be a valid string\",",
+    "   \"direction: Input should be 'minimize', 'maximize' or 'none'\",",
+    "   \"aliases: Input should be a valid list\"",
+    "  ],",
+    "  \"warnings\": [",
+    "   \"m.yaml reads, but is not a valid metric: created_by: Field required; created_at: Field required; unit: Input should be a valid string; and 2 more\"",
+    "  ]",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb show: m.yaml reads, but is not a valid metric: created_by: Field required; created_at: Field required; unit: Input should be a valid string; and 2 more",
+    ""
+   ]
+  },
+  {
+   "run": "show crit.yaml",
+   "exit": 1,
+   "out": [
+    "{",
+    "  \"rb\": 1,",
+    "  \"kind\": \"criteria\",",
+    "  \"experiment\": \"e1\",",
+    "  \"criteria\": [",
+    "    {",
+    "      \"id\": \"c7\",",
+    "      \"statement\": \"fine\",",
+    "      \"metric\": \"wide.top1\",",
+    "      \"comparator\": \"at_least\",",
+    "      \"target\": 0.6,",
+    "      \"created_at\": \"2026-10-01T12:00:00.000+00:00\"",
+    "    },",
+    "    {",
+    "      \"id\": \"c8\",",
+    "      \"statement\": \"no rule\",",
+    "      \"metric\": \"wide.top1\",",
+    "      \"comparator\": \"le\"",
+    "    },",
+    "    \"just a line\",",
+    "    [",
+    "      1,",
+    "      2",
+    "    ],",
+    "    null",
+    "  ]",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb show: crit.yaml reads, but is not a valid criteria: criterion c8: created_by: Field required; criterion c8: created_at: Field required; criterion c8: comparator: Input should be 'at_most', 'at_least', 'equals', 'better', 'noninferior' or 'equivalent'; and 3 more",
+    ""
+   ]
+  },
+  {
+   "run": "show crit.yaml --json",
+   "exit": 1,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"show\",",
+    " \"data\": {",
+    "  \"path\": \"crit.yaml\",",
+    "  \"kind\": \"criteria\",",
+    "  \"record\": {",
+    "   \"rb\": 1,",
+    "   \"kind\": \"criteria\",",
+    "   \"experiment\": \"e1\",",
+    "   \"criteria\": [",
+    "    {",
+    "     \"id\": \"c7\",",
+    "     \"statement\": \"fine\",",
+    "     \"metric\": \"wide.top1\",",
+    "     \"comparator\": \"at_least\",",
+    "     \"target\": 0.6,",
+    "     \"created_by\": \"human:t\",",
+    "     \"created_at\": \"2026-10-01T12:00:00.000+00:00\"",
+    "    },",
+    "    {",
+    "     \"id\": \"c8\",",
+    "     \"statement\": \"no rule\",",
+    "     \"metric\": \"wide.top1\",",
+    "     \"comparator\": \"le\"",
+    "    },",
+    "    \"just a line\",",
+    "    [",
+    "     1,",
+    "     2",
+    "    ],",
+    "    null",
+    "   ]",
+    "  },",
+    "  \"canonical\": \"{\\\"criteria\\\":[{\\\"comparator\\\":\\\"at_least\\\",\\\"created_at\\\":\\\"2026-10-01T12:00:00.000+00:00\\\",\\\"created_by\\\":\\\"human:t\\\",\\\"id\\\":\\\"c7\\\",\\\"metric\\\":\\\"wide.top1\\\",\\\"statement\\\":\\\"fine\\\",\\\"target\\\":0.6},{\\\"comparator\\\":\\\"le\\\",\\\"id\\\":\\\"c8\\\",\\\"metric\\\":\\\"wide.top1\\\",\\\"statement\\\":\\\"no rule\\\"},\\\"just a line\\\",[1,2],null],\\\"experiment\\\":\\\"e1\\\",\\\"kind\\\":\\\"criteria\\\",\\\"rb\\\":1}\",",
+    "  \"criteria\": {",
+    "   \"c7\": \"9212f076f657be60e6e21cf3dd16e0e7287dbc8b28b4794223ae7b8e1d31b9ec\",",
+    "   \"c8\": \"65fd29156bc2585061eb9c3a815203720ea9d139b6dc36bf9730f24b1b594a6d\"",
+    "  },",
+    "  \"valid\": false,",
+    "  \"problems\": [",
+    "   \"criterion c8: created_by: Field required\",",
+    "   \"criterion c8: created_at: Field required\",",
+    "   \"criterion c8: comparator: Input should be 'at_most', 'at_least', 'equals', 'better', 'noninferior' or 'equivalent'\",",
+    "   \"criterion ?: Input should be a valid dictionary\",",
+    "   \"criterion ?: Input should be a valid dictionary\",",
+    "   \"criterion ?: Input should be a valid dictionary\"",
+    "  ],",
+    "  \"warnings\": [",
+    "   \"crit.yaml reads, but is not a valid criteria: criterion c8: created_by: Field required; criterion c8: created_at: Field required; criterion c8: comparator: Input should be 'at_most', 'at_least', 'equals', 'better', 'noninferior' or 'equivalent'; and 3 more\"",
+    "  ]",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb show: crit.yaml reads, but is not a valid criteria: criterion c8: created_by: Field required; criterion c8: created_at: Field required; criterion c8: comparator: Input should be 'at_most', 'at_least', 'equals', 'better', 'noninferior' or 'equivalent'; and 3 more",
+    ""
+   ]
+  },
+  {
+   "run": "show kinds.yaml",
+   "exit": 1,
+   "out": [
+    "{",
+    "  \"rb\": 1,",
+    "  \"kind\": [",
+    "    \"metric\"",
+    "  ]",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb show: kinds.yaml reads, but is not a valid record: kind: Input should be a valid string",
+    ""
+   ]
+  },
+  {
+   "run": "show nokind.yaml --json",
+   "exit": 1,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"show\",",
+    " \"data\": {",
+    "  \"path\": \"nokind.yaml\",",
+    "  \"kind\": null,",
+    "  \"record\": {",
+    "   \"rb\": 1,",
+    "   \"id\": \"x\"",
+    "  },",
+    "  \"canonical\": \"{\\\"id\\\":\\\"x\\\",\\\"rb\\\":1}\",",
+    "  \"content_sha256\": \"5e2b92cc57ce618dfbb54844a31775e4b95c6fb552ee6bf5a068133c12d2ad90\",",
+    "  \"valid\": false,",
+    "  \"problems\": [",
+    "   \"kind: Field required\"",
+    "  ],",
+    "  \"warnings\": [",
+    "   \"nokind.yaml reads, but is not a valid record: kind: Field required\"",
+    "  ]",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb show: nokind.yaml reads, but is not a valid record: kind: Field required",
+    ""
+   ]
+  },
+  {
+   "run": "show truthy.yaml --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"show\",",
+    " \"data\": {",
+    "  \"path\": \"truthy.yaml\",",
+    "  \"kind\": \"note\",",
+    "  \"record\": {",
+    "   \"rb\": true,",
+    "   \"kind\": \"note\",",
+    "   \"id\": \"n1\",",
+    "   \"text\": \"hi\",",
+    "   \"by\": \"human:t\",",
+    "   \"at\": \"2026-10-01T12:00:00.000+00:00\"",
+    "  },",
+    "  \"canonical\": \"{\\\"at\\\":\\\"2026-10-01T12:00:00.000+00:00\\\",\\\"by\\\":\\\"human:t\\\",\\\"id\\\":\\\"n1\\\",\\\"kind\\\":\\\"note\\\",\\\"rb\\\":true,\\\"text\\\":\\\"hi\\\"}\",",
+    "  \"content_sha256\": \"3364c16bed78c834019266fa18a854da8f82b04e9405c2a6103e3e0fb3a3b61a\",",
+    "  \"valid\": true,",
+    "  \"problems\": []",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "show list.yaml --json",
+   "exit": 1,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"show\",",
+    " \"data\": {",
+    "  \"path\": \"list.yaml\",",
+    "  \"kind\": null,",
+    "  \"record\": [",
+    "   {",
+    "    \"rb\": 1",
+    "   },",
+    "   {",
+    "    \"kind\": \"metric\"",
+    "   }",
+    "  ],",
+    "  \"canonical\": \"[{\\\"rb\\\":1},{\\\"kind\\\":\\\"metric\\\"}]\",",
+    "  \"content_sha256\": \"414f6cf1445b32ccb6b1a71659c1d3e2009c0cc6826c06d367ff9e49be3eea23\",",
+    "  \"valid\": false,",
+    "  \"problems\": [",
+    "   \"not a record of Rabbit Brain format 1: it does not start with rb: 1\"",
+    "  ],",
+    "  \"warnings\": [",
+    "   \"list.yaml reads, but is not a valid record: not a record of Rabbit Brain format 1: it does not start with rb: 1\"",
+    "  ]",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb show: list.yaml reads, but is not a valid record: not a record of Rabbit Brain format 1: it does not start with rb: 1",
+    ""
+   ]
+  },
+  {
+   "run": "show q.json",
+   "exit": 0,
+   "out": [
+    "{",
+    "  \"rb\": 1,",
+    "  \"kind\": \"question\",",
+    "  \"id\": \"q1\",",
+    "  \"text\": \"does it?\",",
+    "  \"created_at\": \"2026-10-01T12:00:00.000+00:00\"",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "show exp.yaml --json",
+   "exit": 1,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"show\",",
+    " \"data\": {",
+    "  \"path\": \"exp.yaml\",",
+    "  \"kind\": \"experiment\",",
+    "  \"record\": {",
+    "   \"rb\": 1,",
+    "   \"kind\": \"experiment\",",
+    "   \"id\": \"e\",",
+    "   \"title\": \"t\",",
+    "   \"uid\": \"u\",",
+    "   \"variants\": [",
+    "    {",
+    "     \"name\": 1",
+    "    },",
+    "    {",
+    "     \"name\": \"a\",",
+    "     \"role\": \"baseline\"",
+    "    }",
+    "   ],",
+    "   \"settings\": 5",
+    "  },",
+    "  \"canonical\": \"{\\\"id\\\":\\\"e\\\",\\\"kind\\\":\\\"experiment\\\",\\\"rb\\\":1,\\\"settings\\\":5,\\\"title\\\":\\\"t\\\",\\\"uid\\\":\\\"u\\\",\\\"variants\\\":[{\\\"name\\\":1},{\\\"name\\\":\\\"a\\\",\\\"role\\\":\\\"baseline\\\"}]}\",",
+    "  \"content_sha256\": \"606a55fb4e2d702c74963c60238bfa1c2582f421b3fc403f5cc8624218233999\",",
+    "  \"valid\": false,",
+    "  \"problems\": [",
+    "   \"created_by: Field required\",",
+    "   \"created_at: Field required\",",
+    "   \"uid: String should match pattern '^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$'\",",
+    "   \"variants.0.name: Input should be a valid string\",",
+    "   \"variants.0.role: Field required\",",
+    "   \"variants.0.created_by: Field required\",",
+    "   \"variants.0.created_at: Field required\",",
+    "   \"variants.1.created_by: Field required\",",
+    "   \"variants.1.created_at: Field required\",",
+    "   \"settings: Input should be a valid list\"",
+    "  ],",
+    "  \"warnings\": [",
+    "   \"exp.yaml reads, but is not a valid experiment: created_by: Field required; created_at: Field required; uid: String should match pattern '^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$'; and 7 more\"",
+    "  ]",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb show: exp.yaml reads, but is not a valid experiment: created_by: Field required; created_at: Field required; uid: String should match pattern '^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$'; and 7 more",
+    ""
+   ]
+  },
+  {
+   "run": "show rule.yaml",
+   "exit": 1,
+   "out": [
+    "{",
+    "  \"rb\": 1,",
+    "  \"kind\": \"criterion\",",
+    "  \"id\": \"c\",",
+    "  \"experiment\": \"e\",",
+    "  \"statement\": \"s\",",
+    "  \"metric\": \"m\",",
+    "  \"comparator\": \"at_most\",",
+    "  \"created_at\": \"x\"",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb show: rule.yaml reads, but is not a valid criterion: value: Value error, an 'at_most' criterion needs a target",
+    ""
+   ]
+  },
+  {
+   "run": "show broken.yaml",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb show: broken.yaml:3:3: this line is indented more than the keys beside it; line it up with its sibling keys, or put it under a key that ends with ':'",
+    "  \u2192 line it up with its sibling keys, or put it under a key that ends with ':'",
+    ""
+   ]
+  },
+  {
+   "run": "show latin.yaml",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb show: latin.yaml is not UTF-8 text (the byte 0xff at offset 23); Rabbit Brain YAML is UTF-8.",
+    "  \u2192 Save the file as UTF-8.",
+    ""
+   ]
+  },
+  {
+   "run": "show latin.yaml --json",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"show\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_YAML\",",
+    "   \"message\": \"latin.yaml is not UTF-8 text (the byte 0xff at offset 23); Rabbit Brain YAML is UTF-8.\",",
+    "   \"fix\": \"Save the file as UTF-8.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "show nan.yaml",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb show: nan.yaml:4:8: .nan is a number to some YAML parsers and not to others; write it as a plain decimal number (7, 0.5, 1.0e+3), or quote it for text: \".nan\"",
+    "  \u2192 write it as a plain decimal number (7, 0.5, 1.0e+3), or quote it for text: \".nan\"",
+    ""
+   ]
+  }
+ ],
+ "files": {
+  ".rb/.gitattributes": [
+   "* -text",
+   "log.jsonl merge=union",
+   ""
+  ],
+  ".rb/.gitignore": [
+   ".lock",
+   "*.tmp",
+   "cache/",
+   "journal/",
+   ""
+  ],
+  ".rb/cache/objects/4b/4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb.json.gz": {
+   "sha256": "a929faebb1691ebb0d70bcb999fcf2a10feaf26f2b747ffe16445cf3b9d49a93",
+   "bytes": 117
+  },
+  ".rb/cache/objects/53/53a56a6e0e253fc5556c38ed9b02e72189c45469305498398044953f8da7cc3a.json.gz": {
+   "sha256": "daa380f2c02de77f47534f5782e459b06cabbe2ca5b07697f3d3f87a3ba427b4",
+   "bytes": 145
+  },
+  ".rb/cache/objects/70/705d562d8eae5a334b08631180e366472db846dafb2a6deb079ff7750c9dfb3d.json.gz": {
+   "sha256": "27d8e36518ba64088add777634735fd9cc8cac1249b7fbf2187aa19ed911e78c",
+   "bytes": 251
+  },
+  ".rb/cache/objects/ea/eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695.json.gz": {
+   "sha256": "a4a7d60fac003794f1d4e7a0a04959209477dff8191473a5247407635419fb79",
+   "bytes": 116
+  },
+  ".rb/cache/objects/f3/f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6.json.gz": {
+   "sha256": "b49dd5346ef687f6a501f3c6c503e1efd5ace2a96eedf9f77d561c59e91c0f41",
+   "bytes": 144
+  },
+  ".rb/experiments/e1/criteria/c1.yaml": [
+   "rb: 1",
+   "kind: criterion",
+   "id: c1",
+   "experiment: e1",
+   "statement: wide holds",
+   "metric: wide.top1",
+   "comparator: at_least",
+   "target: 0.6",
+   "over: mean",
+   "role: primary",
+   "min_n: 1",
+   "origin: own",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/experiment.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: e1",
+   "uid: exp_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: x",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/variants/base.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: base",
+   "role: baseline",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/variants/wide.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: wide",
+   "role: candidate",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/log.jsonl": [
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"t\", \"sha256\": \"f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"t\", \"head\": \"\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"53a56a6e0e253fc5556c38ed9b02e72189c45469305498398044953f8da7cc3a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/base\", \"path\": \".rb/experiments/e1/variants/base.yaml\", \"sha256\": \"eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695\"}, {\"kind\": \"variant\", \"id\": \"e1/wide\", \"path\": \".rb/experiments/e1/variants/wide.yaml\", \"sha256\": \"4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb\"}], \"detail\": {\"variants\": [\"base\", \"wide\"], \"like\": null, \"questions\": [], \"changed_parts\": {\"e1\": {\"variant:base\": \"baseline\", \"variant:wide\": \"candidate\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c1\", \"sha256\": \"705d562d8eae5a334b08631180e366472db846dafb2a6deb079ff7750c9dfb3d\", \"path\": \".rb/experiments/e1/criteria/c1.yaml\", \"detail\": {\"rule\": \"wide.top1 \u2265 0.6\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:c1\": \"primary\", \"rule:c1\": \"wide.top1 \u2265 0.6\"}}}}",
+   ""
+  ],
+  ".rb/project.yaml": [
+   "rb: 1",
+   "kind: project",
+   "id: t",
+   "uid: prj_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: t",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  "broken.yaml": [
+   "rb: 1",
+   "kind: metric",
+   "  id: [",
+   ""
+  ],
+  "crit.yaml": [
+   "rb: 1",
+   "kind: criteria",
+   "experiment: e1",
+   "criteria:",
+   "  - id: c7",
+   "    statement: fine",
+   "    metric: wide.top1",
+   "    comparator: at_least",
+   "    target: 0.6",
+   "    created_by: human:t",
+   "    created_at: '2026-10-01T12:00:00.000+00:00'",
+   "  - id: c8",
+   "    statement: no rule",
+   "    metric: wide.top1",
+   "    comparator: le",
+   "  - just a line",
+   "  - [1, 2]",
+   "  -",
+   ""
+  ],
+  "exp.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: e",
+   "title: t",
+   "uid: u",
+   "variants:",
+   "  - name: 1",
+   "  - name: a",
+   "    role: baseline",
+   "settings: 5",
+   ""
+  ],
+  "kinds.yaml": [
+   "rb: 1",
+   "kind:",
+   "  - metric",
+   ""
+  ],
+  "latin.yaml": {
+   "sha256": "394cf3af06ce244d2fe27dd5ae02664a771ab77cd54cc42064ab180536ab1c6a",
+   "bytes": 25
+  },
+  "list.yaml": [
+   "- rb: 1",
+   "- kind: metric",
+   ""
+  ],
+  "m.yaml": [
+   "rb: 1",
+   "kind: metric",
+   "id: m",
+   "unit: 5",
+   "direction: sideways",
+   "aliases: a",
+   ""
+  ],
+  "nan.yaml": [
+   "rb: 1",
+   "kind: metric",
+   "id: m",
+   "scale: .nan",
+   ""
+  ],
+  "nokind.yaml": [
+   "rb: 1",
+   "id: x",
+   ""
+  ],
+  "q.json": [
+   "{\"rb\": 1, \"kind\": \"question\", \"id\": \"q1\", \"text\": \"does it?\", \"created_by\": \"human:t\", \"created_at\": \"2026-10-01T12:00:00.000+00:00\"}",
+   ""
+  ],
+  "rule.yaml": [
+   "rb: 1",
+   "kind: criterion",
+   "id: c",
+   "experiment: e",
+   "statement: s",
+   "metric: m",
+   "comparator: at_most",
+   "created_by: human:t",
+   "created_at: x",
+   ""
+  ],
+  "truthy.yaml": [
+   "rb: true",
+   "kind: note",
+   "id: n1",
+   "text: hi",
+   "by: human:t",
+   "at: '2026-10-01T12:00:00.000+00:00'",
+   ""
+  ]
+ }
+}

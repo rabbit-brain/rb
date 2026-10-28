@@ -1,0 +1,3 @@
+//! The page's icon, inlined by the shell's frame (shell/views.rs).
+
+pub const FAVICON: &str = r###"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2215%22%20fill%3D%22%231c2431%22/%3E%3Ctext%20x%3D%2228%22%20y%3D%2245%22%20text-anchor%3D%22middle%22%20font-size%3D%2236%22%20font-weight%3D%22800%22%20font-family%3D%22system-ui%2C-apple-system%2CHelvetica%2CArial%2Csans-serif%22%20letter-spacing%3D%22-2.5%22%20fill%3D%22%23ffffff%22%3Erb%3C/text%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2242%22%20r%3D%225.5%22%20fill%3D%22%234f7cf5%22/%3E%3C/svg%3E"###;

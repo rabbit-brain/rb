@@ -1,0 +1,7106 @@
+{
+ "prog": "rb",
+ "description": "The record of the experiments your coding agents run, as Rabbit Brain YAML files in your repo: questions, experiments with their hypothesis, variants and criteria, runs with receipts, and the resources they used. Agents record; rb checks and computes findings; you decide. Documentation: rb docs. New here? Run rb tour.",
+ "actions": [
+  {
+   "kind": "help",
+   "options": [
+    "-h",
+    "--help"
+   ],
+   "dest": "help",
+   "nargs": 0,
+   "default": "==SUPPRESS==",
+   "help": "show this help message and exit"
+  },
+  {
+   "kind": "version",
+   "options": [
+    "--version"
+   ],
+   "dest": "version",
+   "nargs": 0,
+   "default": "==SUPPRESS==",
+   "help": "show program's version number and exit",
+   "version": "rabbit-brain {version}"
+  },
+  {
+   "kind": "parsers",
+   "dest": "command",
+   "nargs": "A...",
+   "metavar": "<command>",
+   "parsers": [
+    [
+     "init",
+     {
+      "prog": "rb init",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "title",
+        "nargs": "?",
+        "help": "the work's theme, which its questions share: a paper's title, a model, a line of work (default: this directory's name)"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--id"
+        ],
+        "dest": "id",
+        "help": "a short id for the project (default: from the title)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--no-agents"
+        ],
+        "dest": "no_agents",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "leave the agents' instruction files alone (default: install rb's instructions for the agents found here, as rb skill add does)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--new-project"
+        ],
+        "dest": "new_project",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "start a separate project in a worktree whose repository already holds the project's record in another worktree (default: refused, with how to bring that record here)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--yes"
+        ],
+        "dest": "yes",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "add rb's section to an AGENTS.md and rb's server to a .mcp.json that are here without asking (default: asked once in your terminal; elsewhere left as they are, with what to add)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--dry-run"
+        ],
+        "dest": "dry_run",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "list every file and integration rb init would write, every file it would change and how, and what later commands add, writing nothing"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         3,
+         4,
+         5,
+         6,
+         7
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_init"
+      }
+     }
+    ],
+    [
+     "doctor",
+     {
+      "prog": "rb doctor",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--restore"
+        ],
+        "dest": "restore",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "put back what rb last wrote for every record changed outside rb"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--adopt"
+        ],
+        "dest": "adopt",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "take every change made outside rb as it stands (with --why); edits to who wrote or decided what are refused"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "-m",
+         "--why"
+        ],
+        "dest": "why",
+        "help": "the reason, recorded with --adopt"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--words"
+        ],
+        "dest": "words",
+        "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+        "metavar": "TEXT"
+       },
+       {
+        "kind": "append",
+        "options": [
+         "--seen"
+        ],
+        "dest": "seen",
+        "help": "with --adopt: the reviewed files, each pinned to the sha it had (or 'deleted'); any drift since is refused",
+        "metavar": "PATH@SHA256"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         3,
+         4,
+         5,
+         6
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_doctor"
+      }
+     }
+    ],
+    [
+     "remove",
+     {
+      "prog": "rb remove",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--dry-run"
+        ],
+        "dest": "dry_run",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "show the plan (what rb would remove, what it would keep and why), removing nothing"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--yes"
+        ],
+        "dest": "yes",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "remove without asking (default: asked once in your terminal; refused where there is none)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         3
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_remove"
+      }
+     }
+    ],
+    [
+     "project",
+     {
+      "prog": "rb project",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<title>",
+        "parsers": [
+         [
+          "title",
+          {
+           "prog": "rb project title",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "title",
+             "required": true,
+             "help": "the work's theme: a paper's title, a model, a line of work"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "required": true,
+             "help": "why the title is changing, kept in the log"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_project_title"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "title",
+          "metavar": "title",
+          "help": "change the project's title, keeping its identity and record"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "question",
+     {
+      "prog": "rb question",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<add|move|reword>",
+        "parsers": [
+         [
+          "add",
+          {
+           "prog": "rb question add",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "text",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--id"
+             ],
+             "dest": "id"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--parent"
+             ],
+             "dest": "parent",
+             "help": "the question this one sits under"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5,
+              6
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_question_add"
+           }
+          }
+         ],
+         [
+          "move",
+          {
+           "prog": "rb question move",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "question",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--parent"
+             ],
+             "dest": "parent"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--top"
+             ],
+             "dest": "top",
+             "nargs": 0,
+             "const": true,
+             "default": false
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "the reason, recorded with the call"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5,
+              6,
+              7
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_question_move"
+           }
+          }
+         ],
+         [
+          "reword",
+          {
+           "prog": "rb question reword",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "question",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "text",
+             "required": true,
+             "help": "the new wording, verbatim: the user's own words, never a formalization of them"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "required": true,
+             "help": "why it is reworded, kept in the log"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              5,
+              6
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_question_reword"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "add",
+          "metavar": "add",
+          "help": "add a question, at the top or under another"
+         },
+         {
+          "dest": "move",
+          "metavar": "move",
+          "help": "put a question under another one, or at the top; its evidence goes with it"
+         },
+         {
+          "dest": "reword",
+          "metavar": "reword",
+          "help": "give a question new wording, kept as a revision: the log keeps the old wording, who changed it and why; its id, evidence and calls stay"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "experiment",
+     {
+      "prog": "rb experiment",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<add|file|relate|gate>",
+        "parsers": [
+         [
+          "add",
+          {
+           "prog": "rb experiment add",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "title",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--id"
+             ],
+             "dest": "id",
+             "help": "a short id you choose (default: e and six random characters)"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "-q",
+              "--question"
+             ],
+             "dest": "question",
+             "help": "a question it is filed under (repeatable: an experiment can answer several)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--hypothesis"
+             ],
+             "dest": "hypothesis",
+             "help": "what you expect it to show"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "why you expect it"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--purpose"
+             ],
+             "dest": "purpose",
+             "help": "what it is for, when that is not a hypothesis (a benchmark, a sweep)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--baseline"
+             ],
+             "dest": "baseline",
+             "help": "name of the baseline variant, e.g. fp32"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--candidate"
+             ],
+             "dest": "candidate",
+             "help": "name of a candidate variant, e.g. int8 (repeatable)"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--varies"
+             ],
+             "dest": "varies",
+             "help": "the settings the variants differ in on purpose (repeatable or comma-separated); any other difference is a confound"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--like"
+             ],
+             "dest": "like",
+             "help": "copy another experiment's shared settings (as provisional) and what it varies"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--note"
+             ],
+             "dest": "note",
+             "default": "",
+             "help": "a first note: context, an assumption, a caveat"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--if-holds"
+             ],
+             "dest": "if_holds",
+             "help": "the decision it gates: the action taken when it holds; the sentence it was said in goes in --words",
+             "metavar": "TEXT"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--if-not"
+             ],
+             "dest": "if_not",
+             "help": "and what to do when it does not",
+             "metavar": "TEXT"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_experiment_add"
+           }
+          }
+         ],
+         [
+          "file",
+          {
+           "prog": "rb experiment file",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "experiment",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "question",
+             "required": true
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--remove"
+             ],
+             "dest": "remove",
+             "nargs": 0,
+             "const": true,
+             "default": false
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              5
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_experiment_file"
+           }
+          }
+         ],
+         [
+          "relate",
+          {
+           "prog": "rb experiment relate",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "experiment",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "relation",
+             "choices": [
+              "reproduces",
+              "extends",
+              "follows_from",
+              "compares_with"
+             ],
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "target",
+             "required": true,
+             "help": "another experiment's id here, its global uid, or a published manifest's address"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--note"
+             ],
+             "dest": "note"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4,
+              5
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              6
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_experiment_relate"
+           }
+          }
+         ],
+         [
+          "gate",
+          {
+           "prog": "rb experiment gate",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "experiment",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--if-holds"
+             ],
+             "dest": "if_holds",
+             "help": "the action taken when it holds",
+             "metavar": "TEXT"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--if-not"
+             ],
+             "dest": "if_not",
+             "help": "what to do when it does not",
+             "metavar": "TEXT"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "the reason, recorded with the call"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5,
+              6,
+              7
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_experiment_gate"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "add",
+          "metavar": "add",
+          "help": "add an experiment: planned until its first run"
+         },
+         {
+          "dest": "file",
+          "metavar": "file",
+          "help": "file an experiment under one more question (or --remove it from one)"
+         },
+         {
+          "dest": "relate",
+          "metavar": "relate",
+          "help": "how an experiment stands to another: reproduces, extends, follows_from, compares_with"
+         },
+         {
+          "dest": "gate",
+          "metavar": "gate",
+          "help": "the decision an experiment gates, set or revised: the action taken if it holds, and if not; the sentence it was said in goes in --words"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "note",
+     {
+      "prog": "rb note",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<add>",
+        "parsers": [
+         [
+          "add",
+          {
+           "prog": "rb note add",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "text",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-e",
+              "--experiment"
+             ],
+             "dest": "experiment",
+             "help": "the experiment it is about (default: the whole project)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_note_add"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "add",
+          "metavar": "add",
+          "help": "add a note, kept verbatim with who wrote it"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "variant",
+     {
+      "prog": "rb variant",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<add>",
+        "parsers": [
+         [
+          "add",
+          {
+           "prog": "rb variant add",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "experiment",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "name",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--role"
+             ],
+             "dest": "role",
+             "choices": [
+              "baseline",
+              "candidate",
+              "control",
+              "ablation"
+             ],
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--note"
+             ],
+             "dest": "note",
+             "default": ""
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--amend"
+             ],
+             "dest": "amend",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "the experiment is frozen: add it anyway (with --why); the amendment is recorded"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "the reason, recorded with the call"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              5,
+              6,
+              7,
+              8,
+              9
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_variant_add"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "add",
+          "metavar": "add",
+          "help": "add a variant to an experiment"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "metric",
+     {
+      "prog": "rb metric",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<add>",
+        "parsers": [
+         [
+          "add",
+          {
+           "prog": "rb metric add",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "name",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--unit"
+             ],
+             "dest": "unit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--minimize"
+             ],
+             "dest": "minimize",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "lower is better (an error, a loss, a latency)"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--maximize"
+             ],
+             "dest": "maximize",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "higher is better (an accuracy, a score)"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--alias"
+             ],
+             "dest": "alias",
+             "help": "another name runs may use for it (repeatable), e.g. cross_entropy"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--description"
+             ],
+             "dest": "description"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5,
+              6,
+              7,
+              8
+             ]
+            }
+           ],
+           "mutex": [
+            {
+             "required": false,
+             "actions": [
+              5,
+              6
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_metric_add"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "add",
+          "metavar": "add",
+          "help": "declare a metric"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "spec",
+     {
+      "prog": "rb spec",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<set|verify|vary>",
+        "parsers": [
+         [
+          "set",
+          {
+           "prog": "rb spec set",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "experiment",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "name",
+             "nargs": "?",
+             "help": "the setting; <variant>.<name> for one variant's own value"
+            },
+            {
+             "kind": "store",
+             "dest": "value",
+             "nargs": "?",
+             "help": "a number, true/false, text, or a JSON list; optional with file#key or run: sources"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--unknown"
+             ],
+             "dest": "unknown",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "nobody has found this value yet"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--per-run"
+             ],
+             "dest": "per_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "each run gives its own value (a seed): --set seed=2 on rb run add"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--design-factor"
+             ],
+             "dest": "design_factor",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "a fixed design choice, not an independent sample; a new setting becomes per-run, and an existing one must already be per-run"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--sample-factor"
+             ],
+             "dest": "sample_factor",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "clear this setting's design-factor declaration"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--source"
+             ],
+             "dest": "source",
+             "help": "where the value comes from: file#key (YAML/JSON/TOML), database#table[column=value].column (SQLite), file:LINE, run:PATH#/pointer, https://..., or note:text"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--quote"
+             ],
+             "dest": "quote",
+             "help": "the exact text in a file or url source that states it"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--term"
+             ],
+             "dest": "term",
+             "help": "the word the source uses for it on a prose line, e.g. \"learning rate\""
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--commit"
+             ],
+             "dest": "commit",
+             "help": "read the file at this git commit instead of the working tree"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--locator"
+             ],
+             "dest": "locator",
+             "help": "how a reader finds it, e.g. \"§4.2\" or \"Table 3\""
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--variant"
+             ],
+             "dest": "variant",
+             "help": "set it for this variant only (same as <variant>.<name>)"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--optional"
+             ],
+             "dest": "optional",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "an unknown value is a note, not an integrity problem of the findings"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--required"
+             ],
+             "dest": "required",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "it does (the default for a new setting)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--cited"
+             ],
+             "dest": "cited",
+             "help": "the value the cited source (a paper, its evaluation code) used; a difference makes cited criteria not comparable",
+             "metavar": "VALUE"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--cited-source"
+             ],
+             "dest": "cited_source",
+             "help": "where the cited value comes from"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--from"
+             ],
+             "dest": "from_file",
+             "help": "record settings from a YAML/JSON/TOML config, each by key path, with --keys",
+             "metavar": "FILE"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--keys"
+             ],
+             "dest": "keys",
+             "help": "with --from: the keys that define the experiment, glob patterns, e.g. \"optim.*,model.depth\""
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--note"
+             ],
+             "dest": "note"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--no-verify"
+             ],
+             "dest": "no_verify",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "record it without checking the source now"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--amend"
+             ],
+             "dest": "amend",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "the experiment is frozen: change it anyway (with --why); the amendment is recorded"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "the reason, recorded with the call"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4,
+              5
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26
+             ]
+            }
+           ],
+           "mutex": [
+            {
+             "required": false,
+             "actions": [
+              8,
+              9
+             ]
+            },
+            {
+             "required": false,
+             "actions": [
+              16,
+              17
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_spec_set"
+           }
+          }
+         ],
+         [
+          "verify",
+          {
+           "prog": "rb spec verify",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "experiment",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "names",
+             "nargs": "*",
+             "required": true,
+             "help": "settings (default: every setting with a source)"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_spec_verify"
+           }
+          }
+         ],
+         [
+          "vary",
+          {
+           "prog": "rb spec vary",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "experiment",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "names",
+             "nargs": "+",
+             "required": true,
+             "help": "setting names (or comma-separated)"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--amend"
+             ],
+             "dest": "amend",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "the experiment is frozen: change it anyway (with --why); the amendment is recorded"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "the reason, recorded with the call"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              5,
+              6,
+              7
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_spec_vary"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "set",
+          "metavar": "set",
+          "help": "give a setting's value and source (checked when it can be), record it as unknown, or read many from a config with --from"
+         },
+         {
+          "dest": "verify",
+          "metavar": "verify",
+          "help": "check each setting's source again and record what it states; verified only if it states the value"
+         },
+         {
+          "dest": "vary",
+          "metavar": "vary",
+          "help": "declare settings the variants differ in on purpose; any other difference is a confound"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "criterion",
+     {
+      "prog": "rb criterion",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<add|file|relate>",
+        "parsers": [
+         [
+          "add",
+          {
+           "prog": "rb criterion add",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "statement",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-e",
+              "--experiment"
+             ],
+             "dest": "experiment",
+             "required": true,
+             "help": "the experiment whose runs test it"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "-q",
+              "--question"
+             ],
+             "dest": "question",
+             "help": "the question this criterion bears on (repeatable)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--when-met"
+             ],
+             "dest": "when_met",
+             "help": "your interpretation for these questions when the rule is met, verbatim"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--metric"
+             ],
+             "dest": "metric",
+             "required": true,
+             "help": "what is measured: val_loss, int8.val_loss, candidate.val_loss, or change.val_loss (the candidate against the baseline); with --subject/--reference, the bare metric"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--subject"
+             ],
+             "dest": "subject",
+             "help": "the arm it is about: a variant, a role, or an arm an analysis names (default: the only candidate)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--reference"
+             ],
+             "dest": "reference",
+             "help": "the arm it is compared against; without one it reads a level"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--estimand"
+             ],
+             "dest": "estimand",
+             "help": "what is estimated, when an analysis reports it that way: pooled, per_class (default: rb's reading of the runs, a mean over units)"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--where"
+             ],
+             "dest": "where",
+             "help": "select exact per-run setting values; repeat to require all (where)",
+             "metavar": "NAME=VALUE"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--subject-where"
+             ],
+             "dest": "subject_where",
+             "help": "select exact per-run setting values; repeat to require all (subject-where)",
+             "metavar": "NAME=VALUE"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--reference-where"
+             ],
+             "dest": "reference_where",
+             "help": "select exact per-run setting values; repeat to require all (reference-where)",
+             "metavar": "NAME=VALUE"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--at-most"
+             ],
+             "dest": "at_most",
+             "type": "float"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--at-least"
+             ],
+             "dest": "at_least",
+             "type": "float"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--equals",
+              "--within"
+             ],
+             "dest": "equals",
+             "type": "float",
+             "help": "with --tolerance: holds when |observed - TARGET| <= tolerance",
+             "metavar": "TARGET"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--tolerance"
+             ],
+             "dest": "tolerance",
+             "type": "float"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--better"
+             ],
+             "dest": "better",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "the subject is better than the reference: the interval clear of 0 on the better side"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--noninferior"
+             ],
+             "dest": "noninferior",
+             "type": "float",
+             "help": "the subject is no worse than the reference by more than MARGIN, read on the interval",
+             "metavar": "MARGIN"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--equivalent"
+             ],
+             "dest": "equivalent",
+             "type": "float",
+             "help": "the difference lies inside ±MARGIN, read on the interval",
+             "metavar": "MARGIN"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--over"
+             ],
+             "dest": "over",
+             "choices": [
+              "mean",
+              "each",
+              "bound"
+             ],
+             "help": "==SUPPRESS=="
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--each"
+             ],
+             "dest": "each",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "a threshold every independent unit must meet, not only the estimate"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--bound"
+             ],
+             "dest": "bound",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "a threshold on the interval's bound (the upper for --at-most, the lower for --at-least)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--role"
+             ],
+             "dest": "role",
+             "default": "primary",
+             "choices": [
+              "primary",
+              "secondary",
+              "exploratory",
+              "gate"
+             ],
+             "help": "primary (what the work claims), secondary, exploratory, or gate (a priority policy: a miss parks a line, it never refutes it)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--min-n"
+             ],
+             "dest": "min_n",
+             "default": 1,
+             "type": "int",
+             "help": "independent units it takes (default 1)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--noise"
+             ],
+             "dest": "noise",
+             "type": "float",
+             "help": "run-to-run spread: an estimate this close to the rule is said to be within the noise"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--source"
+             ],
+             "dest": "source",
+             "help": "where the cited number (a paper's table) comes from: file#key (YAML/JSON/TOML), file:LINE, run:PATH#/pointer, https://..., or note:text"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--quote"
+             ],
+             "dest": "quote",
+             "help": "the exact text that states the number, or the ordering a threshold of 0 cites; a file source must state it or the criterion is refused"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--term"
+             ],
+             "dest": "term",
+             "help": "the word the source uses for it on a prose line, e.g. \"learning rate\""
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--commit"
+             ],
+             "dest": "commit",
+             "help": "read the file at this git commit instead of the working tree"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--locator"
+             ],
+             "dest": "locator",
+             "help": "how a reader finds it, e.g. \"§4.2\" or \"Table 3\""
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--note"
+             ],
+             "dest": "note",
+             "default": ""
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--amend"
+             ],
+             "dest": "amend",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "the experiment is frozen: add it anyway (with --why); the amendment is recorded"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "the reason, recorded with the call"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--id"
+             ],
+             "dest": "id"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_criterion_add"
+           }
+          }
+         ],
+         [
+          "file",
+          {
+           "prog": "rb criterion file",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "criterion",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "question",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--when-met"
+             ],
+             "dest": "when_met",
+             "help": "your interpretation when the rule is met, verbatim; omitted keeps the current words"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--remove"
+             ],
+             "dest": "remove",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "retract this question declaration, keeping its history"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--amend"
+             ],
+             "dest": "amend",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "change the frozen declaration with the reason recorded"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "required": true,
+             "help": "the reason, recorded with the call"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              5,
+              6,
+              7,
+              8,
+              9
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_criterion_file"
+           }
+          }
+         ],
+         [
+          "relate",
+          {
+           "prog": "rb criterion relate",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "criterion",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "relation",
+             "choices": [
+              "reverses"
+             ],
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "target",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--orientation"
+             ],
+             "dest": "orientation",
+             "choices": [
+              "same",
+              "opposite"
+             ],
+             "help": "same: corresponding subject/reference order; opposite: swap the target's order"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--remove"
+             ],
+             "dest": "remove",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "withdraw the relation, keeping its attribution"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--amend"
+             ],
+             "dest": "amend",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "change a frozen relation with the reason recorded"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "required": true,
+             "help": "the reason, recorded with the call"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4,
+              5
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              6,
+              7,
+              8,
+              9,
+              10
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_criterion_relate"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "add",
+          "metavar": "add",
+          "help": "declare a criterion; declare it before the evidence that tests it"
+         },
+         {
+          "dest": "file",
+          "metavar": "file",
+          "help": "declare which question a criterion bears on and what meeting it would mean"
+         },
+         {
+          "dest": "relate",
+          "metavar": "relate",
+          "help": "declare, with its reason, that a comparison reverses another and how their arms align; rb reads whether it does"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "analysis",
+     {
+      "prog": "rb analysis",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<add>",
+        "parsers": [
+         [
+          "add",
+          {
+           "prog": "rb analysis add",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "experiment",
+             "required": true
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--compare"
+             ],
+             "dest": "compare",
+             "help": "one comparison it produced (repeatable), e.g. new/old:score=0.12[0.07,0.17]",
+             "metavar": "SUBJECT/REFERENCE:METRIC[@ESTIMAND]=EST[LO,HI]"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--from"
+             ],
+             "dest": "from_file",
+             "help": "its output file listing the comparisons (JSON/YAML/TOML); hashed, and read as computed",
+             "metavar": "FILE"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--title"
+             ],
+             "dest": "title"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--reads"
+             ],
+             "dest": "reads",
+             "help": "runs or analyses it read (repeatable or comma-separated)",
+             "metavar": "RUN|ANALYSIS"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--input"
+             ],
+             "dest": "input",
+             "help": "a resource it read, e.g. predictions:eval (repeatable)",
+             "metavar": "RESOURCE[:ROLE]"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--artifact",
+              "--file"
+             ],
+             "dest": "artifact",
+             "help": "an output whose hash goes into the analysis (repeatable)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--method"
+             ],
+             "dest": "method",
+             "help": "how the intervals were made, e.g. \"paired bootstrap over scenes\""
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--unit"
+             ],
+             "dest": "unit",
+             "help": "the independent unit it resampled, e.g. \"scene\""
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--units"
+             ],
+             "dest": "units",
+             "type": "int",
+             "help": "how many of them"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--draws"
+             ],
+             "dest": "draws",
+             "type": "int",
+             "help": "bootstrap draws, when it resampled"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--level"
+             ],
+             "dest": "level",
+             "type": "float",
+             "help": "the intervals' level (default 0.95)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--source"
+             ],
+             "dest": "source",
+             "help": "the document that states the numbers (a README, a report saved as text): rb finds the line that states each"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--quote"
+             ],
+             "dest": "quote",
+             "help": "the exact row that states them"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--commit"
+             ],
+             "dest": "commit",
+             "help": "read the document at this git commit"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--locator"
+             ],
+             "dest": "locator",
+             "help": "how a reader finds it, e.g. \"Table 2\""
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--supersedes"
+             ],
+             "dest": "supersedes",
+             "help": "an earlier analysis this one replaces (with --why)",
+             "metavar": "ANALYSIS"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--produced-at"
+             ],
+             "dest": "produced_at",
+             "help": "when it was computed, when earlier than now, or unknown",
+             "metavar": "WHEN"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--command"
+             ],
+             "dest": "command_text",
+             "help": "the command that computed it (recorded as given; rb does not run it)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "why it supersedes the earlier analysis"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--note"
+             ],
+             "dest": "note"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--id"
+             ],
+             "dest": "id"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_analysis_add"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "add",
+          "metavar": "add",
+          "help": "record an analysis: its comparisons, what it read, its method, and where its numbers are stated"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "run",
+     {
+      "prog": "rb run",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<add>",
+        "parsers": [
+         [
+          "add",
+          {
+           "prog": "rb run add",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "experiment",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "pairs",
+             "nargs": "*",
+             "required": true,
+             "help": "results, e.g. int8.val_loss=5.64 latency_ms=25.1",
+             "metavar": "NAME=VALUE"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--variant"
+             ],
+             "dest": "variant",
+             "help": "the variant these numbers are for: val_loss=5.64 becomes <variant>.val_loss"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--from"
+             ],
+             "dest": "from_file",
+             "help": "a JSON/YAML/TOML object of metric names to numbers (nested keys join with dots), or a SQLite database with --table",
+             "metavar": "FILE"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--keys"
+             ],
+             "dest": "keys",
+             "help": "with --from: only these numbers, glob patterns, e.g. \"summary.*\" (the file is still hashed whole)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--table"
+             ],
+             "dest": "table",
+             "help": "with --from a SQLite database: the table that holds the run's row (the database is read, never written)"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--where"
+             ],
+             "dest": "where",
+             "help": "with --table: the row's columns and their values, e.g. precision=int8,seed=1; exactly one row must have them all",
+             "metavar": "COLUMN=VALUE"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--select"
+             ],
+             "dest": "select",
+             "help": "with --table: only these of the row's columns that name a declared metric (default: all of them)",
+             "metavar": "COLUMN"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--config"
+             ],
+             "dest": "config",
+             "help": "the run's own resolved config (Hydra, W&B config.yaml, hparams.yaml): checks it ran with the spec"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--set"
+             ],
+             "dest": "set",
+             "help": "a per-run setting this run used, e.g. seed=2; with --table, seed=@seed takes the row's seed column, and seed=@configs.seed (or @configs[config_id].seed) the seed of the row of configs that table links",
+             "metavar": "NAME=VALUE"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--input"
+             ],
+             "dest": "input",
+             "help": "a resource the run read, e.g. imagenet-val:eval (repeatable)",
+             "metavar": "RESOURCE[:ROLE]"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--output"
+             ],
+             "dest": "output",
+             "help": "a resource the run made, e.g. int8-ckpt:checkpoint (repeatable)",
+             "metavar": "RESOURCE[:ROLE]"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--host"
+             ],
+             "dest": "host",
+             "help": "where it ran, as you say it: provider=runpod gpu=A100 (repeatable)",
+             "metavar": "NAME=VALUE"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--commit"
+             ],
+             "dest": "commit",
+             "help": "the commit that produced the numbers"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--tree"
+             ],
+             "dest": "tree",
+             "help": "the git tree of the exact code that produced them, when it had uncommitted changes (rb journal run keeps it; rb reconcile passes it)",
+             "metavar": "TREE"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--artifact",
+              "--file"
+             ],
+             "dest": "artifact",
+             "help": "an output whose hash goes into the run (repeatable)"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--link"
+             ],
+             "dest": "link",
+             "help": "where else it lives, e.g. wandb=https://... (repeatable)",
+             "metavar": "NAME=URL"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--command"
+             ],
+             "dest": "command_text",
+             "help": "the command that produced the numbers (recorded as given; rb does not run it)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--command-source"
+             ],
+             "dest": "command_source",
+             "help": "the log line that records that command's launch, for a run made before it was recorded; rb checks the line holds it",
+             "metavar": "FILE[:LINE]"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--again"
+             ],
+             "dest": "again",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "record numbers identical to a recorded run's as a second execution (with --why)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--replaces"
+             ],
+             "dest": "replaces",
+             "help": "this run replaces RUN, an invalid run of the same experiment: RUN is retracted with --why and the two are linked",
+             "metavar": "RUN"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--repeats"
+             ],
+             "dest": "repeats",
+             "help": "this run re-checks RUN: it joins that run's unit and adds none",
+             "metavar": "RUN"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--produced-at"
+             ],
+             "dest": "produced_at",
+             "help": "when the output existed, when that is earlier than now (ISO date or time), or unknown; with --table, @COLUMN reads it from the row",
+             "metavar": "WHEN"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "the reason, recorded with the call"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--note"
+             ],
+             "dest": "note",
+             "default": ""
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_run_add"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "add",
+          "metavar": "add",
+          "help": "record a run: numbers from any evaluator, or a file"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "resource",
+     {
+      "prog": "rb resource",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<add|locate|expose>",
+        "parsers": [
+         [
+          "add",
+          {
+           "prog": "rb resource add",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "id",
+             "required": true,
+             "help": "a short id you choose, e.g. imagenet-val"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--type"
+             ],
+             "dest": "type",
+             "choices": [
+              "dataset",
+              "checkpoint",
+              "code",
+              "environment",
+              "artifact",
+              "other"
+             ],
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--name"
+             ],
+             "dest": "name",
+             "required": true,
+             "help": "what it is, e.g. \"ImageNet-1k validation\""
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--version"
+             ],
+             "dest": "version"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--subset"
+             ],
+             "dest": "subset",
+             "help": "which part, e.g. \"training split, images 0..199\""
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--file"
+             ],
+             "dest": "file",
+             "help": "a local file: hashed now, and recorded as its first location"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--sha256"
+             ],
+             "dest": "sha256",
+             "help": "the sha256 of the file, when it is one file"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--digest"
+             ],
+             "dest": "digest",
+             "help": "any other fingerprint: a provider's digest, a dataset hash"
+            },
+            {
+             "kind": "append",
+             "options": [
+              "--at"
+             ],
+             "dest": "at",
+             "help": "where its bytes are (repeatable); providers: local, url, git, wandb, mlflow, s3, gcs, hf, runpod, other",
+             "metavar": "PROVIDER:REF"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--source"
+             ],
+             "dest": "source",
+             "help": "where it comes from, in words"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--url"
+             ],
+             "dest": "url",
+             "help": "where to get it again"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--recipe"
+             ],
+             "dest": "recipe",
+             "help": "the command or steps that rebuild it"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--note"
+             ],
+             "dest": "note"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_resource_add"
+           }
+          }
+         ],
+         [
+          "locate",
+          {
+           "prog": "rb resource locate",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "id",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "provider",
+             "choices": [
+              "local",
+              "url",
+              "git",
+              "wandb",
+              "mlflow",
+              "s3",
+              "gcs",
+              "hf",
+              "runpod",
+              "other"
+             ],
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "ref",
+             "required": true,
+             "help": "a path, a uri, an artifact name, a pod id"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--note"
+             ],
+             "dest": "note"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4,
+              5
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              6
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_resource_locate"
+           }
+          }
+         ],
+         [
+          "expose",
+          {
+           "prog": "rb resource expose",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+            },
+            {
+             "kind": "store",
+             "dest": "id",
+             "required": true
+            },
+            {
+             "kind": "store",
+             "dest": "how",
+             "choices": [
+              "inspected",
+              "selected",
+              "evaluated",
+              "trained"
+             ],
+             "required": true
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--at"
+             ],
+             "dest": "at",
+             "help": "when it happened, when earlier than now (ISO date or time), or unknown; kept as reported"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "-m",
+              "--why"
+             ],
+             "dest": "why",
+             "help": "what was looked at, and why"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--words"
+             ],
+             "dest": "words",
+             "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+             "metavar": "TEXT"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              3,
+              4
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              5,
+              6,
+              7
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_resource_expose"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "add",
+          "metavar": "add",
+          "help": "record a resource: its identity, its locations, and how to get it again"
+         },
+         {
+          "dest": "locate",
+          "metavar": "locate",
+          "help": "record another place a resource's bytes are (or were)"
+         },
+         {
+          "dest": "expose",
+          "metavar": "expose",
+          "help": "record that someone looked at a dataset: inspected it, selected on it, evaluated on it, trained on it"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "retract",
+     {
+      "prog": "rb retract",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--dry-run"
+        ],
+        "dest": "dry_run",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+       },
+       {
+        "kind": "store",
+        "dest": "subject",
+        "required": true,
+        "help": "an id (a note's too), or <experiment>/<setting>"
+       },
+       {
+        "kind": "append",
+        "options": [
+         "--scope"
+        ],
+        "dest": "scope",
+        "help": "runs only: supersede these measurements (e.g. --scope latency_ms) and keep the rest counting",
+        "metavar": "MEASUREMENT"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "-m",
+         "--why"
+        ],
+        "dest": "why",
+        "required": true,
+        "help": "the reason, recorded with the call"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--words"
+        ],
+        "dest": "words",
+        "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+        "metavar": "TEXT"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         3
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         4,
+         5,
+         6
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_retract"
+      }
+     }
+    ],
+    [
+     "freeze",
+     {
+      "prog": "rb freeze",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--dry-run"
+        ],
+        "dest": "dry_run",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+       },
+       {
+        "kind": "store",
+        "dest": "experiment",
+        "required": true
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--amend"
+        ],
+        "dest": "amend",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "the experiment is frozen: adopt it as it is now (with --why)"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "-m",
+         "--why"
+        ],
+        "dest": "why",
+        "help": "the reason, recorded with the call"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--words"
+        ],
+        "dest": "words",
+        "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+        "metavar": "TEXT"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         3
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         4,
+         5,
+         6
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_freeze"
+      }
+     }
+    ],
+    [
+     "decide",
+     {
+      "prog": "rb decide",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--dry-run"
+        ],
+        "dest": "dry_run",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+       },
+       {
+        "kind": "store",
+        "dest": "subject",
+        "required": true
+       },
+       {
+        "kind": "store",
+        "dest": "action",
+        "choices": [
+         "accept",
+         "reject",
+         "investigate",
+         "continue",
+         "park",
+         "stop",
+         "pivot",
+         "ship"
+        ],
+        "required": true
+       },
+       {
+        "kind": "store",
+        "options": [
+         "-m",
+         "--why"
+        ],
+        "dest": "why",
+        "required": true,
+        "help": "the reason, recorded with the call"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--words"
+        ],
+        "dest": "words",
+        "help": "the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason",
+        "metavar": "TEXT"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--revisit"
+        ],
+        "dest": "revisit",
+        "help": "when to look again, e.g. \"when the new images are in\""
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--past"
+        ],
+        "dest": "past",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "a call made before it was recorded: it reads Retrospective, dated as --when says"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--when"
+        ],
+        "dest": "when",
+        "help": "with --past: when the call was made, as said (a date, or words); unknown without it",
+        "metavar": "TEXT"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--source"
+        ],
+        "dest": "source",
+        "help": "with --past and --quote: the document that states the call; rb says what git shows of it, and a past call from an agent session still waits for rb confirm",
+        "metavar": "FILE[:LINE]"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--quote"
+        ],
+        "dest": "quote",
+        "help": "with --source: the document's own words that state the call, naming what it is on; rb checks the file holds them",
+        "metavar": "TEXT"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         3,
+         4
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         5,
+         6,
+         7,
+         8,
+         9,
+         10,
+         11
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_decide"
+      }
+     }
+    ],
+    [
+     "confirm",
+     {
+      "prog": "rb confirm",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--dry-run"
+        ],
+        "dest": "dry_run",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "run every check the write makes and print what it would write, writing nothing; it exits as the write would"
+       },
+       {
+        "kind": "store",
+        "dest": "ids",
+        "nargs": "*",
+        "required": true,
+        "help": "the calls to confirm, as rb status lists them, or <experiment>@<hash> for an experiment's design with its gate, as rb confirm lists it; an experiment's id alone lists its design",
+        "metavar": "ID"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--all"
+        ],
+        "dest": "all",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "confirm every call, gate and design that waits as it reads now, after saying each (the command rb confirm ends with confirms them as listed)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         3
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         4
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_confirm"
+      }
+     }
+    ],
+    [
+     "status",
+     {
+      "prog": "rb status",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "experiment",
+        "nargs": "?",
+        "help": "only this experiment"
+       },
+       {
+        "kind": "append",
+        "options": [
+         "--fail-on"
+        ],
+        "dest": "fail_on",
+        "help": "exit 1 when any of: unmet, unresolved, untested, integrity, undecided, stale, unknown, late, checks, unestablished (repeatable or comma-separated); an edit made outside rb that a finding depends on fails any of them",
+        "metavar": "GATE"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         3
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_status"
+      }
+     }
+    ],
+    [
+     "show",
+     {
+      "prog": "rb show",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "id",
+        "required": true,
+        "help": "an id, <experiment>/<setting>, or a path to an Rabbit Brain YAML file"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_show"
+      }
+     }
+    ],
+    [
+     "compare",
+     {
+      "prog": "rb compare",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "experiment",
+        "nargs": "?"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_compare"
+      }
+     }
+    ],
+    [
+     "log",
+     {
+      "prog": "rb log",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "id",
+        "nargs": "?",
+        "help": "only this record, or <experiment>/<setting>"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "-n"
+        ],
+        "dest": "n",
+        "default": 20,
+        "type": "int",
+        "help": "how many (default 20)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         3
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_log"
+      }
+     }
+    ],
+    [
+     "context",
+     {
+      "prog": "rb context",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--model"
+        ],
+        "dest": "model",
+        "help": "an agent's own model, as its provider names it: kept with every later write in this agent session (RB_MODEL gives it for one command)",
+        "metavar": "ID"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--provider"
+        ],
+        "dest": "provider",
+        "help": "who provides that model, kept the same way (RB_PROVIDER for one command); rb fills in Claude Code's, Codex's and Gemini CLI's when none is given",
+        "metavar": "NAME"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         3
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_context"
+      }
+     }
+    ],
+    [
+     "fmt",
+     {
+      "prog": "rb fmt",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "paths",
+        "nargs": "*",
+        "required": true,
+        "help": "files or directories (default: the record)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--check"
+        ],
+        "dest": "check",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "change nothing; exit 1 if any file is not canonical"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         3
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_fmt"
+      }
+     }
+    ],
+    [
+     "journal",
+     {
+      "prog": "rb journal",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "-n"
+        ],
+        "dest": "n",
+        "default": 20,
+        "type": "int",
+        "help": "how many entries (default 20)"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "metavar": "<scan|run>",
+        "parsers": [
+         [
+          "scan",
+          {
+           "prog": "rb journal scan",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": []
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_journal_scan"
+           }
+          }
+         ],
+         [
+          "run",
+          {
+           "prog": "rb journal run",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store",
+             "dest": "cmd",
+             "nargs": "...",
+             "required": true,
+             "help": "the command, after --"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              2
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_journal_run"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "scan",
+          "metavar": "scan",
+          "help": "look at the watched places once and journal what changed"
+         },
+         {
+          "dest": "run",
+          "metavar": "run",
+          "help": "run a command and journal what it did: rb journal run -- python eval.py ..."
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         3
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_journal"
+      }
+     }
+    ],
+    [
+     "reconcile",
+     {
+      "prog": "rb reconcile",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--apply"
+        ],
+        "dest": "apply",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "keep it in the record: add and re-index the experiments, record the runs found, attributed to you"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--no-agents"
+        ],
+        "dest": "no_agents",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "with --apply where there is no record yet: leave the agents' instruction files alone (default: install rb's, as rb init does)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--yes"
+        ],
+        "dest": "yes",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "with --apply where there is no record yet: add rb's part to an AGENTS.md or .mcp.json that is here without asking (default: asked once in your terminal; elsewhere left as they are)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         3,
+         4
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_reconcile"
+      }
+     }
+    ],
+    [
+     "compile",
+     {
+      "prog": "rb compile",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "paths",
+        "nargs": "*",
+        "required": true,
+        "help": "files or directories to compile from"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_compile"
+      }
+     }
+    ],
+    [
+     "page",
+     {
+      "prog": "rb page",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--out"
+        ],
+        "dest": "out",
+        "help": "where to write it (default rb-page.html beside .rb/)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--replace"
+        ],
+        "dest": "replace",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "write over a file at --out that rb did not write (default: refused, the file left as it is)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         3
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_page"
+      }
+     }
+    ],
+    [
+     "export",
+     {
+      "prog": "rb export",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--out"
+        ],
+        "dest": "out",
+        "help": "where to write it (default rb-export/ beside .rb/)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--zip"
+        ],
+        "dest": "zip",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "write one zip file instead of a directory (default rb-export.zip)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--with-record"
+        ],
+        "dest": "with_record",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "carry the record too, for rb clone: its files and log keep who made each write, agent sessions and the user's words"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--url"
+        ],
+        "dest": "url",
+        "help": "with --with-record, the public address this will be served from: the page then opens with the exact rb clone command, and a directory export also contains bundle.zip"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--no-repo"
+        ],
+        "dest": "no_repo",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "leave the code repository's address out of the manifest and page"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--replace"
+        ],
+        "dest": "replace",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "with --zip, write over a file at --out that rb did not write (default: refused, the file left as it is)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         3,
+         4,
+         5,
+         6,
+         7
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_export"
+      }
+     }
+    ],
+    [
+     "clone",
+     {
+      "prog": "rb clone",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "source",
+        "required": true,
+        "help": "a bundle rb export --with-record wrote: a directory, a .zip, or its address"
+       },
+       {
+        "kind": "store",
+        "dest": "dest",
+        "nargs": "?",
+        "help": "where to create it (default ./<project id>)"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--code"
+        ],
+        "dest": "code",
+        "help": "where to get the code the runs need, in place of the repository the bundle names (a copy you can reach, or one the bundle does not name): the record lands in a checkout of it at the bundle's commit",
+        "metavar": "ADDRESS"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2,
+         3
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         4
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_clone"
+      }
+     }
+    ],
+    [
+     "env",
+     {
+      "prog": "rb env",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "parsers",
+        "dest": "env_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<command>",
+        "parsers": [
+         [
+          "check",
+          {
+           "prog": "rb env check",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": []
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_env_check"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "check",
+          "metavar": "check",
+          "help": "compare; differences are said, never fatal (exit 0)"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "login",
+     {
+      "prog": "rb login",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--hub"
+        ],
+        "dest": "hub",
+        "help": "the hub's address (default RB_HUB_URL, else rabbitbrain.ai)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_login"
+      }
+     }
+    ],
+    [
+     "logout",
+     {
+      "prog": "rb logout",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--hub"
+        ],
+        "dest": "hub",
+        "help": "the hub's address (default RB_HUB_URL, else rabbitbrain.ai)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_logout"
+      }
+     }
+    ],
+    [
+     "sync",
+     {
+      "prog": "rb sync",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--hub"
+        ],
+        "dest": "hub",
+        "help": "the hub's address (default RB_HUB_URL, else rabbitbrain.ai)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--with-record"
+        ],
+        "dest": "with_record",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "send the record too: its files and log keep who made each write, agent sessions and the user's words"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--watch"
+        ],
+        "dest": "watch",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "keep the hosted copy current: look every 30 s and sync again when the record changed, at most once a minute, until Ctrl-C"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         3,
+         4
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_sync"
+      }
+     }
+    ],
+    [
+     "ui",
+     {
+      "prog": "rb ui",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_ui"
+      }
+     }
+    ],
+    [
+     "open",
+     {
+      "prog": "rb open",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--port"
+        ],
+        "dest": "port",
+        "default": 8787,
+        "type": "int",
+        "help": "port on 127.0.0.1 (default 8787)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_open"
+      }
+     }
+    ],
+    [
+     "mcp",
+     {
+      "prog": "rb mcp",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--agent"
+        ],
+        "dest": "agent",
+        "help": "the agent's name in the record (default: the MCP client's name)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "docs",
+     {
+      "prog": "rb docs",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--errors"
+        ],
+        "dest": "errors",
+        "nargs": 0,
+        "const": true,
+        "default": false
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--start"
+        ],
+        "dest": "start",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print the start protocol: how an agent records work already done"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2,
+         3
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_docs"
+      }
+     }
+    ],
+    [
+     "tour",
+     {
+      "prog": "rb tour",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "dir",
+        "nargs": "?",
+        "help": "where the tour lands (default ./rb-tour; must be new or empty)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_tour"
+      }
+     }
+    ],
+    [
+     "skill",
+     {
+      "prog": "rb skill",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "action",
+        "nargs": "?",
+        "choices": [
+         "add"
+        ],
+        "help": "add: write it where the agent looks"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--claude"
+        ],
+        "dest": "claude",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "~/.claude/skills/rabbit-brain/ (the default target)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--project"
+        ],
+        "dest": "project",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "with --claude: this project's .claude/skills/ instead of the home directory"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--cursor"
+        ],
+        "dest": "cursor",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": ".cursor/rules/rabbit-brain.mdc in this project"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--agents-md",
+         "--codex"
+        ],
+        "dest": "agents_md",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "a marked section in this project's AGENTS.md, for Codex and anything else that reads it"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--yes"
+        ],
+        "dest": "yes",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "with --agents-md: add rb's section to an AGENTS.md that is here without asking (default: asked once in your terminal; elsewhere left as it is, with what to add)"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         3,
+         4,
+         5,
+         6,
+         7
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_skill"
+      }
+     }
+    ],
+    [
+     "schema",
+     {
+      "prog": "rb schema",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "name",
+        "choices": [
+         "all",
+         "project",
+         "question",
+         "experiment",
+         "metric",
+         "criterion",
+         "run",
+         "analysis",
+         "resource",
+         "decision",
+         "finding",
+         "envelope",
+         "ir"
+        ],
+        "required": true
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_schema"
+      }
+     }
+    ],
+    [
+     "version",
+     {
+      "prog": "rb version",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_version"
+      }
+     }
+    ],
+    [
+     "feedback",
+     {
+      "prog": "rb feedback",
+      "description": "Prints a link to send feedback on rb: the page shows what it would send before you send it; rb sends nothing. In your own terminal it opens the page in your browser; anywhere else it only prints the link.",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--about"
+        ],
+        "dest": "about",
+        "nargs": "+",
+        "help": "the rb command it is about, by its words (--about run add); its arguments are never sent",
+        "metavar": "WORD"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": []
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         2
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_feedback"
+      }
+     }
+    ],
+    [
+     "config",
+     {
+      "prog": "rb config",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<auto-update>",
+        "parsers": [
+         [
+          "auto-update",
+          {
+           "prog": "rb config auto-update",
+           "description": "Whether rb checks PyPI for a newer rb at most once a day: installed as a tool (uv tool install, pipx) it updates itself in the background, and installed with pip it says one line and changes nothing. Never in CI, in an agent session or under DO_NOT_TRACK. With no value it says the setting.",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store",
+             "dest": "value",
+             "nargs": "?",
+             "choices": [
+              "on",
+              "off"
+             ],
+             "help": "on or off"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": [
+              2
+             ]
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_config_auto_update"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "auto-update",
+          "metavar": "auto-update",
+          "help": "whether rb checks for a newer rb once a day, and updates itself when it was installed as a tool (uv tool install, pipx); says the setting with no value"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1
+        ]
+       }
+      ]
+     }
+    ],
+    [
+     "telemetry",
+     {
+      "prog": "rb telemetry",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "parsers",
+        "dest": "sub_command",
+        "nargs": "A...",
+        "required": true,
+        "metavar": "<status|enable|disable|preview|flush>",
+        "parsers": [
+         [
+          "status",
+          {
+           "prog": "rb telemetry status",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": []
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_telemetry"
+           }
+          }
+         ],
+         [
+          "enable",
+          {
+           "prog": "rb telemetry enable",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--project-key"
+             ],
+             "dest": "project_key",
+             "help": "PostHog public project capture key; never a personal API key"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--host"
+             ],
+             "dest": "host",
+             "help": "PostHog HTTPS ingestion host (must match the project's region)"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": []
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1,
+              2,
+              3
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_telemetry"
+           }
+          }
+         ],
+         [
+          "disable",
+          {
+           "prog": "rb telemetry disable",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": []
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_telemetry"
+           }
+          }
+         ],
+         [
+          "preview",
+          {
+           "prog": "rb telemetry preview",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": []
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_telemetry"
+           }
+          }
+         ],
+         [
+          "flush",
+          {
+           "prog": "rb telemetry flush",
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": "==SUPPRESS==",
+             "help": "show this help message and exit"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--json"
+             ],
+             "dest": "json",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "print one JSON object (the envelope) instead of text"
+            }
+           ],
+           "groups": [
+            {
+             "title": "positional arguments",
+             "actions": []
+            },
+            {
+             "title": "options",
+             "actions": [
+              0,
+              1
+             ]
+            }
+           ],
+           "defaults": {
+            "func": "cmd_telemetry"
+           }
+          }
+         ]
+        ],
+        "choice_actions": [
+         {
+          "dest": "status",
+          "metavar": "status",
+          "help": "show the local analytics setting and destination without sending anything"
+         },
+         {
+          "dest": "enable",
+          "metavar": "enable",
+          "help": "opt in to limited usage analytics on this installation"
+         },
+         {
+          "dest": "disable",
+          "metavar": "disable",
+          "help": "stop analytics and delete the local installation ID and pending events"
+         },
+         {
+          "dest": "preview",
+          "metavar": "preview",
+          "help": "show the queued payload without sending it"
+         },
+         {
+          "dest": "flush",
+          "metavar": "flush",
+          "help": "try sending the pending usage events now"
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         1
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0
+        ]
+       }
+      ]
+     }
+    ]
+   ],
+   "choice_actions": [
+    {
+     "dest": "init",
+     "metavar": "init",
+     "help": "start the record (.rb/) here"
+    },
+    {
+     "dest": "doctor",
+     "metavar": "doctor",
+     "help": "check the record: who you are recorded as, edits made outside rb, merge leftovers, sources outside the repository"
+    },
+    {
+     "dest": "remove",
+     "metavar": "remove",
+     "help": "take rb out of this checkout: only what checks out as rb's (the record, its instructions for agents, its pages and exports, its refs and folders in git), after showing the plan"
+    },
+    {
+     "dest": "project",
+     "metavar": "project",
+     "help": "title: the project's title"
+    },
+    {
+     "dest": "question",
+     "metavar": "question",
+     "help": "add|move|reword: what the work is trying to find out, as a tree experiments are filed under"
+    },
+    {
+     "dest": "experiment",
+     "metavar": "experiment",
+     "help": "add|file|relate|gate: what is tested: its purpose, hypothesis, variants and settings; where it is filed; how it stands to others; the decision it gates"
+    },
+    {
+     "dest": "note",
+     "metavar": "note",
+     "help": "add: words about an experiment or the project: an assumption, a caveat, context; a note changes no finding"
+    },
+    {
+     "dest": "variant",
+     "metavar": "variant",
+     "help": "add: an arm of an experiment: baseline, candidate, control, ablation"
+    },
+    {
+     "dest": "metric",
+     "metavar": "metric",
+     "help": "add: the catalogue: a metric's unit, which way is better, its other names"
+    },
+    {
+     "dest": "spec",
+     "metavar": "spec",
+     "help": "set|verify|vary: an experiment's settings, where each value comes from, and whether rb has checked it"
+    },
+    {
+     "dest": "criterion",
+     "metavar": "criterion",
+     "help": "add|file|relate: a rule over one comparison, declared before the evidence it reads"
+    },
+    {
+     "dest": "analysis",
+     "metavar": "analysis",
+     "help": "add: a computation over saved outputs, and the comparisons it produced with their intervals"
+    },
+    {
+     "dest": "run",
+     "metavar": "run",
+     "help": "add: what ran: its results, per-run settings, inputs and outputs, with a receipt"
+    },
+    {
+     "dest": "resource",
+     "metavar": "resource",
+     "help": "add|locate|expose: a dataset, checkpoint, code or artifact: what it is, where its bytes are, how to get it again, who has looked at it"
+    },
+    {
+     "dest": "retract",
+     "metavar": "retract",
+     "help": "take anything back: it stays on record, stops counting, and rb says what rested on it"
+    },
+    {
+     "dest": "freeze",
+     "metavar": "freeze",
+     "help": "lock an experiment's spec and criteria before the evidence, recorded with who locked it"
+    },
+    {
+     "dest": "decide",
+     "metavar": "decide",
+     "help": "a call on a criterion, an experiment, a question or a setting: accept, reject, investigate; continue, park, stop, pivot, ship. Recorded with who made it and why; in an agent session it is proposed until the user confirms it"
+    },
+    {
+     "dest": "confirm",
+     "metavar": "confirm",
+     "help": "make a call proposed, or a past call mentioned, in an agent session yours, or an experiment's design one wrote: run in your own terminal; with no id, list what waits"
+    },
+    {
+     "dest": "status",
+     "metavar": "status",
+     "help": "each criterion on its axes, and what is open, with who usually acts"
+    },
+    {
+     "dest": "show",
+     "metavar": "show",
+     "help": "one record: a criterion with its finding, an experiment with its spec, a run with its receipt, e1/lr with its history; or a .yaml record file as canonical JSON"
+    },
+    {
+     "dest": "compare",
+     "metavar": "compare",
+     "help": "an experiment's own table: variants by metrics, with changes against the baseline"
+    },
+    {
+     "dest": "log",
+     "metavar": "log",
+     "help": "every write, newest last: who, how, what"
+    },
+    {
+     "dest": "context",
+     "metavar": "context",
+     "help": "the record as one Markdown briefing a fresh agent session reads first"
+    },
+    {
+     "dest": "fmt",
+     "metavar": "fmt",
+     "help": "write Rabbit Brain YAML files in their canonical form, comments kept (default: every record file under .rb/)"
+    },
+    {
+     "dest": "journal",
+     "metavar": "journal",
+     "help": "what rb observed in the repository: files that appeared, git moves, wrapped commands"
+    },
+    {
+     "dest": "reconcile",
+     "metavar": "reconcile",
+     "help": "compile the repository against the record: each results folder with a report as an experiment, what its files say (verbatim), its checks, how to reproduce it; --apply keeps it"
+    },
+    {
+     "dest": "compile",
+     "metavar": "compile",
+     "help": "list what existing reports and results files the record can place, and what it cannot; writes nothing"
+    },
+    {
+     "dest": "page",
+     "metavar": "page",
+     "help": "write the project as one self-contained, read-only HTML file you can send anywhere"
+    },
+    {
+     "dest": "export",
+     "metavar": "export",
+     "help": "write the project's page with a hashed manifest, readable without rb; with --with-record, the record too, as a portable bundle"
+    },
+    {
+     "dest": "clone",
+     "metavar": "clone",
+     "help": "start your own line of work from an exported bundle: the structure arrives inherited, and nothing counts until reproduced here"
+    },
+    {
+     "dest": "env",
+     "metavar": "env",
+     "help": "the environment: check this machine against the record's runs and any env.* settings"
+    },
+    {
+     "dest": "login",
+     "metavar": "login",
+     "help": "rabbitbrain.ai, optional: sign this machine in with a short code, approved on any device where you are signed in (hosted service not yet available)"
+    },
+    {
+     "dest": "logout",
+     "metavar": "logout",
+     "help": "revoke this machine's hub credential and remove it from the credentials file"
+    },
+    {
+     "dest": "sync",
+     "metavar": "sync",
+     "help": "rabbitbrain.ai, optional: a private copy of this record's page in your account, for your own eyes from anywhere (hosted service not yet available)"
+    },
+    {
+     "dest": "ui",
+     "metavar": "ui",
+     "help": "open this project in your terminal: your call, the cards, the tree (bare rb does this too)"
+    },
+    {
+     "dest": "open",
+     "metavar": "open",
+     "help": "the catalogue in your browser, live and read-only, on 127.0.0.1 only"
+    },
+    {
+     "dest": "mcp",
+     "metavar": "mcp",
+     "help": "serve the record to an agent over MCP (stdio); every call is recorded as the agent's"
+    },
+    {
+     "dest": "docs",
+     "metavar": "docs",
+     "help": "print AGENTS.md (--start: how to start the record in a project already under way; --errors: the error table)"
+    },
+    {
+     "dest": "tour",
+     "metavar": "tour",
+     "help": "a one-minute walkthrough: builds a small real project in ./rb-tour and runs the whole loop"
+    },
+    {
+     "dest": "skill",
+     "metavar": "skill",
+     "help": "print the agent skill; `rb skill add` installs it for your coding agent"
+    },
+    {
+     "dest": "schema",
+     "metavar": "schema",
+     "help": "print a JSON Schema: `rb schema all` is Rabbit Brain format 1 (rb-v1.schema.json), `rb schema <kind>` one record's shape"
+    },
+    {
+     "dest": "version",
+     "metavar": "version",
+     "help": "print the version"
+    },
+    {
+     "dest": "feedback",
+     "metavar": "feedback",
+     "help": "a link to send feedback on rb: the page shows what it would send before you send it; rb sends nothing"
+    },
+    {
+     "dest": "config",
+     "metavar": "config",
+     "help": "rb's own settings on this machine: whether rb keeps itself up to date"
+    },
+    {
+     "dest": "telemetry",
+     "metavar": "telemetry",
+     "help": "optional usage analytics: off until you enable it; never sends research content"
+    }
+   ]
+  }
+ ],
+ "groups": [
+  {
+   "title": "positional arguments",
+   "actions": [
+    2
+   ]
+  },
+  {
+   "title": "options",
+   "actions": [
+    0,
+    1
+   ]
+  }
+ ]
+}

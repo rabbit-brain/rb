@@ -1,0 +1,77 @@
+[build-system]
+# the wheel carries the rb binary (rust/, maturin "bin" bindings, the way uv and ruff ship) beside the Python package
+# that holds the SDK and the terminal UI; rb hands `rb ui` to the Python it is installed with
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "rabbit-brain"
+version = "0.6.0"
+description = "Track the state of ML research you run with coding agents: questions, criteria, runs and decisions as plain YAML next to your code."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "THIRD-PARTY-NOTICES"]   # the notices of the crates built into rb: rust/gen/gen_notices.py
+requires-python = ">=3.10"
+authors = [{ name = "Jhet Chan" }]
+keywords = ["ml-research", "experiment-tracking", "reproducibility", "provenance", "coding-agents", "agents", "open-science", "research-record", "paper-reproduction", "evaluation", "mcp", "ci"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
+]
+dependencies = ["pydantic>=2.5,<3", "textual>=8,<9"]   # textual is core on purpose: pip install rabbit-brain, then rb, is the whole install
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "build>=1.2", "twine>=5", "pyyaml>=6", "pydantic>=2.11"]   # pyyaml: what the differential test holds rb's own config reader to; pydantic 2.11+ writes the committed schemas
+
+[project.urls]
+Homepage = "https://rabbitbrain.ai"
+Documentation = "https://github.com/rabbit-brain/rb/blob/main/AGENTS.md"
+Repository = "https://github.com/rabbit-brain/rb"
+Issues = "https://github.com/rabbit-brain/rb/issues"
+Changelog = "https://github.com/rabbit-brain/rb/blob/main/CHANGELOG.md"
+
+
+# rb and rabbit-brain are the binaries the crate builds; rb carries its own manual (rb docs) and skill (rb skill add)
+[tool.maturin]
+bindings = "bin"
+module-name = "rabbit_brain"
+manifest-path = "rust/Cargo.toml"
+python-source = "src"
+python-packages = ["rabbit_brain"]
+include = [
+  { path = "AGENTS.md", format = "sdist" },
+  { path = "SKILL.md", format = "sdist" },
+  { path = "README.md", format = "sdist" },
+  { path = "PRIVACY.md", format = "sdist" },
+  { path = "CHANGELOG.md", format = "sdist" },
+  { path = "CONTRIBUTING.md", format = "sdist" },
+  { path = "SECURITY.md", format = "sdist" },
+  { path = "RELEASING.md", format = "sdist" },
+  { path = "docs/**/*", format = "sdist" },
+  { path = ".github/scripts/*.py", format = "sdist" },
+  { path = ".github/workflows/*.yml", format = "sdist" },
+  { path = "rust/ARCHITECTURE.md", format = "sdist" },
+  { path = "llms.txt", format = "sdist" },
+  { path = "tests/**/*", format = "sdist" },
+  { path = "bench/**/*", format = "sdist" },
+  { path = "schema/**/*", format = "sdist" },
+  { path = ".cargo/config.toml", format = "sdist" },   # a build from source keeps its own C runtime on Windows, and the same SQLite
+]
+exclude = ["**/__pycache__/**", "**/*.pyc"]      # what running the tests leaves beside them is not source
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

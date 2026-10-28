@@ -1,0 +1,377 @@
+{
+ "contract": "rb-shell-view/1.1",
+ "about": "The markup A's script reads, from the prototype's shell.js (SPRINT-OCT24.md section 1.7). R draws what made_by markup names; dom_contract_holds checks it on the render of the example named, on each surface in on, once its group is merged. The script's own classes are the app harness's to check.",
+ "selectors": [
+  {
+   "selector": "#nav",
+   "what": "the navigator",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "#main",
+   "what": "the working view's region",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "#overview",
+   "what": "the Overview view",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "section.view[id][data-title][data-crumb][data-root]",
+   "what": "a view, with its title, crumb and root rail",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": ".card[id][data-home][data-crumb]",
+   "what": "a card, with the view it belongs to and its crumb",
+   "group": "R5",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": ".rootc",
+   "what": "a view's rail drawn as the inspector's root card",
+   "group": "A1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "script",
+   "example": "live"
+  },
+  {
+   "selector": "[data-go]",
+   "what": "a row or link that opens a view or card",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-for]",
+   "what": "what a control acts on, by id",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-row]",
+   "what": "an evidence row",
+   "group": "R3",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-rail]",
+   "what": "a rail: what waits beside the work",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "a[href^=\"#\"]",
+   "what": "a link inside the document",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "details[data-fold]",
+   "what": "a fold with a stable key, kept open across live updates (4a)",
+   "group": "A3",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "details.nd > summary",
+   "what": "a row's details fold",
+   "group": "R3",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "details.evm",
+   "what": "more evidence, folded",
+   "group": "R3",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "details.ipm",
+   "what": "more interpretations, folded",
+   "group": "R3",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": ".cmdbox",
+   "what": "a command to copy",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-copybtn]",
+   "what": "its copy button",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": ".decide",
+   "what": "the composer",
+   "group": "R5",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-act]",
+   "what": "a composer action",
+   "group": "R5",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-action]",
+   "what": "the action a composer choice makes",
+   "group": "R5",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-cons]",
+   "what": "the consequence line a choice previews",
+   "group": "R5",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-hint]",
+   "what": "a hint",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-keys]",
+   "what": "the keys help",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "[data-theme]",
+   "what": "the theme control",
+   "group": "R1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "html.app",
+   "what": "a class the script sets",
+   "group": "A1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "script",
+   "example": "live"
+  },
+  {
+   "selector": ".enh",
+   "what": "a class the script sets",
+   "group": "A1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "script",
+   "example": "live"
+  },
+  {
+   "selector": ".ready",
+   "what": "a class the script sets",
+   "group": "A1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "script",
+   "example": "live"
+  },
+  {
+   "selector": ".sel",
+   "what": "a class the script sets",
+   "group": "A1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "script",
+   "example": "live"
+  },
+  {
+   "selector": ".on",
+   "what": "a class the script sets",
+   "group": "A1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "script",
+   "example": "live"
+  },
+  {
+   "selector": ".flash",
+   "what": "a class the script sets",
+   "group": "A1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "script",
+   "example": "live"
+  },
+  {
+   "selector": ".enter",
+   "what": "a class the script sets",
+   "group": "A1",
+   "on": [
+    "page",
+    "open"
+   ],
+   "made_by": "script",
+   "example": "live"
+  },
+  {
+   "selector": "[data-place]",
+   "what": "a place in the Where picker",
+   "group": "A5",
+   "on": [
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "away"
+  },
+  {
+   "selector": "[data-at]",
+   "what": "a version in the Version picker",
+   "group": "A5",
+   "on": [
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "past"
+  },
+  {
+   "selector": "#scope",
+   "what": "the scope bar: where you are, in words, away from the live start place",
+   "group": "A5",
+   "on": [
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "away"
+  }
+ ]
+}

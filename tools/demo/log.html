@@ -1,0 +1,105 @@
+<!doctype html>
+<!-- The film's turn beats (FILM-V2 beats 1 and 2): the study's own agent log, as it is, at a size a viewer reads, for
+     walk.mjs to capture with {"play": true}.
+     ?log=<url>&beat=turns|summary&font=<px>&title=<text>&turns=<n>&reply=<first line>-<last line>
+     turns: scrolls from user turn to user turn (the log's lines whose kind is "user"), lighting each as it passes, with
+     a small counter, up to turn <n> (10 by default). summary: opens on turn <n> lit, then scrolls until the reply's
+     lines (1-based, as `sed -n` numbers them) fill the window, the lines around them faded. Every line drawn is the log's own; nothing is added to
+     it but the counter and the light. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>agent log</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #16181d; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; font: 15px/1.4 -apple-system, "Segoe UI", "DejaVu Sans", sans-serif; }
+  #win { width: 1360px; height: 820px; border-radius: 10px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,.45);
+         background: #1e2027; display: flex; flex-direction: column; }
+  #bar { height: 34px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #2a2d36; color: #a9adb8; font-size: 14px; }
+  #bar i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  #bar .t { flex: 1; text-align: center; }
+  #turn { color: #f2f2f4; background: #3b3f4b; border-radius: 6px; padding: 2px 10px; font-size: 14px; font-variant-numeric: tabular-nums; visibility: hidden; }
+  #log { flex: 1; overflow: hidden; padding: 0 18px; color: #c9cbd2; font-family: "DejaVu Sans Mono", Menlo, monospace; }
+  .l { white-space: pre-wrap; overflow-wrap: anywhere; padding: 1px 6px; border-left: 4px solid transparent; }
+  .l .ts { color: #6b6f7a; }
+  .l.k-user { color: #f2f2f4; font-weight: 700; }
+  .l.k-cmd, .l.k-out { color: #8d919c; }
+  .l.lit { background: #2f4a7a; border-left-color: #8fb4ff; }
+  .l { transition: opacity .5s; }
+  #log.only .l:not(.reply) { opacity: .28; }
+</style>
+</head>
+<body>
+<div id="win">
+  <div id="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>
+    <span class="t" id="title"></span><span id="turn"></span></div>
+  <div id="log"></div>
+</div>
+<script>
+(async () => {
+  const q = new URLSearchParams(location.search);
+  const beat = q.get("beat") || "turns";
+  const upto = parseInt(q.get("turns") || "10", 10);
+  const log = document.getElementById("log");
+  log.style.fontSize = (q.get("font") || "20") + "px";
+  document.getElementById("title").textContent = q.get("title") || "";
+  const text = await (await fetch(q.get("log"))).text();
+  const lines = text.replace(/\n$/, "").split("\n");
+  // a line's kind is its third column ("user", "agent", "$", "|", ...); a line that starts with spaces carries on the one before
+  let kind = "";
+  const rows = lines.map((s, i) => {
+    const m = s.match(/^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)  (\S+)/);
+    if (m) kind = m[2];
+    const d = document.createElement("div");
+    d.className = "l k-" + ({ "$": "cmd", "|": "out" }[kind] || kind);
+    d.dataset.n = i + 1;
+    if (m) { const ts = document.createElement("span"); ts.className = "ts"; ts.textContent = m[1]; d.append(ts, s.slice(m[1].length)); }
+    else d.textContent = s || " ";
+    log.appendChild(d);
+    return d;
+  });
+  const users = rows.filter(r => /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d  user /.test(lines[r.dataset.n - 1]));
+  const counter = document.getElementById("turn");
+  const at = k => { counter.textContent = `turn ${k}`; counter.style.visibility = "visible"; };
+  const top = r => r.offsetTop - log.offsetTop;
+  const ease = k => k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+  const scrollTo = (y, ms) => new Promise(res => {
+    const y0 = log.scrollTop, t0 = performance.now();
+    const f = () => { const k = Math.min(1, (performance.now() - t0) / ms); log.scrollTop = y0 + (y - y0) * ease(k); k < 1 ? requestAnimationFrame(f) : res(); };
+    requestAnimationFrame(f);
+  });
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const lead = Math.round(log.clientHeight * 0.28);
+  const travel = parseFloat(q.get("travel") || "650"), hold = parseFloat(q.get("hold") || "520");
+  let plan;
+  if (beat === "turns") {
+    log.scrollTop = Math.max(0, top(users[0]) - lead);
+    plan = async () => {
+      for (let k = 0; k < Math.min(upto, users.length); k++) {
+        if (k) await scrollTo(Math.max(0, top(users[k]) - lead), travel);
+        users.forEach(u => u.classList.remove("lit"));
+        users[k].classList.add("lit"); at(k + 1);
+        await sleep(hold);
+      }
+    };
+    window.__length = Math.min(upto, users.length) * (travel + hold) / 1000;
+  } else {
+    const turn = users[upto - 1];
+    const [a, b] = (q.get("reply") || "").split("-").map(Number);
+    turn.classList.add("lit"); at(upto);
+    log.scrollTop = Math.max(0, top(turn) - lead);
+    const first = rows[a - 1], last = rows[b - 1];
+    // the reply's lines fill the window: its first line near the top, its last above the bottom
+    const y = top(first) - Math.max(16, (log.clientHeight - (top(last) + last.offsetHeight - top(first))) / 2);
+    rows.slice(a - 1, b).forEach(r => r.classList.add("reply"));
+    // the reply is what this beat reads: the lines around it fade as it comes up
+    plan = async () => { await sleep(parseFloat(q.get("first") || "1600")); log.classList.add("only"); await scrollTo(y, parseFloat(q.get("travel") || "1400")); };
+    window.__length = (parseFloat(q.get("first") || "1600") + parseFloat(q.get("travel") || "1400")) / 1000;
+  }
+  window.__done = false;
+  window.__start = () => plan().then(() => { window.__done = true; });
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>

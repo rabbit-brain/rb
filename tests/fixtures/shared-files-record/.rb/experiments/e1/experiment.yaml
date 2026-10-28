@@ -1,0 +1,64 @@
+rb: 1
+kind: experiment
+id: e1
+uid: exp_01M3VWMS6H4QYXMKPJQ6Z9EADH
+title: wide vs base
+questions:
+  - q1
+varies:
+  - model.width
+variants:
+  - name: base
+    role: baseline
+    settings:
+      - name: model.width
+        value: 64
+        status: provisional
+        required: true
+        per_run: false
+        set_by: human:t
+        set_at: "2026-10-01T14:07:12.572+00:00"
+        via: cli
+    created_by: human:t
+    created_at: "2026-10-01T14:07:11.568+00:00"
+    via: cli
+  - name: wide
+    role: candidate
+    settings:
+      - name: model.width
+        value: 128
+        status: provisional
+        required: true
+        per_run: false
+        set_by: human:t
+        set_at: "2026-10-01T14:07:12.252+00:00"
+        via: cli
+    created_by: human:t
+    created_at: "2026-10-01T14:07:11.568+00:00"
+    via: cli
+  - name: narrow
+    role: ablation
+    created_by: human:t
+    created_at: "2026-10-01T14:07:12.885+00:00"
+    via: cli
+settings:
+  - name: lr
+    value: 0.0003
+    status: provisional
+    required: true
+    per_run: false
+    set_by: human:t
+    set_at: "2026-10-01T14:07:11.918+00:00"
+    via: cli
+notes:
+  - text: first note
+    by: human:t
+    at: "2026-10-01T14:07:11.573+00:00"
+    via: cli
+  - text: second note
+    by: human:t
+    at: "2026-10-01T14:07:13.769+00:00"
+    via: cli
+created_by: human:t
+created_at: "2026-10-01T14:07:11.568+00:00"
+via: cli

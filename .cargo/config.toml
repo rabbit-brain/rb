@@ -1,0 +1,10 @@
+# rb.exe and rabbit-brain.exe carry the C runtime in themselves, so they start where the Visual C++ Redistributable is
+# not installed (a venv does not bring it); cargo reads this file when it runs from the repository or below it
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# rb reads the ordinary tables of a SQLite database (rb run add --from, rb compile): the parts of the SQLite built into it
+# that serve other uses (full-text search, R*Tree, dbstat, stat4, soundex, column metadata, loading extensions) are left
+# out, about 0.5 MB of the binary; the variable set in the environment wins
+[env]
+LIBSQLITE3_FLAGS = "-USQLITE_ENABLE_FTS3 -USQLITE_ENABLE_FTS3_PARENTHESIS -USQLITE_ENABLE_FTS5 -USQLITE_ENABLE_RTREE -USQLITE_ENABLE_DBSTAT_VTAB -USQLITE_ENABLE_STAT4 -USQLITE_SOUNDEX -USQLITE_ENABLE_COLUMN_METADATA -USQLITE_ENABLE_LOAD_EXTENSION -DSQLITE_OMIT_LOAD_EXTENSION"

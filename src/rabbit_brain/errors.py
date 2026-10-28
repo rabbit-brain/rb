@@ -1,0 +1,71 @@
+"""Error codes: one table feeds `errors[]` in the JSON envelope, `rb docs`, and the tests.
+
+Exit codes: 0 ok · 1 a check failed (rb status --fail-on, rb spec verify, rb fmt --check, rb doctor) · 2 rb could not do what was asked, and says why
+· 3 a fault in rb itself, or an install that cannot start it.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+EXIT_OK = 0
+EXIT_CHECK_FAILED = 1
+EXIT_INVALID = 2
+EXIT_ENVIRONMENT = 3
+
+# code -> (meaning, what to do)
+ERRORS: dict[str, tuple[str, str]] = {
+    "E_FILE_NOT_FOUND": ("A file given on the command line does not exist, or could not be read.", "Check the path; it is relative to the current directory."),
+    "E_NOT_AVAILABLE": ("This command, or the hosted service it needs, is not available in this version of rabbit-brain.", "The message says what to use instead. `rb --help` lists every command in this version."),
+    "E_WRITE_FAILED": ("A file could not be written.", "The message names the file and says why; check that its directory is one you can write to."),
+    "E_NO_PROJECT": ("No record here: no .rb/ in this directory or any directory above it.", "Run `rb init \"<the work's theme>\"` in the project root (it creates .rb/), or cd into a project that has one. In a project already under way, `rb docs --start` says how to record the work done."),
+    "E_PROJECT_EXISTS": ("A project already exists here or in a directory above, or in another worktree of this repository.", "Use it: `rb status`. One .rb/ per line of work; start another in a different directory."),
+    "E_YAML": ("The file is not Rabbit Brain YAML.", "The message says where and what to write instead. Rabbit Brain YAML is plain YAML without anchors, tags, dates or yes/no; `rb fmt <file>` rewrites a file that reads in the canonical form."),
+    "E_OBJECT_NOT_FOUND": ("No record with that id in this project.", "`rb status --json` lists every record; `rb show <experiment>` lists its variants, settings, criteria and runs; a setting is addressed as <experiment>/<name>."),
+    "E_OBJECT_INVALID": ("The values given do not make a valid record.", "Do what the message says; `rb <command> --help` lists the arguments and `rb schema <kind>` prints a record's shape (experiment, criterion, run, ...)."),
+    "E_FROZEN": ("The experiment is frozen, and this would change what it locked: a setting, a variant, what it varies, or a criterion.", "Run the same command with --amend --why \"<reason>\"; the change, the reason, who made it and the hash before and after are kept."),
+    "E_USAGE": ("The command line could not be parsed: an unknown option, a missing argument, or a value that is not allowed.", "`rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --."),
+    "E_ACTOR_INVALID": ("RB_ACTOR is not in the form human:<name> or agent:<name>.", "Set it to human:<name> or agent:<name> (letters, digits and _.@+-), or unset it: rb then detects the agent runtime, or names the human from git."),
+    "E_SOURCE_UNRESOLVED": ("The source was read and does not state the value, or could not be read.", "The setting stays provisional. Check the path, key, line, quote or commit, or set the value the source actually states: `rb spec set <exp> <name> <value> --source <file#key>`."),
+    "E_SOURCE_OUTSIDE": ("The source is outside the project, so nobody else can check it.", "Copy it into the repository, commit it, and point --source at the copy."),
+    "E_SOURCE_UNVERIFIABLE": ("This source cannot be checked by reading a file: a url, a note, or a file source without a line or a quote.", "Point at a config key (file#key), a file line, a quote in a saved copy of the page, or a run's JSON (run:PATH#/pointer) that states the value; or someone vouches for it: `rb decide <exp>/<name> accept --why \"...\"`."),
+    "E_STATE_EDITED": ("A record under .rb/ was changed outside rb (its content edited, its file moved or deleted, or written by hand), and rb will not write over it. Comments and formatting are not changes.", "`rb doctor` lists every such file. `rb doctor --restore` puts back what rb last wrote; if the change is right, `rb doctor --adopt --why \"...\"` takes it as it stands, recorded as yours."),
+    "E_STATE_CORRUPT": ("A file under .rb/ is not a valid record.", "It was probably edited by hand or left mid-merge. `rb doctor` lists every such file and says where it breaks; `rb doctor --restore` puts back what rb last wrote."),
+    "E_STATE_NEWER": ("Part of this .rb/ was written by a newer rb than this one.", "Upgrade: `pip install --upgrade rabbit-brain`. Until then rb will not guess at state it cannot read, so gates fail closed with this reason."),
+    "E_BUNDLE_INVALID": ("The bundle is not a valid rb export, or its files do not match its manifest.", "Get a fresh copy from where it was published; every file must hash to what manifest.json records. rb export --with-record writes one."),
+    "E_HUB_REFUSED": ("The hub refused the request.", "The message carries the hub's reason and fix; the record on this machine is unchanged."),
+    "E_HUB_UNREACHABLE": ("The hub could not be reached, or what answered at its address is not the hub.", "Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected."),
+    "E_ADOPT_AUTHORITY": ("The edit changes who wrote or decided something, or through what, which an adoption must never launder into the record.", "`rb doctor --restore` puts the file back. If the authorship or decision is really wrong, make the change through rb as yourself, where it is logged as yours."),
+    "E_STALE_REVIEW": ("The files changed between the review and the adoption, so what was reviewed is not what would be adopted.", "Look again: `rb doctor` lists every file changed outside rb as it is now."),
+    "E_INTERNAL": ("A fault in rb itself, or an install that cannot run a part of it.", "Report it with the link its fix line gives (report_url under --json)."),
+}
+
+
+class RBWarning(UserWarning):
+    """What rb says after a write that went through, for the writer to act on: the SDK's `data.warnings`. A run's input
+    whose copy here is not the bytes it names gets one, and so do numbers that differ from the run already recorded with
+    the same output files, and an agent's new text that holds LaTeX."""
+
+
+@dataclass
+class RBError(Exception):
+    code: str
+    message: str | None = None
+    fix: str | None = None
+    exit_code: int = EXIT_INVALID
+    problems: list[str] = field(default_factory=list)
+    extra: dict = field(default_factory=dict)          # structured detail for agents
+
+    def __post_init__(self) -> None:
+        meaning, default_fix = ERRORS.get(self.code, ("Unexpected failure.", ERRORS["E_INTERNAL"][1]))
+        if self.message is None:
+            self.message = meaning
+        if self.fix is None:
+            self.fix = default_fix
+        super().__init__(self.message)
+
+    def to_dict(self) -> dict:
+        d = {"code": self.code, "message": self.message, "fix": self.fix}
+        if self.problems:
+            d["problems"] = list(self.problems)
+        d.update(self.extra)
+        return d

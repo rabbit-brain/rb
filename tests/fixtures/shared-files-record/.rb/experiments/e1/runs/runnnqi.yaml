@@ -1,0 +1,42 @@
+rb: 1
+kind: run
+id: runnnqi
+uid: run_01M3VWMWKYWPYW1475BE7G3XG5
+experiment: e1
+metrics:
+  base.top1: 0.72
+  wide.top1: 0.77
+  narrow.top1: 0.66
+produced_basis: recorded
+basis: typed
+spec_sha256: cd6983036bbe0aa94ad8884a38ff6cce585b0cb12d6472fbc2c74967171eee5f
+settings:
+  lr: 0.0003
+  base.model.width: 64
+  wide.model.width: 128
+spec_frozen: false
+synthetic: false
+fingerprint: 03f80905d717d084991d47c2718b809c71447f7a9ff2aeaf2ab9c3ae289abddf
+receipt:
+  at: "2026-10-01T14:07:15.054+00:00"
+  actor: human:t
+  actor_via: git-email
+  via: cli
+  rb_version: 0.6.0.dev0
+  attached:
+    commit: null
+    branch: main
+    dirty: false
+  produced:
+    commit: null
+    from: unknown
+  environment:
+    python: 3.11.15
+    platform: Linux-6.18.44-fc-v50-x86_64-with-glibc2.39
+    rb: 0.6.0.dev0
+    torch: 2.14.0
+    numpy: 2.4.4
+    pydantic: 2.13.3
+created_by: human:t
+created_at: "2026-10-01T14:07:15.070+00:00"
+via: cli

@@ -1,0 +1,917 @@
+{
+ "steps": [
+  {
+   "run": "compile report.md data",
+   "exit": 0,
+   "out": [
+    "Sources (7):",
+    "  report.md  \u00b7  prose  \u00b7  \"Width study, round two\"",
+    "  data/blob.bin  \u00b7  other",
+    "  data/metrics.json  \u00b7  structured  \u00b7  3 numbers (acc, other, top1)",
+    "  data/run.py  \u00b7  code",
+    "  data/table.csv  \u00b7  table  \u00b7  columns seed, top1, top5",
+    "  data/tabs.tsv  \u00b7  table  \u00b7  columns a, b",
+    "  data/unknown.json  \u00b7  structured  \u00b7  1 number (zz)",
+    "",
+    "No record here yet. A compiled record starts with the work's theme, then each question the work asks:",
+    "  rb init \"<the work's theme>\"",
+    "  rb question add \"<what are you trying to find out?>\"",
+    "To record the work already done: rb docs --start.",
+    "",
+    "The contract (for the agent doing the reading):",
+    "  1. Propose structure through the ordinary commands; rb compile writes nothing itself.",
+    "  2. Every value carries its source. Structured: --source file#key.path (rb reads the file and checks it). Prose: --quote \"exact text\" --locator \"section\" (the line must state the value; rb reads and checks the span).",
+    "  3. Statements travel verbatim: a question, hypothesis or criterion lifted from a report keeps its words, never reworded, as plain text with the markup dropped (Unicode symbols for math, no citation keys). A --quote stays exact: rb checks it against the file. A summary is a new artifact with an author, not a replacement for what was said.",
+    "  4. Numbers in structured files are runs (rb run add <exp> --from <file>); so is a row of a SQLite database, read from the database itself (--from <database> --table <table> --where <column>=<value>), never from an export of it. Give --command only for a command you saw run or a log line records (--command-source <file>:<line>); a command from a README, a paper or a script is a recipe, a note with its file and line. A result that exists only in prose becomes a cited criterion (rb criterion add \"...\" -e <exp> -q <question> --metric <m> --source <file> --quote \"...\" --locator \"...\"), which runs made later reproduce or not; a threshold a plan sets is a criterion in the plan's words with --why \"<file>:<line>\", and rb checks that the line states it.",
+    "  5. Declare the comparison as it was: experiment with its --hypothesis, --baseline and --candidate, control and ablation variants, --varies for the intended differences. A direction nobody ran yet is an experiment with no runs. Declare the counting structure as population.* settings; rb says it beside every count. Datasets and checkpoints the runs read are resources (rb resource add).",
+    "  6. Unknown stays unknown (rb spec set <exp> <name> --unknown); ambiguity is listed, never guessed.",
+    "  7. Everything you write is recorded as yours. Calls on results and on lines of work (rb decide) are the user's: record one when they ask, with their words verbatim in --words; it waits for their confirmation (rb confirm <id>, in their own terminal). A call made before the record is --past, and it waits for the same one confirmation whatever document it cites: --source <file>[:<line>] --quote \"...\" gives the document, and rb says beside the call what git shows of it.",
+    "",
+    "Next: rb init \"<the work's theme>\"  \u00b7  rb docs --start",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "compile",
+   "exit": 0,
+   "out": [
+    "",
+    "No record here yet. A compiled record starts with the work's theme, then each question the work asks:",
+    "  rb init \"<the work's theme>\"",
+    "  rb question add \"<what are you trying to find out?>\"",
+    "To record the work already done: rb docs --start.",
+    "",
+    "The contract (for the agent doing the reading):",
+    "  1. Propose structure through the ordinary commands; rb compile writes nothing itself.",
+    "  2. Every value carries its source. Structured: --source file#key.path (rb reads the file and checks it). Prose: --quote \"exact text\" --locator \"section\" (the line must state the value; rb reads and checks the span).",
+    "  3. Statements travel verbatim: a question, hypothesis or criterion lifted from a report keeps its words, never reworded, as plain text with the markup dropped (Unicode symbols for math, no citation keys). A --quote stays exact: rb checks it against the file. A summary is a new artifact with an author, not a replacement for what was said.",
+    "  4. Numbers in structured files are runs (rb run add <exp> --from <file>); so is a row of a SQLite database, read from the database itself (--from <database> --table <table> --where <column>=<value>), never from an export of it. Give --command only for a command you saw run or a log line records (--command-source <file>:<line>); a command from a README, a paper or a script is a recipe, a note with its file and line. A result that exists only in prose becomes a cited criterion (rb criterion add \"...\" -e <exp> -q <question> --metric <m> --source <file> --quote \"...\" --locator \"...\"), which runs made later reproduce or not; a threshold a plan sets is a criterion in the plan's words with --why \"<file>:<line>\", and rb checks that the line states it.",
+    "  5. Declare the comparison as it was: experiment with its --hypothesis, --baseline and --candidate, control and ablation variants, --varies for the intended differences. A direction nobody ran yet is an experiment with no runs. Declare the counting structure as population.* settings; rb says it beside every count. Datasets and checkpoints the runs read are resources (rb resource add).",
+    "  6. Unknown stays unknown (rb spec set <exp> <name> --unknown); ambiguity is listed, never guessed.",
+    "  7. Everything you write is recorded as yours. Calls on results and on lines of work (rb decide) are the user's: record one when they ask, with their words verbatim in --words; it waits for their confirmation (rb confirm <id>, in their own terminal). A call made before the record is --past, and it waits for the same one confirmation whatever document it cites: --source <file>[:<line>] --quote \"...\" gives the document, and rb says beside the call what git shows of it.",
+    "",
+    "Next: rb init \"<the work's theme>\"  \u00b7  rb docs --start",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "init exhaust --no-agents",
+   "exit": 0,
+   "out": [
+    "Project 'exhaust' started: @BASE@/work/.rb",
+    "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
+    "",
+    "Then paste this line into your agent's chat:",
+    "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "question add 'Does width help?' --id q1",
+   "exit": 0,
+   "out": [
+    "q1: Does width help?",
+    "",
+    "Next: rb experiment add \"<what would answer it>\" -q q1 --hypothesis \"<what you expect>\"",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment add 'wide vs base' --id e1 -q q1 --baseline base --candidate wide --hypothesis 'wider wins'",
+   "exit": 0,
+   "out": [
+    "Experiment e1: wide vs base \u00b7 base (baseline) vs wide (candidate) \u00b7 under q1",
+    "  hypothesis: wider wins",
+    "  Planned: nothing in the record tests it yet, and it shows as a planned direction until its first run or analysis.",
+    "  Made 2 variants: base (baseline), wide (candidate); a setting of one is rb spec set e1 base.<setting> <value>.",
+    "",
+    "Next: rb spec set e1 --from <config.yaml> --keys \"<the keys that define it>\"  \u00b7  rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "metric add top1 --maximize --alias acc",
+   "exit": 0,
+   "out": [
+    "Metric top1: higher is better \u00b7 also called acc",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "spec set e1 lr 0.0003 --no-verify",
+   "exit": 0,
+   "out": [
+    "e1/lr = 0.0003 \u00b7 provisional",
+    "  It stays provisional until a file (file#key, file:LINE, or --quote) or a run's JSON that states it is its source; a url or a note is recorded but cannot be checked.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "criterion add 'wide reaches 0.7' -e e1 --metric wide.top1 --at-least 0.7 --id c1",
+   "exit": 0,
+   "out": [
+    "c1: wide reaches 0.7",
+    "  wide.top1 \u2265 0.7 \u00b7 primary \u00b7 on e1",
+    "  declared; no evidence recorded yet",
+    "",
+    "Next: rb run add e1 wide.top1=<value> --command \"...\"",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "run add e1 base.top1=0.70 wide.top1=0.74",
+   "exit": 0,
+   "out": [
+    "runp5h4s6 on e1: base.top1=0.7, wide.top1=0.74",
+    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  c1 estimate meets criterion \u00b7 point only: wide.top1: 0.74 \u00b7 mean, 1 run (rb)",
+    "  rb put the code in git at refs/rb/snapshots/87390d922376c91b74ab0a5fc455b62542ea44b0, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/87390d922376c91b74ab0a5fc455b62542ea44b0 removes it.",
+    "",
+    "Next: rb show c1",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "run add e1 base.top1=0.70 wide.top1=0.74 --command again",
+   "exit": 0,
+   "out": [
+    "runqtdhpa on e1: base.top1=0.7, wide.top1=0.74",
+    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  c1 estimate meets criterion \u00b7 point only: wide.top1: 0.74 \u00b7 mean, 2 runs (rb)",
+    "",
+    "Next: rb show c1",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "analysis add e1 --compare 'wide/base:top1=0.04[0.01,0.07]' --id a1",
+   "exit": 0,
+   "out": [
+    "a1 on e1: 1 comparison (reported)",
+    "  top1: wide vs base: +0.04 [+0.01, +0.07]",
+    "",
+    "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric top1 --subject wide --reference base --better",
+    ""
+   ],
+   "err": [
+    "rb analysis add: a1's numbers were typed with no document to check them against; every reading of them says so",
+    ""
+   ]
+  },
+  {
+   "run": "compile report.md data notes",
+   "exit": 0,
+   "out": [
+    "Sources (9):",
+    "  report.md  \u00b7  prose  \u00b7  \"Width study, round two\"",
+    "      speaks the record's language: wide (variant of e1) \u00d73 \u00b7 base (variant of e1) \u00d72 \u00b7 top1 (metric) \u00b7 acc (metric (alias of top1)) \u00b7 e1 (experiment) \u00b7 lr (setting of e1)",
+    "      line 4: 0.04 grounds to the estimate of top1, wide vs base, in a1 or change in top1, wide vs base (e1)",
+    "      line 4: 5.7% grounds to % change in top1, wide vs base (e1)",
+    "      7 numbers ground nowhere in the record: unplaced, not guessed at",
+    "  data/blob.bin  \u00b7  other",
+    "  data/metrics.json  \u00b7  structured  \u00b7  3 numbers (acc, other, top1)",
+    "  data/run.py  \u00b7  code",
+    "  data/table.csv  \u00b7  table  \u00b7  columns seed, top1, top5",
+    "  data/tabs.tsv  \u00b7  table  \u00b7  columns a, b",
+    "  data/unknown.json  \u00b7  structured  \u00b7  1 number (zz)  \u00b7  holds numbers nothing declares yet",
+    "  notes/empty.md  \u00b7  prose",
+    "  notes/plain.txt  \u00b7  prose  \u00b7  \"first line says something\"",
+    "",
+    "Compile against what exists (ids are handles, not suggestions):",
+    "  question q1: Does width help? (open)",
+    "  experiment e1: wide vs base \u00b7 open \u00b7 base (baseline) vs wide (candidate) \u00b7 hypothesis: wider wins",
+    "  analysis a1 on e1: 1 comparison (reported)",
+    "  metrics known: top1",
+    "  criteria: 1 meets",
+    "",
+    "Matched by metric name (1): only one experiment reads these names. A name is not provenance: record one only when it is that experiment's run.",
+    "  rb run add e1 --from data/metrics.json   (written 2026-10-01, before e1 existed: likely not its run)",
+    "",
+    "The contract (for the agent doing the reading):",
+    "  1. Propose structure through the ordinary commands; rb compile writes nothing itself.",
+    "  2. Every value carries its source. Structured: --source file#key.path (rb reads the file and checks it). Prose: --quote \"exact text\" --locator \"section\" (the line must state the value; rb reads and checks the span).",
+    "  3. Statements travel verbatim: a question, hypothesis or criterion lifted from a report keeps its words, never reworded, as plain text with the markup dropped (Unicode symbols for math, no citation keys). A --quote stays exact: rb checks it against the file. A summary is a new artifact with an author, not a replacement for what was said.",
+    "  4. Numbers in structured files are runs (rb run add <exp> --from <file>); so is a row of a SQLite database, read from the database itself (--from <database> --table <table> --where <column>=<value>), never from an export of it. Give --command only for a command you saw run or a log line records (--command-source <file>:<line>); a command from a README, a paper or a script is a recipe, a note with its file and line. A result that exists only in prose becomes a cited criterion (rb criterion add \"...\" -e <exp> -q <question> --metric <m> --source <file> --quote \"...\" --locator \"...\"), which runs made later reproduce or not; a threshold a plan sets is a criterion in the plan's words with --why \"<file>:<line>\", and rb checks that the line states it.",
+    "  5. Declare the comparison as it was: experiment with its --hypothesis, --baseline and --candidate, control and ablation variants, --varies for the intended differences. A direction nobody ran yet is an experiment with no runs. Declare the counting structure as population.* settings; rb says it beside every count. Datasets and checkpoints the runs read are resources (rb resource add).",
+    "  6. Unknown stays unknown (rb spec set <exp> <name> --unknown); ambiguity is listed, never guessed.",
+    "  7. Everything you write is recorded as yours. Calls on results and on lines of work (rb decide) are the user's: record one when they ask, with their words verbatim in --words; it waits for their confirmation (rb confirm <id>, in their own terminal). A call made before the record is --past, and it waits for the same one confirmation whatever document it cites: --source <file>[:<line>] --quote \"...\" gives the document, and rb says beside the call what git shows of it.",
+    "",
+    "Next: rb run add e1 --from data/metrics.json",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "compile report.md --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"compile\",",
+    " \"data\": {",
+    "  \"sources\": [",
+    "   {",
+    "    \"path\": \"report.md\",",
+    "    \"kind\": \"prose\",",
+    "    \"bytes\": 350,",
+    "    \"heading\": \"Width study, round two\",",
+    "    \"anchors\": {",
+    "     \"terms\": [",
+    "      {",
+    "       \"term\": \"wide\",",
+    "       \"kind\": \"variant of e1\",",
+    "       \"count\": 3,",
+    "       \"line\": 3",
+    "      },",
+    "      {",
+    "       \"term\": \"base\",",
+    "       \"kind\": \"variant of e1\",",
+    "       \"count\": 2,",
+    "       \"line\": 3",
+    "      },",
+    "      {",
+    "       \"term\": \"top1\",",
+    "       \"kind\": \"metric\",",
+    "       \"count\": 1,",
+    "       \"line\": 3",
+    "      },",
+    "      {",
+    "       \"term\": \"acc\",",
+    "       \"kind\": \"metric (alias of top1)\",",
+    "       \"count\": 1,",
+    "       \"line\": 3",
+    "      },",
+    "      {",
+    "       \"term\": \"e1\",",
+    "       \"kind\": \"experiment\",",
+    "       \"count\": 1,",
+    "       \"line\": 5",
+    "      },",
+    "      {",
+    "       \"term\": \"lr\",",
+    "       \"kind\": \"setting of e1\",",
+    "       \"count\": 1,",
+    "       \"line\": 5",
+    "      },",
+    "      {",
+    "       \"term\": \"c1\",",
+    "       \"kind\": \"criterion\",",
+    "       \"count\": 1,",
+    "       \"line\": 6",
+    "      }",
+    "     ],",
+    "     \"grounded\": [",
+    "      {",
+    "       \"text\": \"0.04\",",
+    "       \"line\": 4,",
+    "       \"matches\": [",
+    "        \"the estimate of top1, wide vs base, in a1\",",
+    "        \"change in top1, wide vs base (e1)\"",
+    "       ]",
+    "      },",
+    "      {",
+    "       \"text\": \"5.7%\",",
+    "       \"line\": 4,",
+    "       \"matches\": [",
+    "        \"% change in top1, wide vs base (e1)\"",
+    "       ]",
+    "      }",
+    "     ],",
+    "     \"numbers\": 9",
+    "    }",
+    "   }",
+    "  ],",
+    "  \"outside\": [],",
+    "  \"proposals\": [],",
+    "  \"project\": true,",
+    "  \"contract\": [",
+    "   \"Propose structure through the ordinary commands; rb compile writes nothing itself.\",",
+    "   \"Every value carries its source. Structured: --source file#key.path (rb reads the file and checks it). Prose: --quote \\\"exact text\\\" --locator \\\"section\\\" (the line must state the value; rb reads and checks the span).\",",
+    "   \"Statements travel verbatim: a question, hypothesis or criterion lifted from a report keeps its words, never reworded, as plain text with the markup dropped (Unicode symbols for math, no citation keys). A --quote stays exact: rb checks it against the file. A summary is a new artifact with an author, not a replacement for what was said.\",",
+    "   \"Numbers in structured files are runs (rb run add <exp> --from <file>); so is a row of a SQLite database, read from the database itself (--from <database> --table <table> --where <column>=<value>), never from an export of it. Give --command only for a command you saw run or a log line records (--command-source <file>:<line>); a command from a README, a paper or a script is a recipe, a note with its file and line. A result that exists only in prose becomes a cited criterion (rb criterion add \\\"...\\\" -e <exp> -q <question> --metric <m> --source <file> --quote \\\"...\\\" --locator \\\"...\\\"), which runs made later reproduce or not; a threshold a plan sets is a criterion in the plan's words with --why \\\"<file>:<line>\\\", and rb checks that the line states it.\",",
+    "   \"Declare the comparison as it was: experiment with its --hypothesis, --baseline and --candidate, control and ablation variants, --varies for the intended differences. A direction nobody ran yet is an experiment with no runs. Declare the counting structure as population.* settings; rb says it beside every count. Datasets and checkpoints the runs read are resources (rb resource add).\",",
+    "   \"Unknown stays unknown (rb spec set <exp> <name> --unknown); ambiguity is listed, never guessed.\",",
+    "   \"Everything you write is recorded as yours. Calls on results and on lines of work (rb decide) are the user's: record one when they ask, with their words verbatim in --words; it waits for their confirmation (rb confirm <id>, in their own terminal). A call made before the record is --past, and it waits for the same one confirmation whatever document it cites: --source <file>[:<line>] --quote \\\"...\\\" gives the document, and rb says beside the call what git shows of it.\"",
+    "  ]",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [",
+    "  \"rb status\"",
+    " ],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "compile",
+   "exit": 0,
+   "out": [
+    "",
+    "Compile against what exists (ids are handles, not suggestions):",
+    "  question q1: Does width help? (open)",
+    "  experiment e1: wide vs base \u00b7 open \u00b7 base (baseline) vs wide (candidate) \u00b7 hypothesis: wider wins",
+    "  analysis a1 on e1: 1 comparison (reported)",
+    "  metrics known: top1",
+    "  criteria: 1 meets",
+    "",
+    "Nothing given and nothing unplaced in the journal. Point this at files or a directory: rb compile <path...>",
+    "",
+    "The contract (for the agent doing the reading):",
+    "  1. Propose structure through the ordinary commands; rb compile writes nothing itself.",
+    "  2. Every value carries its source. Structured: --source file#key.path (rb reads the file and checks it). Prose: --quote \"exact text\" --locator \"section\" (the line must state the value; rb reads and checks the span).",
+    "  3. Statements travel verbatim: a question, hypothesis or criterion lifted from a report keeps its words, never reworded, as plain text with the markup dropped (Unicode symbols for math, no citation keys). A --quote stays exact: rb checks it against the file. A summary is a new artifact with an author, not a replacement for what was said.",
+    "  4. Numbers in structured files are runs (rb run add <exp> --from <file>); so is a row of a SQLite database, read from the database itself (--from <database> --table <table> --where <column>=<value>), never from an export of it. Give --command only for a command you saw run or a log line records (--command-source <file>:<line>); a command from a README, a paper or a script is a recipe, a note with its file and line. A result that exists only in prose becomes a cited criterion (rb criterion add \"...\" -e <exp> -q <question> --metric <m> --source <file> --quote \"...\" --locator \"...\"), which runs made later reproduce or not; a threshold a plan sets is a criterion in the plan's words with --why \"<file>:<line>\", and rb checks that the line states it.",
+    "  5. Declare the comparison as it was: experiment with its --hypothesis, --baseline and --candidate, control and ablation variants, --varies for the intended differences. A direction nobody ran yet is an experiment with no runs. Declare the counting structure as population.* settings; rb says it beside every count. Datasets and checkpoints the runs read are resources (rb resource add).",
+    "  6. Unknown stays unknown (rb spec set <exp> <name> --unknown); ambiguity is listed, never guessed.",
+    "  7. Everything you write is recorded as yours. Calls on results and on lines of work (rb decide) are the user's: record one when they ask, with their words verbatim in --words; it waits for their confirmation (rb confirm <id>, in their own terminal). A call made before the record is --past, and it waits for the same one confirmation whatever document it cites: --source <file>[:<line>] --quote \"...\" gives the document, and rb says beside the call what git shows of it.",
+    "",
+    "Next: rb status",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "compile nothing.md data/metrics.json",
+   "exit": 0,
+   "out": [
+    "Sources (1):",
+    "  data/metrics.json  \u00b7  structured  \u00b7  3 numbers (acc, other, top1)",
+    "  outside the project, so sources cannot cite it: nothing.md: no such file (copy it into the repository first)",
+    "",
+    "Compile against what exists (ids are handles, not suggestions):",
+    "  question q1: Does width help? (open)",
+    "  experiment e1: wide vs base \u00b7 open \u00b7 base (baseline) vs wide (candidate) \u00b7 hypothesis: wider wins",
+    "  analysis a1 on e1: 1 comparison (reported)",
+    "  metrics known: top1",
+    "  criteria: 1 meets",
+    "",
+    "Matched by metric name (1): only one experiment reads these names. A name is not provenance: record one only when it is that experiment's run.",
+    "  rb run add e1 --from data/metrics.json   (written 2026-10-01, before e1 existed: likely not its run)",
+    "",
+    "The contract (for the agent doing the reading):",
+    "  1. Propose structure through the ordinary commands; rb compile writes nothing itself.",
+    "  2. Every value carries its source. Structured: --source file#key.path (rb reads the file and checks it). Prose: --quote \"exact text\" --locator \"section\" (the line must state the value; rb reads and checks the span).",
+    "  3. Statements travel verbatim: a question, hypothesis or criterion lifted from a report keeps its words, never reworded, as plain text with the markup dropped (Unicode symbols for math, no citation keys). A --quote stays exact: rb checks it against the file. A summary is a new artifact with an author, not a replacement for what was said.",
+    "  4. Numbers in structured files are runs (rb run add <exp> --from <file>); so is a row of a SQLite database, read from the database itself (--from <database> --table <table> --where <column>=<value>), never from an export of it. Give --command only for a command you saw run or a log line records (--command-source <file>:<line>); a command from a README, a paper or a script is a recipe, a note with its file and line. A result that exists only in prose becomes a cited criterion (rb criterion add \"...\" -e <exp> -q <question> --metric <m> --source <file> --quote \"...\" --locator \"...\"), which runs made later reproduce or not; a threshold a plan sets is a criterion in the plan's words with --why \"<file>:<line>\", and rb checks that the line states it.",
+    "  5. Declare the comparison as it was: experiment with its --hypothesis, --baseline and --candidate, control and ablation variants, --varies for the intended differences. A direction nobody ran yet is an experiment with no runs. Declare the counting structure as population.* settings; rb says it beside every count. Datasets and checkpoints the runs read are resources (rb resource add).",
+    "  6. Unknown stays unknown (rb spec set <exp> <name> --unknown); ambiguity is listed, never guessed.",
+    "  7. Everything you write is recorded as yours. Calls on results and on lines of work (rb decide) are the user's: record one when they ask, with their words verbatim in --words; it waits for their confirmation (rb confirm <id>, in their own terminal). A call made before the record is --past, and it waits for the same one confirmation whatever document it cites: --source <file>[:<line>] --quote \"...\" gives the document, and rb says beside the call what git shows of it.",
+    "",
+    "Next: rb run add e1 --from data/metrics.json",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment add 'second' --id e2 --baseline base --candidate wide",
+   "exit": 0,
+   "out": [
+    "Experiment e2: second \u00b7 base (baseline) vs wide (candidate)",
+    "  Planned: nothing in the record tests it yet, and it shows as a planned direction until its first run or analysis.",
+    "  Made 2 variants: base (baseline), wide (candidate); a setting of one is rb spec set e2 base.<setting> <value>.",
+    "",
+    "Next: rb spec set e2 --from <config.yaml> --keys \"<the keys that define it>\"  \u00b7  rb criterion add \"<what it should show>\" -e e2 -q <question> --metric <name> --at-most <x>",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "criterion add 'also top1' -e e2 --metric wide.top1 --at-least 0.5 --id c2",
+   "exit": 0,
+   "out": [
+    "c2: also top1",
+    "  wide.top1 \u2265 0.5 \u00b7 primary \u00b7 on e2",
+    "  declared; no evidence recorded yet",
+    "",
+    "Next: rb run add e2 wide.top1=<value> --command \"...\"",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "compile data/metrics.json data/unknown.json",
+   "exit": 0,
+   "out": [
+    "Sources (2):",
+    "  data/metrics.json  \u00b7  structured  \u00b7  3 numbers (acc, other, top1)  \u00b7  could belong to e1 or e2: say which",
+    "  data/unknown.json  \u00b7  structured  \u00b7  1 number (zz)  \u00b7  holds numbers nothing declares yet",
+    "",
+    "Compile against what exists (ids are handles, not suggestions):",
+    "  question q1: Does width help? (open)",
+    "  experiment e1: wide vs base \u00b7 open \u00b7 base (baseline) vs wide (candidate) \u00b7 hypothesis: wider wins",
+    "  experiment e2: second \u00b7 planned \u00b7 base (baseline) vs wide (candidate)",
+    "  analysis a1 on e1: 1 comparison (reported)",
+    "  metrics known: top1",
+    "  criteria: 1 meets \u00b7 1 untested",
+    "",
+    "The contract (for the agent doing the reading):",
+    "  1. Propose structure through the ordinary commands; rb compile writes nothing itself.",
+    "  2. Every value carries its source. Structured: --source file#key.path (rb reads the file and checks it). Prose: --quote \"exact text\" --locator \"section\" (the line must state the value; rb reads and checks the span).",
+    "  3. Statements travel verbatim: a question, hypothesis or criterion lifted from a report keeps its words, never reworded, as plain text with the markup dropped (Unicode symbols for math, no citation keys). A --quote stays exact: rb checks it against the file. A summary is a new artifact with an author, not a replacement for what was said.",
+    "  4. Numbers in structured files are runs (rb run add <exp> --from <file>); so is a row of a SQLite database, read from the database itself (--from <database> --table <table> --where <column>=<value>), never from an export of it. Give --command only for a command you saw run or a log line records (--command-source <file>:<line>); a command from a README, a paper or a script is a recipe, a note with its file and line. A result that exists only in prose becomes a cited criterion (rb criterion add \"...\" -e <exp> -q <question> --metric <m> --source <file> --quote \"...\" --locator \"...\"), which runs made later reproduce or not; a threshold a plan sets is a criterion in the plan's words with --why \"<file>:<line>\", and rb checks that the line states it.",
+    "  5. Declare the comparison as it was: experiment with its --hypothesis, --baseline and --candidate, control and ablation variants, --varies for the intended differences. A direction nobody ran yet is an experiment with no runs. Declare the counting structure as population.* settings; rb says it beside every count. Datasets and checkpoints the runs read are resources (rb resource add).",
+    "  6. Unknown stays unknown (rb spec set <exp> <name> --unknown); ambiguity is listed, never guessed.",
+    "  7. Everything you write is recorded as yours. Calls on results and on lines of work (rb decide) are the user's: record one when they ask, with their words verbatim in --words; it waits for their confirmation (rb confirm <id>, in their own terminal). A call made before the record is --past, and it waits for the same one confirmation whatever document it cites: --source <file>[:<line>] --quote \"...\" gives the document, and rb says beside the call what git shows of it.",
+    "",
+    "Next: rb status",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "compile data/metrics.json",
+   "exit": 0,
+   "out": [
+    "Sources (1):",
+    "  data/metrics.json  \u00b7  structured  \u00b7  2 numbers (base.top1, wide.top1)  \u00b7  already in the record",
+    "",
+    "Compile against what exists (ids are handles, not suggestions):",
+    "  question q1: Does width help? (open)",
+    "  experiment e1: wide vs base \u00b7 open \u00b7 base (baseline) vs wide (candidate) \u00b7 hypothesis: wider wins",
+    "  experiment e2: second \u00b7 planned \u00b7 base (baseline) vs wide (candidate)",
+    "  analysis a1 on e1: 1 comparison (reported)",
+    "  metrics known: top1",
+    "  criteria: 1 meets \u00b7 1 untested",
+    "",
+    "The contract (for the agent doing the reading):",
+    "  1. Propose structure through the ordinary commands; rb compile writes nothing itself.",
+    "  2. Every value carries its source. Structured: --source file#key.path (rb reads the file and checks it). Prose: --quote \"exact text\" --locator \"section\" (the line must state the value; rb reads and checks the span).",
+    "  3. Statements travel verbatim: a question, hypothesis or criterion lifted from a report keeps its words, never reworded, as plain text with the markup dropped (Unicode symbols for math, no citation keys). A --quote stays exact: rb checks it against the file. A summary is a new artifact with an author, not a replacement for what was said.",
+    "  4. Numbers in structured files are runs (rb run add <exp> --from <file>); so is a row of a SQLite database, read from the database itself (--from <database> --table <table> --where <column>=<value>), never from an export of it. Give --command only for a command you saw run or a log line records (--command-source <file>:<line>); a command from a README, a paper or a script is a recipe, a note with its file and line. A result that exists only in prose becomes a cited criterion (rb criterion add \"...\" -e <exp> -q <question> --metric <m> --source <file> --quote \"...\" --locator \"...\"), which runs made later reproduce or not; a threshold a plan sets is a criterion in the plan's words with --why \"<file>:<line>\", and rb checks that the line states it.",
+    "  5. Declare the comparison as it was: experiment with its --hypothesis, --baseline and --candidate, control and ablation variants, --varies for the intended differences. A direction nobody ran yet is an experiment with no runs. Declare the counting structure as population.* settings; rb says it beside every count. Datasets and checkpoints the runs read are resources (rb resource add).",
+    "  6. Unknown stays unknown (rb spec set <exp> <name> --unknown); ambiguity is listed, never guessed.",
+    "  7. Everything you write is recorded as yours. Calls on results and on lines of work (rb decide) are the user's: record one when they ask, with their words verbatim in --words; it waits for their confirmation (rb confirm <id>, in their own terminal). A call made before the record is --past, and it waits for the same one confirmation whatever document it cites: --source <file>[:<line>] --quote \"...\" gives the document, and rb says beside the call what git shows of it.",
+    "",
+    "Next: rb status",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  }
+ ],
+ "files": {
+  ".rb/.gitattributes": [
+   "* -text",
+   "log.jsonl merge=union",
+   ""
+  ],
+  ".rb/.gitignore": [
+   ".lock",
+   "*.tmp",
+   "cache/",
+   "journal/",
+   ""
+  ],
+  ".rb/cache/objects/01/01e724e9d6edf857862a184f77e3f38deb762f4ee2d07cde1d850efb9b6c32e9.json.gz": {
+   "sha256": "b227cae91d12c1deb8ab21b5b801df55396a577e2cb03483d0529fddc95b1f3a",
+   "bytes": 201
+  },
+  ".rb/cache/objects/2a/2a2c4c58ccb20540b6ca5d8c64a52a3a5b13f4123420e0934336e4590565aed2.json.gz": {
+   "sha256": "bfb03000a9d3a250af14d4944a41e4d252af827e2c997c6840365732aeccd4bd",
+   "bytes": 137
+  },
+  ".rb/cache/objects/46/464778c9e4930b2b53253248844c54bdf468968737c752e027ebfa1d6cb838f6.json.gz": {
+   "sha256": "fb5c602abb2dfb1323d45a181a8fdd979726d6c205cb674a5a34a25794555fe8",
+   "bytes": 120
+  },
+  ".rb/cache/objects/4b/4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb.json.gz": {
+   "sha256": "a929faebb1691ebb0d70bcb999fcf2a10feaf26f2b747ffe16445cf3b9d49a93",
+   "bytes": 117
+  },
+  ".rb/cache/objects/62/62daadbc4304c4ac81e286cf603aba38957d785776e9dfb6ead3231a66c74382.json.gz": {
+   "sha256": "66d2219a58317088f0e0d4c1c43f9233016ab51f7cd2dd403cd5baa31273c5b7",
+   "bytes": 150
+  },
+  ".rb/cache/objects/6b/6b73b0a2bcd29b45910f30dc0d43486c355bd0dae6ae8908d5d181c4789a698e.json.gz": {
+   "sha256": "38c5714c760dd413a554d0b6846ddc91f4fd0acaec8171669af018bb40a6626f",
+   "bytes": 370
+  },
+  ".rb/cache/objects/6c/6ce596216f32edfef3282cc2cff2c02e673ff6e906dfde1037ca3aa3b96832be.json.gz": {
+   "sha256": "9d309ceb709b4e649a5138d0b96174dbe9c53747cbb83e91fc17bcec5fc2df46",
+   "bytes": 782
+  },
+  ".rb/cache/objects/85/855159424c56f0dd6484cc7776803a96f03a68287f49a71dc844d18241f9edb4.json.gz": {
+   "sha256": "4ddaab53ec775e7f7be3342aac36b9e2d8788da3339d67388db1ba8e89d83d35",
+   "bytes": 1149
+  },
+  ".rb/cache/objects/97/976f541e2fe8ac2e5638e5eb477211172d1db075297fab2c6f813144fda20966.json.gz": {
+   "sha256": "ee78efee65c9edb37f64c17dae21ef972cc77f61bc49d982fde916225cb09492",
+   "bytes": 156
+  },
+  ".rb/cache/objects/a6/a620448fe202c7e9382f209b8fc00ce0170a5c2deff1f2901aa3fb7e788e92d9.json.gz": {
+   "sha256": "51e897c8b52b8312cdcf0a37a2c992d12a7702619674230e3fa8d0a66a57c48e",
+   "bytes": 1167
+  },
+  ".rb/cache/objects/b2/b25f2761e5885179565e1c493166029a9d14d54fe1112052438aafe7a8449024.json.gz": {
+   "sha256": "ea33d5bad9d36c417ff13a0882624cf1d17bf105ddbcc5ed7b5d42d3122be2e4",
+   "bytes": 257
+  },
+  ".rb/cache/objects/e3/e3cedc086881f1eb2aedf1470c2a6991ce9e6e7dc728a5b453cf91be3941b611.json.gz": {
+   "sha256": "0be87fe84a44f7d96709bb6f7527fdc8830ee11271130a33cb412375005e57fc",
+   "bytes": 250
+  },
+  ".rb/cache/objects/ea/eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695.json.gz": {
+   "sha256": "a4a7d60fac003794f1d4e7a0a04959209477dff8191473a5247407635419fb79",
+   "bytes": 116
+  },
+  ".rb/experiments/e1/analyses/a1.yaml": [
+   "rb: 1",
+   "kind: analysis",
+   "id: a1",
+   "uid: ana_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "experiment: e1",
+   "basis: reported",
+   "comparisons:",
+   "  - subject: wide",
+   "    reference: base",
+   "    metric: top1",
+   "    estimate: 0.04",
+   "    lo: 0.01",
+   "    hi: 0.07",
+   "    level: 0.95",
+   "produced_basis: recorded",
+   "receipt:",
+   "  at: \"2026-10-01T12:00:00.000+00:00\"",
+   "  actor: human:t",
+   "  actor_via: git-email",
+   "  via: cli",
+   "  rb_version: 0.0.0",
+   "  attached:",
+   "    commit: null",
+   "    branch: main",
+   "    dirty: true",
+   "    diff_sha256: ee0fa81237f90205d3189d424b33370e0d1878bf37b60230a3cae21a6ec1babb",
+   "    untracked: 11",
+   "  produced:",
+   "    commit: null",
+   "    from: unknown",
+   "  environment:",
+   "    python: 3.12.1",
+   "    platform: Linux-6.1.0-x86_64-with-glibc2.39",
+   "    rb: 0.0.0",
+   "    torch: 2.4.1",
+   "    numpy: 2.0.2",
+   "    pydantic: 2.9.2",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/criteria/c1.yaml": [
+   "rb: 1",
+   "kind: criterion",
+   "id: c1",
+   "experiment: e1",
+   "statement: wide reaches 0.7",
+   "metric: wide.top1",
+   "comparator: at_least",
+   "target: 0.7",
+   "over: mean",
+   "role: primary",
+   "min_n: 1",
+   "origin: own",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/experiment.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: e1",
+   "uid: exp_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: wide vs base",
+   "questions:",
+   "  - q1",
+   "hypothesis: wider wins",
+   "settings:",
+   "  - name: lr",
+   "    value: 0.0003",
+   "    status: provisional",
+   "    required: true",
+   "    per_run: false",
+   "    set_by: human:t",
+   "    set_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "    via: cli",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/runs/runp5h4s6.yaml": [
+   "rb: 1",
+   "kind: run",
+   "id: runp5h4s6",
+   "uid: run_01M3VNBWG0GK37F0M3GMH9W716",
+   "experiment: e1",
+   "metrics:",
+   "  base.top1: 0.7",
+   "  wide.top1: 0.74",
+   "produced_basis: recorded",
+   "basis: typed",
+   "spec_sha256: 61021da0cf05f1774e412e748165a40ff49998240cf4982ec4540e4363ac1bf9",
+   "settings:",
+   "  lr: 0.0003",
+   "arm_specs:",
+   "  base: a2dd10a8d07ebb34417fd5e32978b1aeab8ac2a2c1d7b0021e776243062e8356",
+   "  wide: df02967f2e91c28d23978112cf0c9148962c7848852977c8a1afa0cc744a3e13",
+   "spec_frozen: false",
+   "synthetic: false",
+   "fingerprint: d1107c26d996292b6a762dbb0dbf1b3892e92ab8ebe22e6abb3929593959edbd",
+   "receipt:",
+   "  at: \"2026-10-01T12:00:00.000+00:00\"",
+   "  actor: human:t",
+   "  actor_via: git-email",
+   "  via: cli",
+   "  rb_version: 0.0.0",
+   "  attached:",
+   "    commit: null",
+   "    branch: main",
+   "    dirty: true",
+   "    diff_sha256: ee0fa81237f90205d3189d424b33370e0d1878bf37b60230a3cae21a6ec1babb",
+   "    untracked: 11",
+   "    tree: 87390d922376c91b74ab0a5fc455b62542ea44b0",
+   "  produced:",
+   "    commit: null",
+   "    from: unknown",
+   "  environment:",
+   "    python: 3.12.1",
+   "    platform: Linux-6.1.0-x86_64-with-glibc2.39",
+   "    rb: 0.0.0",
+   "    torch: 2.4.1",
+   "    numpy: 2.0.2",
+   "    pydantic: 2.9.2",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/runs/runqtdhpa.yaml": [
+   "rb: 1",
+   "kind: run",
+   "id: runqtdhpa",
+   "uid: run_01M3VNBWG0WK40130DZ62F1AG3",
+   "experiment: e1",
+   "metrics:",
+   "  base.top1: 0.7",
+   "  wide.top1: 0.74",
+   "produced_basis: recorded",
+   "basis: typed",
+   "spec_sha256: 61021da0cf05f1774e412e748165a40ff49998240cf4982ec4540e4363ac1bf9",
+   "settings:",
+   "  lr: 0.0003",
+   "arm_specs:",
+   "  base: a2dd10a8d07ebb34417fd5e32978b1aeab8ac2a2c1d7b0021e776243062e8356",
+   "  wide: df02967f2e91c28d23978112cf0c9148962c7848852977c8a1afa0cc744a3e13",
+   "spec_frozen: false",
+   "synthetic: false",
+   "fingerprint: 5ee495cb6c576d80f6d4357d6c84a7696dd3388b6120f996e12f31059f62bb25",
+   "receipt:",
+   "  at: \"2026-10-01T12:00:00.000+00:00\"",
+   "  actor: human:t",
+   "  actor_via: git-email",
+   "  via: cli",
+   "  rb_version: 0.0.0",
+   "  command: again",
+   "  attached:",
+   "    commit: null",
+   "    branch: main",
+   "    dirty: true",
+   "    diff_sha256: ee0fa81237f90205d3189d424b33370e0d1878bf37b60230a3cae21a6ec1babb",
+   "    untracked: 11",
+   "    tree: 87390d922376c91b74ab0a5fc455b62542ea44b0",
+   "  produced:",
+   "    commit: null",
+   "    from: unknown",
+   "  environment:",
+   "    python: 3.12.1",
+   "    platform: Linux-6.1.0-x86_64-with-glibc2.39",
+   "    rb: 0.0.0",
+   "    torch: 2.4.1",
+   "    numpy: 2.0.2",
+   "    pydantic: 2.9.2",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/variants/base.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: base",
+   "role: baseline",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/variants/wide.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: wide",
+   "role: candidate",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e2/criteria/c2.yaml": [
+   "rb: 1",
+   "kind: criterion",
+   "id: c2",
+   "experiment: e2",
+   "statement: also top1",
+   "metric: wide.top1",
+   "comparator: at_least",
+   "target: 0.5",
+   "over: mean",
+   "role: primary",
+   "min_n: 1",
+   "origin: own",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e2/experiment.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: e2",
+   "uid: exp_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: second",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e2/variants/base.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: base",
+   "role: baseline",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e2/variants/wide.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: wide",
+   "role: candidate",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/log.jsonl": [
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"exhaust\", \"sha256\": \"976f541e2fe8ac2e5638e5eb477211172d1db075297fab2c6f813144fda20966\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"exhaust\", \"head\": \"\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"question\", \"id\": \"q1\", \"sha256\": \"464778c9e4930b2b53253248844c54bdf468968737c752e027ebfa1d6cb838f6\", \"path\": \".rb/questions/q1.yaml\", \"detail\": {\"parent\": null}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"01e724e9d6edf857862a184f77e3f38deb762f4ee2d07cde1d850efb9b6c32e9\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/base\", \"path\": \".rb/experiments/e1/variants/base.yaml\", \"sha256\": \"eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695\"}, {\"kind\": \"variant\", \"id\": \"e1/wide\", \"path\": \".rb/experiments/e1/variants/wide.yaml\", \"sha256\": \"4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb\"}], \"detail\": {\"variants\": [\"base\", \"wide\"], \"like\": null, \"questions\": [\"q1\"], \"changed_parts\": {\"e1\": {\"variant:base\": \"baseline\", \"variant:wide\": \"candidate\", \"hypothesis\": \"wider wins\", \"question:q1\": \"q1\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"metric\", \"id\": \"top1\", \"sha256\": \"2a2c4c58ccb20540b6ca5d8c64a52a3a5b13f4123420e0934336e4590565aed2\", \"path\": \".rb/metrics/top1.yaml\"}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"spec_set\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"6b73b0a2bcd29b45910f30dc0d43486c355bd0dae6ae8908d5d181c4789a698e\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"setting\": \"lr\", \"change\": \"setting lr: new, 0.0003\", \"value\": 0.0003, \"status\": \"provisional\", \"required\": true, \"source\": null, \"changed_parts\": {\"e1\": {\"setting:lr\": \"0.0003\", \"source:lr\": null}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c1\", \"sha256\": \"b25f2761e5885179565e1c493166029a9d14d54fe1112052438aafe7a8449024\", \"path\": \".rb/experiments/e1/criteria/c1.yaml\", \"detail\": {\"rule\": \"wide.top1 \u2265 0.7\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:c1\": \"primary\", \"rule:c1\": \"wide.top1 \u2265 0.7\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"855159424c56f0dd6484cc7776803a96f03a68287f49a71dc844d18241f9edb4\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"a620448fe202c7e9382f209b8fc00ce0170a5c2deff1f2901aa3fb7e788e92d9\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"a1\", \"sha256\": \"6ce596216f32edfef3282cc2cff2c02e673ff6e906dfde1037ca3aa3b96832be\", \"path\": \".rb/experiments/e1/analyses/a1.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e2\", \"sha256\": \"62daadbc4304c4ac81e286cf603aba38957d785776e9dfb6ead3231a66c74382\", \"path\": \".rb/experiments/e2/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e2/base\", \"path\": \".rb/experiments/e2/variants/base.yaml\", \"sha256\": \"eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695\"}, {\"kind\": \"variant\", \"id\": \"e2/wide\", \"path\": \".rb/experiments/e2/variants/wide.yaml\", \"sha256\": \"4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb\"}], \"detail\": {\"variants\": [\"base\", \"wide\"], \"like\": null, \"questions\": [], \"changed_parts\": {\"e2\": {\"variant:base\": \"baseline\", \"variant:wide\": \"candidate\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c2\", \"sha256\": \"e3cedc086881f1eb2aedf1470c2a6991ce9e6e7dc728a5b453cf91be3941b611\", \"path\": \".rb/experiments/e2/criteria/c2.yaml\", \"detail\": {\"rule\": \"wide.top1 \u2265 0.5\", \"experiment\": \"e2\", \"role\": \"primary\", \"changed_parts\": {\"e2\": {\"role:c2\": \"primary\", \"rule:c2\": \"wide.top1 \u2265 0.5\"}}}}",
+   ""
+  ],
+  ".rb/metrics/top1.yaml": [
+   "rb: 1",
+   "kind: metric",
+   "id: top1",
+   "direction: maximize",
+   "aliases:",
+   "  - acc",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/project.yaml": [
+   "rb: 1",
+   "kind: project",
+   "id: exhaust",
+   "uid: prj_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: exhaust",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/questions/q1.yaml": [
+   "rb: 1",
+   "kind: question",
+   "id: q1",
+   "text: Does width help?",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  "data/.hidden.md": [
+   "# hidden",
+   ""
+  ],
+  "data/__pycache__/x.md": [
+   "# cache",
+   ""
+  ],
+  "data/blob.bin": [
+   "xx"
+  ],
+  "data/metrics.json": [
+   "{\"base.top1\": 0.70, \"wide.top1\": 0.74}",
+   ""
+  ],
+  "data/run.py": [
+   "print(1)",
+   ""
+  ],
+  "data/table.csv": [
+   "seed, top1 ,top5",
+   "1,0.7,0.9",
+   ""
+  ],
+  "data/tabs.tsv": [
+   "a\tb",
+   ""
+  ],
+  "data/unknown.json": [
+   "{\"zz\": 1.5}",
+   ""
+  ],
+  "notes/empty.md": [
+   "",
+   "",
+   ""
+  ],
+  "notes/plain.txt": [
+   "first line says something",
+   "",
+   "more",
+   ""
+  ],
+  "report.md": [
+   "# Width study, round two",
+   "",
+   "We compared wide against base on top1 (also logged as acc).",
+   "The wide arm reached 0.74 and base 0.70, a gain of 0.04 (5.7%).",
+   "Seeds: seed 1 and 2. The lr was 0.0003 throughout; e1 is the experiment.",
+   "Criterion c1 asks for at least 0.7 on wide.",
+   "A stray 0.123 and 42% and 3.14159 nowhere in the record.",
+   "Repeated: wide wide wide.",
+   ""
+  ]
+ }
+}

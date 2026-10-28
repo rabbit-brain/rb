@@ -1,0 +1,38 @@
+name: Bug report
+description: rb does something wrong, or does not do what the manual says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Show the problem with a small synthetic record. Do not paste private research, credentials or tokens. Report a security problem privately, as [SECURITY.md](https://github.com/rabbit-brain/rb/blob/main/SECURITY.md) describes.
+  - type: input
+    id: version
+    attributes:
+      label: rb version
+      description: What `rb version` prints.
+      placeholder: rabbit-brain 0.6.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Ubuntu 24.04, macOS 15, Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: The command that triggered the behavior and what rb printed. With `--json`, include the whole envelope.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected rb to do instead.
+    validations:
+      required: true

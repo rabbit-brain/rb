@@ -1,0 +1,756 @@
+{
+ "about": "The film, v2 (FILM-V2.md, Oct 24): prose turn after turn until you're lost, then one living view of where you stand. One segment per beat, or two where the screen moves mid-line (5 and 8: the line split where it moves). Every beat has its caption (compose.py --overlay), so the film tells its story muted; every number in a voice line is checked against the record's screens (VOICE.md). cut.py --spec cut.json makes dry-run-9's storyboard instead.",
+ "width": 1440,
+ "height": 900,
+ "scale": 2,
+ "segments": [
+  {
+   "id": "pitch",
+   "beat": "0 the pitch",
+   "title": "Rabbit Brain",
+   "caption": "the living state of your research, not a wall of prose",
+   "blur": 12,
+   "voice": "Rabbit Brain turns your AI agent's experiments into one living view of where your research stands.",
+   "steps": [
+    {
+     "goto": "{open}"
+    },
+    {
+     "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+     "lead": true
+    },
+    {
+     "goto": "{open}",
+     "lead": true
+    },
+    {
+     "waitFor": "document.documentElement.classList.contains('ready')"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "wait": 3700
+    }
+   ]
+  },
+  {
+   "id": "turns",
+   "beat": "1 the turns",
+   "caption": "One idea per turn. A wall of prose after each.",
+   "voice": "I research with my AI agent one turn at a time: an idea, a run, a long answer. Ten turns in, I've lost track.",
+   "steps": [
+    {
+     "goto": "/demo/log.html?log=/files/agent.log&beat=turns&turns=10&font=20&title=logs/agent.log"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "play": true
+    },
+    {
+     "wait": 400
+    }
+   ],
+   "voice_at": 3.5
+  },
+  {
+   "id": "summary",
+   "beat": "2 turn 10",
+   "caption": "Ten turns in: where do I actually stand?",
+   "voice": "I ask for a summary, and I get more prose. Where do I actually stand?",
+   "steps": [
+    {
+     "goto": "/demo/log.html?log=/files/agent.log&beat=summary&turns=10&reply=2784-2790&font=24&first=500&travel=900&title=logs/agent.log"
+    },
+    {
+     "wait": 200
+    },
+    {
+     "play": true
+    },
+    {
+     "wait": 2500
+    }
+   ],
+   "voice_at": 1.6
+  },
+  {
+   "id": "import",
+   "beat": "3 one line",
+   "caption": "One line to my agent",
+   "voice": "I paste one line into my agent, and Rabbit Brain reads the project as it is: the runs, their settings, my questions.",
+   "steps": [
+    {
+     "goto": "/demo/term.html?cast=/files/import.cast&from=18.5&to=285&lapse_from=23&speed=48&gap=2&font=11.6&mask=ids&lapse=bar&title=int8-cifar"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "mark": "subject",
+     "rect": "#bar"
+    },
+    {
+     "play": true
+    },
+    {
+     "wait": 900
+    }
+   ],
+   "zoom": {
+    "box": [
+     216,
+     116,
+     1008,
+     630
+    ]
+   }
+  },
+  {
+   "id": "living",
+   "beat": "4 the living view",
+   "caption": "The living state · is INT8 within 1 point of FP32?",
+   "voice": "Now one view shows where it stands: my question isn't answered yet, and here's why.",
+   "steps": [
+    {
+     "goto": "{open}"
+    },
+    {
+     "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+     "lead": true
+    },
+    {
+     "goto": "{open}",
+     "lead": true
+    },
+    {
+     "waitFor": "document.documentElement.classList.contains('ready')"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "move": "#overview section.stand .stq",
+     "still": true
+    },
+    {
+     "wait": 300
+    },
+    {
+     "mark": "voice"
+    },
+    {
+     "move": "#overview section.stand .str",
+     "still": true
+    },
+    {
+     "wait": 2400
+    },
+    {
+     "move": "#nav a[href='#research']",
+     "still": true
+    },
+    {
+     "wait": 700
+    },
+    {
+     "move": "#nav a[href='#experiments']",
+     "still": true
+    },
+    {
+     "wait": 700
+    },
+    {
+     "move": "#nav a[href='#runs']",
+     "still": true
+    },
+    {
+     "wait": 1200
+    },
+    {
+     "mark": "subject",
+     "rect": "#overview section.stand"
+    },
+    {
+     "mark": "subject",
+     "rect": "#nav a[href='#runs']"
+    }
+   ],
+   "zoom": {
+    "box": [
+     0,
+     48,
+     1008,
+     630
+    ]
+   }
+  },
+  {
+   "id": "rows",
+   "beat": "5 catch 1: the two experiments",
+   "caption": "A different normalization, one seed",
+   "voice": "First: the per-channel runs used a different normalization,",
+   "steps": [
+    {
+     "goto": "{open}"
+    },
+    {
+     "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+     "lead": true
+    },
+    {
+     "goto": "{open}",
+     "lead": true
+    },
+    {
+     "waitFor": "document.documentElement.classList.contains('ready')"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "click": "#nav a[href='#experiments']",
+     "ms": 250
+    },
+    {
+     "wait": 700
+    },
+    {
+     "move": "main .view.on .srow[data-go='x-e-ptq'] a.sq .au",
+     "still": true
+    },
+    {
+     "wait": 300
+    },
+    {
+     "mark": "voice"
+    },
+    {
+     "wait": 1600
+    },
+    {
+     "move": "main .view.on .srow[data-go='x-e-scheme-s0'] a.sq .au",
+     "still": true
+    },
+    {
+     "wait": 1800
+    },
+    {
+     "mark": "subject",
+     "rect": "main .view.on .srow[data-go='x-e-ptq'] a.sq .au"
+    },
+    {
+     "mark": "subject",
+     "rect": "main .view.on .srow[data-go='x-e-scheme-s0'] a.sq .au"
+    }
+   ],
+   "zoom": {
+    "box": [
+     286,
+     100,
+     720,
+     450
+    ]
+   }
+  },
+  {
+   "id": "oneseed",
+   "beat": "5 catch 1: one seed",
+   "caption": "A different normalization, one seed",
+   "voice": "and on one seed, so we can't tell yet.",
+   "steps": [
+    {
+     "goto": "{open}"
+    },
+    {
+     "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+     "lead": true
+    },
+    {
+     "goto": "{open}",
+     "lead": true
+    },
+    {
+     "waitFor": "document.documentElement.classList.contains('ready')"
+    },
+    {
+     "eval": "(e => { e.scrollIntoView({ block: 'center', inline: 'nearest' }); e.click(); })(document.querySelector(\"#nav a[href='#experiments']\"))",
+     "lead": true
+    },
+    {
+     "waitFor": "document.querySelector('main .view.on') && document.querySelector('main .view.on').innerText.includes('[0.5] normalization')",
+     "lead": true
+    },
+    {
+     "wait": 500,
+     "lead": true
+    },
+    {
+     "pointAt": "main .view.on .srow[data-go='x-e-scheme-s0'] a.sq .au",
+     "lead": true
+    },
+    {
+     "wait": 300,
+     "lead": true
+    },
+    {
+     "wait": 200
+    },
+    {
+     "click": "#nav a[href='#q-q-scheme']",
+     "ms": 250
+    },
+    {
+     "wait": 600
+    },
+    {
+     "click": "main .view.on a[href='#c-c-s0-pc-1024']",
+     "ms": 250
+    },
+    {
+     "wait": 700
+    },
+    {
+     "move": "main .view.on a.evs[href='#c-c-s0-pc-1024:rule']"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "mark": "voice"
+    },
+    {
+     "wait": 2600
+    },
+    {
+     "wait": 1400
+    },
+    {
+     "mark": "subject",
+     "rect": "aside.insp p.stand"
+    },
+    {
+     "mark": "subject",
+     "rect": "aside.insp a[href='#c-c-s0-pc-1024:runs']:not(h4 *)"
+    },
+    {
+     "mark": "subject",
+     "rect": "main .view.on a.evs[href='#c-c-s0-pc-1024:rule']"
+    }
+   ],
+   "zoom": {
+    "box": [
+     640,
+     120,
+     800,
+     500
+    ]
+   }
+  },
+  {
+   "id": "baseline",
+   "beat": "6 catch 2",
+   "caption": "The baseline doesn't match the paper",
+   "voice": "Second: my FP32 baseline is below the paper's, 90.48 against 91.25, and no one has decided what that means.",
+   "steps": [
+    {
+     "goto": "{open}"
+    },
+    {
+     "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+     "lead": true
+    },
+    {
+     "goto": "{open}",
+     "lead": true
+    },
+    {
+     "waitFor": "document.documentElement.classList.contains('ready')"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "move": "#overview #queue h2",
+     "still": true
+    },
+    {
+     "wait": 300
+    },
+    {
+     "mark": "voice"
+    },
+    {
+     "move": "#overview #queue li.qrow:nth-of-type(1) .qt",
+     "still": true
+    },
+    {
+     "wait": 1500
+    },
+    {
+     "move": "#overview #queue li.qrow:nth-of-type(1) .qv",
+     "still": true
+    },
+    {
+     "wait": 2500
+    },
+    {
+     "mark": "subject",
+     "rect": "#overview #queue li.qrow:nth-of-type(1)"
+    }
+   ],
+   "zoom": {
+    "box": [
+     286,
+     420,
+     720,
+     450
+    ]
+   }
+  },
+  {
+   "id": "goalposts",
+   "beat": "7 catch 3",
+   "caption": "Rules written after the results: 9 of 13",
+   "voice": "Third: nine of my thirteen success rules were written after the results came in.",
+   "steps": [
+    {
+     "goto": "{open}"
+    },
+    {
+     "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+     "lead": true
+    },
+    {
+     "goto": "{open}",
+     "lead": true
+    },
+    {
+     "waitFor": "document.documentElement.classList.contains('ready')"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "move": "#overview #integrity h2",
+     "still": true
+    },
+    {
+     "wait": 300
+    },
+    {
+     "mark": "voice"
+    },
+    {
+     "move": {
+      "text": "9 of 13 rules were written after their results came in.",
+      "within": "#overview"
+     },
+     "still": true
+    },
+    {
+     "wait": 3000
+    },
+    {
+     "mark": "subject",
+     "rect": {
+      "text": "9 of 13 rules were written after their results came in.",
+      "within": "#overview"
+     }
+    }
+   ],
+   "zoom": {
+    "box": [
+     286,
+     250,
+     720,
+     450
+    ]
+   }
+  },
+  {
+   "id": "holds",
+   "beat": "8 what holds: the reading",
+   "caption": "What the runs do show, with receipts",
+   "voice": "What the runs do show: per-tensor INT8 stays within a third of a point, on three seeds,",
+   "steps": [
+    {
+     "goto": "{open}"
+    },
+    {
+     "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+     "lead": true
+    },
+    {
+     "goto": "{open}",
+     "lead": true
+    },
+    {
+     "waitFor": "document.documentElement.classList.contains('ready')"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "click": "#nav a[href='#q-q-calib']",
+     "ms": 250
+    },
+    {
+     "wait": 600
+    },
+    {
+     "click": "main .view.on a[href='#c-c-pt-1024']",
+     "ms": 250
+    },
+    {
+     "wait": 600
+    },
+    {
+     "move": "aside.insp [data-id='c-c-pt-1024:reading'] .e"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "mark": "voice"
+    },
+    {
+     "wait": 2000
+    },
+    {
+     "mark": "subject",
+     "rect": "aside.insp [data-id='c-c-pt-1024:reading'] .e"
+    }
+   ],
+   "zoom": {
+    "box": [
+     720,
+     100,
+     720,
+     450
+    ]
+   }
+  },
+  {
+   "id": "receipt",
+   "beat": "8 what holds: the receipt",
+   "caption": "What the runs do show, with receipts",
+   "voice": "and every number opens to the exact run behind it.",
+   "steps": [
+    {
+     "goto": "{open}"
+    },
+    {
+     "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+     "lead": true
+    },
+    {
+     "goto": "{open}",
+     "lead": true
+    },
+    {
+     "waitFor": "document.documentElement.classList.contains('ready')"
+    },
+    {
+     "eval": "(e => { e.scrollIntoView({ block: 'center', inline: 'nearest' }); e.click(); })(document.querySelector(\"#nav a[href='#q-q-calib']\"))",
+     "lead": true
+    },
+    {
+     "waitFor": "!!document.querySelector(\"main .view.on a[href='#c-c-pt-1024']\")",
+     "lead": true
+    },
+    {
+     "eval": "(e => { e.scrollIntoView({ block: 'center', inline: 'nearest' }); e.click(); })(document.querySelector(\"main .view.on a[href='#c-c-pt-1024']\"))",
+     "lead": true
+    },
+    {
+     "waitFor": "!!document.querySelector(\"aside.insp [data-id='c-c-pt-1024:reading']\")",
+     "lead": true
+    },
+    {
+     "wait": 600,
+     "lead": true
+    },
+    {
+     "pointAt": "aside.insp [data-id='c-c-pt-1024:reading'] .e",
+     "lead": true
+    },
+    {
+     "wait": 300,
+     "lead": true
+    },
+    {
+     "wait": 300
+    },
+    {
+     "click": {
+      "text": "runxhzv6x",
+      "within": "aside.insp"
+     },
+     "ms": 250
+    },
+    {
+     "wait": 600
+    },
+    {
+     "click": "aside.insp details.src > summary",
+     "ms": 250
+    },
+    {
+     "wait": 300
+    },
+    {
+     "wheelTo": "aside.insp details.src",
+     "top": 110
+    },
+    {
+     "wait": 300
+    },
+    {
+     "move": {
+      "text": "inputs",
+      "within": "aside.insp details.src"
+     }
+    },
+    {
+     "wait": 300
+    },
+    {
+     "mark": "voice"
+    },
+    {
+     "wait": 2500
+    },
+    {
+     "mark": "subject",
+     "rect": {
+      "text": "(checkpoint) · present when recorded · sha256",
+      "within": "aside.insp details.src"
+     }
+    },
+    {
+     "mark": "subject",
+     "rect": {
+      "text": "results/r024_int8_pt_c1024_s0/metrics.json · sha256",
+      "within": "aside.insp details.src"
+     }
+    }
+   ],
+   "zoom": {
+    "box": [
+     720,
+     380,
+     720,
+     450
+    ]
+   }
+  },
+  {
+   "id": "call",
+   "beat": "9 the call",
+   "caption": "The judgment stays mine",
+   "voice": "The baseline is my call. I choose to investigate, type my reason, and Rabbit Brain gives me the command that records it.",
+   "steps": [
+    {
+     "goto": "{open}"
+    },
+    {
+     "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+     "lead": true
+    },
+    {
+     "goto": "{open}",
+     "lead": true
+    },
+    {
+     "waitFor": "document.documentElement.classList.contains('ready')"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "click": "#overview #queue li.qrow:nth-of-type(1) a.qbtn",
+     "ms": 250
+    },
+    {
+     "wait": 600
+    },
+    {
+     "move": "aside.insp button[data-action='investigate']"
+    },
+    {
+     "wait": 300
+    },
+    {
+     "mark": "voice"
+    },
+    {
+     "click": "aside.insp button[data-action='investigate']"
+    },
+    {
+     "wait": 500
+    },
+    {
+     "click": "aside.insp input.why"
+    },
+    {
+     "type": "check the 30-epoch schedule against the paper's"
+    },
+    {
+     "wait": 2000
+    },
+    {
+     "mark": "subject",
+     "rect": "aside.insp input.why"
+    },
+    {
+     "mark": "subject",
+     "rect": "aside.insp p.willread"
+    },
+    {
+     "mark": "subject",
+     "rect": "aside.insp .cmdbox"
+    }
+   ],
+   "zoom": {
+    "box": [
+     720,
+     420,
+     720,
+     450
+    ]
+   }
+  },
+  {
+   "id": "share",
+   "beat": "10 the share",
+   "caption": "Live as the work goes on · one link to share",
+   "voice": "It stays current as the work goes on, privately, and one link shares it.",
+   "external": "share_beat.mjs captures it on the Mac against the hosted service; cut.py --share-segment <its out> puts it here",
+   "steps": [
+    {
+     "goto": "/demo/card.html?hold=The%20share%20beat%3A%20rb%20sync%20--watch%2C%20a%20new%20run%2C%20the%20share%20link%20in%20a%20fresh%20browser.%20Captured%20on%20the%20Mac%20by%20share_beat.sh"
+    },
+    {
+     "wait": 2500
+    }
+   ]
+  },
+  {
+   "id": "end",
+   "beat": "11 the end",
+   "caption": "Know where your research stands",
+   "voice": "Your agents run the experiments. Rabbit Brain keeps track of what you've actually learned.",
+   "steps": [
+    {
+     "goto": "/demo/card.html"
+    },
+    {
+     "wait": 4500
+    }
+   ]
+  }
+ ]
+}

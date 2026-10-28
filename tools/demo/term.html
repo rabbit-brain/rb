@@ -1,0 +1,174 @@
+<!doctype html>
+<!-- The demo's terminal beats: an asciinema v2 cast played into xterm.js, for walk.mjs to capture.
+     ?cast=<url>&speed=<n>&from=<s>&to=<s>&gap=<s>&title=<text>&badge=<text>
+     speed above 1 is a time-lapse: the label says so, with the recording's own clock beside it. lapse_from=<s> plays the
+     cast at its own speed until then, and the time-lapse (and its label) only after it.
+     gap caps a quiet stretch (in the cast's seconds) before speed applies; the clock still shows real time.
+     pace=<lines per second> lets a long output scroll line by line instead of landing in one frame; it only slows what
+     came at once, and the content is the cast's own. caption=<text> is a line under the window (the beat's own words,
+     not rb's), shown from caption_at=<s> of playback. mask=ids blanks every id shaped like a UUID (a chat session's, in
+     the agent's own scratch paths) where it shows on the screen, with dots laid over its cells (the terminal itself is left as the cast drew it), and
+     the label says so. mask=ids,footer also covers each of the last four rows that names the agent's permission mode (Claude
+     Code's footer line under its prompt box) with the window's own background, and the label says nothing of it. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>terminal</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.css"
+      integrity="sha384-8Xk9wy/gzEDUKrXtrmCFa2bBuK3BpjpDuL/p0SeKQX19Khl/M+lHOgD/CyYf7efP" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.js"
+        integrity="sha384-M169f14mRZOXm3hD/v2Ti0ThIT/RnAQagXA9nlE15yHAtrW19gdePJh/HaTzUOe/" crossorigin="anonymous"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #16181d; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; font: 15px/1.4 -apple-system, "Segoe UI", "DejaVu Sans", sans-serif; }
+  #win { border-radius: 10px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,.45); background: #1e2027; }
+  /* the bar takes the window's width (the terminal's) and never sets it: a long title is cut short */
+  #bar { width: 0; min-width: 100%; box-sizing: border-box; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: #2a2d36; color: #a9adb8; font-size: 13px; }
+  #bar i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  #bar .t { flex: 1; text-align: center; margin-right: 52px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #term { padding: 10px 12px; }
+  #caption { margin-top: 22px; color: #f2f2f4; font-size: 26px; font-weight: 600; letter-spacing: .2px; visibility: hidden; }
+  #lapse { margin-top: 14px; color: #e8e8ea; background: #3b3f4b; border-radius: 6px; padding: 5px 12px; font-size: 14px; visibility: hidden; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="win">
+  <div id="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span class="t" id="title"></span></div>
+  <div id="term"></div>
+</div>
+<div id="lapse"></div>
+<div id="caption"></div>
+<script>
+(async () => {
+  const q = new URLSearchParams(location.search);
+  const speed = parseFloat(q.get("speed") || "1");
+  const from = parseFloat(q.get("from") || "0");
+  const to = parseFloat(q.get("to") || "Infinity");
+  const gap = parseFloat(q.get("gap") || "Infinity");
+  const fontSize = parseFloat(q.get("font") || "15");
+  const pace = parseFloat(q.get("pace") || "0");
+  const captionAt = parseFloat(q.get("caption_at") || "0");
+  // lapse_from=<s>: the cast plays at its own speed until then (a paste a viewer reads), and `speed` times as fast after
+  const lapseFrom = parseFloat(q.get("lapse_from") || "-Infinity");
+  const caption = document.getElementById("caption");
+  caption.textContent = q.get("caption") || "";
+  document.getElementById("title").textContent = q.get("title") || "";
+  const lines = (await (await fetch(q.get("cast"))).text()).split("\n").filter(Boolean);
+  const head = JSON.parse(lines[0]);
+  const events = lines.slice(1).map(l => JSON.parse(l));
+  const masks = (q.get("mask") || "").split(",");
+  const mask = masks.includes("ids"), footer = masks.includes("footer");
+  const term = new Terminal({ cols: head.width, rows: head.height, fontSize, fontFamily: '"DejaVu Sans Mono", Menlo, monospace',
+    theme: { background: "#1e2027", foreground: "#e6e6e6" }, allowProposedApi: true, scrollback: 0, cursorBlink: false });
+  term.open(document.getElementById("term"));
+  // ids are masked where they show: on the screen, drawn over it, never written into it. An agent's screen redraws
+  // only the cells that change, so an id is whole only on the screen, and a cell written by anyone but the agent would
+  // break its next redraw. After each render the visible rows (wrapped rows joined) are read cell by cell, and every
+  // UUID-shaped id gets dots laid over its cells.
+  const ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+  const screenEl = document.querySelector("#term .xterm-screen");
+  const overlay = document.createElement("div");
+  overlay.className = "idmask";
+  overlay.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:10";
+  screenEl.appendChild(overlay);
+  const FOOTER = /bypass permissions|shift\+tab to cycle/i;
+  const maskScreen = () => {
+    const buf = term.buffer.active, top = buf.viewportY, cover = [], rowsHidden = [];
+    let text = "", cells = [];
+    const flush = () => {
+      for (const m of (mask ? text.matchAll(ID) : []))
+        for (let k = m.index; k < m.index + m[0].length; k++) if (/[0-9a-f]/i.test(text[k])) cover.push(cells[k]);
+      text = ""; cells = [];
+    };
+    for (let y = top; y < top + term.rows; y++) {
+      const line = buf.getLine(y);
+      if (!line) continue;
+      // the footer sits under the prompt box, in the screen's last rows: the same words higher up are the transcript's
+      if (footer && y - top >= term.rows - 4 && FOOTER.test(line.translateToString(true))) rowsHidden.push(y - top);
+      if (!line.isWrapped) flush();
+      for (let x = 0; x < term.cols; x++) {
+        const cell = line.getCell(x);
+        if (!cell || cell.getWidth() === 0) continue;
+        for (const c of cell.getChars() || " ") { text += c; cells.push([y - top, x]); }
+      }
+    }
+    flush();
+    const w = screenEl.clientWidth / term.cols, h = screenEl.clientHeight / term.rows;
+    const blank = rowsHidden.map(r => {
+      const box = document.createElement("span");
+      box.className = "footer";
+      box.style.cssText = `position:absolute;left:0;top:${r * h}px;width:100%;height:${h}px;background:#1e2027`;
+      return box;
+    });
+    overlay.replaceChildren(...blank, ...cover.map(([r, c]) => {
+      const box = document.createElement("span");
+      box.textContent = "•";
+      box.style.cssText = `position:absolute;left:${c * w}px;top:${r * h}px;width:${w}px;height:${h}px;line-height:${h}px;` +
+        `text-align:center;background:#1e2027;color:#9a9da6;font-size:${Math.round(h * 0.8)}px`;
+      return box;
+    }));
+  };
+  if (mask || footer) term.onRender(() => maskScreen());
+  const show = data => new Promise(done => term.write(data, done));
+  // xterm.js parses a write after it is handed over and draws it on a later frame: on screen after two more frames
+  const drawn = written => written.then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  // what came before `from` is written at once, so the screen opens as it stood then
+  let before = "";
+  for (const [t, k, d] of events) { if (t >= from) break; if (k === "o") before += d; }
+  await drawn(show(before));
+  const play = events.filter(([t, k]) => t >= from && t <= to && k === "o");
+  // the playback clock: a quiet stretch longer than `gap` is cut to `gap`, then all of it runs `speed` times as fast
+  let prev = from, at = 0;
+  const sched = [];
+  for (const [t, , d] of play) {
+    at += Math.min(t - prev, gap) / (t > lapseFrom ? speed : 1); prev = t;
+    // a chunk of many lines scrolls at `pace` lines a second, from where it came
+    const parts = pace > 0 ? d.split(/(?<=\n)/) : [d];
+    if (parts.length > 3) { parts.forEach((part, k) => sched.push([at + k / pace, t, part])); at += parts.length / pace; }
+    else sched.push([at, t, d]);
+  }
+  const lapse = document.getElementById("lapse");
+  const clock = s => { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}`; };
+  // lapse=bar: the label in the window's own bar, so a zoom on the window keeps it
+  if (q.get("lapse") === "bar") {
+    document.getElementById("bar").appendChild(lapse);
+    lapse.style.cssText = "margin:0;padding:2px 8px;font-size:12px;border-radius:4px";
+    document.getElementById("title").style.marginRight = "0";
+  }
+  // badge=<text>: a clock ("+52 min") in the window's own bar, beside its label, where no page text is under it
+  if (q.get("badge")) {
+    const b = document.createElement("span");
+    b.id = "badge";
+    b.textContent = q.get("badge");
+    b.style.cssText = "padding:1px 9px;border-radius:9px;background:#e8e8ea;color:#16181d;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap";
+    document.getElementById("bar").insertBefore(b, lapse.parentElement === document.getElementById("bar") ? lapse : null);
+    document.getElementById("title").style.marginRight = "0";
+  }
+  const lapsing = t => speed > 1 && t > lapseFrom;
+  if (lapsing(from) || mask) lapse.style.visibility = "visible";
+  const label = t => { lapse.textContent = lapsing(t) ? `time-lapse, ${speed}× · ${clock(t)} into the recording${mask ? " · ids masked" : ""}` : (mask ? "ids masked" : ""); };
+  label(from);
+  window.__ready = true;
+  window.__done = false;
+  window.__length = at;
+  window.__start = () => new Promise(resolve => {
+    const t0 = performance.now();
+    let i = 0, written = Promise.resolve();
+    const step = () => {
+      const now = (performance.now() - t0) / 1000;
+      let last = null;
+      let batch = "";
+      while (i < sched.length && sched[i][0] <= now) { batch += sched[i][2]; last = sched[i][1]; i++; }
+      if (batch) written = show(batch);
+      if (last !== null && lapsing(last)) { label(last); lapse.style.visibility = "visible"; }
+      if (caption.textContent && now >= captionAt) caption.style.visibility = "visible";
+      if (i < sched.length) { requestAnimationFrame(step); return; }
+      // played once the last write is on the screen
+      drawn(written).then(() => { window.__done = true; resolve(at); });
+    };
+    requestAnimationFrame(step);
+  });
+})();
+</script>
+</body>
+</html>

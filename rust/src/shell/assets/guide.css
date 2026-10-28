@@ -1,0 +1,36 @@
+/* rb shell: the pointer guide (script.js's last block), a first visit's few steps in app mode. Fixed over the page, so
+   it moves no layout; it takes no pointer outside its tooltip, so the page stays usable behind it. Leave this file
+   out with that block and nothing else changes. */
+.guide-spot, .guide { display: none; }
+/* the dimming around the lit part: on a dark page it must darken the page's light text to read as dimmed */
+:root { --guide-dim: rgba(0, 0, 0, .12); --guide-edge: var(--tip-line, #c8d1da); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --guide-dim: rgba(0, 0, 0, .58); --guide-edge: #6e7681; } }
+:root[data-theme="dark"] { --guide-dim: rgba(0, 0, 0, .58); --guide-edge: #6e7681; }
+@media screen {
+  html.app .guide-spot { display: block; position: fixed; z-index: 80; pointer-events: none; border-radius: 8px;
+    outline: 2px solid var(--mark, #3b6ae0); outline-offset: 2px;
+    box-shadow: 0 0 0 100vmax var(--guide-dim); }
+  html.app .guide { display: block; position: fixed; z-index: 81; width: min(320px, calc(100vw - 24px)); box-sizing: border-box;
+    background: var(--tip-bg, #fff); color: var(--tip-ink, #1f2328); border: 1px solid var(--guide-edge); border-radius: 10px;
+    box-shadow: var(--shadow, 0 10px 32px rgba(0, 0, 0, .18)); padding: 12px 14px; font: 13.5px/1.5 var(--sans, sans-serif); }
+  html.app .guide[hidden], html.app .guide-spot[hidden] { display: none; }
+  .guide h2 { margin: 0 0 4px; font-size: 14.5px; line-height: 1.35; }
+  .guide h2:focus { outline: none; }
+  .guide p { margin: 0 0 10px; }
+  .guide .gfoot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .guide .gdots { display: flex; gap: 5px; margin-right: auto; padding: 0; list-style: none; }
+  .guide .gdots li { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--tip-ink, #1f2328); }
+  .guide .gdots li[aria-current="step"] { background: var(--tip-ink, #1f2328); }
+  .guide button { font: inherit; font-size: 13px; padding: 3px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--tip-line, #c8d1da); background: transparent; color: var(--tip-ink, #1f2328); }
+  .guide button.gnext { background: var(--tip-ink, #1f2328); color: var(--tip-bg, #fff); border-color: var(--tip-ink, #1f2328); }
+  .guide button:focus-visible { outline: 2px solid var(--mark, #3b6ae0); outline-offset: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    html.app .guide-spot { transition: top .16s ease-out, left .16s ease-out, width .16s ease-out, height .16s ease-out; }
+  }
+  /* the keys list opened while the guide shows sits over it, not dimmed under it */
+  html.app .help { z-index: 82; }
+  @media (forced-colors: active) { html.app .guide-spot { box-shadow: none; outline-color: Highlight; } }
+}
+.help .guide-again { font: inherit; font-size: 13px; margin: 8px 0 0; padding: 0; border: 0; background: none; color: var(--teal, #0969da); cursor: pointer; }
+@media print { .guide, .guide-spot, .help .guide-again { display: none !important; } }

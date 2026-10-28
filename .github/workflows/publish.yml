@@ -1,0 +1,168 @@
+name: publish
+
+# A tag v<version> builds the wheels (the rb binary for Linux, macOS and Windows, beside the Python package with the SDK
+# and the terminal UI) and the sdist, checks that the tag matches the package version, runs the tests against a built
+# wheel on Linux and on Windows, checks that rb carries its analytics destination, checks the committed files and every
+# built file against the release denylist, publishes to PyPI through trusted publishing (no token anywhere), and
+# attaches the same files to the tag's GitHub release.
+# PyPI side, once: project settings > Publishing > add GitHub publisher owner=rabbit-brain repository=rb
+# workflow=publish.yml environment=pypi. See RELEASING.md.
+
+on:
+  push:
+    tags: ["v[0-9]*"]   # release tags only: v0.6.0, v0.6.0rc1
+
+permissions:
+  contents: read
+
+jobs:
+  packages:
+    uses: ./.github/workflows/build-wheels.yml
+
+  check:
+    needs: packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: Tag matches the package version, in the Python package and in the binary
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          ver="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          test "$tag" = "$ver" || { echo "tag v$tag but pyproject.toml says $ver"; exit 1; }
+          grep -qx "__version__ = \"$ver\"" src/rabbit_brain/__init__.py || { echo "src/rabbit_brain/__init__.py does not say $ver"; exit 1; }
+          grep -qx "pub const VERSION: &str = \"$ver\";" rust/src/lib.rs || { echo "rust/src/lib.rs does not say $ver"; exit 1; }
+          grep -qxE "## ${ver//./\\.} \([0-9]{4}-[0-9]{2}-[0-9]{2}\)" CHANGELOG.md || { echo "CHANGELOG.md has no dated entry: ## $ver (YYYY-MM-DD)"; exit 1; }
+          ls dist/rabbit_brain-"$ver".tar.gz dist/rabbit_brain-"$ver"-*manylinux*x86_64.whl
+      - name: Test the built wheel
+        run: |
+          python -m pip install twine pytest
+          python -m twine check dist/*
+          python -m pip install dist/rabbit_brain-*manylinux*x86_64.whl
+          python -m pytest -q
+          rb version
+          rabbit-brain version
+      - name: The release carries an analytics destination
+        run: |
+          # enabling in a scratch settings directory reads the destination built into rb; enable and disable never send
+          export RB_CONFIG_DIR="$RUNNER_TEMP/rb-settings"
+          unset RB_POSTHOG_KEY RB_POSTHOG_HOST   # rb takes these over what is built into it
+          # rb turns analytics on only for a human, and GitHub Actions is an agent runtime and CI to it
+          env -u GITHUB_ACTIONS -u CI rb telemetry enable --json > "$RUNNER_TEMP/enabled.json" || true
+          env -u GITHUB_ACTIONS -u CI rb telemetry disable --json > /dev/null
+          python - "$RUNNER_TEMP/enabled.json" <<'EOF'
+          import json, sys
+          answer = json.load(open(sys.argv[1], encoding="utf-8"))
+          if not answer["ok"]:
+              sys.exit("rb refuses the analytics destination built into it: " + answer["errors"][0]["message"])
+          if not answer["data"]["telemetry"]["configured"]:
+              sys.exit("rb was built with no analytics destination, so anyone who opts in would send nothing. "
+                       "Set the repository variables RB_POSTHOG_KEY and RB_POSTHOG_HOST, then re-run all jobs.")
+          if answer["data"]["telemetry"]["queued"] < 1:
+              sys.exit("rb queued no consent event when enabled, so this build would record nothing: "
+                       "check that its version is one rb's analytics accepts.")
+          EOF
+
+  check-windows:
+    needs: packages
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: wheel-windows-x86_64
+          path: dist/
+      - name: Test the built wheel
+        shell: bash
+        run: |
+          python -m pip install pytest
+          python -m pip install dist/rabbit_brain-*win_amd64.whl
+          python -m pytest -q
+          rb version
+          rabbit-brain version
+
+  # The denylist reaches this job alone, and in it only the last step. The job installs nothing: GitHub's checkout and
+  # artifact download, then the runner's own Python, isolated (-I -S), runs the check's tests and the check over the
+  # built files. The jobs that build, pip install and run the suite never receive the secret. It runs when a build
+  # fails too, over whatever was uploaded; nothing is published then.
+  scan:
+    if: ${{ !cancelled() }}
+    needs: packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: The content check's own tests
+        run: python3 -I -S .github/scripts/test-public-content.py
+      - name: Check the committed files and every unpacked wheel and sdist member
+        env:
+          RB_RELEASE_DENYLIST: ${{ secrets.RB_RELEASE_DENYLIST }}
+        run: python3 -I -S .github/scripts/check-public-content.py --source . --artifacts dist
+
+  publish:
+    needs: [check, check-windows, scan]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/rabbit-brain/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          path: dist/
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+
+  # the files PyPI got, with their checksums and the third-party notices, on the tag's GitHub release for anyone who
+  # installs from GitHub
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+          path: tree
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: Release the tag on GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          cp tree/THIRD-PARTY-NOTICES dist/   # the licenses of the crates built into rb, as every wheel carries them
+          (cd dist && sha256sum * > SHA256SUMS)
+          pre=""
+          case "$ver" in *a*|*b*|*rc*|*dev*) pre="--prerelease" ;; esac
+          notes="Install with \`pip install rabbit-brain==$ver\`, or download the wheel for your platform below and \`pip install\` it. SHA256SUMS lists the sha256 of every file, and THIRD-PARTY-NOTICES the licenses of the code built into rb. What changed: https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/CHANGELOG.md"
+          # a re-run after a partial release adds what is missing instead of failing on the release that exists
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "rabbit-brain $ver" --notes "$notes" $pre
+          fi

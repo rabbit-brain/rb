@@ -1,0 +1,1111 @@
+{
+ "steps": [
+  {
+   "run": "init 'Does width help?' --no-agents",
+   "exit": 0,
+   "out": [
+    "Project 'does-width-help' started: @BASE@/work/.rb",
+    "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
+    "",
+    "Then paste this line into your agent's chat:",
+    "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "question add 'Does width help?' --id q1",
+   "exit": 0,
+   "out": [
+    "q1: Does width help?",
+    "",
+    "Next: rb experiment add \"<what would answer it>\" -q q1 --hypothesis \"<what you expect>\"",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "question add 'Is it the batch size?' --parent q1 --id q2",
+   "exit": 0,
+   "out": [
+    "q2: Is it the batch size? \u00b7 under q1",
+    "",
+    "Next: rb experiment add \"<what would answer it>\" -q q2 --hypothesis \"<what you expect>\"",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "question add 'Something else'",
+   "exit": 0,
+   "out": [
+    "qp5h4s6: Something else",
+    "",
+    "Next: rb experiment add \"<what would answer it>\" -q qp5h4s6 --hypothesis \"<what you expect>\"",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "question move q2 --top",
+   "exit": 0,
+   "out": [
+    "q2 is now at the top: its experiments and their evidence go with it.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "question move q2 --parent q1",
+   "exit": 0,
+   "out": [
+    "q2 is now under q1: its experiments and their evidence go with it.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment add 'wide vs base' --id e1 -q q1 --hypothesis 'wider is better' -m 'more capacity' --baseline base --candidate wide --varies model.width --note 'a first note' --if-holds 'ship wide' --if-not 'keep base'",
+   "exit": 0,
+   "out": [
+    "Experiment e1: wide vs base \u00b7 base (baseline) vs wide (candidate) \u00b7 varies model.width \u00b7 under q1",
+    "  hypothesis: wider is better (why: more capacity)",
+    "  Planned: nothing in the record tests it yet, and it shows as a planned direction until its first run or analysis.",
+    "  Made 2 variants: base (baseline), wide (candidate); a setting of one is rb spec set e1 base.<setting> <value>.",
+    "  e1 declares it varies model.width, but no variant has a value for it yet; give each variant its own: rb spec set e1 <variant>.model.width <value> --source <file#key>",
+    "",
+    "Next: rb spec set e1 --from <config.yaml> --keys \"<the keys that define it>\"  \u00b7  rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment add 'a sweep' --purpose 'map the learning rate' -q q2",
+   "exit": 0,
+   "out": [
+    "Experiment ep5h4s6: a sweep \u00b7 under q2",
+    "  purpose: map the learning rate",
+    "  Planned: nothing in the record tests it yet, and it shows as a planned direction until its first run or analysis.",
+    "  No variants yet. A comparison needs them: rb variant add ep5h4s6 <name> --role baseline|candidate",
+    "",
+    "Next: rb spec set ep5h4s6 --from <config.yaml> --keys \"<the keys that define it>\"  \u00b7  rb criterion add \"<what it should show>\" -e ep5h4s6 -q q2 --metric <name> --at-most <x>",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment add 'like e1' --like e1 --id e3",
+   "exit": 0,
+   "out": [
+    "Experiment e3: like e1 \u00b7 varies model.width \u00b7 under q1",
+    "  settings copied from e1 as provisional: 0; verify them with rb spec verify e3",
+    "  Planned: nothing in the record tests it yet, and it shows as a planned direction until its first run or analysis.",
+    "  No variants yet. A comparison needs them: rb variant add e3 <name> --role baseline|candidate",
+    "",
+    "Next: rb spec set e3 --from <config.yaml> --keys \"<the keys that define it>\"  \u00b7  rb criterion add \"<what it should show>\" -e e3 -q q1 --metric <name> --at-most <x>",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment file e1 q2",
+   "exit": 0,
+   "out": [
+    "e1 is filed under q1, q2.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment file e1 q2 --remove",
+   "exit": 0,
+   "out": [
+    "e1 is filed under q1.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment relate e3 follows_from e1 --note 'grew out of it'",
+   "exit": 0,
+   "out": [
+    "e3 follows from e1: grew out of it",
+    "  A relation is structure: it changes no finding.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment gate e1 --if-holds 'ship wide now' -m 'the deadline moved'",
+   "exit": 0,
+   "out": [
+    "e1 gates: if it holds: ship wide now \u00b7 if not: keep base",
+    "  before: if it holds: ship wide \u00b7 if not: keep base (kept in rb log e1)",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment gate e1 --if-holds 'ship wide now'",
+   "exit": 0,
+   "out": [
+    "e1 already gates: if it holds: ship wide now \u00b7 if not: keep base",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "note add 'the project note'",
+   "exit": 0,
+   "out": [
+    "Note np5h4s6 on the project: the project note",
+    "  Kept verbatim with who wrote it; a note changes no finding.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "note add 'about e1' -e e1",
+   "exit": 0,
+   "out": [
+    "Note n4teabd on e1: about e1",
+    "  Kept verbatim with who wrote it; a note changes no finding.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "variant add e1 narrow --role ablation --note 'half width'",
+   "exit": 0,
+   "out": [
+    "e1: variant narrow (ablation)",
+    "",
+    "Next: rb spec set e1 narrow.<setting> <value> --source <file#key>",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "metric add top1 --maximize --alias accuracy --unit fraction --description 'top-1 accuracy'",
+   "exit": 0,
+   "out": [
+    "Metric top1 (fraction): higher is better \u00b7 also called accuracy",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "metric add loss --minimize",
+   "exit": 0,
+   "out": [
+    "Metric loss: lower is better",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "metric add speed",
+   "exit": 0,
+   "out": [
+    "Metric speed: no direction",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment add 'bad' --id 'bad/id'",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb experiment add: Ids are letters, digits, '_', '.' and '-', up to 80 characters (got 'bad/id').",
+    "  \u2192 Do what the message says; `rb <command> --help` lists the arguments and `rb schema <kind>` prints a record's shape (experiment, criterion, run, ...).",
+    ""
+   ]
+  },
+  {
+   "run": "question move nope --top",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb question move: No question 'nope' in this project.",
+    "  \u2192 `rb status --json` lists every record; `rb show <experiment>` lists its variants, settings, criteria and runs; a setting is addressed as <experiment>/<name>.",
+    ""
+   ]
+  },
+  {
+   "run": "question add 'json mode' --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"question add\",",
+    " \"data\": {",
+    "  \"actor\": {",
+    "   \"id\": \"human:t\",",
+    "   \"via\": \"git-email\"",
+    "  },",
+    "  \"object\": {",
+    "   \"kind\": \"question\",",
+    "   \"created_by\": \"human:t\",",
+    "   \"created_at\": \"2026-10-01T12:00:00.000+00:00\",",
+    "   \"via\": \"cli\",",
+    "   \"retracted\": null,",
+    "   \"id\": \"qqtdhpa\",",
+    "   \"text\": \"json mode\",",
+    "   \"parent\": null",
+    "  }",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [",
+    "  \"rb experiment add \\\"<what would answer it>\\\" -q qqtdhpa --hypothesis \\\"<what you expect>\\\"\"",
+    " ],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "experiment add 'json mode exp' --baseline a --candidate b --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"experiment add\",",
+    " \"data\": {",
+    "  \"actor\": {",
+    "   \"id\": \"human:t\",",
+    "   \"via\": \"git-email\"",
+    "  },",
+    "  \"object\": {",
+    "   \"kind\": \"experiment\",",
+    "   \"created_by\": \"human:t\",",
+    "   \"created_at\": \"2026-10-01T12:00:00.000+00:00\",",
+    "   \"via\": \"cli\",",
+    "   \"retracted\": null,",
+    "   \"id\": \"eqtdhpa\",",
+    "   \"uid\": \"exp_01M3VNBWG0WK40130DZ62F1AG3\",",
+    "   \"title\": \"json mode exp\",",
+    "   \"questions\": [],",
+    "   \"purpose\": \"\",",
+    "   \"hypothesis\": \"\",",
+    "   \"why\": \"\",",
+    "   \"if_holds\": \"\",",
+    "   \"if_not\": \"\",",
+    "   \"varies\": [],",
+    "   \"variants\": [",
+    "    {",
+    "     \"name\": \"a\",",
+    "     \"role\": \"baseline\",",
+    "     \"settings\": [],",
+    "     \"note\": \"\",",
+    "     \"created_by\": \"human:t\",",
+    "     \"created_at\": \"2026-10-01T12:00:00.000+00:00\",",
+    "     \"via\": \"cli\",",
+    "     \"retracted\": null",
+    "    },",
+    "    {",
+    "     \"name\": \"b\",",
+    "     \"role\": \"candidate\",",
+    "     \"settings\": [],",
+    "     \"note\": \"\",",
+    "     \"created_by\": \"human:t\",",
+    "     \"created_at\": \"2026-10-01T12:00:00.000+00:00\",",
+    "     \"via\": \"cli\",",
+    "     \"retracted\": null",
+    "    }",
+    "   ],",
+    "   \"settings\": [],",
+    "   \"notes\": [],",
+    "   \"relations\": [],",
+    "   \"frozen\": null,",
+    "   \"amendments\": [],",
+    "   \"folder\": \"\",",
+    "   \"files\": [],",
+    "   \"quotes\": [],",
+    "   \"checks\": [],",
+    "   \"indexed\": null",
+    "  }",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [",
+    "  \"rb spec set eqtdhpa --from <config.yaml> --keys \\\"<the keys that define it>\\\"\",",
+    "  \"rb criterion add \\\"<what it should show>\\\" -e eqtdhpa -q <question> --metric <name> --at-most <x>\"",
+    " ],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "status",
+   "exit": 0,
+   "out": [
+    "Does width help? \u00b7 does-width-help",
+    "",
+    "Does width help? (open)",
+    "  below it: 1 sub-question, 1 open \u00b7 3 planned",
+    "  No criterion is linked directly to this question.",
+    "  wide vs base \u00b7 planned",
+    "          hypothesis: wider is better",
+    "          if it holds: ship wide now \u00b7 if not: keep base",
+    "          note nqtdhpa: a first note \u00b7 1 more: rb show e1",
+    "  like e1 \u00b7 planned",
+    "",
+    "  Is it the batch size? (open)",
+    "    below it: 1 planned",
+    "    No criterion is linked directly to this question.",
+    "  a sweep \u00b7 planned",
+    "",
+    "Something else (open)",
+    "  No criterion is linked directly to this question.",
+    "",
+    "json mode (open)",
+    "  No criterion is linked directly to this question.",
+    "",
+    "Not filed under a question",
+    "  json mode exp \u00b7 planned",
+    "",
+    "Criteria: none yet",
+    "",
+    "Can be done now (6)",
+    "  - 4 \u00d7 planned:",
+    "      rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
+    "      rb variant add e3 <name> --role baseline   (then a candidate, then rb criterion add ... -e e3 -q q1)",
+    "      rb variant add ep5h4s6 <name> --role baseline   (then a candidate, then rb criterion add ... -e ep5h4s6 -q q2)",
+    "      rb criterion add \"<what it should show>\" -e eqtdhpa -q <question> --metric <name> --at-most <x>",
+    "  - qp5h4s6 is open and nothing is filed under it: Something else",
+    "      rb experiment add \"<what would test it>\" -q qp5h4s6 --hypothesis \"<what you expect>\"",
+    "  - qqtdhpa is open and nothing is filed under it: json mode",
+    "      rb experiment add \"<what would test it>\" -q qqtdhpa --hypothesis \"<what you expect>\"",
+    "",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "",
+    "Experiments",
+    "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "  e3      like e1 \u00b7 planned \u00b7 no variants \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "  ep5h4s6 a sweep \u00b7 planned \u00b7 no variants \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "  eqtdhpa json mode exp \u00b7 planned \u00b7 a (baseline) vs b (candidate) \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "",
+    "Notes on the project",
+    "  note np5h4s6 (2026-10-01): the project note",
+    "",
+    "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>  \u00b7  rb variant add e3 <name> --role baseline   (then a candidate, then rb criterion add ... -e e3 -q q1)  \u00b7  rb variant add ep5h4s6 <name> --role baseline   (then a candidate, then rb criterion add ... -e ep5h4s6 -q q2)",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "--json status",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"status\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_USAGE\",",
+    "   \"message\": \"unrecognized arguments: --json\",",
+    "   \"fix\": \"`rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "status e1",
+   "exit": 0,
+   "out": [
+    "Does width help? \u00b7 does-width-help \u00b7 experiment e1",
+    "",
+    "Does width help? (open)",
+    "  below it: 1 sub-question, 1 open \u00b7 1 planned",
+    "  No criterion is linked directly to this question.",
+    "  wide vs base \u00b7 planned",
+    "          hypothesis: wider is better",
+    "          if it holds: ship wide now \u00b7 if not: keep base",
+    "          note nqtdhpa: a first note \u00b7 1 more: rb show e1",
+    "",
+    "Criteria: none yet",
+    "",
+    "Can be done now (1)",
+    "  - nothing in the record tests e1 yet: wider is better",
+    "      rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
+    "",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "",
+    "Experiments",
+    "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "",
+    "Notes on the project",
+    "  note np5h4s6 (2026-10-01): the project note",
+    "",
+    "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "status nope",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb status: No experiment 'nope' in this project.",
+    "  \u2192 `rb status --json` lists every record; `rb show <experiment>` lists its variants, settings, criteria and runs; a setting is addressed as <experiment>/<name>.",
+    ""
+   ]
+  },
+  {
+   "run": "status --fail-on bogus,unmet",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb status: --fail-on takes unmet, unresolved, untested, integrity, undecided, stale, unknown, late, checks, unestablished (got bogus).",
+    "  \u2192 Do what the message says; `rb <command> --help` lists the arguments and `rb schema <kind>` prints a record's shape (experiment, criterion, run, ...).",
+    ""
+   ]
+  },
+  {
+   "run": "status --fail-on untested --fail-on unestablished",
+   "exit": 0,
+   "out": [
+    "Does width help? \u00b7 does-width-help",
+    "",
+    "Does width help? (open)",
+    "  below it: 1 sub-question, 1 open \u00b7 3 planned",
+    "  No criterion is linked directly to this question.",
+    "  wide vs base \u00b7 planned",
+    "          hypothesis: wider is better",
+    "          if it holds: ship wide now \u00b7 if not: keep base",
+    "          note nqtdhpa: a first note \u00b7 1 more: rb show e1",
+    "  like e1 \u00b7 planned",
+    "",
+    "  Is it the batch size? (open)",
+    "    below it: 1 planned",
+    "    No criterion is linked directly to this question.",
+    "  a sweep \u00b7 planned",
+    "",
+    "Something else (open)",
+    "  No criterion is linked directly to this question.",
+    "",
+    "json mode (open)",
+    "  No criterion is linked directly to this question.",
+    "",
+    "Not filed under a question",
+    "  json mode exp \u00b7 planned",
+    "",
+    "Criteria: none yet",
+    "",
+    "Can be done now (6)",
+    "  - 4 \u00d7 planned:",
+    "      rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
+    "      rb variant add e3 <name> --role baseline   (then a candidate, then rb criterion add ... -e e3 -q q1)",
+    "      rb variant add ep5h4s6 <name> --role baseline   (then a candidate, then rb criterion add ... -e ep5h4s6 -q q2)",
+    "      rb criterion add \"<what it should show>\" -e eqtdhpa -q <question> --metric <name> --at-most <x>",
+    "  - qp5h4s6 is open and nothing is filed under it: Something else",
+    "      rb experiment add \"<what would test it>\" -q qp5h4s6 --hypothesis \"<what you expect>\"",
+    "  - qqtdhpa is open and nothing is filed under it: json mode",
+    "      rb experiment add \"<what would test it>\" -q qqtdhpa --hypothesis \"<what you expect>\"",
+    "",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "",
+    "Experiments",
+    "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "  e3      like e1 \u00b7 planned \u00b7 no variants \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "  ep5h4s6 a sweep \u00b7 planned \u00b7 no variants \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "  eqtdhpa json mode exp \u00b7 planned \u00b7 a (baseline) vs b (candidate) \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "",
+    "Notes on the project",
+    "  note np5h4s6 (2026-10-01): the project note",
+    "",
+    "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>  \u00b7  rb variant add e3 <name> --role baseline   (then a candidate, then rb criterion add ... -e e3 -q q1)  \u00b7  rb variant add ep5h4s6 <name> --role baseline   (then a candidate, then rb criterion add ... -e ep5h4s6 -q q2)",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "status",
+   "exit": 0,
+   "out": [
+    "Does width help? \u00b7 does-width-help",
+    "",
+    "Does width help? (open)",
+    "  below it: 1 sub-question, 1 open \u00b7 3 planned",
+    "  No criterion is linked directly to this question.",
+    "  wide vs base \u00b7 planned",
+    "          hypothesis: wider is better",
+    "          if it holds: ship wide now \u00b7 if not: keep base",
+    "          note nqtdhpa: a first note \u00b7 1 more: rb show e1",
+    "  like e1 \u00b7 planned",
+    "",
+    "  Is it the batch size? (open)",
+    "    below it: 1 planned",
+    "    No criterion is linked directly to this question.",
+    "  a sweep \u00b7 planned",
+    "",
+    "Something else (open)",
+    "  No criterion is linked directly to this question.",
+    "",
+    "json mode (open)",
+    "  No criterion is linked directly to this question.",
+    "",
+    "Not filed under a question",
+    "  json mode exp \u00b7 planned",
+    "",
+    "Criteria: none yet",
+    "",
+    "Can be done now (6)",
+    "  - 4 \u00d7 planned:",
+    "      rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
+    "      rb variant add e3 <name> --role baseline   (then a candidate, then rb criterion add ... -e e3 -q q1)",
+    "      rb variant add ep5h4s6 <name> --role baseline   (then a candidate, then rb criterion add ... -e ep5h4s6 -q q2)",
+    "      rb criterion add \"<what it should show>\" -e eqtdhpa -q <question> --metric <name> --at-most <x>",
+    "  - qp5h4s6 is open and nothing is filed under it: Something else",
+    "      rb experiment add \"<what would test it>\" -q qp5h4s6 --hypothesis \"<what you expect>\"",
+    "  - qqtdhpa is open and nothing is filed under it: json mode",
+    "      rb experiment add \"<what would test it>\" -q qqtdhpa --hypothesis \"<what you expect>\"",
+    "",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "",
+    "Experiments",
+    "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "  e3      like e1 \u00b7 planned \u00b7 no variants \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "  ep5h4s6 a sweep \u00b7 planned \u00b7 no variants \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "  eqtdhpa json mode exp \u00b7 planned \u00b7 a (baseline) vs b (candidate) \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
+    "",
+    "Notes on the project",
+    "  note np5h4s6 (2026-10-01): the project note",
+    "",
+    "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>  \u00b7  rb variant add e3 <name> --role baseline   (then a candidate, then rb criterion add ... -e e3 -q q1)  \u00b7  rb variant add ep5h4s6 <name> --role baseline   (then a candidate, then rb criterion add ... -e ep5h4s6 -q q2)",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "note add 'after a look'",
+   "exit": 0,
+   "out": [
+    "Note nf3hlli on the project: after a look",
+    "  Kept verbatim with who wrote it; a note changes no finding.",
+    "",
+    "Since this session last looked:",
+    "  - question q1 added: Does width help?",
+    "  - question q2 added: Is it the batch size?",
+    "  - question qp5h4s6 added: Something else",
+    "  - question q2 moved to the top",
+    "  - question q2 moved under q1",
+    "  - experiment e1 added: wide vs base",
+    "  - note on e1: a first note",
+    "  - experiment ep5h4s6 added: a sweep",
+    "  - experiment e3 added: like e1",
+    "  - experiment e1 filed under question q2",
+    "  - experiment e1 taken out of question q2",
+    "  - relation declared: experiment e3 follows from e1",
+    "  - No model is recorded for your writes yet   (rb context --model <your model id>)",
+    "  - and 9 more, which the session's next command tells",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "page",
+   "exit": 0,
+   "out": [
+    "rb-page.html written: the project as one file, readable anywhere; send it to anyone.",
+    "It is the record as computed now; regenerate after new runs. If it ever disagrees with rb status, rb status is right.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  }
+ ],
+ "files": {
+  ".rb/.gitattributes": [
+   "* -text",
+   "log.jsonl merge=union",
+   ""
+  ],
+  ".rb/.gitignore": [
+   ".lock",
+   "*.tmp",
+   "cache/",
+   "journal/",
+   ""
+  ],
+  ".rb/cache/objects/0a/0ad8f0d034884b429a553d2ee4fc2f8cec671b86adb7c94413ad7df2455f5967.json.gz": {
+   "sha256": "39770ae2784f71443d800be0efebcb7c36fdd887e0be77070e53f06734affd2a",
+   "bytes": 116
+  },
+  ".rb/cache/objects/0e/0e7b8b28d5e4ae439c347324d227845317364e09b3943f55664cf78f836b6b8a.json.gz": {
+   "sha256": "01ce92002b3042c42cb7a95957bb52e8ad9a3ace4a40c3c34de9ad47e4ac89d3",
+   "bytes": 115
+  },
+  ".rb/cache/objects/0f/0f48305056163332e5666c9bcd9a87e0e13ed9740d94b096d0382e7fff65669a.json.gz": {
+   "sha256": "d1417035a3d966b2dcaa261ada3bce0b29c957994a6eab4b17a6773d66b8b666",
+   "bytes": 297
+  },
+  ".rb/cache/objects/15/1514a4555243b0b4fd4bdb37b4c0ea4d4c4483ec3b18c8020bfd332b6e887751.json.gz": {
+   "sha256": "1b7802d4fcfc417a5ce78f2314a81fd70865244343e42c4d92def7d5322dfb0f",
+   "bytes": 118
+  },
+  ".rb/cache/objects/1d/1daaf17045d908051ee7d2160288d654e384a51fb573886d3061f6095211c67f.json.gz": {
+   "sha256": "377b3007bb13113cd9ef7d9d9cf688e3143cbbac3f7b0a099040c0fdcffb37a7",
+   "bytes": 302
+  },
+  ".rb/cache/objects/20/2089f6e1e4b3de4e585eccb79bcb3836f846a68263c2a1ee76578538b0234268.json.gz": {
+   "sha256": "97842ce5a517278fe0db743766a9f1e76676f9e64476b5fc7225d05999e815b8",
+   "bytes": 323
+  },
+  ".rb/cache/objects/2a/2ab62c275ceaf5b5905fb86a3b3d9fdeaf7a24bca6b6e9a1f66e642f8081e234.json.gz": {
+   "sha256": "6ab3351e6ad0f5cb1b0e0ae34694f02759724661d8bde4ad8a87ece825b29f36",
+   "bytes": 109
+  },
+  ".rb/cache/objects/2c/2c94035e6e6aef7259a55efea6e4b83bfe30c46905286424d3dca699ac18ba7b.json.gz": {
+   "sha256": "adb6689b60ee547ee925d5a6fd34fd9efd4e56d235a0a5e41646f453413e60e5",
+   "bytes": 105
+  },
+  ".rb/cache/objects/3a/3ad5e2a6ec65d60e8a96e820176959c314283714490e00dc6c4b1facabcd2f17.json.gz": {
+   "sha256": "8318f65567f0a3e6d86d71abb66a5b0ca23598eedbffa8016582108a697e0b20",
+   "bytes": 119
+  },
+  ".rb/cache/objects/46/464778c9e4930b2b53253248844c54bdf468968737c752e027ebfa1d6cb838f6.json.gz": {
+   "sha256": "fb5c602abb2dfb1323d45a181a8fdd979726d6c205cb674a5a34a25794555fe8",
+   "bytes": 120
+  },
+  ".rb/cache/objects/4b/4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb.json.gz": {
+   "sha256": "a929faebb1691ebb0d70bcb999fcf2a10feaf26f2b747ffe16445cf3b9d49a93",
+   "bytes": 117
+  },
+  ".rb/cache/objects/5b/5bed708ce93b76b337a266f9650097c25509e7a6257504b109084ab51b997383.json.gz": {
+   "sha256": "8203dfe1f717b782b1cfa750e0c2dd4a974d7529196a1680fa864203dab2ac8c",
+   "bytes": 301
+  },
+  ".rb/cache/objects/5d/5d311f966346304c7c03ebc96282f2d6b23df820f11ffc57b4993584e8665d1a.json.gz": {
+   "sha256": "b96170fea454d5be04f9629d8b017ebcf09235862516b771cf0ced4e66700453",
+   "bytes": 123
+  },
+  ".rb/cache/objects/74/740d70d148007f54fd2c5d1d77391909f375d282e66cc79853b40b53f06f8821.json.gz": {
+   "sha256": "c0c02f6bf6b064f29a5720a11d971dc20054eed564859324cdeacfb4fb29a68a",
+   "bytes": 209
+  },
+  ".rb/cache/objects/a0/a00c6147ef5e0ed8141990207762b43149837f336f5f395a3d9f18e8dbeab600.json.gz": {
+   "sha256": "8fc5678b48d1f40b79a32df6268701035fa6f28afacf944ef6b223de7eef3911",
+   "bytes": 162
+  },
+  ".rb/cache/objects/b0/b06de89c394a1d13bdfad7cfceb424bfbb059d5ccb76720292643affb7e7fc78.json.gz": {
+   "sha256": "ffd4cb04c1a0512f436e5bddd3ccf7135af0b8444102797dea77cc21b3e48784",
+   "bytes": 101
+  },
+  ".rb/cache/objects/c9/c94420a05336113fcd838b13f065e3254591ba52e0076fa0ba037d2148e0fadf.json.gz": {
+   "sha256": "b0d177f93b82ccff83c83d0d0219848e4081ae35fbcd96c3a7fde68885523729",
+   "bytes": 139
+  },
+  ".rb/cache/objects/cc/cc782f86a9f6ba6678acd0b3283a3419a5879b0d2cafee605e3265d4c7862cf4.json.gz": {
+   "sha256": "d76ff5532a8b5a80c5e4cf9d6924791ebc2f5ed652709d76c00341983e07d52c",
+   "bytes": 125
+  },
+  ".rb/cache/objects/cd/cd87d225d007a37f9ad17c65ae5d44d4853dcc4a82a1530e1349678d9d1bacee.json.gz": {
+   "sha256": "eac0ee81cc0777c4ec5af40647963b8f9d9141be948fc088f089450d33583c37",
+   "bytes": 138
+  },
+  ".rb/cache/objects/d4/d45c446f9f0c3bb4783e7b1d0359a50f9853bd1f81c5b4323908c0ec197a5e14.json.gz": {
+   "sha256": "0dd81c900928a344a51285213e01488ba1566cf9a69b7988473350f269f6f19d",
+   "bytes": 113
+  },
+  ".rb/cache/objects/d8/d84fb96b77e3a6946d0eccabf71e5a29f3962816a061565bc8470b3dfdd110fe.json.gz": {
+   "sha256": "e4113e5230106344aa9e0b5a02683eec5afe1aa802115ed0eda7eabd12bc05ad",
+   "bytes": 191
+  },
+  ".rb/cache/objects/e1/e132b0db2568a7ef4f0e0574177b2dbe780ee4fb054a043f22de0a52278f8806.json.gz": {
+   "sha256": "636344bd30db1b63f05f49fb140c2dce6cbc8466d8e0194746863f229a16359b",
+   "bytes": 114
+  },
+  ".rb/cache/objects/ea/eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695.json.gz": {
+   "sha256": "a4a7d60fac003794f1d4e7a0a04959209477dff8191473a5247407635419fb79",
+   "bytes": 116
+  },
+  ".rb/cache/objects/f4/f4e4e499b9cf10eb377618fde8658ad67dd6a013cb405e516738d48d98970df7.json.gz": {
+   "sha256": "675ee420d1a7f56bdd76a8ae62573188d6df222b8329a91eb07cda87b5bbda53",
+   "bytes": 173
+  },
+  ".rb/cache/objects/f9/f9761defb451152a697e523c6dd7006817cbc05f26e77c69f3b8249f29f10dab.json.gz": {
+   "sha256": "c46fa6b88d11fdfdc08ae8d1ff273a296f30120f46d83801e7fd58b144141049",
+   "bytes": 195
+  },
+  ".rb/cache/sessions/golden-session-1.json": [
+   "{",
+   " \"session\": \"golden-session-1\",",
+   " \"seen\": [",
+   "  \"model_unsaid:model\"",
+   " ],",
+   " \"cursor\": 24,",
+   " \"arrived\": \"2026-10-01T12:00:00.000+00:00\",",
+   " \"seen_lines\": [",
+   "  \"a3113116f7b70c12\",",
+   "  \"71a9a2247e223097\",",
+   "  \"f0850c77683af8bc\",",
+   "  \"9e8ea0a2be883b1f\",",
+   "  \"698101718af57fce\",",
+   "  \"cf60289d9c0461f9\",",
+   "  \"849c7c0945647126\",",
+   "  \"3ebde5b3b922307a\",",
+   "  \"fd29b7a8b74c6950\",",
+   "  \"f34ac5ad9e30f94a\",",
+   "  \"4eeea495447014a5\",",
+   "  \"f6d435f3c456f663\",",
+   "  \"714374ac06962392\",",
+   "  \"3f6a391e25f5ddaa\",",
+   "  \"98079ed18989fc25\"",
+   " ],",
+   " \"counted\": []",
+   "}"
+  ],
+  ".rb/experiments/e1/experiment.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: e1",
+   "uid: exp_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: wide vs base",
+   "questions:",
+   "  - q1",
+   "hypothesis: wider is better",
+   "why: more capacity",
+   "if_holds: ship wide now",
+   "if_not: keep base",
+   "varies:",
+   "  - model.width",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/notes/n4teabd.yaml": [
+   "rb: 1",
+   "kind: note",
+   "id: n4teabd",
+   "text: about e1",
+   "by: human:t",
+   "at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/notes/nqtdhpa.yaml": [
+   "rb: 1",
+   "kind: note",
+   "id: nqtdhpa",
+   "text: a first note",
+   "by: human:t",
+   "at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/variants/base.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: base",
+   "role: baseline",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/variants/narrow.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: narrow",
+   "role: ablation",
+   "note: half width",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/variants/wide.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: wide",
+   "role: candidate",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e3/experiment.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: e3",
+   "uid: exp_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: like e1",
+   "questions:",
+   "  - q1",
+   "varies:",
+   "  - model.width",
+   "relations:",
+   "  - kind: follows_from",
+   "    target: e1",
+   "    note: grew out of it",
+   "    by: human:t",
+   "    at: \"2026-10-01T12:00:00.000+00:00\"",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/ep5h4s6/experiment.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: ep5h4s6",
+   "uid: exp_01M3VNBWG0GK37F0M3GMH9W716",
+   "title: a sweep",
+   "questions:",
+   "  - q2",
+   "purpose: map the learning rate",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/eqtdhpa/experiment.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: eqtdhpa",
+   "uid: exp_01M3VNBWG0WK40130DZ62F1AG3",
+   "title: json mode exp",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/eqtdhpa/variants/a.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: a",
+   "role: baseline",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/eqtdhpa/variants/b.yaml": [
+   "rb: 1",
+   "kind: variant",
+   "name: b",
+   "role: candidate",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/log.jsonl": [
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"does-width-help\", \"sha256\": \"f4e4e499b9cf10eb377618fde8658ad67dd6a013cb405e516738d48d98970df7\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"Does width help?\", \"head\": \"\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"question\", \"id\": \"q1\", \"sha256\": \"464778c9e4930b2b53253248844c54bdf468968737c752e027ebfa1d6cb838f6\", \"path\": \".rb/questions/q1.yaml\", \"detail\": {\"parent\": null}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"question\", \"id\": \"q2\", \"sha256\": \"c94420a05336113fcd838b13f065e3254591ba52e0076fa0ba037d2148e0fadf\", \"path\": \".rb/questions/q2.yaml\", \"detail\": {\"parent\": \"q1\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"question\", \"id\": \"qp5h4s6\", \"sha256\": \"5d311f966346304c7c03ebc96282f2d6b23df820f11ffc57b4993584e8665d1a\", \"path\": \".rb/questions/qp5h4s6.yaml\", \"detail\": {\"parent\": null}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"move\", \"kind\": \"question\", \"id\": \"q2\", \"sha256\": \"cc782f86a9f6ba6678acd0b3283a3419a5879b0d2cafee605e3265d4c7862cf4\", \"path\": \".rb/questions/q2.yaml\", \"detail\": {\"parent\": null}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"move\", \"kind\": \"question\", \"id\": \"q2\", \"sha256\": \"c94420a05336113fcd838b13f065e3254591ba52e0076fa0ba037d2148e0fadf\", \"path\": \".rb/questions/q2.yaml\", \"detail\": {\"parent\": \"q1\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"0f48305056163332e5666c9bcd9a87e0e13ed9740d94b096d0382e7fff65669a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/base\", \"path\": \".rb/experiments/e1/variants/base.yaml\", \"sha256\": \"eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695\"}, {\"kind\": \"variant\", \"id\": \"e1/wide\", \"path\": \".rb/experiments/e1/variants/wide.yaml\", \"sha256\": \"4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb\"}], \"detail\": {\"variants\": [\"base\", \"wide\"], \"like\": null, \"questions\": [\"q1\"], \"changed_parts\": {\"e1\": {\"variant:base\": \"baseline\", \"variant:wide\": \"candidate\", \"gate:if_holds\": \"ship wide\", \"gate:if_not\": \"keep base\", \"hypothesis\": \"wider is better\", \"question:q1\": \"q1\", \"varies:model.width\": \"model.width\", \"why\": \"more capacity\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"note\", \"kind\": \"experiment\", \"id\": \"e1\", \"parts\": [{\"kind\": \"note\", \"id\": \"nqtdhpa\", \"path\": \".rb/experiments/e1/notes/nqtdhpa.yaml\", \"sha256\": \"2c94035e6e6aef7259a55efea6e4b83bfe30c46905286424d3dca699ac18ba7b\"}], \"detail\": {\"text\": \"a first note\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"ep5h4s6\", \"sha256\": \"740d70d148007f54fd2c5d1d77391909f375d282e66cc79853b40b53f06f8821\", \"path\": \".rb/experiments/ep5h4s6/experiment.yaml\", \"detail\": {\"variants\": [], \"like\": null, \"questions\": [\"q2\"], \"changed_parts\": {\"ep5h4s6\": {\"purpose\": \"map the learning rate\", \"question:q2\": \"q2\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e3\", \"sha256\": \"f9761defb451152a697e523c6dd7006817cbc05f26e77c69f3b8249f29f10dab\", \"path\": \".rb/experiments/e3/experiment.yaml\", \"detail\": {\"variants\": [], \"like\": \"e1\", \"questions\": [\"q1\"], \"changed_parts\": {\"e3\": {\"question:q1\": \"q1\", \"varies:model.width\": \"model.width\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"file\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"1daaf17045d908051ee7d2160288d654e384a51fb573886d3061f6095211c67f\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"question\": \"q2\", \"changed_parts\": {\"e1\": {\"question:q2\": \"q2\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"unfile\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"0f48305056163332e5666c9bcd9a87e0e13ed9740d94b096d0382e7fff65669a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"question\": \"q2\", \"changed_parts\": {\"e1\": {\"question:q2\": null}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"relate\", \"kind\": \"experiment\", \"id\": \"e3\", \"sha256\": \"2089f6e1e4b3de4e585eccb79bcb3836f846a68263c2a1ee76578538b0234268\", \"path\": \".rb/experiments/e3/experiment.yaml\", \"detail\": {\"relation\": \"follows_from\", \"target\": \"e1\", \"changed_parts\": {\"e3\": {}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"gate\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"5bed708ce93b76b337a266f9650097c25509e7a6257504b109084ab51b997383\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"before\": {\"if_holds\": \"ship wide\", \"if_not\": \"keep base\"}, \"why\": \"the deadline moved\", \"changed_parts\": {\"e1\": {\"gate:if_holds\": \"ship wide now\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"note\", \"kind\": \"project\", \"id\": \"does-width-help\", \"parts\": [{\"kind\": \"note\", \"id\": \"np5h4s6\", \"path\": \".rb/notes/np5h4s6.yaml\", \"sha256\": \"2ab62c275ceaf5b5905fb86a3b3d9fdeaf7a24bca6b6e9a1f66e642f8081e234\"}], \"detail\": {\"text\": \"the project note\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"note\", \"kind\": \"experiment\", \"id\": \"e1\", \"parts\": [{\"kind\": \"note\", \"id\": \"n4teabd\", \"path\": \".rb/experiments/e1/notes/n4teabd.yaml\", \"sha256\": \"b06de89c394a1d13bdfad7cfceb424bfbb059d5ccb76720292643affb7e7fc78\"}], \"detail\": {\"text\": \"about e1\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add_variant\", \"kind\": \"experiment\", \"id\": \"e1\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/narrow\", \"path\": \".rb/experiments/e1/variants/narrow.yaml\", \"sha256\": \"cd87d225d007a37f9ad17c65ae5d44d4853dcc4a82a1530e1349678d9d1bacee\"}], \"detail\": {\"variant\": \"narrow\", \"role\": \"ablation\", \"changed_parts\": {\"e1\": {\"variant:narrow\": \"ablation\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"metric\", \"id\": \"top1\", \"sha256\": \"d84fb96b77e3a6946d0eccabf71e5a29f3962816a061565bc8470b3dfdd110fe\", \"path\": \".rb/metrics/top1.yaml\"}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"metric\", \"id\": \"loss\", \"sha256\": \"3ad5e2a6ec65d60e8a96e820176959c314283714490e00dc6c4b1facabcd2f17\", \"path\": \".rb/metrics/loss.yaml\"}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"metric\", \"id\": \"speed\", \"sha256\": \"0ad8f0d034884b429a553d2ee4fc2f8cec671b86adb7c94413ad7df2455f5967\", \"path\": \".rb/metrics/speed.yaml\"}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"question\", \"id\": \"qqtdhpa\", \"sha256\": \"1514a4555243b0b4fd4bdb37b4c0ea4d4c4483ec3b18c8020bfd332b6e887751\", \"path\": \".rb/questions/qqtdhpa.yaml\", \"detail\": {\"parent\": null}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"eqtdhpa\", \"sha256\": \"a00c6147ef5e0ed8141990207762b43149837f336f5f395a3d9f18e8dbeab600\", \"path\": \".rb/experiments/eqtdhpa/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"eqtdhpa/a\", \"path\": \".rb/experiments/eqtdhpa/variants/a.yaml\", \"sha256\": \"d45c446f9f0c3bb4783e7b1d0359a50f9853bd1f81c5b4323908c0ec197a5e14\"}, {\"kind\": \"variant\", \"id\": \"eqtdhpa/b\", \"path\": \".rb/experiments/eqtdhpa/variants/b.yaml\", \"sha256\": \"e132b0db2568a7ef4f0e0574177b2dbe780ee4fb054a043f22de0a52278f8806\"}], \"detail\": {\"variants\": [\"a\", \"b\"], \"like\": null, \"questions\": [], \"changed_parts\": {\"eqtdhpa\": {\"variant:a\": \"baseline\", \"variant:b\": \"candidate\"}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"agent:claude-code\", \"actor_via\": \"detected:CLAUDECODE\", \"via\": \"cli\", \"op\": \"session\", \"kind\": \"session\", \"id\": \"golden-session-1\", \"session\": \"golden-session-1\", \"agent\": {\"name\": \"claude-code\", \"provider\": \"anthropic\", \"provider_from\": \"inferred\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"agent:claude-code\", \"actor_via\": \"detected:CLAUDECODE\", \"via\": \"cli\", \"op\": \"note\", \"kind\": \"project\", \"id\": \"does-width-help\", \"session\": \"golden-session-1\", \"agent\": {\"name\": \"claude-code\", \"provider\": \"anthropic\", \"provider_from\": \"inferred\"}, \"parts\": [{\"kind\": \"note\", \"id\": \"nf3hlli\", \"path\": \".rb/notes/nf3hlli.yaml\", \"sha256\": \"0e7b8b28d5e4ae439c347324d227845317364e09b3943f55664cf78f836b6b8a\"}], \"detail\": {\"text\": \"after a look\"}}",
+   ""
+  ],
+  ".rb/metrics/loss.yaml": [
+   "rb: 1",
+   "kind: metric",
+   "id: loss",
+   "direction: minimize",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/metrics/speed.yaml": [
+   "rb: 1",
+   "kind: metric",
+   "id: speed",
+   "direction: none",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/metrics/top1.yaml": [
+   "rb: 1",
+   "kind: metric",
+   "id: top1",
+   "unit: fraction",
+   "direction: maximize",
+   "aliases:",
+   "  - accuracy",
+   "description: top-1 accuracy",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/notes/nf3hlli.yaml": [
+   "rb: 1",
+   "kind: note",
+   "id: nf3hlli",
+   "text: after a look",
+   "by: agent:claude-code",
+   "at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/notes/np5h4s6.yaml": [
+   "rb: 1",
+   "kind: note",
+   "id: np5h4s6",
+   "text: the project note",
+   "by: human:t",
+   "at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/project.yaml": [
+   "rb: 1",
+   "kind: project",
+   "id: does-width-help",
+   "uid: prj_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: Does width help?",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/questions/q1.yaml": [
+   "rb: 1",
+   "kind: question",
+   "id: q1",
+   "text: Does width help?",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/questions/q2.yaml": [
+   "rb: 1",
+   "kind: question",
+   "id: q2",
+   "text: Is it the batch size?",
+   "parent: q1",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/questions/qp5h4s6.yaml": [
+   "rb: 1",
+   "kind: question",
+   "id: qp5h4s6",
+   "text: Something else",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/questions/qqtdhpa.yaml": [
+   "rb: 1",
+   "kind: question",
+   "id: qqtdhpa",
+   "text: json mode",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  "rb-page.html": {
+   "sha256": "52046a1b32c0f08bc23e7c11a9f18657da7b97396bc5e2033a4b5f1dedf1065c",
+   "bytes": 197491
+  }
+ }
+}

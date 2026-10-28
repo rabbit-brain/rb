@@ -1,0 +1,25 @@
+/* Print (BP 2b-2): the frame links this after shell.css. A printed page is the document whole: light ink on white, every
+   fold open (a card's receipts included), the app's controls gone, a card kept on one page where it fits. */
+/* A Source view's cited lines (CITE, C's card) wrap on every screen and on paper: a quoted line is never cut at the
+   right edge of a phone or of the inspector. Its look beyond that is shell.css's. */
+pre.srclines { white-space: pre-wrap; overflow-wrap: break-word; }
+pre.srclines .sl.on { font-weight: 600; }
+@media print {
+  :root, :root:not([data-theme="light"]), :root[data-theme="dark"] {
+    --bg: #ffffff; --card: #f6f8fa; --ink: #1f2328; --dim: #59636e; --line: #d1d9e0;
+    --good: #1a7f37; --bad: #cf222e; --teal: #0969da; --warn: #9a6700; --accent: #9a6700; color-scheme: light; }
+  body { padding: 0; }
+  /* every fold prints open: its content is drawn whatever its open state, and its marker says so */
+  details::details-content { content-visibility: visible; display: contents; }
+  details > summary::before { content: "\25BE  " !important; }
+  details.rc > summary, details.fold > summary { break-after: avoid; }
+  /* what only a script drives, or only a screen needs */
+  nav.nav, aside.insp, .ctl, .cp, .filterbar, .help, .skip, .app-only, .seg, .composer, .cprow { display: none !important; }
+  .acts.enh { display: grid !important; }
+  .term::after { content: none; }
+  .card, .srow, .repro, tr, .callrow, .igroup, .pair, .hev, .cells li, svg.fig { break-inside: avoid; }
+  h1, h2, h3, h4 { break-after: avoid; }
+  /* the figure stays neutral ink on paper */
+  svg.fig .rg { fill: #eaeef2; }
+  a { color: var(--ink); text-decoration: none; }
+}

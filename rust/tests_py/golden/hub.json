@@ -1,0 +1,2452 @@
+{
+ "steps": [
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/ok",
+   "exit": 0,
+   "out": [
+    "Signed in as t on http://127.0.0.1:47821/m/ok.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/ok/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/complete",
+   "exit": 0,
+   "out": [
+    "Signed in as t on http://127.0.0.1:47821/m/complete.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/complete/link?code=ABCD-EFGH on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/slow",
+   "exit": 0,
+   "out": [
+    "Signed in as t on http://127.0.0.1:47821/m/slow.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/slow/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/denied",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/denied/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    "rb login: Declined on the hub. Nothing was created.",
+    "  \u2192 The message carries the hub's reason and fix; the record on this machine is unchanged.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/expired",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/expired/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    "rb login: The code expired before it was approved.",
+    "  \u2192 Run rb login again.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/described",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/described/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    "rb login: The hub answered: the hub tripped",
+    "  \u2192 The message carries the hub's reason and fix; the record on this machine is unchanged.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/undescribed",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/undescribed/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    "rb login: The hub answered: server_error",
+    "  \u2192 The message carries the hub's reason and fix; the record on this machine is unchanged.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/notoken",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/notoken/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    "rb login: http://127.0.0.1:47821/m/notoken/api/hub/device/token did not answer as the hub does: its answer has no token.",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/nohandle",
+   "exit": 0,
+   "out": [
+    "Signed in as you on http://127.0.0.1:47821/m/nohandle.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/nohandle/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/nullhandle",
+   "exit": 0,
+   "out": [
+    "Signed in as you on http://127.0.0.1:47821/m/nullhandle.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/nullhandle/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/code500",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb login: The hub did not start a sign-in: the hub is down",
+    "  \u2192 The message carries the hub's reason and fix; the record on this machine is unchanged.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/code404",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb login: The hub did not start a sign-in: Not Found",
+    "  \u2192 The message carries the hub's reason and fix; the record on this machine is unchanged.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/codejunk",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb login: http://127.0.0.1:47821/m/codejunk/api/hub/device/code did not answer as the hub does: its answer is not JSON.",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/nocode",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb login: The hub did not start a sign-in: no device flow here",
+    "  \u2192 The message carries the hub's reason and fix; the record on this machine is unchanged.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/nousercode",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb login: http://127.0.0.1:47821/m/nousercode/api/hub/device/code did not answer as the hub does: its answer has no user_code.",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/expiresnow",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/expiresnow/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ",
+    "rb login: The code expired before it was approved.",
+    "  \u2192 Run rb login again.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/strinterval",
+   "exit": 0,
+   "out": [
+    "Signed in as t on http://127.0.0.1:47821/m/strinterval.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/strinterval/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login unreachable: rb login --hub http://127.0.0.1:1",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb login: http://127.0.0.1:1/api/hub/device/code could not be reached: Connection refused",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login no scheme: rb login --hub rabbitbrain",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb login: rabbitbrain is not a web address: one starts with https:// (or http://) and names a host.",
+    "  \u2192 Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses https://rabbitbrain.ai.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login odd scheme: rb login --hub localhost:1",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb login: localhost:1 is not a web address: one starts with https:// (or http://) and names a host.",
+    "  \u2192 Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses https://rabbitbrain.ai.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login no host: rb login --hub https://",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb login: https:// is not a web address: one starts with https:// (or http://) and names a host.",
+    "  \u2192 Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses https://rabbitbrain.ai.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login nowhere: rb login --hub http://rb-nowhere.invalid",
+   "exit": 2
+  },
+  {
+   "run": "login json: rb login --hub http://127.0.0.1:47821/m/ok/ --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"login\",",
+    " \"data\": {",
+    "  \"hub\": \"http://127.0.0.1:47821/m/ok\",",
+    "  \"handle\": \"t\",",
+    "  \"credentials\": \"@BASE@/cfg/credentials.json\"",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/ok/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) .",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login env: rb login",
+   "exit": 0,
+   "out": [
+    "Signed in as t on http://127.0.0.1:47821/m/complete.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/complete/link?code=ABCD-EFGH on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) .",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/ok": {
+      "token": "rb_stub_ok",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "logout: rb logout --hub http://127.0.0.1:47821/m/ok",
+   "exit": 0,
+   "out": [
+    "Logged out of http://127.0.0.1:47821/m/ok: credential removed from @BASE@/cfg/credentials.json and revoked on the hub.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "logout again: rb logout --hub http://127.0.0.1:47821/m/ok",
+   "exit": 0,
+   "out": [
+    "Nothing stored for http://127.0.0.1:47821/m/ok; nothing to do.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login for norevoke: rb login --hub http://127.0.0.1:47821/m/norevoke",
+   "exit": 0,
+   "out": [
+    "Signed in as t on http://127.0.0.1:47821/m/norevoke.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/norevoke/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/norevoke": {
+      "token": "rb_stub_norevoke",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "logout norevoke: rb logout --hub http://127.0.0.1:47821/m/norevoke --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"logout\",",
+    " \"data\": {",
+    "  \"hub\": \"http://127.0.0.1:47821/m/norevoke\",",
+    "  \"revoked\": false,",
+    "  \"removed\": true",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login for revokejunk: rb login --hub http://127.0.0.1:47821/m/revokejunk",
+   "exit": 0,
+   "out": [
+    "Signed in as t on http://127.0.0.1:47821/m/revokejunk.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/revokejunk/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/revokejunk": {
+      "token": "rb_stub_revokejunk",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "logout revokejunk: rb logout --hub http://127.0.0.1:47821/m/revokejunk",
+   "exit": 0,
+   "out": [
+    "Logged out of http://127.0.0.1:47821/m/revokejunk: credential removed from @BASE@/cfg/credentials.json. The hub was not reachable to revoke it; revoke at /account if it may have leaked.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "logout nothing: rb logout --hub http://127.0.0.1:47821/m/never",
+   "exit": 0,
+   "out": [
+    "Nothing stored for http://127.0.0.1:47821/m/never; nothing to do.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync no credential: rb sync --hub http://127.0.0.1:47821/m/ok",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: No credential for http://127.0.0.1:47821/m/ok on this machine.",
+    "  \u2192 Run rb login --hub http://127.0.0.1:47821/m/ok once per machine, or set RB_HUB_TOKEN for CI.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync env token: rb sync --hub http://127.0.0.1:47821/m/ok",
+   "exit": 0,
+   "out": [
+    "Synced, privately: http://127.0.0.1:47821/m/ok/u/t/proj",
+    "Only you can open it, signed in. It shows the record as computed at this sync; run rb sync again after new runs.",
+    "Share it from its page on the site, with a link you can revoke; rb sync again updates what the link shows.",
+    "Its page went alone: the record stays in this repository, the store, and rb sync --with-record sends it too.",
+    "A share link's readers can rerun only a sync made with --with-record.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync stored: rb sync --hub http://127.0.0.1:47821/m/complete",
+   "exit": 0,
+   "out": [
+    "Synced, privately: http://127.0.0.1:47821/m/complete/u/t/proj",
+    "Only you can open it, signed in. It shows the record as computed at this sync; run rb sync again after new runs.",
+    "Share it from its page on the site, with a link you can revoke; rb sync again updates what the link shows.",
+    "Its page went alone: the record stays in this repository, the store, and rb sync --with-record sends it too.",
+    "A share link's readers can rerun only a sync made with --with-record.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync query: rb sync --hub http://127.0.0.1:47821/m/query/ --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"sync\",",
+    " \"data\": {",
+    "  \"handle\": \"t\",",
+    "  \"url\": \"http://127.0.0.1:47821/m/query/u/t/proj\",",
+    "  \"with_record\": false",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync with record: rb sync --hub http://127.0.0.1:47821/m/ok --with-record --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"sync\",",
+    " \"data\": {",
+    "  \"handle\": \"t\",",
+    "  \"url\": \"http://127.0.0.1:47821/m/ok/u/t/proj\",",
+    "  \"clone\": \"rb clone http://127.0.0.1:47821/m/ok/u/t/proj/bundle.zip\",",
+    "  \"with_record\": true",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync who401: rb sync --hub http://127.0.0.1:47821/m/who401",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: The hub answered 401: bad token",
+    "  \u2192 Read the message; the hub says what it needs.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync who403fix: rb sync --hub http://127.0.0.1:47821/m/who403fix --json",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"sync\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_HUB_REFUSED\",",
+    "   \"message\": \"The hub answered 403: not yours\",",
+    "   \"fix\": \"Sign in as the owner.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync whojunk: rb sync --hub http://127.0.0.1:47821/m/whojunk",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: The hub answered 500: Internal Server Error",
+    "  \u2192 Read the message; the hub says what it needs.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync nobase: rb sync --hub http://127.0.0.1:47821/m/nobase",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: http://127.0.0.1:47821/m/nobase/api/hub/whoami did not answer as the hub does: its answer has no base.",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync put500: rb sync --hub http://127.0.0.1:47821/m/put500",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: The hub answered 500: Internal Server Error",
+    "  \u2192 Read the message; the hub says what it needs.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync putjunk: rb sync --hub http://127.0.0.1:47821/m/putjunk",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: http://127.0.0.1:47821/m/putjunk/api/hub/upload?visibility=private did not answer as the hub does: its answer is not JSON.",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync putlist: rb sync --hub http://127.0.0.1:47821/m/putlist",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: http://127.0.0.1:47821/m/putlist/api/hub/upload?visibility=private did not answer as the hub does: its answer is not a JSON object.",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync unreachable: rb sync --hub http://127.0.0.1:1",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: http://127.0.0.1:1/api/hub/whoami could not be reached: Connection refused",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "logout unreachable: rb logout --hub http://127.0.0.1:1",
+   "exit": 0,
+   "out": [
+    "Nothing stored for http://127.0.0.1:1; nothing to do.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "clone: rb clone http://127.0.0.1:47821/files/bundle.zip fromhub",
+   "exit": 0,
+   "out": [
+    "fromhub: \"the synced project\" cloned: 1 experiment, 1 criterion, 0 metrics, 0 resources. Everything arrived inherited; nothing counts until it is reproduced here.",
+    "It is a repository of its own; the record is its first commit.",
+    "The parent's runs, analyses and decisions stay in the parent's record. Record runs made in this repository, and each inherited criterion reads them like any finding: reproduced or not reproduced.",
+    "The runs need the code; this bundle doesn't say where it is. When you have it: rb clone http://127.0.0.1:47821/files/bundle.zip <new folder> --code <address of the code>",
+    "",
+    "Next: cd fromhub && rb context   (the parent, the code, each resource and the first command to rerun)  \u00b7  rb env check   (does this machine match the runs that made it?)  \u00b7  rb export --with-record --url <your address>   (publish your fork; its page names the parent)",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "clone missing: rb clone http://127.0.0.1:47821/files/none.zip x1",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb clone: http://127.0.0.1:47821/files/none.zip could not be fetched: Not Found",
+    "  \u2192 Get a fresh copy from where it was published; every file must hash to what manifest.json records. rb export --with-record writes one.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "clone junk: rb clone http://127.0.0.1:47821/files/junk.zip x2",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb clone: http://127.0.0.1:47821/files/junk.zip is not a zip; a published bundle is the zip rb export --with-record writes.",
+    "  \u2192 Get a fresh copy from where it was published; every file must hash to what manifest.json records. rb export --with-record writes one.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "clone unreachable: rb clone http://127.0.0.1:1/bundle.zip x3",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb clone: http://127.0.0.1:1/bundle.zip could not be fetched: Connection refused",
+    "  \u2192 Get a fresh copy from where it was published; every file must hash to what manifest.json records. rb export --with-record writes one.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "clone no host: rb clone https:///bundle.zip x4",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb clone: https:///bundle.zip is not a web address: one starts with https:// (or http://) and names a host.",
+    "  \u2192 Give the address the bundle is served from in full, or the path of a bundle on this machine.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login nulltoken: rb login --hub http://127.0.0.1:47821/m/nulltoken",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/nulltoken/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    "rb login: http://127.0.0.1:47821/m/nulltoken/api/hub/device/token did not answer as the hub does: its token is not text.",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login emptytoken: rb login --hub http://127.0.0.1:47821/m/emptytoken",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/emptytoken/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    "rb login: http://127.0.0.1:47821/m/emptytoken/api/hub/device/token did not answer as the hub does: its token is empty.",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login token500: rb login --hub http://127.0.0.1:47821/m/token500",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/token500/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    "rb login: The hub answered 500 and gave no reason.",
+    "  \u2192 Run rb login again; nothing was stored on this machine.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login hugeexpiry: rb login --hub http://127.0.0.1:47821/m/hugeexpiry",
+   "exit": 0,
+   "out": [
+    "Signed in as t on http://127.0.0.1:47821/m/hugeexpiry.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/hugeexpiry/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login for revoke204: rb login --hub http://127.0.0.1:47821/m/revoke204",
+   "exit": 0,
+   "out": [
+    "Signed in as t on http://127.0.0.1:47821/m/revoke204.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "rb sync now works here. rb logout revokes and removes it.",
+    ""
+   ],
+   "err": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/revoke204/link on any device; it signs you in first if needed, and approve the code.",
+    "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/revoke204": {
+      "token": "rb_stub_revoke204",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "logout revoke204: rb logout --hub http://127.0.0.1:47821/m/revoke204 --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"logout\",",
+    " \"data\": {",
+    "  \"hub\": \"http://127.0.0.1:47821/m/revoke204\",",
+    "  \"revoked\": true,",
+    "  \"removed\": true",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync relpublish: rb sync --hub http://127.0.0.1:47821/m/relpublish",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: http://127.0.0.1:47821/m/relpublish/api/hub/whoami did not answer as the hub does: its publish is not a web address.",
+    "  \u2192 Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync unsendable: rb sync --hub http://127.0.0.1:47821/m/ok",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: The credential for this hub cannot be sent: it holds a character no request carries.",
+    "  \u2192 Check RB_HUB_TOKEN, or run rb login again.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "logout no address: rb logout",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb logout: RB_HUB_URL is set to nothing.",
+    "  \u2192 Unset it to use https://rabbitbrain.ai, or give it the hub's address.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  }
+ ],
+ "files": {
+  ".rb/.gitattributes": [
+   "* -text",
+   "log.jsonl merge=union",
+   ""
+  ],
+  ".rb/.gitignore": [
+   ".lock",
+   "*.tmp",
+   "cache/",
+   "journal/",
+   ""
+  ],
+  ".rb/cache/objects/08/089d5e2a0357b55422d58604f1bf280bb86cb293c86b288b69e9a992a15047bb.json.gz": {
+   "sha256": "5644add9049f35975f6eb7db8fff2ded0bce3a6156f78365d3e54df5d2ac2a24",
+   "bytes": 240
+  },
+  ".rb/cache/objects/52/52413c52f4554df698fcde7e71fda820eb9e53deda527ac72db9ccdb6327b632.json.gz": {
+   "sha256": "1410049fcf800fb638a01e0beef5b45ee02c89897fd202a8badb603e8e939400",
+   "bytes": 305
+  },
+  ".rb/cache/objects/90/9032548348ad00fdc1162fabd048ff7de2f9ce799e95c72084147206e8fe88bd.json.gz": {
+   "sha256": "c88a9f3b2c6a91d32752441b07a1b783ec4adccc089d2af2217b527c2cb0117c",
+   "bytes": 336
+  },
+  ".rb/experiments/e1/criteria/c1.yaml": [
+   "rb: 1",
+   "kind: criterion",
+   "id: c1",
+   "experiment: e1",
+   "statement: c",
+   "metric: m",
+   "comparator: at_least",
+   "target: 0.5",
+   "over: mean",
+   "role: primary",
+   "min_n: 1",
+   "origin: inherited",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/experiments/e1/experiment.yaml": [
+   "rb: 1",
+   "kind: experiment",
+   "id: e1",
+   "uid: exp_01M3VNBWG0GK37F0M3GMH9W716",
+   "title: e",
+   "relations:",
+   "  - kind: reproduces",
+   "    target: exp_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "    note: cloned from http://127.0.0.1:47821/files/bundle.zip",
+   "    by: human:t",
+   "    at: \"2026-10-01T12:00:00.000+00:00\"",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  ".rb/log.jsonl": [
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"clone\", \"kind\": \"project\", \"id\": \"sync-proj\", \"sha256\": \"52413c52f4554df698fcde7e71fda820eb9e53deda527ac72db9ccdb6327b632\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"the synced project\", \"parent_url\": \"http://127.0.0.1:47821/files/bundle.zip\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"clone\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"9032548348ad00fdc1162fabd048ff7de2f9ce799e95c72084147206e8fe88bd\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"parent\": \"exp_01M3VNBWG0FX7WJYHM24ARM0RQ\", \"rerun\": {\"criterion\": \"c1\", \"commands\": []}, \"changed_parts\": {\"e1\": {}}}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"clone\", \"kind\": \"criterion\", \"id\": \"c1\", \"sha256\": \"089d5e2a0357b55422d58604f1bf280bb86cb293c86b288b69e9a992a15047bb\", \"path\": \".rb/experiments/e1/criteria/c1.yaml\", \"detail\": {\"rule\": \"m \u2265 0.5\", \"experiment\": \"e1\", \"changed_parts\": {\"e1\": {\"role:c1\": \"primary\", \"rule:c1\": \"m \u2265 0.5\"}}}}",
+   ""
+  ],
+  ".rb/project.yaml": [
+   "rb: 1",
+   "kind: project",
+   "id: sync-proj",
+   "uid: prj_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: the synced project",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   "parent:",
+   "  url: http://127.0.0.1:47821/files/bundle.zip",
+   "  version: \"2026-10-01 12:00 UTC\"",
+   "  cloned_at: \"2026-10-01T12:00:00.000+00:00\"",
+   ""
+  ]
+ }
+}

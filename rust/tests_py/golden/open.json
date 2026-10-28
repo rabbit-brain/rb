@@ -1,0 +1,476 @@
+{
+ "steps": [
+  {
+   "run": "open",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb open: No record here: no .rb/ in this directory or any directory above it.",
+    "  \u2192 Run `rb init \"<the work's theme>\"` in the project root (it creates .rb/), or cd into a project that has one. In a project already under way, `rb docs --start` says how to record the work done.",
+    ""
+   ]
+  },
+  {
+   "run": "open --json",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"open\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_NO_PROJECT\",",
+    "   \"message\": \"No record here: no .rb/ in this directory or any directory above it.\",",
+    "   \"fix\": \"Run `rb init \\\"<the work's theme>\\\"` in the project root (it creates .rb/), or cd into a project that has one. In a project already under way, `rb docs --start` says how to record the work done.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "ui",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb ui: There is no record (.rb/) here or above. Your agent sets it up: paste this line into your agent's chat: Use Rabbit Brain to track this: read rb context, then record where the work stands.",
+    "  \u2192 Run `rb init \"<the work's theme>\"` in the project root (it creates .rb/), or cd into a project that has one. In a project already under way, `rb docs --start` says how to record the work done.",
+    ""
+   ]
+  },
+  {
+   "run": "ui --json",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"ui\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_NO_PROJECT\",",
+    "   \"message\": \"There is no record (.rb/) here or above. Your agent sets it up: paste this line into your agent's chat: Use Rabbit Brain to track this: read rb context, then record where the work stands.\",",
+    "   \"fix\": \"Run `rb init \\\"<the work's theme>\\\"` in the project root (it creates .rb/), or cd into a project that has one. In a project already under way, `rb docs --start` says how to record the work done.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "init t --no-agents",
+   "exit": 0,
+   "out": [
+    "Project 't' started: @BASE@/work/.rb",
+    "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
+    "",
+    "Then paste this line into your agent's chat:",
+    "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "open",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb open: rb open is the user's view and this is an agent session. The state is in rb status; the user opens it in their own terminal.",
+    "  \u2192 `rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --.",
+    ""
+   ]
+  },
+  {
+   "run": "open --json",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"open\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_USAGE\",",
+    "   \"message\": \"rb open is the user's view and this is an agent session. The state is in rb status; the user opens it in their own terminal.\",",
+    "   \"fix\": \"`rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "ui",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb ui: rb ui is an interactive screen, and this is an agent session: rb status prints the same state.",
+    "  \u2192 `rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --.",
+    ""
+   ]
+  },
+  {
+   "run": "ui --json",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"ui\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_USAGE\",",
+    "   \"message\": \"rb ui is an interactive screen, and this is an agent session: rb status prints the same state.\",",
+    "   \"fix\": \"`rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "ui",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb ui: rb ui needs an interactive terminal. Without one, rb status prints the same state.",
+    "  \u2192 `rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --.",
+    ""
+   ]
+  },
+  {
+   "run": "ui --json",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"ui\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_USAGE\",",
+    "   \"message\": \"rb ui needs an interactive terminal. Without one, rb status prints the same state.\",",
+    "   \"fix\": \"`rb <command> --help` lists the arguments. A negative number is written as it is (--at-most -0.001); text that starts with '-' goes after --.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "ui extra",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "usage: rb [-h] [--version] <command> ...",
+    "rb ui extra: unrecognized arguments: extra",
+    ""
+   ]
+  },
+  {
+   "run": "",
+   "exit": 0,
+   "out": [
+    "usage: rb <command> [...]",
+    "",
+    "The record of the experiments your coding agents run, as Rabbit Brain YAML files in your repo: questions, experiments with their hypothesis, variants and criteria, runs with receipts, and the resources they used. Agents record; rb checks and computes findings; you decide. Documentation: rb docs. New here? Run rb tour.",
+    "",
+    "The record:",
+    "  init         start the record (.rb/) here",
+    "  project      title: the project's title",
+    "  question     add|move|reword: what the work is trying to find out, as a tree experiments are filed under",
+    "  experiment   add|file|relate|gate: what is tested: its purpose, hypothesis, variants and settings; where it is filed; how it stands to others; the decision it gates",
+    "  variant      add: an arm of an experiment: baseline, candidate, control, ablation",
+    "  note         add: words about an experiment or the project: an assumption, a caveat, context; a note changes no finding",
+    "  metric       add: the catalogue: a metric's unit, which way is better, its other names",
+    "  spec         set|verify|vary: an experiment's settings, where each value comes from, and whether rb has checked it",
+    "  criterion    add|file|relate: a rule over one comparison, declared before the evidence it reads",
+    "  run          add: what ran: its results, per-run settings, inputs and outputs, with a receipt",
+    "  analysis     add: a computation over saved outputs, and the comparisons it produced with their intervals",
+    "  resource     add|locate|expose: a dataset, checkpoint, code or artifact: what it is, where its bytes are, how to get it again, who has looked at it",
+    "",
+    "Calls:",
+    "  freeze       lock an experiment's spec and criteria before the evidence, recorded with who locked it",
+    "  decide       a call on a criterion, an experiment, a question or a setting: accept, reject, investigate; continue, park, stop, pivot, ship. Recorded with who made it and why; in an agent session it is proposed until the user confirms it",
+    "  confirm      make a call proposed, or a past call mentioned, in an agent session yours, or an experiment's design one wrote: run in your own terminal; with no id, list what waits",
+    "  retract      take anything back: it stays on record, stops counting, and rb says what rested on it",
+    "",
+    "Reading it:",
+    "  open         the catalogue in your browser, live and read-only, on 127.0.0.1 only",
+    "  ui           open this project in your terminal: your call, the cards, the tree (bare rb does this too)",
+    "  status       each criterion on its axes, and what is open, with who usually acts",
+    "  show         one record: a criterion with its finding, an experiment with its spec, a run with its receipt, e1/lr with its history; or a .yaml record file as canonical JSON",
+    "  compare      an experiment's own table: variants by metrics, with changes against the baseline",
+    "  log          every write, newest last: who, how, what",
+    "  context      the record as one Markdown briefing a fresh agent session reads first",
+    "  page         write the project as one self-contained, read-only HTML file you can send anywhere",
+    "",
+    "Carrying it:",
+    "  export       write the project's page with a hashed manifest, readable without rb; with --with-record, the record too, as a portable bundle",
+    "  clone        start your own line of work from an exported bundle: the structure arrives inherited, and nothing counts until reproduced here",
+    "  env          the environment: check this machine against the record's runs and any env.* settings",
+    "",
+    "For agents:",
+    "  mcp          serve the record to an agent over MCP (stdio); every call is recorded as the agent's",
+    "  skill        print the agent skill; `rb skill add` installs it for your coding agent",
+    "  journal      what rb observed in the repository: files that appeared, git moves, wrapped commands",
+    "  reconcile    compile the repository against the record: each results folder with a report as an experiment, what its files say (verbatim), its checks, how to reproduce it; --apply keeps it",
+    "  compile      list what existing reports and results files the record can place, and what it cannot; writes nothing",
+    "",
+    "Upkeep:",
+    "  doctor       check the record: who you are recorded as, edits made outside rb, merge leftovers, sources outside the repository",
+    "  fmt          write Rabbit Brain YAML files in their canonical form, comments kept (default: every record file under .rb/)",
+    "  telemetry    optional usage analytics: off until you enable it; never sends research content",
+    "  config       rb's own settings on this machine: whether rb keeps itself up to date",
+    "",
+    "Leaving:",
+    "  remove       take rb out of this checkout: only what checks out as rb's (the record, its instructions for agents, its pages and exports, its refs and folders in git), after showing the plan",
+    "",
+    "Reference:",
+    "  tour         a one-minute walkthrough: builds a small real project in ./rb-tour and runs the whole loop",
+    "  docs         print AGENTS.md (--start: how to start the record in a project already under way; --errors: the error table)",
+    "  schema       print a JSON Schema: `rb schema all` is Rabbit Brain format 1 (rb-v1.schema.json), `rb schema <kind>` one record's shape",
+    "  version      print the version",
+    "  feedback     a link to send feedback on rb: the page shows what it would send before you send it; rb sends nothing",
+    "",
+    "rabbitbrain.ai (not yet available):",
+    "  login        rabbitbrain.ai, optional: sign this machine in with a short code, approved on any device where you are signed in (hosted service not yet available)",
+    "  logout       revoke this machine's hub credential and remove it from the credentials file",
+    "  sync         rabbitbrain.ai, optional: a private copy of this record's page in your account, for your own eyes from anywhere (hosted service not yet available)",
+    "",
+    "rb <command> --help for its arguments. Start: rb init \"<the work's theme>\", then rb question add for each question the work asks, and rb context.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "open --port 70000",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb open: 70000 is not a port: a port is a number from 0 to 65535.",
+    "  \u2192 Pick another: rb open --port <n>.",
+    ""
+   ]
+  },
+  {
+   "run": "open --port -1 --json",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"open\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_USAGE\",",
+    "   \"message\": \"-1 is not a port: a port is a number from 0 to 65535.\",",
+    "   \"fix\": \"Pick another: rb open --port <n>.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "open --port abc",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "usage: rb open [-h] [--json] [--port PORT]",
+    "rb open: argument --port: invalid int value: 'abc'",
+    ""
+   ]
+  },
+  {
+   "run": "python3 serve.py taken",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb open: Port PORT is not available (Address already in use).",
+    "  \u2192 Pick another: rb open --port <n>.",
+    ""
+   ]
+  },
+  {
+   "run": "python3 serve.py taken --json",
+   "exit": 2,
+   "out": [
+    "{",
+    " \"ok\": false,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"open\",",
+    " \"data\": {},",
+    " \"errors\": [",
+    "  {",
+    "   \"code\": \"E_USAGE\",",
+    "   \"message\": \"Port PORT is not available (Address already in use).\",",
+    "   \"fix\": \"Pick another: rb open --port <n>.\"",
+    "  }",
+    " ],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "python3 serve.py stop",
+   "exit": 0,
+   "out": [
+    "200 True",
+    ""
+   ],
+   "err": [
+    "rb open \u00b7 http://127.0.0.1:PORT/",
+    "this machine only.",
+    "from another machine, bring it over ssh:  ssh -N -L PORT:127.0.0.1:PORT <this-host>  then open the same link there",
+    "Ctrl-C stops the server.",
+    ""
+   ]
+  },
+  {
+   "run": "python3 serve.py stop --json",
+   "exit": 0,
+   "out": [
+    "200 True",
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"open\",",
+    " \"data\": {},",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    "rb open \u00b7 http://127.0.0.1:PORT/",
+    "this machine only.",
+    "from another machine, bring it over ssh:  ssh -N -L PORT:127.0.0.1:PORT <this-host>  then open the same link there",
+    "Ctrl-C stops the server.",
+    ""
+   ]
+  }
+ ],
+ "files": {
+  ".rb/.gitattributes": [
+   "* -text",
+   "log.jsonl merge=union",
+   ""
+  ],
+  ".rb/.gitignore": [
+   ".lock",
+   "*.tmp",
+   "cache/",
+   "journal/",
+   ""
+  ],
+  ".rb/cache/objects/f3/f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6.json.gz": {
+   "sha256": "b49dd5346ef687f6a501f3c6c503e1efd5ace2a96eedf9f77d561c59e91c0f41",
+   "bytes": 144
+  },
+  ".rb/log.jsonl": [
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"t\", \"sha256\": \"f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"t\", \"head\": \"\"}}",
+   ""
+  ],
+  ".rb/project.yaml": [
+   "rb: 1",
+   "kind: project",
+   "id: t",
+   "uid: prj_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: t",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ],
+  "serve.py": [
+   "import os, shlex, signal, socket, subprocess, sys, urllib.request",
+   "rb = shlex.split(os.environ[\"RB\"])",
+   "held = socket.socket()",
+   "held.bind((\"127.0.0.1\", 0))",
+   "held.listen()",
+   "port = held.getsockname()[1]",
+   "if sys.argv[1] == \"stop\":",
+   "    held.close()",
+   "p = subprocess.Popen([*rb, \"open\", \"--port\", str(port), *sys.argv[2:]], stdout=subprocess.PIPE, stderr=subprocess.PIPE)",
+   "if sys.argv[1] == \"stop\":",
+   "    lines = [p.stderr.readline() for _ in range(4)]",
+   "    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(f\"http://127.0.0.1:{port}/\", timeout=30) as r:",
+   "        print(r.status, len(r.read()) > 1000)",
+   "    p.send_signal(signal.SIGINT)",
+   "    out, err = p.communicate(timeout=30)",
+   "    err = b\"\".join(lines) + err",
+   "else:",
+   "    out, err = p.communicate(timeout=30)",
+   "sys.stdout.write(out.decode().replace(str(port), \"PORT\"))",
+   "sys.stderr.write(err.decode().replace(str(port), \"PORT\"))",
+   "sys.exit(p.returncode)",
+   ""
+  ]
+ }
+}

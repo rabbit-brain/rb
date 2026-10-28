@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>INT8 ResNet-50 on ImageNet</title>
+<!-- The DOM fixture (SPRINT-OCT24.md 1.7): one view and one card of each kind in the prototype's markup, with the
+     INT8 example's text, so the app script is built and checked before the shell renders. Its style is the
+     prototype's, without the section 15 overlay. It is retired once dom_contract_holds passes on the real render. -->
+<style>
+/* rb shell: Opus tokens (SURFACE_MAP 5.1), document mode first, app mode under html.app */
+:root {
+  --bg: #ffffff; --card: #f6f8fa; --ink: #1f2328; --dim: #59636e; --line: #d1d9e0;
+  --accent: #9a6700; --good: #1a7f37; --bad: #cf222e; --warn: #9a6700; --teal: #0969da; --mark: #3b6ae0;
+  --tip-bg: #ffffff; --tip-ink: #1f2328; --tip-line: #c8d1da;
+  --sans: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --barh: 46px; --toph: 48px; --navw: 272px; --iw: min(420px, 32vw);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1117; --card: #151b23; --ink: #e6edf3; --dim: #9198a1; --line: #3d444d;
+    --accent: #e3b341; --good: #3fb950; --bad: #f85149; --teal: #4493f8; --warn: #d29922; --mark: #4f7cf5;
+    --tip-bg: #262c36; --tip-ink: #e6edf3; --tip-line: #3d444d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1117; --card: #151b23; --ink: #e6edf3; --dim: #9198a1; --line: #3d444d;
+  --accent: #e3b341; --good: #3fb950; --bad: #f85149; --teal: #4493f8; --warn: #d29922; --mark: #4f7cf5;
+  --tip-bg: #262c36; --tip-ink: #e6edf3; --tip-line: #3d444d;
+  color-scheme: dark;
+}
+:root {
+  --hover: color-mix(in srgb, var(--ink) 3.5%, transparent);
+  --hover2: color-mix(in srgb, var(--ink) 8%, transparent);
+  --sel: color-mix(in srgb, var(--accent) 5%, transparent);
+  --soft: color-mix(in srgb, var(--line) 55%, transparent);
+  --wash: color-mix(in srgb, var(--ink) 8%, transparent);
+  --shadow: 0 10px 32px color-mix(in srgb, #000 18%, transparent);
+  --surf: var(--bg);
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { overflow-x: clip; scroll-padding-top: calc(var(--barh) + 12px); -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sans); padding-inline: 16px; overflow-wrap: break-word; }
+a { color: var(--teal); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+code, .mono, kbd { font-family: var(--mono); font-size: 0.87em; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--bg); font-size: 11.5px; }
+h1 { font-size: 26px; line-height: 1.25; letter-spacing: -0.01em; margin: 4px 0 10px; text-wrap: balance; font-weight: 650; }
+h2 { font-size: 18px; line-height: 1.3; margin: 30px 0 10px; font-weight: 650; }
+h2 .n, h4 .n { color: var(--dim); font-weight: 500; }
+h3 { font-size: 15px; line-height: 1.4; margin: 20px 0 6px; font-weight: 650; }
+p { margin: 6px 0; }
+.dim { color: var(--dim); }
+.rsn, dl.ax dd, .r3, .meta, .roll, .counts, .quiet, .who, .reads, .stand, .callrow .t, .ct2 { font-variant-numeric: tabular-nums; }
+.nw, .counts a { white-space: nowrap; }
+.sm { font-size: 13.5px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 16px; top: 8px; z-index: 100; background: var(--bg); padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; }
+.lede { color: var(--dim); margin: 0 0 14px; }
+.crumb { font-size: 13px; color: var(--dim); margin: 0 0 4px; }
+.crumb a { color: var(--dim); }
+.crumb a:hover { color: var(--teal); }
+.crumb .sep { margin: 0 5px; opacity: .7; }
+.id { font: 12px var(--mono); color: var(--dim); }
+a.id { color: var(--teal); }
+q { quotes: "\201C" "\201D"; }
+.app-only { display: none; }
+
+/* ---------- top bar and nav (document mode: one sticky bar that wraps, never scrolls sideways) ---------- */
+header.top { max-width: 880px; margin: 0 auto; padding: 14px 0 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; color: var(--dim); }
+.rbwm { font-weight: 700; color: var(--ink); letter-spacing: -0.01em; font-size: 14px; }
+.rbdot { color: var(--mark); }
+header.top .oid { font-family: var(--mono); color: var(--ink); }
+header.top .ttl, header.top .slash { display: none; }
+header.top .end { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.ctl { display: none; }
+nav.nav { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); margin: 0 -16px; padding: 0 16px; }
+nav.nav > ul { max-width: 880px; margin: 0 auto; padding: 0; list-style: none; display: flex; flex-wrap: wrap; align-items: center; }
+nav.nav li { list-style: none; }
+nav.nav ul ul { padding: 0; margin: 0; }
+nav.nav a { display: inline-flex; align-items: center; gap: 6px; padding: 10px 10px 9px; color: var(--dim); font-size: 14px; border-bottom: 2px solid transparent; white-space: nowrap; }
+nav.nav a:hover { color: var(--ink); text-decoration: none; }
+nav.nav a:focus-visible { outline-offset: -2px; }
+nav .n { font: 12px var(--mono); color: var(--dim); }
+nav .sub, nav .grp { display: none; }
+nav .rec { display: flex; }
+nav li.yc { margin-left: auto; }
+nav li.yc .n { background: var(--ink); color: var(--bg); border-radius: 10px; padding: 0 7px; font-weight: 600; font-family: var(--sans); font-size: 12px; line-height: 18px; }
+main { max-width: 880px; margin: 0 auto; padding-block: 18px 64px; }
+.view { scroll-margin-top: calc(var(--barh) + 12px); }
+.sec { border-top: 1px solid var(--line); margin-top: 40px; padding-top: 4px; }
+.sec:first-child { border-top: 0; margin-top: 0; }
+.sechd { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 24px 0 0; }
+.view + .view { margin-top: 34px; }
+
+/* ---------- words: standing words carry the only strong colour; everything else is ink, dim or link ---------- */
+.sw { white-space: nowrap; }
+.sw.good { color: var(--good); }
+.sw.bad { color: var(--bad); }
+.sw.warn { color: var(--warn); }
+.sw.mute { color: var(--dim); }
+a.sw { color: var(--ink); }
+a.sw.good { color: var(--good); } a.sw.bad { color: var(--bad); } a.sw.warn { color: var(--warn); } a.sw.mute { color: var(--dim); }
+a.lq, a.hl { color: inherit; }
+a.lq:hover, a.hl:hover { color: var(--teal); }
+.tag { font: 600 10.5px/17px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
+.kind { font: 600 10.5px/18px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
+.st { font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.g { display: inline-block; width: 1.3em; text-align: center; color: var(--ink); }
+.gw { white-space: nowrap; margin-right: 6px; }
+.gw .g { width: 1.1em; margin-right: .2em; }
+
+/* ---------- strip rows (Overview, Research, Experiments): the answer first, the question its label, the state quiet ---------- */
+nav.strip { display: block; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 6px 0 6px; }
+.srow { padding: 10px 16px 11px; border-top: 1px solid var(--soft); }
+.srow:first-child { border-top: 0; }
+.srow .r1 { margin: 0; line-height: 1.45; }
+.ov .srow .r1 { font-size: 13.5px; line-height: 1.4; }
+/* the question's status sits with the question: open until a call closes it (the answer is what the record reads) */
+.srow .qs { font-size: 12px; color: var(--dim); white-space: nowrap; }
+.srow .qs .st { font-size: 10.5px; }
+.srow .sq { font-weight: 600; font-size: 14.5px; line-height: 1.45; color: var(--ink); min-width: 0; }
+.srow .sq:hover { color: var(--teal); text-decoration: none; }
+.srow .sc { font-size: 13px; white-space: nowrap; flex-shrink: 0; }
+.srow.sg { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; }
+.srow.sg > .r1 { grid-column: 1; grid-row: 1; }
+.srow.sg > .sc { grid-column: 2; grid-row: 1; align-self: start; padding-top: 1px; }
+.srow.sg > .ansp, .srow.sg > .r3 { grid-column: 1 / -1; }
+.ov .srow .sq { font-weight: 500; font-size: 13.5px; color: var(--dim); }
+.ov .srow.d1 .sq { color: var(--ink); }
+.srow .ansp { margin: 1px 0 0; font-size: 16.5px; line-height: 1.32; font-weight: 620; letter-spacing: -0.006em; text-wrap: pretty; }
+.srow .ansp a.ans { color: var(--ink); }
+.srow .ansp a.ans:hover { color: var(--teal); text-decoration: none; }
+.srow .ansp.none { font-weight: 500; font-size: 14.5px; }
+.srow .ansp.none a.ans { color: var(--dim); }
+.srow .ansp .by { font-size: 12.5px; font-weight: 400; letter-spacing: 0; color: var(--dim); }
+.srow .ansp .k { white-space: nowrap; }
+a.term, .by .term, .srow .term { text-decoration-color: var(--line); }
+.srow .ansp .more { color: var(--dim); white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.srow .ansp .more:hover { color: var(--teal); }
+.srow .r3 { margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--dim); }
+.ov .srow { padding: 8px 16px 9px; }
+.srow.d1 { padding-left: 34px; }
+.rs .r3 .mono { color: var(--dim); }
+.quiet { color: var(--dim); font-size: 13px; margin: 8px 0 0; }
+.quiet a { color: var(--dim); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.quiet a:hover { color: var(--teal); }
+.counts { color: var(--dim); font-size: 13.5px; margin: 4px 0 0; }
+.counts a { color: inherit; }
+.counts a:hover { color: var(--teal); }
+.openrec { color: var(--dim); font-size: 13.5px; }
+.openrec a { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.openrec a:hover { color: var(--teal); }
+.pnote .nd2 { color: var(--dim); font-variant-numeric: tabular-nums; }
+.made { color: var(--dim); font-size: 13px; margin: 0 0 5px; }
+.made a { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.made a:hover { color: var(--teal); }
+.made .term { white-space: nowrap; }
+h3.ogh { font-size: 13px; margin: 14px 0 4px; }
+ul.idw { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 3px 16px; font-size: 13px; }
+ul.idw a, ul.idw span { white-space: nowrap; }
+
+/* ---------- objects: questions and experiments ---------- */
+.obj > h1 { margin-top: 2px; font-size: 22px; line-height: 1.3; }
+.tt:focus, h1:focus, h2:focus { outline: none; }
+.meta { margin: 8px 0 0; font-size: 13.5px; color: var(--dim); }
+.roll .hl { color: var(--ink); }
+.roll { font-size: 13.5px; color: var(--dim); margin: 2px 0 4px; }
+.who { color: var(--dim); font-size: 13.5px; }
+.facts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 14px 0; font-size: 14.5px; overflow-wrap: anywhere; }
+.facts .k { color: var(--dim); font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; display: block; }
+.note { color: var(--dim); font-size: 14px; }
+.xrow { padding: 8px 0; border-bottom: 1px solid var(--soft); font-size: 14px; }
+.xrow:last-child { border-bottom: 0; }
+.qrail, .repro, .ycl { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 16px 0; }
+.qrail h2, .ycl h2 { margin: 0 0 6px; font-size: 16px; }
+.qrail h3 { margin: 14px 0 4px; font-size: 13px; }
+.empty { border: 1px dashed var(--line); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+.empty h2 { font-size: 13px; margin: 14px 0 4px; }
+h2.subq { font-size: 15px; margin: 22px 0 6px; }
+
+/* interpretation groups: the recorded interpretation reads as the answer; the criteria it rests on sit under it */
+h2.evh2 { font-size: 13.5px; font-weight: 600; color: var(--dim); margin: 26px 0 0; }
+h2.evh2 .n { font-weight: 500; }
+.igroup { margin: 12px 0 26px; }
+.igroup > .by, .rel > .by { font-size: 12.5px; font-weight: 400; color: var(--dim); margin: 0; }
+.igroup > .said, .rel > .said { font-size: 17px; line-height: 1.42; font-weight: 620; letter-spacing: -0.006em; margin: 1px 0 0; text-wrap: pretty; }
+.igroup.cond > .said { font-weight: 500; }
+.igroup > .said.none { color: var(--dim); font-weight: 500; font-size: 16px; }
+.igroup.rest { margin-top: 30px; }
+.evh2 + .igroup.rest { margin-top: 12px; }
+details.ipm { margin: 3px 0 0; font-size: 12.5px; color: var(--dim); }
+details.ipm > summary, details.evm > summary { cursor: pointer; list-style: none; width: fit-content; color: var(--dim); }
+details.ipm > summary::-webkit-details-marker, details.evm > summary::-webkit-details-marker { display: none; }
+details.ipm > summary::after, details.evm > summary::after { content: " \25B8"; }
+details.ipm[open] > summary::after, details.evm[open] > summary::after { content: " \25BE"; }
+details.ipm > summary:hover, details.evm > summary:hover { color: var(--ink); }
+details.ipm p { margin: 2px 0 4px; font-size: 13px; max-width: 72ch; }
+/* an evidence row: statement and state, then the reading, then the units; the machinery one disclosure away */
+ul.evl { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--soft); }
+.igroup:not(.rest) > ul.evl { margin-left: 2px; border-left: 2px solid var(--line); border-top: 0; }
+li.evr { padding: 10px 14px 10px; border-bottom: 1px solid var(--soft); }
+.igroup:not(.rest) > ul.evl > li.evr:last-child { border-bottom: 0; }
+.evh { display: flex; gap: 18px; align-items: baseline; justify-content: space-between; }
+.evh .stm { color: var(--ink); font-size: 14.5px; line-height: 1.45; min-width: 0; }
+.evh a.stm:hover { color: var(--teal); text-decoration: none; }
+.evh .evs { flex-shrink: 0; font-size: 13.5px; font-weight: 600; text-align: right; }
+.evv { margin: 3px 0 0; font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.evv a.v { color: var(--ink); }
+.evv a.v:hover { color: var(--teal); text-decoration: none; }
+.evv .e { font-weight: 600; }
+.evv .iv, .evv .u { color: var(--dim); }
+.evv .res { color: var(--dim); font-size: 13px; white-space: nowrap; }
+.evu { margin: 0; font-size: 12.5px; line-height: 20px; color: var(--dim); padding-right: 80px; font-variant-numeric: tabular-nums; }
+.evu > span > a, .evu > a:not(.callk) { color: inherit; }
+.evu a:hover { color: var(--teal); }
+.evu .callk { margin-left: 8px; }
+details.evm { position: relative; font-size: 12.5px; }
+details.evm > summary { position: absolute; right: 0; top: -20px; line-height: 20px; font-size: 12px; padding: 0 2px; }
+details.evm > summary::before { content: ""; position: absolute; inset: -7px -8px; }
+dl.evd { grid-template-columns: 7.4em minmax(0, 1fr); font-size: 12.5px; gap: 3px 12px; margin: 8px 0 2px; padding-top: 7px; border-top: 1px dashed var(--line); }
+dl.evd dd { color: var(--ink); }
+
+/* computed comparison: paired cards with the relation between them */
+.rel { margin: 14px 0 6px; }
+.pairs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin: 10px 0 6px; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: stretch; }
+.pc { border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 13.5px; cursor: pointer; }
+.pc:hover { background: var(--hover); }
+.pc .px { margin: 0; font-size: 11.5px; color: var(--dim); }
+.pc .stm { color: var(--ink); font-weight: 500; }
+.pc .pl { margin: 3px 0 0; }
+.pc .cid { margin: 3px 0 0; font: 11.5px var(--mono); color: var(--dim); }
+.pv { align-self: center; font-size: 12.5px; color: var(--dim); }
+
+/* ---------- tables ---------- */
+.wrap { overflow-x: auto; margin: 8px 0;
+  background: linear-gradient(90deg, var(--surf) 30%, transparent) left / 32px 100% no-repeat local,
+    linear-gradient(270deg, var(--surf) 30%, transparent) right / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--ink) 22%, transparent), transparent) left / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--ink) 22%, transparent), transparent) right / 12px 100% no-repeat scroll; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--soft); vertical-align: baseline; }
+thead th { color: var(--dim); font-weight: 600; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; border-bottom-color: var(--line); white-space: nowrap; }
+td.num, .num { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+td .sub2 { display: block; color: var(--dim); font-size: 12px; white-space: normal; font-family: var(--sans); }
+[data-go] { cursor: pointer; }
+tr[data-go]:hover td { background: var(--hover); }
+.cmp td:first-child { white-space: nowrap; }
+.cmp thead th { white-space: normal; vertical-align: bottom; }
+.cmp .role { color: var(--dim); font-size: 12px; margin-left: 4px; }
+.cmp .delta { display: block; color: var(--dim); font: 12px var(--sans); white-space: normal; }
+.cmp td.num { white-space: normal; min-width: 6.5em; }
+.cmp .nn { display: block; color: var(--dim); font: 11.5px var(--mono); }
+.cmp .vs { display: block; color: var(--dim); font: 11.5px var(--mono); white-space: normal; }
+.callk { font-size: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 0 7px; white-space: nowrap; color: var(--ink); }
+.pass td.rd { white-space: normal; }
+.settings td.src { white-space: normal; color: var(--dim); }
+table.log td { font-size: 12.5px; }
+table.log td:nth-child(1), table.log td:nth-child(2), table.log td:nth-child(4) { font-family: var(--mono); white-space: nowrap; }
+table.log td:nth-child(5) { color: var(--dim); }
+table.runs td { white-space: nowrap; }
+
+/* ---------- node rows: one record node, folded in the document, cloned into the inspector ---------- */
+.list { border-top: 1px solid var(--line); }
+details.nd { border-bottom: 1px solid var(--soft); }
+details.nd > summary { list-style: none; cursor: pointer; padding: 8px 8px; display: grid; gap: 2px 14px; align-items: baseline; }
+details.nd > summary::-webkit-details-marker { display: none; }
+details.nd > summary:hover, details.nd[open] > summary { background: var(--hover); }
+details.nd > summary:focus-visible { outline-offset: -2px; }
+.cr { grid-template-columns: minmax(0, 1fr) auto; font-size: 14px; }
+.cr .cs { line-height: 1.45; }
+.cr .cid { font: 12px var(--mono); color: var(--dim); margin-right: 8px; }
+.cr .lab { font-size: 12px; font-weight: 600; color: var(--dim); margin-right: 8px; }
+.cr .cv { font: 12.5px var(--mono); color: var(--dim); grid-column: 1; }
+.cr .cw { grid-row: 1; grid-column: 2; font-size: 13px; text-align: right; color: var(--dim); }
+.cr .cg { grid-column: 1 / -1; font-size: 12.5px; color: var(--dim); overflow-wrap: anywhere; }
+.cr .cg code { color: var(--ink); font-size: 12px; }
+.rr { grid-template-columns: 6.6em 5.5em minmax(0, 1fr) 6.5em 8em; font-size: 13.5px; }
+.rhead { display: grid; grid-template-columns: 6.6em 5.5em minmax(0, 1fr) 6.5em 8em; gap: 2px 14px; padding: 4px 8px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.rhead span:nth-child(4), .rr .rv { text-align: right; }
+.rr .rid { font: 12.5px var(--mono); color: var(--teal); }
+.rr .ra { font: 12.5px var(--mono); }
+.rr .rp, .rr .rv { font: 12.5px var(--mono); }
+.rr .rc2 { font-size: 12.5px; color: var(--dim); }
+.rrow.gone .rid { text-decoration: line-through; color: var(--dim); }
+.rrow.gone .rp, .rrow.gone .rv { color: var(--dim); }
+.grouphd { margin: 22px 0 4px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.grouphd h2, .grouphd h3 { margin: 0; font-size: 14.5px; }
+.filterbar { display: none; }
+
+/* ---------- cards ---------- */
+.card { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 8px 0 12px; background: var(--bg); }
+details.nd > .card { margin: 4px 0 14px; }
+.card.crit.is-good { border-left: 3px solid var(--good); }
+.card.crit.is-bad { border-left: 3px solid var(--bad); }
+.card .hd { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.card .hd .lab { font-size: 12.5px; font-weight: 600; }
+.card .tt { font-size: 16px; font-weight: 650; line-height: 1.4; margin: 6px 0 2px; text-wrap: pretty; }
+.card .lineage { font-size: 12px; color: var(--dim); margin: 0 0 6px; }
+.card .lineage a { color: var(--dim); }
+.card h4, .repro h4, .part h4, .repro h3, .part h3 { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 18px 0 6px; }
+.part h4 .n, .repro h4 .n, .repro h3 .n { letter-spacing: 0; text-transform: none; font-weight: 500; }
+.stand { font-size: 13.5px; margin: 6px 0 0; }
+.secnav { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 0; font-size: 12.5px; }
+.secnav a { border: 1px solid var(--line); border-radius: 11px; padding: 0 9px; color: var(--dim); line-height: 21px; }
+.secnav a:hover { color: var(--teal); border-color: var(--teal); text-decoration: none; }
+dl.ax { display: grid; grid-template-columns: 5.6em minmax(0, 1fr); gap: 5px 12px; margin: 4px 0 0; font-size: 13.5px; }
+dl.ax dt { color: var(--dim); }
+dl.ax dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+dl.ax .r2 { display: block; font: 12px var(--mono); color: var(--dim); }
+.big { font: 600 21px/1.3 var(--mono); letter-spacing: -0.01em; margin: 6px 0 0; }
+.big.sm2 { font-size: 18px; }
+.big a { color: var(--ink); }
+.big a:hover { text-decoration: none; color: var(--teal); }
+.big .iv { color: var(--dim); font-weight: 500; font-size: 15px; }
+.big .u { color: var(--dim); font-weight: 500; font-size: 14px; }
+.reads { font-size: 13px; color: var(--dim); margin: 2px 0 0; }
+table.obs { font-size: 13px; }
+table.obs td.u { font: 11.5px var(--mono); color: var(--dim); white-space: normal; }
+table.obs tr.nc td { color: var(--dim); }
+table.obs .why { display: block; font: italic 12px var(--sans); color: var(--dim); }
+/* observations reflow into two lines where the column is narrow: arm, value and run, then the per-run values */
+.ibody table.obsr thead { display: none; }
+.ibody table.obsr, .ibody table.obsr tbody { display: block; }
+.ibody table.obsr tr { display: grid; grid-template-columns: 6.2em minmax(0, 1fr) auto; gap: 0 10px; padding: 5px 2px; border-bottom: 1px solid var(--soft); }
+.ibody table.obsr td { padding: 0; border: 0; }
+.ibody table.obsr td:nth-child(1) { grid-area: 1 / 1; }
+.ibody table.obsr td:nth-child(2) { grid-area: 2 / 1 / 3 / 4; }
+.ibody table.obsr td:nth-child(3) { grid-area: 1 / 2; text-align: left; }
+.ibody table.obsr td:nth-child(4) { grid-area: 1 / 3; }
+ul.ctw, ul.idl { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+ul.ctw li { padding: 5px 0; border-bottom: 1px solid var(--soft); }
+ul.ctw li > a.mono { margin-right: 6px; }
+ul.ctw .st2 { display: block; color: var(--dim); font-size: 12.5px; }
+ul.idl li { padding: 5px 0; border-bottom: 1px solid var(--soft); }
+ul.idl .qh { display: block; font-size: 12.5px; color: var(--dim); }
+ul.idl .ids { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 12px; }
+.cells { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.cells li { border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; font-size: 12px; }
+.cells li .k { color: var(--dim); font-family: var(--mono); font-size: 11px; display: block; }
+.cells li .v { font: 600 13px var(--mono); display: block; }
+.cells li .o { display: block; font-size: 11px; font-weight: 600; color: var(--ink); }
+.cells li .rs { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: 11.5px; }
+.cells li.out { border: 1.5px solid var(--ink); }
+.rests { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; font-size: 13.5px; }
+.rests li { border-left: 2px solid var(--line); padding-left: 10px; }
+.rests .by { color: var(--dim); font-size: 12px; }
+ul.ctq { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+ul.ctq > li { padding: 4px 0 6px; border-bottom: 1px solid var(--soft); }
+ul.ctq .qh { font-size: 12px; color: var(--dim); }
+ul.ctq ul { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 2px; }
+a.ci { color: var(--ink); }
+a.ci .mono { color: var(--teal); margin-right: 4px; }
+a.ci:hover { text-decoration: none; }
+a.ci:hover .mono { text-decoration: underline; }
+ul.ctq .why { display: block; color: var(--dim); font: italic 12px var(--sans); }
+.ct { list-style: none; padding: 0; margin: 0; display: grid; font-size: 13px; }
+.ct li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 6px 0; border-bottom: 1px solid var(--soft); align-items: baseline; }
+.notes { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; font-size: 13px; color: var(--dim); overflow-wrap: anywhere; }
+.notes b { font-weight: 600; color: var(--ink); font-size: 12px; }
+.notes.plain { gap: 8px; }
+.retr { border: 1px solid var(--line); border-left: 3px solid var(--ink); border-radius: 6px; padding: 8px 12px; margin: 10px 0; font-size: 13.5px; }
+.retr b { font-weight: 650; }
+.stub { font-size: 13px; color: var(--dim); border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 10px; }
+.from { font-size: 12px; color: var(--dim); font-family: var(--mono); overflow-wrap: anywhere; }
+.samebytes { margin-top: 8px; }
+.madeby { margin: 6px 0 0; font-size: 13px; }
+dl.rx .wr { color: var(--dim); font-family: var(--sans); font-size: 12px; }
+q.quote { display: block; font: 12px/1.5 var(--mono); color: var(--dim); margin: 3px 0; }
+dl.rx .s, dl.ax .s { display: block; color: var(--dim); font-size: 11.5px; }
+
+/* the rule figure: rb draws it; every mark is neutral ink, the shaded band is what the rule accepts */
+.figw { margin: 10px 0 2px; }
+svg.fig { display: block; width: 100%; max-width: 440px; height: auto; overflow: visible; }
+svg.fig .ax { stroke: var(--line); stroke-width: 1; }
+svg.fig .rg { fill: var(--wash); }
+svg.fig .rge { stroke: var(--dim); stroke-width: 1; stroke-dasharray: 2 2; }
+svg.fig .tk { stroke: var(--dim); stroke-width: 1; }
+svg.fig .iv, svg.fig .cap { stroke: var(--ink); stroke-width: 2; stroke-linecap: round; }
+svg.fig .est { fill: var(--ink); stroke: var(--surf); stroke-width: 2; }
+svg.fig .cell { fill: var(--dim); stroke: var(--surf); stroke-width: 1.5; }
+svg.fig .cell.out { fill: var(--ink); }
+svg.fig text { fill: var(--dim); font: 11px var(--sans); }
+svg.fig text.k { fill: var(--ink); font: 600 11px var(--mono); }
+.figleg { font-size: 11.5px; color: var(--dim); margin: 0; }
+
+/* receipts: stored field names, mono, folded on the page and open in the inspector */
+details.rc { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 8px; }
+details.rc > summary { cursor: pointer; list-style: none; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); width: fit-content; }
+details.rc > summary::-webkit-details-marker { display: none; }
+details.rc > summary::before { content: "\25B8  "; }
+details.rc[open] > summary::before { content: "\25BE  "; }
+dl.rx { display: grid; grid-template-columns: minmax(6.5em, max-content) minmax(0, 1fr); gap: 3px 14px; font: 12.5px/1.55 var(--mono); margin: 8px 0 0; }
+dl.rx dt { color: var(--dim); }
+dl.rx dd { margin: 0; overflow-wrap: anywhere; }
+dl.rx.mets { margin-top: 4px; }
+details.fold { margin: 10px 0; }
+details.fold > summary { cursor: pointer; color: var(--dim); font-size: 14px; width: fit-content; }
+details.fold > summary:hover { color: var(--ink); }
+details.fold[open] > summary { margin-bottom: 8px; }
+
+/* commands and copy */
+.cmdbox { position: relative; margin: 6px 0; }
+.cmd { display: block; margin: 0; padding: 9px 12px; font: 12.5px/1.55 var(--mono); background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+.cp { display: none; }
+.asgiven { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; align-items: baseline; padding: 9px 12px; border: 1px dashed var(--line); border-radius: 8px; margin: 14px 0 4px; font-size: 13.5px; }
+.asgiven .k { font: 12.5px var(--mono); color: var(--dim); }
+.asgiven .v { font-weight: 600; }
+
+/* reproduce */
+.repro .rhd { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; justify-content: space-between; }
+.repro .rhd h2 { margin: 0; font-size: 16px; }
+.readyline { font-size: 13.5px; margin: 2px 0 0; }
+ul.ready { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13.5px; }
+ul.ready li { display: grid; grid-template-columns: 1.3em 8em minmax(0, 1fr); gap: 0 8px; align-items: baseline; }
+ul.ready .s { color: var(--ink); }
+ul.ready .d { color: var(--dim); overflow-wrap: anywhere; }
+ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+ol.steps > li { display: grid; grid-template-columns: 1.6em minmax(0, 1fr); gap: 0 6px; padding: 8px 0; border-top: 1px solid var(--soft); font-size: 13.5px; }
+ol.steps > li::before { counter-increment: step; content: counter(step); font: 12px/1.9 var(--mono); color: var(--dim); grid-row: 1 / span 4; }
+ol.steps > li > * { grid-column: 2; min-width: 0; }
+ol.steps .sl b { font-weight: 600; }
+ol.steps .unk { color: var(--dim); }
+.perrun { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 10px; font-size: 12.5px; margin-top: 4px; }
+.perrun .arm { color: var(--dim); font-family: var(--mono); }
+.perrun > span:not(.arm) { overflow-wrap: anywhere; }
+
+/* calls */
+.calls-in { display: grid; gap: 0; }
+.callgrp { font-size: 12px; font-weight: 600; color: var(--dim); margin: 10px 0 1px; }
+.callrow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; padding: 6px 6px 7px 4px; border-bottom: 1px solid var(--soft); color: var(--ink); }
+a.callrow:hover { text-decoration: none; background: var(--hover); }
+.callrow .t { font-size: 13.5px; line-height: 1.42; }
+.callrow .t .mono, .crow .ct2 .mono { font-size: 11px; color: var(--dim); white-space: nowrap; margin-left: 2px; }
+/* why rb asks: a short reason in rb's words, then its qualifier; neutral ink, since a call is not a standing */
+.rsn { display: block; margin: 0; font-size: 12px; line-height: 1.45; color: var(--dim); }
+.rsn .rl { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink); }
+.card.call .rsn { margin: 0 0 3px; font-size: 12.5px; }
+.crow .cs { display: grid; gap: 1px; }
+.crow .ct2 { font-size: 14px; line-height: 1.45; color: var(--ink); }
+.acts { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 10px; }
+.acts > li { display: grid; gap: 2px; }
+.acts .an { font-weight: 600; font-size: 13.5px; }
+.acts .cons { font-size: 12.5px; color: var(--dim); }
+.honest { font-size: 13px; color: var(--dim); margin-top: 8px; }
+.decide { border: 1px solid var(--line); border-radius: 10px; padding: 4px 14px 10px; margin-top: 16px; }
+.seg, .composer { display: none; }
+
+/* history */
+ol.sits, ol.hlist { list-style: none; margin: 0; padding: 0; }
+.sit { margin: 18px 0 6px; }
+.sith { font-size: 12.5px; font-weight: 600; color: var(--dim); margin: 8px 0 4px; }
+.hev { display: grid; grid-template-columns: 7.2em minmax(0, 1fr); gap: 2px 12px; padding: 8px 0; border-bottom: 1px solid var(--soft); font-size: 14px; }
+.hev .ht { font-size: 12px; color: var(--dim); padding-top: 2px; }
+.hev .why { display: block; color: var(--dim); font-size: 13px; }
+.hev .rawl { display: block; font-size: 12.5px; }
+
+/* hints (glossary words), drawn from an attribute, never copied */
+.term { position: relative; cursor: help; text-decoration: underline dotted currentColor; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a.term { cursor: pointer; }
+.term[data-hint]:hover::after, .term[data-hint]:focus::after {
+  content: attr(data-hint); content: attr(data-hint) / "";
+  position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 60;
+  max-width: 560px; margin-inline: auto; white-space: normal; padding: 9px 12px; border-radius: 9px;
+  background: var(--tip-bg); color: var(--tip-ink); border: 1px solid var(--tip-line);
+  font: 400 13px/1.45 var(--sans); letter-spacing: 0; text-transform: none; text-align: left; box-shadow: var(--shadow); }
+@supports (anchor-scope: all) {
+  .term { anchor-name: --term; anchor-scope: --term; }
+  .term[data-hint]:hover::after, .term[data-hint]:focus::after { inset: auto; position-anchor: --term; position-area: bottom span-right; position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline; margin: 7px 0; width: max-content; max-width: min(320px, calc(100vw - 32px)); }
+}
+.gloss { display: grid; grid-template-columns: minmax(8em, 13em) 1fr; gap: 5px 16px; margin: 0; font-size: 13.5px; }
+.gloss dt { font-weight: 600; }
+.gloss dd { margin: 0; color: var(--dim); }
+footer.foot { margin-top: 40px; color: var(--dim); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 4px; }
+footer.foot details > summary { cursor: pointer; width: fit-content; }
+:target { scroll-margin-top: calc(var(--barh) + 16px); }
+html:not(.app) .card:target, html:not(.app) tr:target, html:not(.app) .repro:target, html:not(.app) .part:target, html:not(.app) section:target { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* the NEW-field overlay (prototype only): elements backed by a view-model field rb does not provide today */
+
+/* ==================== app mode (the enhancement script adds html.app before the body parses) ==================== */
+@media screen {
+  html.app { scroll-padding-top: 0; overflow: hidden; }
+  html.app .app-only { display: block; }
+  html.app .sr { position: fixed; top: 0; left: 0; }
+  html.app body { padding: 0; height: 100vh; height: 100dvh; overflow: hidden; display: grid;
+    grid-template-columns: var(--navw) minmax(0, 1fr) var(--iw);
+    grid-template-rows: var(--toph) minmax(0, 1fr);
+    grid-template-areas: "top top top" "nav main insp"; }
+  html.app header.top { grid-area: top; max-width: none; margin: 0; padding: 0 12px 0 18px; border-bottom: 1px solid var(--line); align-items: center; flex-wrap: nowrap; gap: 10px; min-width: 0; }
+  html.app header.top .ttl { display: block; color: var(--ink); font-size: 13.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html.app header.top .slash { display: inline; color: var(--line); }
+  html.app header.top .end { flex-wrap: nowrap; white-space: nowrap; gap: 6px; align-items: center; }
+  html.app header.top .stamp { font-size: 12.5px; }
+  html.app .ctl { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--dim); font: 500 12.5px var(--sans); cursor: pointer; }
+  html.app .ctl:hover { color: var(--ink); background: var(--hover); }
+  html.app .ctl[aria-pressed="true"] { color: var(--ink); border-color: var(--mark); }
+  html.app nav.nav { grid-area: nav; position: static; margin: 0; padding: 10px 8px 12px; border-bottom: 0; border-right: 1px solid var(--line); overflow: auto; }
+  html.app nav.nav > ul { display: flex; flex-direction: column; align-items: stretch; min-height: 100%; max-width: none; flex-wrap: nowrap; }
+  html.app nav.nav a { display: flex; gap: 8px; padding: 4px 10px; margin: 1px 0; border: 0; border-radius: 6px; color: var(--ink); font-size: 14px; white-space: normal; line-height: 1.35; }
+  html.app nav.nav a:hover { background: var(--hover); }
+  html.app nav.nav a[aria-current="page"] { background: var(--hover2); box-shadow: inset 2px 0 0 var(--accent); font-weight: 600; }
+  html.app nav.nav a.in { font-weight: 600; }
+  html.app nav .n { margin-left: auto; padding-left: 6px; }
+  html.app nav .sub { display: block; margin: 0 0 6px; }
+  html.app nav .sub a { font-size: 13px; color: var(--dim); padding: 3px 10px 4px 22px; font-weight: 400; line-height: 1.36; }
+  html.app nav .sub a .tx { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  html.app nav .sub a .tx.q { -webkit-line-clamp: 5; color: color-mix(in srgb, var(--ink) 78%, var(--bg)); }
+  html.app nav .sub a .tx .mono { color: var(--ink); font-size: 12px; }
+  html.app nav .sub li + li a .tx.q { padding-top: 1px; }
+  html.app nav .sub a.d1 { padding-left: 34px; }
+  html.app nav .sub a[aria-current="page"], html.app nav .sub a[aria-current="page"] .tx.q { color: var(--ink); font-weight: 500; }
+  html.app nav .grp { display: block; padding: 14px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  html.app nav .rec { display: block; }
+  html.app nav li.yc { margin: auto -8px -12px; padding: 8px 8px 12px; border-top: 1px solid var(--line); position: sticky; bottom: -12px; background: var(--bg); }
+  html.app nav li.yc a { font-weight: 600; }
+  html.app main { grid-area: main; max-width: none; margin: 0; padding: 20px 32px 96px; overflow: auto; scroll-padding-top: 16px; }
+  html.app #overview h1 { font-size: 23px; margin: 0 0 4px; }
+  html.app #overview .counts { font-size: 12.5px; margin-top: 2px; }
+  html.app #overview h2 { margin: 14px 0 2px; }
+  html.app #overview .lede { margin-bottom: 8px; }
+  html.app .srow { padding: 8px 16px 9px; }
+  html.app .srow.d1 { padding-left: 34px; }
+  html.app .srow .r3 { margin-top: 2px; }
+  html.app main > * { max-width: 800px; }
+  html.app main .sec { border: 0; margin: 0; padding: 0; }
+  html.app main .sechd { display: none; }
+  html.app.ready main .view:not(.on) { display: none; }
+  html.app.ready main .view + .view { margin-top: 0; }
+  html.app .filterbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 10px; }
+  html.app .filterbar input { flex: 1 1 220px; max-width: 320px; font: 13.5px var(--sans); padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink); }
+  html.app .fchips { display: flex; flex-wrap: wrap; gap: 6px; }
+  html.app .fchip { font: 500 12.5px var(--sans); padding: 2px 9px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--dim); cursor: pointer; }
+  html.app .fchip .n { font: 11.5px var(--mono); }
+  html.app .fchip[aria-pressed="true"] { color: var(--bg); background: var(--ink); border-color: var(--ink); }
+  html.app details.nd > .card { display: none; }
+  html.app details.nd > summary { border-radius: 6px; }
+  html.app .sel > summary, html.app .srow.sel, html.app .pc.sel, html.app li.evr.sel { background: var(--sel); box-shadow: inset 2px 0 0 var(--accent); }
+  html.app li.evr:hover { background: var(--hover); }
+  html.app li.evr.sel:hover, html.app .srow.sel:hover, html.app .pc.sel:hover, html.app .sel > summary:hover { background: var(--sel); }
+  html.app table:not(.ev) tr.sel td { background: var(--sel); }
+  html.app table:not(.ev) tr.sel td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+  html.app .srow[data-go]:hover { background: var(--hover); cursor: pointer; }
+  html.app .cp { display: inline-flex; position: absolute; top: 5px; right: 5px; height: 24px; align-items: center; padding: 0 8px; font: 500 12px var(--sans); color: var(--dim); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+  html.app .cp:hover { color: var(--ink); }
+  html.app .cp:disabled { opacity: .45; cursor: default; }
+  html.app .cmdbox:not(.nocp) .cmd { padding-right: 64px; }
+  html.app .cp.big2 { position: static; height: 30px; padding: 0 12px; font-size: 13px; color: var(--ink); }
+  html.app .cprow { margin: 2px 0 4px; }
+
+
+  /* the inspector: a stack with a breadcrumb; its root is the working object's action */
+  aside.insp { display: none; }
+  html.app aside.insp { grid-area: insp; display: flex; flex-direction: column; min-width: 0; overflow: auto; background: var(--card); border-left: 1px solid var(--line); overscroll-behavior: contain; --surf: var(--card); }
+  .ibar { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 6px 8px 6px 10px; background: var(--card); border-bottom: 1px solid var(--line); }
+  .ibar .crumbs { display: flex; flex-wrap: nowrap; gap: 2px; align-items: center; min-width: 0; flex: 1; overflow: hidden; font: 12.5px var(--mono); color: var(--dim); white-space: nowrap; }
+  .ibar .crumbs a, .ibar .crumbs span { color: var(--dim); overflow: hidden; text-overflow: ellipsis; padding: 2px 3px; border-radius: 4px; flex-shrink: 1; min-width: 0; }
+  .ibar .crumbs a:hover { color: var(--ink); background: var(--hover); text-decoration: none; }
+  .ibar .crumbs [aria-current] { color: var(--ink); flex-shrink: 0; max-width: 60%; }
+  .ibar .crumbs .sep { color: var(--line); padding: 0; flex-shrink: 0; }
+  .ibar .rootname { font: 600 13px var(--sans); color: var(--ink); padding-left: 6px; }
+  .ibar .bact:empty { display: none; }
+  .ibar .bact .cp { position: static; height: 28px; font-size: 12.5px; color: var(--ink); }
+  .ibtn { flex-shrink: 0; display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 6px; border: 1px solid transparent; background: none; color: var(--dim); font: 500 13px var(--sans); cursor: pointer; }
+  .ibtn:hover { background: var(--hover); color: var(--ink); }
+  .ibtn.back { font-size: 16px; }
+  .ibody { padding: 2px 0 40px; }
+  .ibody > .card, .ibody > .rootc { border: 0; border-radius: 0; background: transparent; margin: 0; padding: 14px 20px 8px; }
+  .ibody > .card.crit.is-good, .ibody > .card.crit.is-bad { border-left-width: 3px; border-left-style: solid; padding-left: 17px; }
+  .ibody .cmd { background: var(--bg); }
+  .ibody .card .lineage { display: none; }
+  .ibody .decide { background: var(--bg); }
+  .ibody .repro, .ibody .qrail, .ibody .ycl { border: 0; padding: 0; margin: 0; background: transparent; }
+  .ibody .rootc > * > h2:first-child, .ibody .rootc .rhd h2, .ibody .rootc .ycl > .lede { display: none; }
+  .ibody .rootc .rhd { justify-content: flex-end; margin: -2px 0 2px; }
+  .ibody .rootc h4:first-of-type { margin-top: 10px; }
+  .ibody .flash { animation: flash 1.2s ease-out 1; }
+  @keyframes flash { from { background: color-mix(in srgb, var(--accent) 22%, transparent); } to { background: transparent; } }
+  @media (prefers-reduced-motion: no-preference) { .ibody > .card.enter { animation: enter .14s ease-out 1; } }
+  @keyframes enter { from { opacity: .3; transform: translateX(6px); } to { opacity: 1; transform: none; } }
+
+  /* the call composer: rb's actions as a segmented choice, your reason, then the one line to run */
+  html.app .acts.enh { display: none; }
+  html.app .composer[hidden] { display: none; }
+  html.app .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 2px 0 8px; }
+  html.app .seg button { font: 500 13.5px var(--sans); padding: 6px 14px; border: 0; border-left: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+  html.app .seg button:first-child { border-left: 0; }
+  html.app .seg button:hover { background: var(--hover); }
+  html.app .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  html.app .seg kbd { margin-left: 6px; border: 0; background: none; color: inherit; opacity: .6; padding: 0; }
+  html.app .composer { display: block; }
+  html.app .composer label { display: block; font-size: 12.5px; color: var(--dim); margin-top: 2px; }
+  html.app .composer input { width: 100%; font: 13.5px var(--sans); padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink); margin: 3px 0 4px; }
+  html.app .composer .willread { font-size: 12.5px; color: var(--dim); margin: 2px 0 0; }
+  html.app .composer .willread span { color: var(--ink); font-family: var(--mono); font-size: 12px; }
+  html.app .composer .pick { font-size: 13px; color: var(--dim); margin: 4px 0; }
+
+  /* keyboard help */
+  .help { position: fixed; inset: auto 16px 16px auto; z-index: 70; width: min(380px, calc(100vw - 32px)); background: var(--tip-bg); color: var(--tip-ink); border: 1px solid var(--tip-line); border-radius: 10px; box-shadow: var(--shadow); padding: 12px 14px; font-size: 13px; }
+  .help dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 6px 0 8px; }
+  .help dd { margin: 0; color: var(--dim); }
+  .help label { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; }
+  .help .hw { margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+}
+
+/* app mode with the rail visible: the working object's action block moves to the inspector root */
+@media screen and (min-width: 960px) {
+  html.app.ready main [data-rail] { display: none; }
+}
+/* 960 to 1279: the nav folds into a bar; two columns remain */
+@media screen and (max-width: 1279px) {
+  html.app body { grid-template-columns: minmax(0, 1fr) min(400px, 40vw); grid-template-rows: var(--toph) auto minmax(0, 1fr); grid-template-areas: "top top" "nav nav" "main insp"; }
+  html.app nav.nav { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 12px; overflow: visible; }
+  html.app nav.nav > ul { flex-direction: row; flex-wrap: wrap; min-height: 0; align-items: center; }
+  html.app nav.nav a { padding: 9px 10px 8px; margin: 0; border-radius: 0; border-bottom: 2px solid transparent; }
+  html.app nav.nav a:hover { background: none; }
+  html.app nav.nav a[aria-current="page"], html.app nav.nav a.in { background: none; box-shadow: none; border-bottom-color: var(--accent); }
+  html.app nav .sub, html.app nav .grp { display: none; }
+  html.app nav .rec { display: flex; }
+  html.app nav li.yc { margin: 0 0 0 auto; padding: 0; border: 0; position: static; background: none; }
+  html.app main { padding: 20px 28px 80px; }
+}
+/* under 960: one column; the inspector is a sheet over the working object */
+@media screen and (max-width: 959px) {
+  html.app body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "top" "nav" "main"; }
+  html.app aside.insp { position: fixed; top: 0; right: 0; bottom: 0; width: min(500px, 100vw); z-index: 50; transform: translateX(102%); visibility: hidden; box-shadow: var(--shadow); border-left: 1px solid var(--line); }
+  html.app.sheet aside.insp { transform: none; visibility: visible; }
+  html.app.sheet main { overflow: hidden; }
+  html.app header.top .stamp { display: none; }
+  @media (prefers-reduced-motion: no-preference) { html.app aside.insp { transition: transform .18s ease-out, visibility .18s; } }
+}
+@media screen and (max-width: 639px) {
+  :root { --barh: 78px; }
+  h1 { font-size: 22px; }
+  .srow { padding: 10px 12px 11px; }
+  html.app .keys { display: none; }
+  #overview h2 { margin-top: 14px; }
+  .lede { margin-bottom: 10px; }
+  .srow.d1 { padding-left: 24px; }
+  .srow.sg { grid-template-columns: minmax(0, 1fr); }
+  .srow.sg > .sc { grid-column: 1; grid-row: auto; padding-top: 2px; }
+  .srow .ansp { font-size: 16px; }
+  .srow .ansp .k { white-space: normal; }
+  .srow .ansp .term { white-space: nowrap; }
+  .igroup > .said, .rel > .said { font-size: 16px; }
+  li.evr { padding: 10px 6px 10px 10px; }
+  .evh { display: block; }
+  .evh .evs { display: block; text-align: left; margin-top: 2px; }
+  html.app header.top { padding: 0 8px 0 12px; height: var(--toph); }
+  html.app header.top .ttl, html.app header.top .slash { display: none; }
+  html.app .ctl .lt { display: none; }
+  html.app nav.nav { padding: 0 6px; }
+  html.app nav.nav a { padding: 8px 7px 7px; font-size: 13.5px; }
+  html.app nav .n { padding-left: 2px; }
+  html.app main { padding: 16px 16px 72px; }
+  html.app aside.insp { width: 100vw; border-left: 0; }
+  nav.nav a { padding: 7px 7px 6px; font-size: 13.5px; }
+  dl.ax, dl.rx { grid-template-columns: 1fr; gap: 0; }
+  dl.ax dd, dl.rx dd { margin-bottom: 6px; }
+  ul.ready li { grid-template-columns: 1.3em minmax(0, 1fr); }
+  ul.ready li .d { grid-column: 2; }
+  .rr, .rhead { grid-template-columns: 6.4em minmax(0, 1fr) auto; }
+  .rr .ra, .rhead span:nth-child(2), .rr .rc2, .rhead span:nth-child(5) { display: none; }
+  .cr { grid-template-columns: minmax(0, 1fr); }
+  .cr .cw { grid-row: auto; grid-column: 1; text-align: left; }
+  .pair { grid-template-columns: minmax(0, 1fr); }
+  .pv { justify-self: start; }
+  .hev { grid-template-columns: 1fr; }
+  table.st2, table.st2 thead, table.st2 tbody, table.st2 tr, table.st2 th, table.st2 td { display: block; }
+  table.st2 thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  table.st2 tbody tr { border-bottom: 1px solid var(--line); padding: 8px 0; }
+  table.st2 td { border: 0; padding: 1px 0; }
+  html:not(.app) table.st2 td[data-k]::before { content: attr(data-k) "  "; color: var(--dim); font: 600 10.5px var(--sans); letter-spacing: .06em; text-transform: uppercase; }
+  .gloss { grid-template-columns: 1fr; gap: 0; }
+  .gloss dd { margin-bottom: 8px; }
+  .term[data-hint]:hover::after, .term[data-hint]:focus::after { position-area: bottom span-all; margin: 7px 16px; width: auto; max-width: none; }
+}
+@media (max-width: 639px) and (max-height: 500px) { nav.nav { position: static; } html { scroll-padding-top: 8px; } }
+@media (forced-colors: active) {
+  .chip, .kind, .tag { border-color: CanvasText; }
+  html.app nav.nav a[aria-current="page"] { outline: 2px solid Highlight; }
+}
+
+/* print: the light palette, the whole document with every fold open (T5), no chrome */
+@media print {
+  :root, :root:not([data-theme="light"]), :root[data-theme="dark"] {
+    --bg: #ffffff; --card: #f6f8fa; --ink: #1f2328; --dim: #59636e; --line: #d1d9e0;
+    --good: #1a7f37; --bad: #cf222e; --teal: #0969da; --warn: #9a6700; --accent: #9a6700; color-scheme: light; }
+  body { padding: 0; }
+  nav.nav, aside.insp, .ctl, .cp, .filterbar, .help, .skip, .app-only, .seg, .composer { display: none !important; }
+  .acts.enh { display: grid !important; }
+  .term::after { content: none; }
+  details::details-content { content-visibility: visible; display: contents; }
+  .card, .srow, .repro, tr, .callrow, .igroup, .pair, .hev { break-inside: avoid; }
+  h1, h2, h3, h4 { break-after: avoid; }
+  .cmd { user-select: text; }
+}
+
+section.stand, #integrity, #queue { border: 1px solid var(--line, #ccc); border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
+#integrity { background: rgba(200,150,0,.08); }
+ul.queue { list-style: none; margin: 0; padding: 0; }
+ul.queue > li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 8px 0; border-top: 1px solid var(--line, #ddd); }
+ul.queue > li > .qbtn { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.qt, .qd { margin: 0; } .qd { font-size: 13px; opacity: .8; }
+</style>
+<link rel="stylesheet" href="/assets/guide.css">
+<noscript><style>nav.nav{position:sticky}</style></noscript>
+<script src="/assets/script.js"></script>
+<script id="rb-live" src="/assets/live.js" data-key="k1" data-query="" defer></script>
+</head><body>
+<a class="skip" href="#main">Skip to the record</a>
+<header class="top" id="top"><span class="rbwm">rb<span class="rbdot">.</span></span><span>research record · <span class="oid">int8-resnet50</span></span><span class="slash t">/</span><span class="ttl">INT8 ResNet-50 on ImageNet</span><span class="end"><span class="stamp">2026-10-19 14:20 UTC · rb 0.9.0</span><button type="button" class="ctl" data-theme>Theme</button><button type="button" class="ctl" data-keys aria-label="Keyboard">?</button></span></header>
+<nav class="nav" id="nav" aria-label="Research record"><ul>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#research">Research <span class="n">2</span></a><ul class="sub">
+<li><a href="#q-q1"><span class="tx q">Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1?</span></a></li>
+<li><a class="d1" href="#q-q1a"><span class="tx q">↳ How many calibration images does INT8 need?</span></a></li>
+<li><a href="#criteria"><span class="tx">All criteria</span> <span class="n">6</span></a></li></ul></li>
+<li><a href="#experiments">Experiments <span class="n">2</span></a><ul class="sub">
+<li><a href="#x-e1" title="int8 against fp32"><span class="tx x"><span class="mono">e1</span> int8 against fp32</span></a></li>
+<li><a href="#x-e2" title="calibration set size: how many images INT8 needs"><span class="tx x"><span class="mono">e2</span> calibration set size</span></a></li></ul></li>
+<li><span class="grp">Record</span><ul class="rec">
+<li><a href="#runs">Runs <span class="n">9</span></a></li>
+<li><a href="#resources">Resources <span class="n">4</span></a></li>
+<li><a href="#history">History</a></li></ul></li>
+<li class="yc"><a href="#your-call">Your call <span class="n">4</span></a></li>
+</ul></nav>
+<p id="insp-empty" class="iempty dim" hidden>Pick a question, a finding or a run to inspect it</p>
+<main id="main" tabindex="-1">
+<div class="sec" id="sec-overview">
+<section class="view" id="overview" data-title="INT8 ResNet-50 on ImageNet" data-crumb="Overview" aria-labelledby="h-ov">
+<h1 id="h-ov">INT8 ResNet-50 on ImageNet</h1>
+<p class="sub">main · 8 recorded runs · changed <span title="2026-10-19 14:20 UTC">2 h ago</span><span class="drawn" hidden> · drawing {{N}}</span></p>
+<section class="stand" id="st-q1" aria-label="Open" data-go="q-q1"><p class="sth"><span class="stw">Open</span></p>
+<p class="stq"><a class="sq" href="#q-q1">Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1?</a></p>
+<p class="str">The record does not answer it yet: the FP32 baseline is not reproduced, and 2 of 6 criteria are not met.</p>
+<p class="tally"><a href="#criteria">4 met</a> · <a href="#criteria">1 not reproduced</a> · <a href="#criteria">1 not met</a></p></section>
+<section class="integ" id="integrity" aria-labelledby="h-integrity"><h2 id="h-integrity">How far to trust it</h2>
+<p><a href="#criteria">2 of 6 criteria</a> were declared after their evidence existed.</p>
+<p><a href="#runs">6 of 8 runs</a> do not record the command they were run with.</p>
+<p class="sm">Read them as a description of what happened, not as a test.</p></section>
+<section class="judge" id="queue" aria-labelledby="h-queue"><h2 id="h-queue">Needs your judgment <span class="n">4</span></h2>
+<ul class="queue">
+<li class="qrow" data-kind="call"><span class="qt"><span class="qv">Review the FP32 baseline mismatch</span><span class="qd">FP32 baseline: observed 75.97% · published 76.13%</span></span><a class="qbtn" href="#call-c2" data-decide="call-c2">Review</a></li>
+<li class="qrow" data-kind="call"><span class="qt"><span class="qv">Decide on the calibration gate</span><span class="qd">calibration set size · gate missed</span></span><a class="qbtn" href="#call-e2" data-decide="call-e2">Review</a></li>
+<li class="qrow" data-kind="call"><span class="qt"><span class="qv">Review a result that rests on one run</span><span class="qd">the ONNX export holds onnx_top1</span></span><a class="qbtn" href="#call-c3" data-decide="call-c3">Review</a></li>
+<li class="qrow" data-kind="uncited"><span class="qt"><span class="qv">Inspect a changed config nothing in the record cites</span><span class="qd">configs/data.yaml</span></span><a class="qbtn" href="#uncited-1" data-decide="uncited-1">Inspect</a></li>
+</ul></section>
+<section class="rqs" aria-labelledby="h-rq"><h2 id="h-rq">Research questions</h2>
+<div class="srow sg" data-go="q-q1"><p class="r1"><a class="sq" href="#q-q1">Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1?</a> <span class="qs">open · 4 met · 1 not met</span></p></div>
+<div class="srow sg d1" data-go="q-q1a"><p class="r1"><a class="sq" href="#q-q1a">↳ How many calibration images does INT8 need?</a> <span class="qs">open · 1 not met</span></p></div></section>
+<details class="fold" data-fold="how-rb-reads"><summary>How rb reads this repository</summary><ul class="plain"><li id="uncited-1">configs/data.yaml: changed since 3f2a9c1; nothing in the record cites it</li></ul>
+<p class="sm">rb looks at out/, results/ and the git history; last looked 2026-10-19 14:20 UTC.</p></details>
+</section></div>
+<div class="sec" id="sec-research"><p class="sechd">Research</p>
+<section class="view" id="research" data-crumb="Research" data-title="Research · INT8 ResNet-50 on ImageNet" aria-labelledby="h-res">
+<h1 id="h-res">Research</h1>
+<div class="srow sg" data-go="q-q1"><p class="r1"><a class="sq" href="#q-q1">Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1?</a></p></div>
+<div class="srow sg d1" data-go="q-q1a"><p class="r1"><a class="sq" href="#q-q1a">↳ How many calibration images does INT8 need?</a></p></div>
+</section>
+<article class="view obj" id="q-q1" data-nav="research" data-crumb="q1" data-title="q1 · INT8 ResNet-50 on ImageNet" aria-labelledby="h-q1">
+<h1 id="h-q1">Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1?</h1>
+<section class="qrail" id="q-q1:rail" data-rail data-rootname="q1 · 2 calls" aria-label="Actions on q1"><p class="callgrp">2 results to review</p><a class="callrow" href="#call-c2" data-for="call-c2"><span class="t">fp32 top1 matches the published 76.13 <span class="mono">c2</span></span></a></section>
+<div class="filterbar"><input type="search" aria-label="Filter the evidence" placeholder="filter"></div>
+<ul class="evl" id="q-q1:evidence">
+<li class="evr" id="f-c1:q1" data-go="c-c1" data-row data-x="e1"><div class="evh"><a class="stm" href="#c-c1">int8 holds top1 within 1 point of fp32</a><a class="sw good evs" href="#c-c1:rule">criterion met</a></div><p class="evv"><a class="v" href="#c-c1:reading">-0.0029 [-0.0071, +0.0013]</a></p><p class="evu"><a href="#c-c1:runs">3 runs · 3 seeds per arm · 1 run not counted</a></p><details class="evm" data-fold="evm-c1-q1"><summary>details<span class="sr"> of c1</span></summary><p class="sm">rule: change.top1 ≥ -0.01 (n ≥ 3)</p></details></li>
+<li class="evr" id="f-c2:q1" data-go="c-c2" data-row data-x="e1"><div class="evh"><a class="stm" href="#c-c2">fp32 top1 matches the published 76.13</a><a class="sw bad evs" href="#c-c2:rule">not reproduced</a></div><p class="evv"><a class="v" href="#c-c2:reading">0.7597</a></p><p class="evu"><a href="#c-c2:runs">3 runs · 1 run not counted</a> <a class="callk" href="#call-c2">Your call</a></p></li>
+<li class="evr" id="f-c3:q1" data-go="c-c3" data-row data-x="e1"><div class="evh"><a class="stm" href="#c-c3">the ONNX export holds onnx_top1</a><a class="sw good evs" href="#c-c3:rule">criterion met</a></div><p class="evu"><a href="#c-c3">1 run</a> <a class="callk" href="#call-c3">Your call</a></p></li>
+</ul>
+<section class="igroup" id="q-q1:ip:1"><p class="by">Recorded interpretation</p><h3 class="said">INT8 keeps ResNet-50 within the one-point budget</h3>
+<details class="ipm" data-fold="ipm-q1"><summary>1 more interpretation</summary><p class="sm">the ONNX export keeps the INT8 reading · not confirmed</p></details></section>
+<details class="nd" data-row data-for="q-q1:lim:1" data-fold="lim-q1-1"><summary>1 run not counted</summary>
+<div class="card lim" id="q-q1:lim:1" data-kind="qualification" data-home="q-q1" data-crumb="1 run not counted"><div class="hd"><span class="kind">qualification</span></div><h3 class="tt">1 run not counted</h3><p>runs2 was retracted and replaced by <a class="mono" href="#run-runs2b">runs2b</a>.</p></div></details>
+</article>
+<article class="view obj" id="q-q1a" data-nav="research" data-crumb="q1a" data-title="q1a · INT8 ResNet-50 on ImageNet" aria-labelledby="h-q1a">
+<h1 id="h-q1a">How many calibration images does INT8 need?</h1>
+<ul class="evl"><li class="evr" id="f-c5:q1a" data-go="c-c5" data-row data-x="e2"><div class="evh"><a class="stm" href="#c-c5">int8 stays within 1 point of fp32 at every calibration size</a><a class="sw bad evs" href="#c-c5">criterion not met</a></div><p class="evu"><a href="#c-c5">4 runs</a></p></li></ul>
+</article>
+<section class="view" id="criteria" data-nav="research" data-crumb="All criteria" data-title="All criteria · INT8 ResNet-50 on ImageNet" aria-labelledby="h-crit">
+<h1 id="h-crit">All criteria</h1>
+<div class="filterbar"><input type="search" aria-label="Filter the criteria" placeholder="filter"><span class="fchips"><button type="button" class="fchip" data-fx="e1" aria-pressed="false">e1</button><button type="button" class="fchip" data-fx="e2" aria-pressed="false">e2</button></span></div>
+<div class="list" data-group>
+<details class="nd" data-row data-x="e1" data-for="c-c1" data-fold="crit-c1"><summary><span class="mono">c1</span> int8 holds top1 within 1 point of fp32 · criterion met</summary>
+<div class="card crit is-good" id="c-c1" data-kind="criterion" data-home="q-q1" data-crumb="c1">
+<div class="hd"><span class="kind">criterion</span><span class="id">c1</span><span class="dim sm">in <a href="#x-e1">e1</a></span></div>
+<h3 class="tt">int8 holds top1 within 1 point of fp32</h3>
+<p class="stand" id="c-c1:rule">criterion met · loss</p>
+<div class="big" id="c-c1:reading"><span class="e">-0.0029 [-0.0071, +0.0013]</span> top1 · paired difference, t interval, 3 seeds, 95% (rb)</div>
+<section class="part" id="c-c1:runs"><h4>what it rests on</h4><ul class="obs">
+<li><a class="mono" href="#run-runs1">runs1</a> fp32 and int8 · seed 1 · counted</li>
+<li><a class="mono" href="#run-runs2b">runs2b</a> fp32 and int8 · seed 2 · counted</li>
+<li><a class="mono" href="#run-runs2">runs2</a> fp32 and int8 · seed 2 · not counted: retracted</li>
+<li><a class="mono" href="#run-runs3">runs3</a> fp32 and int8 · seed 3 · counted</li></ul>
+<p class="sm">read in <a href="#r-imagenet-val">imagenet-val</a></p></section>
+<details class="rc" data-fold="rc-c1"><summary>receipt</summary><p class="sm">declared 2026-10-12 · experiment <a href="#x-e1">e1</a> · metric top1</p></details>
+</div></details>
+<details class="nd" data-row data-x="e1" data-for="c-c2" data-fold="crit-c2"><summary><span class="mono">c2</span> fp32 top1 matches the published 76.13 · not reproduced</summary>
+<div class="card crit is-bad" id="c-c2" data-kind="criterion" data-home="q-q1" data-crumb="c2">
+<div class="hd"><span class="kind">criterion</span><span class="id">c2</span><span class="dim sm">in <a href="#x-e1">e1</a></span></div>
+<h3 class="tt">fp32 top1 matches the published 76.13</h3>
+<p class="stand" id="c-c2:rule">not reproduced · measured</p>
+<div class="big" id="c-c2:reading"><span class="e">0.7597</span></div>
+<section class="part" id="c-c2:runs"><h4>what it rests on</h4><ul class="obs"><li><a class="mono" href="#run-runs1">runs1</a> counted</li><li><a class="mono" href="#run-runs3">runs3</a> counted</li></ul></section>
+<p class="sm"><a href="#call-c2">Your call on c2</a></p>
+</div></details>
+<details class="nd" data-row data-x="e1" data-for="c-c3" data-fold="crit-c3"><summary><span class="mono">c3</span> the ONNX export holds onnx_top1 · criterion met</summary>
+<div class="card crit is-good" id="c-c3" data-kind="criterion" data-home="q-q1" data-crumb="c3"><div class="hd"><span class="kind">criterion</span><span class="id">c3</span></div><h3 class="tt">the ONNX export holds onnx_top1</h3><p class="stand" id="c-c3:rule">criterion met · point only</p><p class="sm">rests on <a class="mono" href="#run-runs1">runs1</a></p></div></details>
+<details class="nd" data-row data-x="e1" data-for="c-c4" data-fold="crit-c4"><summary><span class="mono">c4</span> the per-class top1 drop stays under 2 points · criterion met</summary>
+<div class="card crit is-good" id="c-c4" data-kind="criterion" data-home="q-q1" data-crumb="c4"><div class="hd"><span class="kind">criterion</span><span class="id">c4</span></div><h3 class="tt">the per-class top1 drop stays under 2 points for at least 99% of classes</h3><p class="stand">criterion met · measured</p><p class="sm">read through <a class="mono" href="#a-a1">a1</a></p></div></details>
+<details class="nd" data-row data-x="e2" data-for="c-c5" data-fold="crit-c5"><summary><span class="mono">c5</span> int8 stays within 1 point of fp32 at every calibration size · criterion not met</summary>
+<div class="card crit is-bad" id="c-c5" data-kind="criterion" data-home="q-q1a" data-crumb="c5"><div class="hd"><span class="kind">criterion</span><span class="id">c5</span></div><h3 class="tt">int8 stays within 1 point of fp32 at every calibration size</h3><p class="stand">gate missed · point only</p><p class="sm">rests on <a class="mono" href="#run-runc128">runc128</a>, <a class="mono" href="#run-runc512">runc512</a></p></div></details>
+<details class="nd" data-row data-x="e1" data-for="c-c6" data-fold="crit-c6"><summary><span class="mono">c6</span> int8 latency is at most 0.6 of fp32 on the T4 · criterion not met</summary>
+<div class="card crit is-bad" id="c-c6" data-kind="criterion" data-home="criteria" data-crumb="c6"><div class="hd"><span class="kind">criterion</span><span class="id">c6</span></div><h3 class="tt">int8 latency is at most 0.6 of fp32 on the T4</h3><p class="stand">criterion not met · point only</p><p class="sm">rests on <a class="mono" href="#run-runsql7">runsql7</a></p></div></details>
+</div></section></div>
+<div class="sec" id="sec-experiments"><p class="sechd">Experiments</p>
+<section class="view" id="experiments" data-crumb="Experiments" data-title="Experiments · INT8 ResNet-50 on ImageNet" aria-labelledby="h-exps">
+<h1 id="h-exps">Experiments</h1>
+<div class="srow" data-go="x-e1"><div class="r1"><a class="sq" href="#x-e1" title="int8 against fp32">int8 against fp32</a></div></div>
+<div class="srow" data-go="x-e2"><div class="r1"><a class="sq" href="#x-e2" title="calibration set size: how many images INT8 needs">calibration set size: how many images INT8 needs</a></div></div>
+</section>
+<article class="view obj" id="x-e1" data-nav="experiments" data-crumb="e1" data-title="e1 · INT8 ResNet-50 on ImageNet" aria-labelledby="h-e1">
+<h1 id="h-e1">int8 against fp32</h1>
+<p class="who">design confirmed, then changed: rb confirm e1 lists it</p>
+<section class="repro" id="x-e1:reproduce" data-rail data-rootname="Reproduce · e1" aria-label="Reproduce e1">
+<div class="rhd"><h2>Reproduce</h2><span data-copybtn="x-e1:recipe" data-label="Copy recipe"></span></div>
+<p class="readyline">ready: code, environment and inputs recorded</p>
+<details class="fold" data-fold="recipe-e1"><summary>The whole recipe as one script</summary><div class="cmdbox nocp" id="x-e1:recipe"><pre class="cmd">git checkout 3f2a9c1
+python eval.py --precision int8 --seed 1</pre></div></details>
+</section>
+<table class="tbl"><thead><tr><th>run</th><th>arms</th><th>top1</th></tr></thead><tbody>
+<tr data-go="run-runs1"><td><a class="mono" href="#run-runs1">runs1</a></td><td>fp32 and int8 · seed 1</td><td class="num">0.7598 · 0.7569</td></tr>
+<tr data-go="run-runs3"><td><a class="mono" href="#run-runs3">runs3</a></td><td>fp32 and int8 · seed 3</td><td class="num">0.7599 · 0.7572</td></tr>
+</tbody></table>
+</article>
+<article class="view obj" id="x-e2" data-nav="experiments" data-crumb="e2" data-title="e2 · INT8 ResNet-50 on ImageNet" aria-labelledby="h-e2">
+<h1 id="h-e2">calibration set size: how many images INT8 needs</h1>
+<p class="who">design not confirmed: rb confirm e2 lists it</p>
+</article></div>
+<div class="sec" id="record"><p class="sechd">Record</p>
+<section class="view" id="runs" data-nav="runs" data-crumb="Runs" data-title="Runs · INT8 ResNet-50 on ImageNet" aria-labelledby="h-runs">
+<h1 id="h-runs">Runs</h1>
+<div class="filterbar"><input type="search" aria-label="Filter the runs" placeholder="filter"><span class="fchips"><button type="button" class="fchip" data-fret aria-pressed="false">retracted</button></span></div>
+<div class="list" data-group>
+<details class="nd" data-row data-x="e1" data-for="run-runs1" data-fold="run-runs1"><summary><span class="mono">runs1</span> fp32 and int8 · seed 1</summary>
+<div class="card run" id="run-runs1" data-kind="run" data-home="x-e1" data-crumb="runs1">
+<div class="hd"><span class="kind">run</span><span class="id">runs1</span><span class="dim sm">in <a href="#x-e1">e1</a></span></div>
+<h3 class="tt">fp32 and int8 · seed 1</h3>
+<div class="who">run · recorded 2026-10-12 09:14 UTC<br>produced 2026-10-12 09:02 (file)</div>
+<p class="sm">fp32: top1=0.7598 onnx_top1=0.7569 · int8: top1=0.7569 onnx_top1=0.7566</p>
+<p class="sm">counts toward <a class="mono" href="#c-c1">c1</a>, <a class="mono" href="#c-c2">c2</a>, <a class="mono" href="#c-c3">c3</a> · made <a href="#r-ckpt-int8-s1">ckpt-int8-s1</a> · read <a href="#r-imagenet-val">imagenet-val</a></p>
+<div class="cmdbox" data-copybtn><pre class="cmd">python eval.py --precision int8 --seed 1</pre></div>
+</div></details>
+<details class="nd" data-row data-x="e1" data-ret data-for="run-runs2" data-fold="run-runs2"><summary><span class="mono">runs2</span> fp32 and int8 · seed 2 · retracted</summary>
+<div class="card run gone" id="run-runs2" data-kind="run" data-home="x-e1" data-crumb="runs2"><div class="hd"><span class="kind">run</span><span class="id">runs2</span><span class="tag">retracted</span></div><h3 class="tt">fp32 and int8 · seed 2</h3><div class="retr"><b>retracted</b> 2026-10-13: the wrong checkpoint was loaded</div><p class="sm">replaced by <a class="mono" href="#run-runs2b">runs2b</a></p></div></details>
+<details class="nd" data-row data-x="e1" data-for="run-runs2b" data-fold="run-runs2b"><summary><span class="mono">runs2b</span> fp32 and int8 · seed 2</summary>
+<div class="card run" id="run-runs2b" data-kind="run" data-home="x-e1" data-crumb="runs2b"><div class="hd"><span class="kind">run</span><span class="id">runs2b</span></div><h3 class="tt">fp32 and int8 · seed 2</h3><p class="sm">replaces <a class="mono" href="#run-runs2">runs2</a> · counts toward <a class="mono" href="#c-c1">c1</a></p></div></details>
+<details class="nd" data-row data-x="e1" data-for="run-runs3" data-fold="run-runs3"><summary><span class="mono">runs3</span> fp32 and int8 · seed 3</summary>
+<div class="card run" id="run-runs3" data-kind="run" data-home="x-e1" data-crumb="runs3"><div class="hd"><span class="kind">run</span><span class="id">runs3</span></div><h3 class="tt">fp32 and int8 · seed 3</h3><p class="sm">counts toward <a class="mono" href="#c-c1">c1</a>, <a class="mono" href="#c-c2">c2</a></p></div></details>
+<details class="nd" data-row data-x="e1" data-for="run-runsql7" data-fold="run-runsql7"><summary><span class="mono">runsql7</span> fp32 and int8 · results/runs.db row 7</summary>
+<div class="card run short" id="run-runsql7" data-kind="run" data-home="x-e1" data-crumb="runsql7"><div class="hd"><span class="kind">run</span><span class="id">runsql7</span></div><h3 class="tt">fp32 and int8 · results/runs.db row 7</h3><p class="sm">fp32: latency_ms=6.1 · int8: latency_ms=3.9</p></div></details>
+<details class="nd" data-row data-x="e2" data-for="run-runc128" data-fold="run-runc128"><summary><span class="mono">runc128</span> fp32 and int8 · calib_images 128</summary>
+<div class="card run short" id="run-runc128" data-kind="run" data-home="x-e2" data-crumb="runc128"><div class="hd"><span class="kind">run</span><span class="id">runc128</span></div><h3 class="tt">fp32 and int8 · calib_images 128</h3></div></details>
+<details class="nd" data-row data-x="e2" data-for="run-runc512" data-fold="run-runc512"><summary><span class="mono">runc512</span> fp32 and int8 · calib_images 512</summary>
+<div class="card run short" id="run-runc512" data-kind="run" data-home="x-e2" data-crumb="runc512"><div class="hd"><span class="kind">run</span><span class="id">runc512</span></div><h3 class="tt">fp32 and int8 · calib_images 512</h3><p class="sm">same bytes as what <a class="mono" href="#run-runs1">runs1</a> made</p></div></details>
+</div>
+<h2 id="runs-analyses">Analyses</h2>
+<details class="nd" data-row data-for="a-a1" data-fold="ana-a1"><summary><span class="mono">a1</span> per-class bootstrap over images</summary>
+<div class="card ana" id="a-a1" data-kind="analysis" data-home="x-e1" data-crumb="a1"><div class="hd"><span class="kind">analysis</span><span class="id">a1</span></div><h3 class="tt">per-class bootstrap over images</h3><p class="sm">reads <a class="mono" href="#run-runs1">runs1</a>, <a class="mono" href="#run-runs2b">runs2b</a>, <a class="mono" href="#run-runs3">runs3</a> · used by <a class="mono" href="#c-c4">c4</a></p></div></details>
+</section>
+<section class="view" id="resources" data-nav="resources" data-crumb="Resources" data-title="Resources · INT8 ResNet-50 on ImageNet" aria-labelledby="h-rs">
+<h1 id="h-rs">Resources</h1>
+<details class="nd" data-row data-for="r-imagenet-val" data-fold="res-imagenet-val"><summary>imagenet-val · ImageNet-1k validation · evaluation data · remote</summary>
+<div class="card res" id="r-imagenet-val" data-kind="resource" data-home="resources" data-crumb="imagenet-val"><div class="hd"><span class="kind">resource</span><span class="id">imagenet-val</span></div><h3 class="tt">ImageNet-1k validation</h3><p class="sm">read by <a class="mono" href="#run-runs1">runs1</a>, <a class="mono" href="#run-runs3">runs3</a> and 6 more</p></div></details>
+<details class="nd" data-row data-for="r-ckpt-int8-s1" data-fold="res-ckpt-int8-s1"><summary>ckpt-int8-s1 · ResNet-50 INT8, seed 1 · checkpoint · present</summary>
+<div class="card res" id="r-ckpt-int8-s1" data-kind="resource" data-home="resources" data-crumb="ckpt-int8-s1"><div class="hd"><span class="kind">resource</span><span class="id">ckpt-int8-s1</span></div><h3 class="tt">ResNet-50 INT8, seed 1</h3><p class="sm">made by <a class="mono" href="#run-runs1">runs1</a></p><div class="cmdbox"><pre class="cmd">python quantize.py --calib 512 --seed 1</pre></div></div></details>
+</section>
+<section class="view" id="history" data-nav="history" data-crumb="History" data-title="History · INT8 ResNet-50 on ImageNet" aria-labelledby="h-hist">
+<h1 id="h-hist">History</h1>
+<ol class="hlist"><li>2026-10-19 · accepted c1: within the one-point budget on three seeds</li><li>2026-10-13 · runs2 retracted: the wrong checkpoint was loaded</li></ol>
+</section></div>
+<div class="sec" id="sec-calls">
+<section class="view" id="your-call" data-nav="your-call" data-crumb="Your call" data-title="Your call (4) · INT8 ResNet-50 on ImageNet" data-root="call-c2" aria-labelledby="h-yc">
+<h1 id="h-yc">Your call (4)</h1>
+<p class="lede">4 calls wait on you.</p>
+<div class="grouphd"><h2><a href="#q-q1">q1</a></h2></div>
+<div class="list">
+<details class="nd crow" data-row data-for="call-c2" data-fold="call-c2"><summary class="cr"><span class="cs"><span class="rsn"><span class="rl">Not reproduced</span><span class="rd2"> · estimate 0.7597 outside 0.7613 ± 0.001</span></span><span class="ct2">fp32 top1 matches the published 76.13 <span class="mono">c2</span></span></span></summary>
+<article class="card call" id="call-c2" data-kind="call" data-home="your-call" data-crumb="call c2">
+<div class="hd"><span class="kind">your call</span><span class="lab">Review this result</span><a class="id" href="#c-c2">c2</a></div>
+<h3 class="tt">fp32 top1 matches the published 76.13</h3>
+<section class="part"><h4>Why this needs a call</h4><p class="rsn"><span class="rl">Not reproduced</span><span class="rd2"> · estimate 0.7597 outside 0.7613 ± 0.001</span></p><p class="sm">It rests on <a href="#c-c2:runs">3 runs · 1 run not counted</a> · <a href="#c-c2">the whole finding</a></p></section>
+<details class="fold lv src" data-level="trace" data-fold="call-c2:source"><summary>Source details</summary><dl class="rx" id="call-c2:receipts"><dt>declared</dt><dd>2026-10-12 · experiment e1 · metric top1</dd><dt>runs</dt><dd>runs1, runs2b, runs3 · out/seed1/metrics.json …</dd></dl></details>
+<section class="part decide lv" data-level="decide" id="call-c2:decide"><h4>Record a call</h4>
+<div class="seg" role="group" aria-label="Record a call on c2"><button type="button" data-act="pick" data-action="accept" aria-pressed="false">Accept<kbd aria-hidden="true">a</kbd></button><button type="button" data-act="pick" data-action="reject" aria-pressed="false">Reject<kbd aria-hidden="true">r</kbd></button><button type="button" data-act="pick" data-action="investigate" aria-pressed="false">Investigate<kbd aria-hidden="true">i</kbd></button></div>
+<div class="composer" hidden><label>why, in your words (rb records them)<input class="why" type="text" autocomplete="off" spellcheck="true" placeholder="your reason"></label><div class="cmdbox nocp"><pre class="cmd line"></pre><button type="button" class="cp" data-act="copy" disabled>Copy</button></div><p class="willread">Its review will read: <span></span></p></div>
+<ul class="acts" data-subject="c2">
+<li data-action="accept" data-label="Accept" data-cons="accepted ‹day›: ‹why›"><span class="an">Accept</span><div class="cmdbox"><pre class="cmd line">rb decide c2 accept --why '‹why›'</pre></div><span class="cons">Its review will read: accepted ‹day›: ‹why›</span></li>
+<li data-action="reject" data-label="Reject" data-cons="rejected ‹day›: ‹why›"><span class="an">Reject</span><div class="cmdbox"><pre class="cmd line">rb decide c2 reject --why '‹why›'</pre></div><span class="cons">Its review will read: rejected ‹day›: ‹why›</span></li>
+<li data-action="investigate" data-label="Investigate" data-cons="investigating since ‹day›: ‹why›"><span class="an">Investigate</span><div class="cmdbox"><pre class="cmd line">rb decide c2 investigate --why '‹why›'</pre></div><span class="cons">Its review will read: investigating since ‹day›: ‹why›</span></li>
+</ul></section>
+</article></details>
+<details class="nd crow" data-row data-for="call-e2" data-fold="call-e2"><summary class="cr"><span class="cs"><span class="rsn"><span class="rl">Gate missed</span></span><span class="ct2">calibration set size: how many images INT8 needs <span class="mono">e2</span></span></span></summary>
+<article class="card call" id="call-e2" data-kind="call" data-home="your-call" data-crumb="call e2"><div class="hd"><span class="kind">your call</span><a class="id" href="#x-e2">e2</a></div><h3 class="tt">calibration set size: how many images INT8 needs</h3>
+<section class="part"><h4>Why this needs a call</h4><p class="sm">calib_images 64: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 128: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 192: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 256: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p><p class="sm">calib_images 320: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 384: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 448: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 512: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p><p class="sm">calib_images 576: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 640: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 704: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 768: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p><p class="sm">calib_images 832: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 896: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 960: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 1024: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p><p class="sm">calib_images 1088: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 1152: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 1216: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 1280: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p><p class="sm">calib_images 1344: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 1408: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 1472: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 1536: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p><p class="sm">calib_images 1600: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 1664: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 1728: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 1792: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p><p class="sm">calib_images 1856: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 1920: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 1984: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 2048: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p><p class="sm">calib_images 2112: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 2176: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 2240: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 2304: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p><p class="sm">calib_images 2368: int8 top1 within 1 point of fp32 in 0 of 3 seeds</p><p class="sm">calib_images 2432: int8 top1 within 1 point of fp32 in 1 of 3 seeds</p><p class="sm">calib_images 2496: int8 top1 within 1 point of fp32 in 2 of 3 seeds</p><p class="sm">calib_images 2560: int8 top1 within 1 point of fp32 in 3 of 3 seeds</p></section>
+<section class="part decide lv" data-level="decide"><h4>Record a call</h4>
+<div class="seg" role="group" aria-label="Record a call on e2"><button type="button" data-act="pick" data-action="continue" aria-pressed="false">Continue<kbd aria-hidden="true">c</kbd></button><button type="button" data-act="pick" data-action="park" aria-pressed="false">Park<kbd aria-hidden="true">p</kbd></button><button type="button" data-act="pick" data-action="stop" aria-pressed="false">Stop<kbd aria-hidden="true">s</kbd></button></div>
+<div class="composer" hidden><label>why, in your words (rb records them)<input class="why" type="text" autocomplete="off" spellcheck="true" placeholder="your reason"></label><div class="cmdbox nocp"><pre class="cmd line"></pre><button type="button" class="cp" data-act="copy" disabled>Copy</button></div><p class="willread">Its review will read: <span></span></p></div>
+<ul class="acts" data-subject="e2">
+<li data-action="continue" data-label="Continue" data-cons="continued ‹day›: ‹why›"><span class="an">Continue</span><div class="cmdbox"><pre class="cmd line">rb decide e2 continue --why '‹why›'</pre></div></li>
+<li data-action="park" data-label="Park" data-cons="parked ‹day›: ‹why›"><span class="an">Park</span><div class="cmdbox"><pre class="cmd line">rb decide e2 park --why '‹why›'</pre></div></li>
+<li data-action="stop" data-label="Stop" data-cons="stopped ‹day›: ‹why›"><span class="an">Stop</span><div class="cmdbox"><pre class="cmd line">rb decide e2 stop --why '‹why›'</pre></div></li>
+</ul></section></article></details>
+<details class="nd crow" data-row data-for="call-c3" data-fold="call-c3"><summary class="cr"><span class="cs"><span class="rsn"><span class="rl">Rests on one run</span></span><span class="ct2">the ONNX export holds onnx_top1 <span class="mono">c3</span></span></span></summary>
+<article class="card call" id="call-c3" data-kind="call" data-home="your-call" data-crumb="call c3"><div class="hd"><span class="kind">your call</span><a class="id" href="#c-c3">c3</a></div><h3 class="tt">the ONNX export holds onnx_top1</h3><p class="sm">It rests on <a href="#run-runs1">1 run</a></p></article></details>
+</div>
+<section class="waiting" id="to-confirm" aria-labelledby="h-to-confirm"><h2 id="h-to-confirm">Waiting for your confirmation, listed apart</h2>
+<h3>Proposed, not made (1)</h3><ul class="wl"><li><p class="wt">accept c3: the ONNX export holds onnx_top1</p><p class="wp">note: one run is enough for an export check · not confirmed</p><div class="cmdbox"><pre class="cmd">rb decide c3 accept --why 'one run is enough for an export check'</pre></div><p class="cf">Confirm it in your own terminal:</p><div class="cmdbox" data-copybtn><pre class="cmd">rb confirm d7k2pqa</pre></div></li></ul>
+<h3>Past calls mentioned, not confirmed (1)</h3><ul class="wl"><li><p class="wt">park e2, as notes.md:3 reads: "we park the 128-image cell for now"</p><p class="cf">Confirm it in your own terminal:</p><div class="cmdbox" data-copybtn><pre class="cmd">rb confirm d4m8xqe</pre></div></li></ul></section>
+<p class="sm"><a href="#to-confirm">What waits for your confirmation, listed apart →</a></p>
+</section></div>
+<details class="fold gl" data-fold="words"><summary>What the words on this page mean</summary><div id="words"><dl class="gloss"><dt id="g-command">command (as given)</dt><dd>the command the run names, as given; rb did not run it</dd><dt id="g-retrospective">Retrospective</dt><dd>declared after its evidence existed</dd></dl></div></details>
+<footer class="foot"><p class="sm">rb page · a snapshot of the record at 2026-10-19 14:20 UTC</p></footer>
+</main>
+</body></html>

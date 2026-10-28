@@ -1,0 +1,91 @@
+/* rb open's parts of the frame (open.rs): the place line and its pickers, the scope bar, what a past version
+   withholds, and the Overview's Elsewhere. Drawn on rb open only, after the shell's own styles. */
+
+/* the place line and the Where and Version pickers, in the top bar */
+.where { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; font-size: 12.5px; color: var(--dim); }
+.where .pl { overflow-wrap: anywhere; }
+.where .failed:empty { display: none; }
+.where .failed { color: var(--warn); overflow-wrap: anywhere; }
+details.pick { position: relative; }
+details.pick > summary { cursor: pointer; list-style: none; color: var(--ink); white-space: nowrap; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+details.pick > summary::-webkit-details-marker { display: none; }
+details.pick > summary::after { content: " \25BE"; color: var(--dim); }
+/* the summary's label gives way with an ellipsis, its ▾ always shown */
+details.pick > summary { display: flex; align-items: baseline; gap: .3em; }
+details.pick > summary .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+details.pick > summary::after, details.pick > summary > .dim { flex: none; }
+/* a place's label in a list breaks after a ' · ' or a '/', never at a hyphen inside a name */
+ul.picks .nw { white-space: nowrap; }
+details.pick > summary .dim { color: var(--dim); }
+ul.picks { list-style: none; margin: 4px 0 0; padding: 4px 0; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; box-shadow: var(--shadow); min-width: 220px; max-width: min(420px, calc(100vw - 24px)); max-height: 60vh; overflow: auto; }
+details.pick:not([open]) > ul.picks { display: none; }
+details.pick[open] > ul.picks { position: absolute; z-index: 60; left: 0; top: 100%; }
+ul.picks li { padding: 0; }
+ul.picks a, ul.picks .off { display: block; padding: 5px 12px; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+ul.picks a:hover, ul.picks a:focus-visible { background: var(--card); }
+ul.picks a[aria-current="true"] { font-weight: 600; }
+ul.picks a[aria-current="true"]::before { content: "\2713  "; color: var(--mark); }
+ul.picks .off { color: var(--dim); padding-bottom: 0; }
+ul.picks .why { display: block; padding: 0 12px 5px; font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+
+/* the scope bar: where you are, in words, away from the live start place; it stays in view as the page scrolls */
+.scope:empty, .past:empty { display: none; }
+/* a quiet tinted strip, with no coloured rule; its one action is the way back */
+.scope { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--warn) 14%, var(--bg)); }
+.scope .bar { max-width: 880px; margin: 0 auto; padding: 6px 12px; font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.scope .bar .said { color: var(--ink); }
+.scope .back, .past .withheld a { white-space: nowrap; font-weight: 600; }
+.past .withheld { max-width: 880px; margin: 0 auto; padding: 6px 12px; font-size: 13px; color: var(--dim); overflow-wrap: anywhere; }
+
+/* Elsewhere: each other place with its own counts, never added up */
+.elsewhere > details > summary > h2 { display: inline; font-size: inherit; margin: 0; }
+.elsewhere ul.place-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.elsewhere ul.place-list > li { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.elsewhere .place-name { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.elsewhere .said, .elsewhere .w { margin: 2px 0 0; font-size: 13px; color: var(--dim); overflow-wrap: anywhere; }
+.elsewhere ul.wl { padding: 0; margin: 6px 0 0; list-style: none; }
+
+@media screen {
+  /* app mode: the scope bar spans the three panes, above them; what a past version withholds heads the working view */
+  html.app body { grid-template-rows: var(--toph) auto minmax(0, 1fr); grid-template-areas: "top top top" "scope scope scope" "nav main insp"; }
+  html.app .scope { grid-area: scope; position: static; }
+  html.app .scope .bar { max-width: none; padding: 6px 18px; }
+  html.app .past .withheld { max-width: none; padding: 0 0 10px; }
+  /* the place line and the pickers give way first, each cut short with an ellipsis (a picker no shorter than its
+     name and a few letters), so the project's id and the clock beside them keep one line each */
+  html.app header.top .where { flex: 0 100 auto; min-width: 0; flex-wrap: nowrap; overflow: visible; }
+  html.app header.top .where > * { flex: 0 1 auto; min-width: 0; }
+  html.app header.top .where > details.pick { min-width: 8.5em; }
+  html.app header.top > :not(.where):not(.ttl) { flex-shrink: 0; }
+  html.app header.top .where .pl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  html.app header.top details.pick > summary { max-width: 100%; }
+  /* from 1280 the bar says the place once, in the Where button, cut by nothing: the place line's counts are in its
+     tooltip */
+  html.app header.top .where:has(details.pick[data-pick="where"]) .pl { display: none; }
+  html.app header.top .where > details.pick { flex-shrink: 0; min-width: 0; }
+  html.app header.top details.pick > summary { max-width: none; }
+  /* the last picker beside the clock opens its list leftward, inside the screen */
+  html.app header.top details.pick[data-pick="version"][open] > ul.picks { left: auto; right: 0; }
+}
+@media screen and (max-width: 1279px) {
+  html.app body { grid-template-rows: auto auto auto minmax(0, 1fr); grid-template-areas: "top top" "scope scope" "nav nav" "main insp"; }
+  /* under 1280 the pickers take a line of their own below the bar's first, which keeps the frame's own line */
+  html.app header.top { flex-wrap: wrap; height: auto; min-height: var(--toph); row-gap: 0; padding-top: 6px; }
+  html.app header.top .where { order: 5; flex: 1 0 100%; flex-wrap: wrap; padding-bottom: 6px; }
+  html.app header.top .where > details.pick { min-width: 0; }
+  html.app header.top .where .pl { display: inline; }
+  html.app header.top > :not(.where):not(.ttl) { flex-shrink: 1; }
+  /* an open picker's list takes its place in the bar, under its summary, never past the screen's edge */
+  details.pick[open] { flex: 1 0 100%; }
+  details.pick[open] > ul.picks { position: static; max-width: none; min-width: 0; }
+  html.app header.top .where .pl { white-space: normal; overflow-wrap: anywhere; }
+}
+@media screen and (max-width: 959px) {
+  html.app body { grid-template-rows: auto auto auto minmax(0, 1fr); grid-template-areas: "top" "scope" "nav" "main"; }
+  details.pick > summary { max-width: calc(100vw - 40px); }
+}
+/* a past version: a command is shown as text, never selected whole by one click */
+html:has(#withheld .withheld) pre.cmd { user-select: text; -webkit-user-select: text; }
+@media print {
+  .where details.pick { display: none; }
+}

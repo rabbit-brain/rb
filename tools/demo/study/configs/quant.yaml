@@ -1,0 +1,7 @@
+backend: fbgemm
+scheme: per_tensor
+activation_observer: histogram
+calibration:
+  images: 512
+  batch_size: 32
+  subset_seed: 0

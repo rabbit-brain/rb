@@ -1,0 +1,26 @@
+# What THIRD-PARTY-NOTICES covers (rust/gen/gen_notices.py): every crate built into rb for the platforms the wheels
+# ship for. Where a crate offers a choice of licenses, the first of these it offers is the one listed.
+accepted = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "CDLA-Permissive-2.0",
+  "Unicode-3.0",
+  "0BSD",
+  "Unlicense",
+]
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+# the license files ring, rustls and chrono leave out of their packages, taken from their repositories
+workarounds = ["chrono", "ring", "rustls"]
+private = { ignore = true }

@@ -1,0 +1,320 @@
+{
+ "steps": [
+  {
+   "run": "init t --no-agents",
+   "exit": 0,
+   "out": [
+    "Project 't' started: @BASE@/work/.rb",
+    "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
+    "",
+    "Then paste this line into your agent's chat:",
+    "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal",
+   "exit": 0,
+   "out": [
+    "  12:00  git      commit none",
+    "  12:00  new      out/a.json   (last written 2026-10-01 11:00 UTC)",
+    "  12:03  git      commit none",
+    "  12:04  ran      python3 x.py (exit 0, 1.5s)",
+    "  12:05  left out k1: \"not mine\"",
+    "  5 entries could not be read, and are not listed: rb journal --json gives every entry as it is.",
+    "",
+    "Next: rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"journal\",",
+    " \"data\": {",
+    "  \"entries\": [",
+    "   {",
+    "    \"at\": \"2026-10-01T12:00:00.000+00:00\",",
+    "    \"op\": \"git\",",
+    "    \"commit\": null,",
+    "    \"branch\": \"main\",",
+    "    \"dirty\": false,",
+    "    \"by\": \"human:t\"",
+    "   },",
+    "   {",
+    "    \"at\": \"2026-10-01T12:00:00+00:00\",",
+    "    \"op\": \"file\",",
+    "    \"path\": \"out/a.json\",",
+    "    \"change\": \"new\",",
+    "    \"written\": \"2026-10-01T11:00:00+00:00\"",
+    "   },",
+    "   {",
+    "    \"at\": \"2026-10-01T12:00:30+00:00\",",
+    "    \"op\": \"file\",",
+    "    \"path\": \"out/b.json\",",
+    "    \"change\": 5,",
+    "    \"written\": \"2026-10-01T12:00:00+00:00\"",
+    "   },",
+    "   {",
+    "    \"op\": \"file\",",
+    "    \"path\": \"out/c.json\",",
+    "    \"change\": true,",
+    "    \"written\": \"2026-10-01T11:00:00\"",
+    "   },",
+    "   {",
+    "    \"at\": \"2026-10-01T12:01:00+00:00\",",
+    "    \"op\": \"file\",",
+    "    \"path\": null,",
+    "    \"change\": 2.5",
+    "   },",
+    "   {",
+    "    \"at\": \"2026-10-01T12:02:00+00:00\",",
+    "    \"op\": \"git\",",
+    "    \"commit\": [",
+    "     \"a\",",
+    "     \"b\"",
+    "    ],",
+    "    \"branch\": \"main\",",
+    "    \"dirty\": true",
+    "   },",
+    "   {",
+    "    \"at\": \"2026-10-01T12:03:00+00:00\",",
+    "    \"op\": \"git\",",
+    "    \"commit\": \"\",",
+    "    \"branch\": null",
+    "   },",
+    "   {",
+    "    \"at\": \"2026-10-01T12:04:00\",",
+    "    \"op\": \"run\",",
+    "    \"command\": \"python3 x.py\",",
+    "    \"exit\": 0,",
+    "    \"secs\": 1.5",
+    "   },",
+    "   {",
+    "    \"at\": 20261001,",
+    "    \"op\": \"run\"",
+    "   },",
+    "   {",
+    "    \"at\": \"2026-10-01T12:05:00+00:00\",",
+    "    \"op\": \"dismiss\",",
+    "    \"key\": \"k1\",",
+    "    \"why\": \"not mine\"",
+    "   },",
+    "   {",
+    "    \"at\": \"2026-10-01T12:06:00+00:00\",",
+    "    \"op\": \"other\"",
+    "   }",
+    "  ],",
+    "  \"entry_count\": 11",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [",
+    "  \"rb reconcile\"",
+    " ],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal -n 2",
+   "exit": 0,
+   "out": [
+    "  12:05  left out k1: \"not mine\"",
+    "",
+    "Next: rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal",
+   "exit": 0,
+   "out": [
+    "  12:00  git      commit none",
+    "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
+    "",
+    "Next: rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal",
+   "exit": 0,
+   "out": [
+    "  12:00  git      commit none",
+    "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
+    "",
+    "Next: rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"journal\",",
+    " \"data\": {",
+    "  \"entries\": [",
+    "   {",
+    "    \"at\": \"2026-10-01T12:00:00.000+00:00\",",
+    "    \"op\": \"git\",",
+    "    \"commit\": null,",
+    "    \"branch\": \"main\",",
+    "    \"dirty\": false,",
+    "    \"by\": \"human:t\"",
+    "   },",
+    "   {",
+    "    \"at\": \"2026-10-01T12:00:00\",",
+    "    \"op\": \"file\",",
+    "    \"path\": \"a\",",
+    "    \"written\": 5",
+    "   }",
+    "  ],",
+    "  \"entry_count\": 2",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [",
+    "  \"rb reconcile\"",
+    " ],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal",
+   "exit": 0,
+   "out": [
+    "  12:00  git      commit none",
+    "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
+    "",
+    "Next: rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal",
+   "exit": 0,
+   "out": [
+    "  12:00  git      commit none",
+    "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
+    "",
+    "Next: rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal",
+   "exit": 0,
+   "out": [
+    "  12:00  git      commit none",
+    "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
+    "",
+    "Next: rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal",
+   "exit": 0,
+   "out": [
+    "  12:00  git      commit none",
+    "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
+    "",
+    "Next: rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  },
+  {
+   "run": "journal",
+   "exit": 0,
+   "out": [
+    "  12:00  git      commit none",
+    "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
+    "",
+    "Next: rb reconcile",
+    ""
+   ],
+   "err": [
+    ""
+   ]
+  }
+ ],
+ "files": {
+  ".rb/.gitattributes": [
+   "* -text",
+   "log.jsonl merge=union",
+   ""
+  ],
+  ".rb/.gitignore": [
+   ".lock",
+   "*.tmp",
+   "cache/",
+   "journal/",
+   ""
+  ],
+  ".rb/cache/objects/f3/f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6.json.gz": {
+   "sha256": "b49dd5346ef687f6a501f3c6c503e1efd5ace2a96eedf9f77d561c59e91c0f41",
+   "bytes": 144
+  },
+  ".rb/journal/journal.jsonl": [
+   "{\"at\": \"2026-10-01T12:00:00\", \"op\": \"git\", \"commit\": {\"a\": 1}}",
+   ""
+  ],
+  ".rb/log.jsonl": [
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"t\", \"sha256\": \"f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"t\", \"head\": \"\"}}",
+   ""
+  ],
+  ".rb/project.yaml": [
+   "rb: 1",
+   "kind: project",
+   "id: t",
+   "uid: prj_01M3VNBWG0FX7WJYHM24ARM0RQ",
+   "title: t",
+   "created_by: human:t",
+   "created_at: \"2026-10-01T12:00:00.000+00:00\"",
+   "via: cli",
+   ""
+  ]
+ }
+}

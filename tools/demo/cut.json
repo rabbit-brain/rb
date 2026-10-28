@@ -1,0 +1,869 @@
+{
+  "about": "The demo's cut (SPRINT-OCT24 6.2), segment by segment: what each shows, the steps walk.mjs takes on it, and its voice line, which starts at the segment's {\"mark\": \"voice\"} step, once its screen shows what the line says. cut.py fills {open} (rb open's address), serves the two casts as /files/pain.cast and /files/import.cast, and runs it. Every voice line must match what the segment's screen shows on the demo record (D4); rb_open_today is the dry run on rb open as it is, shell the A+ shell (rb open's own /, no test switch). A voice may be one line per mode where the screens differ. Ids in steps (c-c-pt-1024, [data-rcpt], runxhzv6x) are the demo record's (take 4). A step marked \"lead\" runs before filming starts (the shell's pointer guide set seen). A cast segment, which drops no marker, may say when its line starts with \"voice_at\" (seconds into it). A segment's \"zoom\" frames the part its voice speaks of, at 1.5 to 2 times: a box [x, y, w, h] in the walk's CSS pixels (the frame's shape, inside the frame, never under 720 wide), per mode where the segment has steps per mode. It eases in over 0.4 s to be full when the voice starts and eases out after the line ends; a {\"mark\": \"subject\", \"rect\": ...} step keeps where the part the voice speaks of is drawn, and the cut refuses a box that leaves it out, or the cursor.",
+  "width": 1440,
+  "height": 900,
+  "scale": 2,
+  "segments": [
+    {
+      "id": "pain",
+      "beat": "0:00 the pain",
+      "voice": "AI agents let me run more experiments than ever. Two weeks in, I have thirty-one result folders, a data config that changed halfway, and a very long agent log. Which of these results can I still trust?",
+      "voice_at": 4.0,
+      "steps": [
+        {
+          "goto": "/demo/term.html?cast=/files/pain.cast&pace=140&gap=0.6&font=15&title=int8-cifar&caption=Which%20results%20can%20I%20still%20trust%2C%20and%20why%3F&caption_at=9"
+        },
+        {
+          "wait": 400
+        },
+        {
+          "play": true
+        },
+        {
+          "wait": 1500
+        }
+      ]
+    },
+    {
+      "id": "import",
+      "beat": "0:19 the intervention",
+      "voice": "I paste one line into my agent. It brings the project into Rabbit Brain: the runs from their own files, the settings they used, and my questions. It asks me nothing up front.",
+      "steps": [
+        {
+          "goto": "/demo/term.html?cast=/files/import.cast&from=0.4&to=285&speed=16&gap=2&font=11.6&mask=ids&lapse=bar&title=int8-cifar"
+        },
+        {
+          "wait": 400
+        },
+        {
+          "mark": "subject",
+          "rect": "#term"
+        },
+        {
+          "play": true
+        },
+        {
+          "wait": 1200
+        }
+      ],
+      "zoom": {
+        "box": [
+          216,
+          116,
+          1008,
+          630
+        ]
+      }
+    },
+    {
+      "id": "standing",
+      "beat": "0:38 the payoff: where it stands",
+      "voice": {
+        "rb_open_today": "Now I can see where it stands. Everything was recorded after the runs, so rb marks it Retrospective. And rb finds one more changed config, one that nothing in the record cites.",
+        "shell": "Now I can see where it stands. No answer yet: eight of thirteen rules are not settled."
+      },
+      "variants": {
+        "rb_open_today": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "waitFor": "document.body.innerText.includes('Where the work stands')"
+          },
+          {
+            "wait": 600
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "move": {
+              "text": "Retrospective"
+            }
+          },
+          {
+            "wait": 2000
+          },
+          {
+            "move": {
+              "text": "Changed .json, .yaml or .toml files that nothing in the record cites (1): rb reconcile lists it by path."
+            }
+          },
+          {
+            "wait": 2000
+          }
+        ],
+        "shell": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+            "lead": true
+          },
+          {
+            "goto": "{open}",
+            "lead": true
+          },
+          {
+            "waitFor": "document.documentElement.classList.contains('ready')"
+          },
+          {
+            "wait": 300
+          },
+          {
+            "move": "#overview section.stand .stq",
+            "still": true
+          },
+          {
+            "wait": 300
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "move": "#overview section.stand .str",
+            "still": true
+          },
+          {
+            "wait": 2200
+          },
+          {
+            "move": "#overview section.stand .stt",
+            "still": true
+          },
+          {
+            "wait": 2000
+          },
+          {
+            "mark": "subject",
+            "rect": "#overview section.stand"
+          }
+        ]
+      },
+      "zoom": {
+        "shell": {
+          "box": [
+            286,
+            122,
+            720,
+            450
+          ]
+        }
+      }
+    },
+    {
+      "id": "integrity",
+      "beat": "0:48 the payoff: how far to trust it",
+      "voice": "And how far to trust it: nine of thirteen rules were written after their results came in, and none of the runs has a command from when it ran.",
+      "variants": {
+        "shell": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+            "lead": true
+          },
+          {
+            "goto": "{open}",
+            "lead": true
+          },
+          {
+            "waitFor": "document.documentElement.classList.contains('ready')"
+          },
+          {
+            "wait": 300
+          },
+          {
+            "move": "#overview #integrity h2",
+            "still": true
+          },
+          {
+            "wait": 300
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "move": {
+              "text": "9 of 13 rules were written after their results came in.",
+              "within": "#overview"
+            },
+            "still": true
+          },
+          {
+            "wait": 2600
+          },
+          {
+            "move": {
+              "text": "None of the 22 runs has a command from when it ran.",
+              "within": "#overview"
+            },
+            "still": true
+          },
+          {
+            "wait": 2600
+          },
+          {
+            "mark": "subject",
+            "rect": "#overview #integrity"
+          }
+        ]
+      },
+      "zoom": {
+        "shell": {
+          "box": [
+            286,
+            300,
+            720,
+            450
+          ]
+        }
+      }
+    },
+    {
+      "id": "queue",
+      "beat": "0:57 the turn: what needs my judgment",
+      "voice": "First in what needs my judgment: the FP32 baseline doesn't match the paper, 90.48 observed against the 91.25 I cited. Then two designs to confirm, and a changed sweep file that nothing in the record cites.",
+      "variants": {
+        "shell": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+            "lead": true
+          },
+          {
+            "goto": "{open}",
+            "lead": true
+          },
+          {
+            "waitFor": "document.documentElement.classList.contains('ready')"
+          },
+          {
+            "wait": 300
+          },
+          {
+            "move": "#overview #queue h2",
+            "still": true
+          },
+          {
+            "wait": 300
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "move": "#overview #queue li.qrow:nth-of-type(1) .qt",
+            "still": true
+          },
+          {
+            "wait": 4200
+          },
+          {
+            "move": "#overview #queue li.qrow:nth-of-type(2) .qv",
+            "still": true
+          },
+          {
+            "wait": 1600
+          },
+          {
+            "move": "#overview #queue li.qrow:nth-of-type(3) .qt",
+            "still": true
+          },
+          {
+            "wait": 2400
+          },
+          {
+            "mark": "subject",
+            "rect": "#overview #queue"
+          }
+        ]
+      },
+      "zoom": {
+        "shell": {
+          "box": [
+            286,
+            420,
+            720,
+            450
+          ]
+        }
+      }
+    },
+    {
+      "id": "holds",
+      "beat": "1:13 the payoff: what holds",
+      "voice": "Per-tensor INT8 stays within a third of a point, on three seeds.",
+      "variants": {
+        "rb_open_today": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "waitFor": "document.body.innerText.includes('Where the work stands')"
+          },
+          {
+            "wait": 600
+          },
+          {
+            "click": {
+              "text": "Explore evidence →"
+            }
+          },
+          {
+            "wait": 900
+          },
+          {
+            "scrollBy": 700,
+            "ms": 700
+          },
+          {
+            "wait": 300
+          },
+          {
+            "click": "[id='c-c-pt-1024:q-int8'] > summary"
+          },
+          {
+            "wait": 400
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "wait": 2000
+          }
+        ],
+        "shell": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+            "lead": true
+          },
+          {
+            "goto": "{open}",
+            "lead": true
+          },
+          {
+            "waitFor": "document.documentElement.classList.contains('ready')"
+          },
+          {
+            "wait": 300
+          },
+          {
+            "click": "#nav a[href='#q-q-calib']",
+            "ms": 250
+          },
+          {
+            "wait": 600
+          },
+          {
+            "click": "main .view.on a[href='#c-c-pt-1024']",
+            "ms": 250
+          },
+          {
+            "wait": 600
+          },
+          {
+            "move": "aside.insp [data-id='c-c-pt-1024:reading'] .e"
+          },
+          {
+            "wait": 300
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "wait": 2000
+          },
+          {
+            "mark": "subject",
+            "rect": "aside.insp [data-id='c-c-pt-1024:reading'] .e"
+          }
+        ]
+      },
+      "zoom": {
+        "shell": {
+          "box": [
+            720,
+            100,
+            720,
+            450
+          ]
+        }
+      }
+    },
+    {
+      "id": "receipt",
+      "beat": "1:23 the payoff: what a number rests on",
+      "voice": {
+        "rb_open_today": "Every number opens to the runs, files and configs behind it, and rb says which commands were given later, not observed.",
+        "shell": "Every number opens to the run behind it, down to the checkpoint it read and its result files, each with its sha256."
+      },
+      "variants": {
+        "rb_open_today": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "waitFor": "document.body.innerText.includes('Where the work stands')"
+          },
+          {
+            "wait": 500
+          },
+          {
+            "click": {
+              "text": "Runs"
+            }
+          },
+          {
+            "wait": 900
+          },
+          {
+            "click": "[data-rcpt]"
+          },
+          {
+            "wait": 500
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "wait": 2000
+          }
+        ],
+        "shell": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+            "lead": true
+          },
+          {
+            "goto": "{open}",
+            "lead": true
+          },
+          {
+            "waitFor": "document.documentElement.classList.contains('ready')"
+          },
+          {
+            "eval": "(e => { e.scrollIntoView({ block: 'center', inline: 'nearest' }); e.click(); })(document.querySelector(\"#nav a[href='#q-q-calib']\"))",
+            "lead": true
+          },
+          {
+            "waitFor": "!!document.querySelector(\"main .view.on a[href='#c-c-pt-1024']\")",
+            "lead": true
+          },
+          {
+            "eval": "(e => { e.scrollIntoView({ block: 'center', inline: 'nearest' }); e.click(); })(document.querySelector(\"main .view.on a[href='#c-c-pt-1024']\"))",
+            "lead": true
+          },
+          {
+            "waitFor": "!!document.querySelector(\"aside.insp [data-id='c-c-pt-1024:reading']\")",
+            "lead": true
+          },
+          {
+            "wait": 600,
+            "lead": true
+          },
+          {
+            "pointAt": "aside.insp [data-id='c-c-pt-1024:reading'] .e",
+            "lead": true
+          },
+          {
+            "wait": 300,
+            "lead": true
+          },
+          {
+            "wait": 300
+          },
+          {
+            "click": {
+              "text": "runxhzv6x",
+              "within": "aside.insp"
+            },
+            "ms": 250
+          },
+          {
+            "wait": 600
+          },
+          {
+            "click": "aside.insp details.src > summary",
+            "ms": 250
+          },
+          {
+            "wait": 300
+          },
+          {
+            "wheelTo": "aside.insp details.src",
+            "top": 150
+          },
+          {
+            "wait": 300
+          },
+          {
+            "move": {
+              "text": "inputs",
+              "within": "aside.insp details.src"
+            }
+          },
+          {
+            "wait": 300
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "wait": 2500
+          },
+          {
+            "mark": "subject",
+            "rect": {
+              "text": "(checkpoint) · present when recorded · sha256",
+              "within": "aside.insp details.src"
+            }
+          },
+          {
+            "mark": "subject",
+            "rect": {
+              "text": "results/r024_int8_pt_c1024_s0/metrics.json · sha256",
+              "within": "aside.insp details.src"
+            }
+          }
+        ]
+      },
+      "zoom": {
+        "shell": {
+          "box": [
+            720,
+            340,
+            720,
+            450
+          ]
+        }
+      }
+    },
+    {
+      "id": "reference",
+      "beat": "1:00 the payoff: the published number",
+      "voice": "I added the paper's number as a check, and it doesn't reproduce.",
+      "variants": {
+        "rb_open_today": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "waitFor": "document.body.innerText.includes('Where the work stands')"
+          },
+          {
+            "wait": 600
+          },
+          {
+            "click": {
+              "text": "Explore evidence →"
+            }
+          },
+          {
+            "wait": 900
+          },
+          {
+            "scroll": "[id='c-c-ref:q-int8'] > summary"
+          },
+          {
+            "wait": 500
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "wait": 2000
+          }
+        ]
+      }
+    },
+    {
+      "id": "perchannel",
+      "beat": "1:37 the payoff: what rests on one seed",
+      "voice": "And per-channel was run on one seed, so rb can't decide it yet.",
+      "variants": {
+        "rb_open_today": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "waitFor": "document.body.innerText.includes('Where the work stands')"
+          },
+          {
+            "wait": 600
+          },
+          {
+            "click": {
+              "text": "Explore evidence →"
+            }
+          },
+          {
+            "wait": 900
+          },
+          {
+            "scroll": "[id='c-c-s0-pc-1024:q-int8'] > summary"
+          },
+          {
+            "wait": 500
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "wait": 2000
+          }
+        ],
+        "shell": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+            "lead": true
+          },
+          {
+            "goto": "{open}",
+            "lead": true
+          },
+          {
+            "waitFor": "document.documentElement.classList.contains('ready')"
+          },
+          {
+            "wait": 300
+          },
+          {
+            "click": "#nav a[href='#q-q-scheme']",
+            "ms": 250
+          },
+          {
+            "wait": 600
+          },
+          {
+            "click": "main .view.on a[href='#c-c-s0-pc-1024']",
+            "ms": 250
+          },
+          {
+            "wait": 600
+          },
+          {
+            "move": "aside.insp [data-id='c-c-s0-pc-1024:reading'] .e"
+          },
+          {
+            "wait": 300
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "wait": 2000
+          },
+          {
+            "mark": "subject",
+            "rect": "aside.insp [data-id='c-c-s0-pc-1024:reading'] .e"
+          }
+        ]
+      },
+      "zoom": {
+        "shell": {
+          "box": [
+            720,
+            100,
+            720,
+            450
+          ]
+        }
+      }
+    },
+    {
+      "id": "waiting",
+      "beat": "1:20 the decision: what waits",
+      "voice": "What the agent set up waits for me to confirm.",
+      "variants": {
+        "rb_open_today": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "waitFor": "document.body.innerText.includes('Where the work stands')"
+          },
+          {
+            "wait": 600
+          },
+          {
+            "click": {
+              "text": "Experiment designs not confirmed (2)"
+            }
+          },
+          {
+            "wait": 500
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "wait": 2000
+          }
+        ]
+      }
+    },
+    {
+      "id": "call",
+      "beat": "1:47 the decision: the call",
+      "voice": {
+        "rb_open_today": "The reference not reproducing needs my call. rb gives me the command that records it, with my reason.",
+        "shell": "The baseline needs my call. I choose to investigate, with my reason, and rb gives me the command that records it."
+      },
+      "variants": {
+        "rb_open_today": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "waitFor": "document.body.innerText.includes('Where the work stands')"
+          },
+          {
+            "wait": 500
+          },
+          {
+            "click": {
+              "text": "Findings"
+            }
+          },
+          {
+            "wait": 800
+          },
+          {
+            "click": {
+              "text": "Does INT8 post-training quantization keep a ResNet-20 within 1 point of FP32 top-1 on CIFAR-10?"
+            }
+          },
+          {
+            "wait": 900
+          },
+          {
+            "click": {
+              "text": "Record a call"
+            }
+          },
+          {
+            "wait": 500
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "wait": 2000
+          }
+        ],
+        "shell": [
+          {
+            "goto": "{open}"
+          },
+          {
+            "eval": "localStorage.setItem('rb.guide.1', 'ended')",
+            "lead": true
+          },
+          {
+            "goto": "{open}",
+            "lead": true
+          },
+          {
+            "waitFor": "document.documentElement.classList.contains('ready')"
+          },
+          {
+            "wait": 300
+          },
+          {
+            "click": "#overview #queue li.qrow:nth-of-type(1) a.qbtn",
+            "ms": 250
+          },
+          {
+            "wait": 600
+          },
+          {
+            "move": "aside.insp button[data-action='investigate']"
+          },
+          {
+            "wait": 300
+          },
+          {
+            "mark": "voice"
+          },
+          {
+            "click": "aside.insp button[data-action='investigate']"
+          },
+          {
+            "wait": 500
+          },
+          {
+            "click": "aside.insp input.why"
+          },
+          {
+            "type": "check the 30-epoch schedule against the paper's"
+          },
+          {
+            "wait": 2000
+          },
+          {
+            "mark": "subject",
+            "rect": "aside.insp input.why"
+          },
+          {
+            "mark": "subject",
+            "rect": "aside.insp p.willread"
+          },
+          {
+            "mark": "subject",
+            "rect": "aside.insp .cmdbox"
+          }
+        ]
+      },
+      "zoom": {
+        "shell": {
+          "box": [
+            720,
+            420,
+            720,
+            450
+          ]
+        }
+      }
+    },
+    {
+      "id": "share",
+      "beat": "2:00 the share: rb sync --watch, a new run, the share link in a fresh browser",
+      "voice": "It syncs privately to rabbitbrain.ai, and one link shares the live research.",
+      "external": "share_beat.mjs captures it on the Mac against the hosted service; cut.py --share-segment <its out> puts it here",
+      "steps": [
+        {
+          "goto": "/demo/card.html?hold=The%20share%20beat%3A%20rb%20sync%20--watch%2C%20a%20new%20run%2C%20the%20share%20link%20in%20a%20fresh%20browser.%20Captured%20on%20the%20Mac%20by%20share_beat.sh"
+        },
+        {
+          "wait": 2500
+        }
+      ]
+    },
+    {
+      "id": "end",
+      "beat": "2:05 the end card",
+      "voice": "AI speeds up experimentation. Rabbit Brain makes sure you never lose track of what you've learned.",
+      "steps": [
+        {
+          "goto": "/demo/card.html"
+        },
+        {
+          "wait": 4500
+        }
+      ]
+    }
+  ]
+}

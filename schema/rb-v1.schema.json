@@ -1,0 +1,3886 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rabbitbrain.ai/schema/rb-v1.schema.json",
+  "title": "Rabbit Brain record, format 1",
+  "description": "One file of a Rabbit Brain record: Rabbit Brain YAML (a strict subset of YAML) or its canonical JSON. `rb` is the format and `kind` says which shape the rest of the file has. Findings and availability are computed from these files on every read and never stored.",
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ProjectFile"
+    },
+    {
+      "$ref": "#/$defs/QuestionFile"
+    },
+    {
+      "$ref": "#/$defs/ExperimentFile"
+    },
+    {
+      "$ref": "#/$defs/VariantFile"
+    },
+    {
+      "$ref": "#/$defs/NoteFile"
+    },
+    {
+      "$ref": "#/$defs/CriterionFile"
+    },
+    {
+      "$ref": "#/$defs/RunFile"
+    },
+    {
+      "$ref": "#/$defs/AnalysisFile"
+    },
+    {
+      "$ref": "#/$defs/MetricFile"
+    },
+    {
+      "$ref": "#/$defs/ResourceFile"
+    },
+    {
+      "$ref": "#/$defs/DecisionFile"
+    },
+    {
+      "$ref": "#/$defs/CriteriaFile"
+    }
+  ],
+  "$defs": {
+    "Acquisition": {
+      "additionalProperties": false,
+      "description": "How to get a resource again when no copy is at hand: where it comes from, and the recipe that rebuilds it.",
+      "properties": {
+        "source": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Source",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "maxLength": 600,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "recipe": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recipe"
+        }
+      },
+      "title": "Acquisition",
+      "type": "object"
+    },
+    "Agent": {
+      "additionalProperties": true,
+      "description": "The agent that made a write, as rb knew it then: its name (its runtime's, as its actor names it), the version its\nruntime or its MCP client gave, its provider and its model, each with where rb has it from. `provider_from` is\n`said` (rb context --provider, the context tool), `env` (RB_PROVIDER, for one command) or `inferred` (rb's table\nof runtimes); `model_from` is `said` (rb context --model, the context tool) or `env` (RB_MODEL, for one command).\nrb never guesses a model. A key a later rb adds is kept.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "provider_from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider From"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "model_from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model From"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Agent",
+      "type": "object"
+    },
+    "Amendment": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "why": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Why",
+          "type": "string"
+        },
+        "change": {
+          "maxLength": 400,
+          "title": "Change",
+          "type": "string"
+        },
+        "before": {
+          "title": "Before",
+          "type": "string"
+        },
+        "after": {
+          "title": "After",
+          "type": "string"
+        },
+        "words": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Words",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "by",
+        "why",
+        "change",
+        "before",
+        "after"
+      ],
+      "title": "Amendment",
+      "type": "object"
+    },
+    "AnalysisFile": {
+      "additionalProperties": false,
+      "description": "A computation over saved outputs, and the comparisons it produced. What it read (runs, other analyses, resources\nby hash), how (its command and the repository at that moment, on its receipt), its method (the resampling unit, how\nmany draws, the level), and its basis: `computed` when rb read the numbers from an output file it hashed, `reported`\nwhen they were typed from a document, each checked against the text that states it. A reanalysis is an analysis,\nnever a run: it adds no unit. `supersedes` names earlier analyses it replaces, with `why`; their readings stay as\nhistory.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "analysis"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "uid": {
+          "pattern": "^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$",
+          "title": "Uid",
+          "type": "string"
+        },
+        "experiment": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Experiment",
+          "type": "string"
+        },
+        "title": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Title",
+          "type": "string"
+        },
+        "reads": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reads",
+          "type": "array"
+        },
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/ResourceUse"
+          },
+          "title": "Inputs",
+          "type": "array"
+        },
+        "method": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Method",
+          "type": "string"
+        },
+        "unit": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Unit",
+          "type": "string"
+        },
+        "units": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Units"
+        },
+        "draws": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Draws"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 1,
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level"
+        },
+        "basis": {
+          "default": "computed",
+          "enum": [
+            "computed",
+            "reported"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/FileRef"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "comparisons": {
+          "items": {
+            "$ref": "#/$defs/Comparison"
+          },
+          "minItems": 1,
+          "title": "Comparisons",
+          "type": "array"
+        },
+        "supersedes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Supersedes",
+          "type": "array"
+        },
+        "why": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Why",
+          "type": "string"
+        },
+        "produced_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Produced At"
+        },
+        "produced_basis": {
+          "default": "recorded",
+          "enum": [
+            "reported",
+            "review",
+            "journal",
+            "git",
+            "file",
+            "recorded",
+            "unknown"
+          ],
+          "title": "Produced Basis",
+          "type": "string"
+        },
+        "receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Receipt"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "created_by",
+        "created_at",
+        "id",
+        "uid",
+        "experiment",
+        "comparisons"
+      ],
+      "title": "analysis file (.rb/experiments/<experiment>/analyses/<id>.yaml)",
+      "type": "object"
+    },
+    "CallSource": {
+      "additionalProperties": false,
+      "description": "The document a past call is given from: its path and line, the words quoted from it, and the earliest commit\nthat held those words at that path when the call was recorded (none when no commit did).",
+      "properties": {
+        "path": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "line": {
+          "minimum": 1,
+          "title": "Line",
+          "type": "integer"
+        },
+        "quote": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{40,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
+        }
+      },
+      "required": [
+        "path",
+        "line",
+        "quote"
+      ],
+      "title": "CallSource",
+      "type": "object"
+    },
+    "Check": {
+      "additionalProperties": false,
+      "description": "A script of the repository that checks the work (an audit, a test) and how to run it, as the repository's own\nfiles say (`said_at`: file:line). Its outcome is read, never stored: from a run rb watched (rb journal run), or from\na file an audit wrote that says whether it passed.",
+      "properties": {
+        "path": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "command": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Command",
+          "type": "string"
+        },
+        "said_at": {
+          "default": "",
+          "maxLength": 400,
+          "title": "Said At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "Check",
+      "type": "object"
+    },
+    "Cited": {
+      "additionalProperties": false,
+      "description": "The value a cited source (a paper, the authors' evaluation code) used for this setting. When it differs from ours,\na cited criterion on the experiment is not comparable rather than not reproduced.",
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Cited",
+      "type": "object"
+    },
+    "Comparison": {
+      "additionalProperties": false,
+      "description": "One comparison an analysis produced: `subject` against `reference` (none: a level) on `metric`, as `estimand`\nsays it was estimated, with the estimate and, when there is one, the interval (`lo`, `hi` at `level`). `unit` and\n`n` say what the interval resampled and how many of them; `source` is where a reported number is stated, checked by\nrb when it was recorded. Its identity is experiment, subject, reference, metric and estimand: an analysis that\nreports the same identity later replaces this reading, which stays on record as history.",
+      "properties": {
+        "subject": {
+          "default": "",
+          "pattern": "^[A-Za-z0-9_.:+-]{0,60}$",
+          "title": "Subject",
+          "type": "string"
+        },
+        "reference": {
+          "default": "",
+          "pattern": "^[A-Za-z0-9_.:+-]{0,60}$",
+          "title": "Reference",
+          "type": "string"
+        },
+        "metric": {
+          "pattern": "^[A-Za-z0-9_.:/-]{1,80}$",
+          "title": "Metric",
+          "type": "string"
+        },
+        "estimand": {
+          "default": "",
+          "pattern": "^[A-Za-z0-9_.:-]{0,60}$",
+          "title": "Estimand",
+          "type": "string"
+        },
+        "estimate": {
+          "title": "Estimate",
+          "type": "number"
+        },
+        "lo": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lo"
+        },
+        "hi": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hi"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 1,
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level"
+        },
+        "unit": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Unit",
+          "type": "string"
+        },
+        "n": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric",
+        "estimate"
+      ],
+      "title": "Comparison",
+      "type": "object"
+    },
+    "ConfigCheck": {
+      "additionalProperties": false,
+      "description": "The run's own resolved config (Hydra, W&B, Lightning) compared with the spec: whether\nthe run actually used the settings the spec says, not only whether a file states them.",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "matches": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Matches",
+          "type": "array"
+        },
+        "mismatches": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Mismatches",
+          "type": "array"
+        },
+        "absent": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Absent",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "ConfigCheck",
+      "type": "object"
+    },
+    "Conflict": {
+      "additionalProperties": false,
+      "description": "A verified source that now states a different value. Re-verifying never clears it: the setting's value or its\nsource has to change.",
+      "properties": {
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "read": {
+          "default": null,
+          "title": "Read"
+        },
+        "text": {
+          "default": "",
+          "maxLength": 400,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at"
+      ],
+      "title": "Conflict",
+      "type": "object"
+    },
+    "CriteriaFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "criteria file (.rb/experiments/<id>/criteria.yaml)",
+      "description": "Every criterion of one experiment in one file, as rb wrote them before each criterion had a file of its own: still read, and moved to one file each the next time rb writes the experiment.",
+      "properties": {
+        "rb": {
+          "const": 1
+        },
+        "kind": {
+          "const": "criteria"
+        },
+        "experiment": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$"
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CriterionEntry"
+          }
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "experiment",
+        "criteria"
+      ]
+    },
+    "CriterionEntry": {
+      "additionalProperties": false,
+      "description": "A rule over one comparison, declared by someone at a time, recorded on its experiment: what would count.\n\nWhat it compares. `metric` names what is measured, in the form runs report it: `val_loss` (the only candidate's,\nwhen there is one), `int8.val_loss` (a variant's level), `candidate.val_loss` (by role), or `change.val_loss` (the\ncandidate against the baseline). Or, spelled out: `subject` (the arm it is about), `reference` (the arm it is\ncompared against; none makes it a level) and the bare `metric`. `estimand` names what is estimated when that is not\nrb's own reading of the runs (a mean over units, paired when there is a reference): `pooled`, `per_class`. An\nanalysis that reports the same subject, reference, metric and estimand is read in place of the runs.\n\nIts rule (`comparator`): a threshold (`at_most`, `at_least`, `equals` with a tolerance) read on the estimate\n(`over: mean`), on every unit (`each`) or on the interval's bound (`bound`); `better` (the interval clear of 0 on\nthe better side); `noninferior` (the interval's worse bound inside `margin`); `equivalent` (the interval inside\n±`margin`). The last three need an interval and the metric's direction.\n\nIts role: `primary` (what the work claims), `secondary`, `exploratory`, or `gate` (a priority policy for spending\neffort: missing a gate parks a line of work, it never refutes anything). `min_n` counts independent units.\n\n`origin`: `own` is a rule you set; `cited` is a number someone else stated (a paper's table), which the runs\nreproduce or not; `inherited` came from another project or manifest and stays so until reproduced here. `words`\nare the user's words it was declared on, verbatim, when an agent gave them.",
+      "properties": {
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "statement": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "metric": {
+          "pattern": "^[A-Za-z0-9_.:/-]{1,80}$",
+          "title": "Metric",
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "pattern": "^[A-Za-z0-9_.:+-]{0,60}$",
+          "title": "Subject",
+          "type": "string"
+        },
+        "reference": {
+          "default": "",
+          "pattern": "^[A-Za-z0-9_.:+-]{0,60}$",
+          "title": "Reference",
+          "type": "string"
+        },
+        "estimand": {
+          "default": "",
+          "pattern": "^[A-Za-z0-9_.:-]{0,60}$",
+          "title": "Estimand",
+          "type": "string"
+        },
+        "where": {
+          "additionalProperties": true,
+          "title": "Where",
+          "type": "object"
+        },
+        "subject_where": {
+          "additionalProperties": true,
+          "title": "Subject Where",
+          "type": "object"
+        },
+        "reference_where": {
+          "additionalProperties": true,
+          "title": "Reference Where",
+          "type": "object"
+        },
+        "comparator": {
+          "enum": [
+            "at_most",
+            "at_least",
+            "equals",
+            "better",
+            "noninferior",
+            "equivalent"
+          ],
+          "title": "Comparator",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        },
+        "tolerance": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tolerance"
+        },
+        "margin": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Margin"
+        },
+        "over": {
+          "default": "mean",
+          "enum": [
+            "mean",
+            "each",
+            "bound"
+          ],
+          "title": "Over",
+          "type": "string"
+        },
+        "role": {
+          "default": "primary",
+          "enum": [
+            "primary",
+            "secondary",
+            "exploratory",
+            "gate"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "min_n": {
+          "default": 1,
+          "maximum": 100000,
+          "minimum": 1,
+          "title": "Min N",
+          "type": "integer"
+        },
+        "noise": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Noise"
+        },
+        "origin": {
+          "default": "own",
+          "enum": [
+            "own",
+            "cited",
+            "inherited"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "words": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Words",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        },
+        "question_links": {
+          "items": {
+            "$ref": "#/$defs/QuestionLink"
+          },
+          "title": "Question Links",
+          "type": "array"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/CriterionRelation"
+          },
+          "title": "Relations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "created_by",
+        "created_at",
+        "id",
+        "statement",
+        "metric",
+        "comparator"
+      ],
+      "title": "Criterion (in its experiment's criteria file)",
+      "type": "object"
+    },
+    "CriterionFile": {
+      "additionalProperties": false,
+      "description": "A rule over one comparison, declared by someone at a time, recorded on its experiment: what would count.\n\nWhat it compares. `metric` names what is measured, in the form runs report it: `val_loss` (the only candidate's,\nwhen there is one), `int8.val_loss` (a variant's level), `candidate.val_loss` (by role), or `change.val_loss` (the\ncandidate against the baseline). Or, spelled out: `subject` (the arm it is about), `reference` (the arm it is\ncompared against; none makes it a level) and the bare `metric`. `estimand` names what is estimated when that is not\nrb's own reading of the runs (a mean over units, paired when there is a reference): `pooled`, `per_class`. An\nanalysis that reports the same subject, reference, metric and estimand is read in place of the runs.\n\nIts rule (`comparator`): a threshold (`at_most`, `at_least`, `equals` with a tolerance) read on the estimate\n(`over: mean`), on every unit (`each`) or on the interval's bound (`bound`); `better` (the interval clear of 0 on\nthe better side); `noninferior` (the interval's worse bound inside `margin`); `equivalent` (the interval inside\n±`margin`). The last three need an interval and the metric's direction.\n\nIts role: `primary` (what the work claims), `secondary`, `exploratory`, or `gate` (a priority policy for spending\neffort: missing a gate parks a line of work, it never refutes anything). `min_n` counts independent units.\n\n`origin`: `own` is a rule you set; `cited` is a number someone else stated (a paper's table), which the runs\nreproduce or not; `inherited` came from another project or manifest and stays so until reproduced here. `words`\nare the user's words it was declared on, verbatim, when an agent gave them.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "criterion"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "experiment": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Experiment",
+          "type": "string"
+        },
+        "statement": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "metric": {
+          "pattern": "^[A-Za-z0-9_.:/-]{1,80}$",
+          "title": "Metric",
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "pattern": "^[A-Za-z0-9_.:+-]{0,60}$",
+          "title": "Subject",
+          "type": "string"
+        },
+        "reference": {
+          "default": "",
+          "pattern": "^[A-Za-z0-9_.:+-]{0,60}$",
+          "title": "Reference",
+          "type": "string"
+        },
+        "estimand": {
+          "default": "",
+          "pattern": "^[A-Za-z0-9_.:-]{0,60}$",
+          "title": "Estimand",
+          "type": "string"
+        },
+        "where": {
+          "additionalProperties": true,
+          "title": "Where",
+          "type": "object"
+        },
+        "subject_where": {
+          "additionalProperties": true,
+          "title": "Subject Where",
+          "type": "object"
+        },
+        "reference_where": {
+          "additionalProperties": true,
+          "title": "Reference Where",
+          "type": "object"
+        },
+        "comparator": {
+          "enum": [
+            "at_most",
+            "at_least",
+            "equals",
+            "better",
+            "noninferior",
+            "equivalent"
+          ],
+          "title": "Comparator",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        },
+        "tolerance": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tolerance"
+        },
+        "margin": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Margin"
+        },
+        "over": {
+          "default": "mean",
+          "enum": [
+            "mean",
+            "each",
+            "bound"
+          ],
+          "title": "Over",
+          "type": "string"
+        },
+        "role": {
+          "default": "primary",
+          "enum": [
+            "primary",
+            "secondary",
+            "exploratory",
+            "gate"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "min_n": {
+          "default": 1,
+          "maximum": 100000,
+          "minimum": 1,
+          "title": "Min N",
+          "type": "integer"
+        },
+        "noise": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Noise"
+        },
+        "origin": {
+          "default": "own",
+          "enum": [
+            "own",
+            "cited",
+            "inherited"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "words": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Words",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        },
+        "question_links": {
+          "items": {
+            "$ref": "#/$defs/QuestionLink"
+          },
+          "title": "Question Links",
+          "type": "array"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/CriterionRelation"
+          },
+          "title": "Relations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "created_by",
+        "created_at",
+        "id",
+        "experiment",
+        "statement",
+        "metric",
+        "comparator"
+      ],
+      "title": "criterion file (.rb/experiments/<experiment>/criteria/<id>.yaml)",
+      "type": "object"
+    },
+    "CriterionRelation": {
+      "additionalProperties": false,
+      "description": "An attributed comparison between two criteria. Alignment is declared explicitly; a reversal is computed\nfrom both current differences, never asserted by this link. The scopes retain what the alignment meant.",
+      "properties": {
+        "kind": {
+          "const": "reverses",
+          "default": "reverses",
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Target",
+          "type": "string"
+        },
+        "orientation": {
+          "enum": [
+            "same",
+            "opposite"
+          ],
+          "title": "Orientation",
+          "type": "string"
+        },
+        "source_scope": {
+          "additionalProperties": true,
+          "title": "Source Scope",
+          "type": "object"
+        },
+        "target_scope": {
+          "additionalProperties": true,
+          "title": "Target Scope",
+          "type": "object"
+        },
+        "declared_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Declared By",
+          "type": "string"
+        },
+        "declared_at": {
+          "title": "Declared At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "why": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Why",
+          "type": "string"
+        },
+        "words": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Words",
+          "type": "string"
+        },
+        "session": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "target",
+        "orientation",
+        "source_scope",
+        "target_scope",
+        "declared_by",
+        "declared_at",
+        "why"
+      ],
+      "title": "CriterionRelation",
+      "type": "object"
+    },
+    "DecisionFile": {
+      "additionalProperties": false,
+      "description": "A call, recorded with what it was made on and when to revisit it.\n\n`accept`, `reject` and `investigate` are calls on a finding (a criterion), an experiment, a question, or a\nsetting (e1/lr: vouching for its value). `continue`, `park`, `stop`, `pivot` and `ship` are calls on a line of work\n(an experiment or a question). A missed gate and `park` is how a line pauses without anything being refuted. Anyone\nmay record any of them: each is attributed to who recorded it, with the chat session when known, the reason as\ngiven (`why`), and, when an agent recorded it on the user's words, those words verbatim (`words`). One recorded in\nan agent session is proposed, not made, until the user confirms it (rb confirm); that authority is computed on\nevery read, never stored. `past` marks a call made before it was recorded.\n\n`basis` is the reading of every finding the call was made on, so a decision is always read against it: when the\nevidence moves, the decision says it was made on an earlier reading. A question call that keeps `inquiry_basis` also\nkeeps here the reading of each missed gate it settles, and settles the gate while that reading holds. `revisit` is\nthe condition for looking again.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "decision"
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "subject": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Subject",
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "accept",
+            "reject",
+            "investigate",
+            "continue",
+            "park",
+            "stop",
+            "pivot",
+            "ship"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "why": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Why",
+          "type": "string"
+        },
+        "revisit": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Revisit",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "session": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session"
+        },
+        "words": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Words",
+          "type": "string"
+        },
+        "basis": {
+          "additionalProperties": true,
+          "title": "Basis",
+          "type": "object"
+        },
+        "inquiry_basis": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inquiry Basis"
+        },
+        "value": {
+          "default": null,
+          "title": "Value"
+        },
+        "across": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Across"
+        },
+        "past": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Past"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "id",
+        "subject",
+        "action",
+        "why",
+        "by",
+        "at"
+      ],
+      "title": "decision file (.rb/decisions/<id>.yaml)",
+      "type": "object"
+    },
+    "ExperimentFile": {
+      "additionalProperties": false,
+      "description": "What is tested: why (purpose, hypothesis), how (variants, shared settings, what it varies on purpose), and by what\nrule (its criteria, recorded beside it). A setting that differs between variants without being declared in `varies`\nis a confound. An experiment with no runs yet is a planned direction; it shows as such. It may answer to several\nquestions at once.\n\nWhen the repository already holds it, as a results folder with its report, manifest and outputs, `folder` names that\nfolder and `files`, `quotes` and `checks` index what is there (rb reconcile --apply): the files where they are, by\nhash; what they say, verbatim; the scripts that check them. The record points at the repository; it never copies it.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "experiment"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "uid": {
+          "pattern": "^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$",
+          "title": "Uid",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Questions",
+          "type": "array"
+        },
+        "purpose": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Purpose",
+          "type": "string"
+        },
+        "hypothesis": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Hypothesis",
+          "type": "string"
+        },
+        "why": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Why",
+          "type": "string"
+        },
+        "if_holds": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "If Holds",
+          "type": "string"
+        },
+        "if_not": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "If Not",
+          "type": "string"
+        },
+        "varies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Varies",
+          "type": "array"
+        },
+        "variants": {
+          "items": {
+            "$ref": "#/$defs/Variant"
+          },
+          "title": "Variants",
+          "type": "array"
+        },
+        "settings": {
+          "items": {
+            "$ref": "#/$defs/Setting"
+          },
+          "title": "Settings",
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/Note"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/Relation"
+          },
+          "title": "Relations",
+          "type": "array"
+        },
+        "frozen": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Freeze"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "amendments": {
+          "items": {
+            "$ref": "#/$defs/Amendment"
+          },
+          "title": "Amendments",
+          "type": "array"
+        },
+        "folder": {
+          "default": "",
+          "maxLength": 400,
+          "title": "Folder",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/RepoFile"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "quotes": {
+          "items": {
+            "$ref": "#/$defs/Quote"
+          },
+          "title": "Quotes",
+          "type": "array"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "indexed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Indexed"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "created_by",
+        "created_at",
+        "id",
+        "uid",
+        "title"
+      ],
+      "title": "experiment file (.rb/experiments/<id>/experiment.yaml)",
+      "type": "object"
+    },
+    "Exposure": {
+      "additionalProperties": false,
+      "description": "Someone looked at a dataset's contents in a way that can shape what they declare next: inspected its cases,\nselected on it, evaluated on it outside a run, or trained on it. A criterion declared after its evaluation data was\nexposed reads as declared after the data was seen. `at` is when it happened, null when nobody knows (then no\ncriterion reading the data can be shown to come before it); `reported` says it was given, not the moment it was\nrecorded.",
+      "properties": {
+        "how": {
+          "enum": [
+            "inspected",
+            "selected",
+            "evaluated",
+            "trained"
+          ],
+          "title": "How",
+          "type": "string"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        },
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "recorded_at": {
+          "title": "Recorded At",
+          "type": "string"
+        },
+        "reported": {
+          "default": false,
+          "title": "Reported",
+          "type": "boolean"
+        },
+        "why": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "how",
+        "by",
+        "recorded_at"
+      ],
+      "title": "Exposure",
+      "type": "object"
+    },
+    "FileRef": {
+      "additionalProperties": false,
+      "description": "A file a run named, hashed when it was recorded. Whether it is still there, and still the same bytes, is\ncomputed when read.",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "bytes": {
+          "title": "Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes"
+      ],
+      "title": "FileRef",
+      "type": "object"
+    },
+    "Freeze": {
+      "additionalProperties": false,
+      "description": "Pre-registration: the spec and the criteria locked, by whoever locked them, with the user's words an agent\nlocked them on, when it gave them.",
+      "properties": {
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "why": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Why",
+          "type": "string"
+        },
+        "after_runs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "After Runs",
+          "type": "array"
+        },
+        "words": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Words",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "at",
+        "by"
+      ],
+      "title": "Freeze",
+      "type": "object"
+    },
+    "Indexed": {
+      "additionalProperties": false,
+      "description": "Who indexed a folder of the repository into the record (rb reconcile --apply), when, and at which commit.",
+      "properties": {
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
+        }
+      },
+      "required": [
+        "by",
+        "at"
+      ],
+      "title": "Indexed",
+      "type": "object"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "description": "One place a resource's bytes were, as someone recorded it. A location can vanish; the resource stays.",
+      "properties": {
+        "provider": {
+          "enum": [
+            "local",
+            "url",
+            "git",
+            "wandb",
+            "mlflow",
+            "s3",
+            "gcs",
+            "hf",
+            "runpod",
+            "other"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "ref": {
+          "maxLength": 600,
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 400,
+          "title": "Note",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "at": {
+          "title": "At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "ref",
+        "by",
+        "at"
+      ],
+      "title": "Location",
+      "type": "object"
+    },
+    "MetricFile": {
+      "additionalProperties": false,
+      "description": "A measurement the catalogue knows: its unit, which direction is better, and the other names it goes by. A run may\nreport a metric that is not declared; it is shown as undeclared rather than dropped.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "metric"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "unit": {
+          "default": "",
+          "maxLength": 16,
+          "title": "Unit",
+          "type": "string"
+        },
+        "direction": {
+          "default": "none",
+          "enum": [
+            "minimize",
+            "maximize",
+            "none"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "created_by",
+        "created_at",
+        "id"
+      ],
+      "title": "metric file (.rb/metrics/<id>.yaml)",
+      "type": "object"
+    },
+    "Note": {
+      "additionalProperties": false,
+      "description": "Words about an experiment that are not a criterion: an assumption the work takes for granted, a caveat, context.\nKept verbatim with who wrote them; a note never changes a finding. Each note is a file of its own, by its id, so\nnotes written on two branches never meet in one file; a note from before that has no id until rb next writes its\nexperiment. A note taken back (`rb retract <note id>`) stays with `retracted` and leaves the screens.",
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "text": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "text",
+        "by",
+        "at"
+      ],
+      "title": "Note",
+      "type": "object"
+    },
+    "NoteFile": {
+      "additionalProperties": false,
+      "description": "Words about an experiment that are not a criterion: an assumption the work takes for granted, a caveat, context.\nKept verbatim with who wrote them; a note never changes a finding. Each note is a file of its own, by its id, so\nnotes written on two branches never meet in one file; a note from before that has no id until rb next writes its\nexperiment. A note taken back (`rb retract <note id>`) stays with `retracted` and leaves the screens.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "note"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "text": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "text",
+        "by",
+        "at"
+      ],
+      "title": "note file (.rb/experiments/<experiment>/notes/<id>.yaml or notes/<id>.yaml)",
+      "type": "object"
+    },
+    "Parent": {
+      "additionalProperties": false,
+      "description": "Where a cloned project came from. Everything it brought is `inherited` until reproduced here.",
+      "properties": {
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "cloned_at": {
+          "title": "Cloned At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "cloned_at"
+      ],
+      "title": "Parent",
+      "type": "object"
+    },
+    "Past": {
+      "additionalProperties": false,
+      "description": "A call made before it was recorded (rb decide --past): when, as given (\"unknown\" when nobody said), and the\ndocument that states it, when one was given.",
+      "properties": {
+        "when": {
+          "default": "unknown",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "When",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CallSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Past",
+      "type": "object"
+    },
+    "ProjectFile": {
+      "additionalProperties": false,
+      "description": "`.rb/project.yaml`: the root of one project's record.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "project"
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "uid": {
+          "pattern": "^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$",
+          "title": "Uid",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Parent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/Note"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "indexed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Indexed"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "id",
+        "uid",
+        "title",
+        "created_by",
+        "created_at"
+      ],
+      "title": "project file (.rb/project.yaml)",
+      "type": "object"
+    },
+    "QuestionFile": {
+      "additionalProperties": false,
+      "description": "What the work is trying to find out. A sub-question names its `parent`; experiments are filed under one or more\nquestions; where a question stands is read from its experiments' findings and the decisions made on it, never\nstored. A child's negative is the child's: it never becomes the parent's refutation.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "question"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent"
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "created_by",
+        "created_at",
+        "id",
+        "text"
+      ],
+      "title": "question file (.rb/questions/<id>.yaml)",
+      "type": "object"
+    },
+    "QuestionLink": {
+      "additionalProperties": false,
+      "description": "A criterion's declared relevance to a question. `when_met` is its author's verbatim interpretation,\nnever an answer inferred by rb. The question's wording is kept so a reframing cannot silently change it.\nRevisions retract the old declaration and keep it beside the new one.",
+      "properties": {
+        "question": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Question",
+          "type": "string"
+        },
+        "question_text": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Question Text",
+          "type": "string"
+        },
+        "when_met": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "When Met",
+          "type": "string"
+        },
+        "declared_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Declared By",
+          "type": "string"
+        },
+        "declared_at": {
+          "title": "Declared At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "why": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Why",
+          "type": "string"
+        },
+        "words": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Words",
+          "type": "string"
+        },
+        "session": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "question",
+        "question_text",
+        "declared_by",
+        "declared_at"
+      ],
+      "title": "QuestionLink",
+      "type": "object"
+    },
+    "Quote": {
+      "additionalProperties": false,
+      "description": "Words from the repository's own files, verbatim, with where they are: a report's title and opening lines, a\nsection its own heading calls a result, a limitation or a next step, a command in a reproduction guide. rb chooses\nthe span by the file's headings and blocks; every word is the file's. `cut` says the span goes on past what rb keeps.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "title",
+            "summary",
+            "result",
+            "limitation",
+            "next",
+            "command"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "lines": {
+          "pattern": "^\\d+(-\\d+)?$",
+          "title": "Lines",
+          "type": "string"
+        },
+        "heading": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Heading",
+          "type": "string"
+        },
+        "cut": {
+          "default": false,
+          "title": "Cut",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "text",
+        "path",
+        "lines"
+      ],
+      "title": "Quote",
+      "type": "object"
+    },
+    "Receipt": {
+      "additionalProperties": true,
+      "description": "What rb recorded when the run was. `attached` is the repository at that moment; `produced` is where the numbers\ncame from, when --commit or --tree says so, and `produced.existed` the earliest sign of the bytes of the file its\nnumbers were read from (--from), the journal's first sighting, git's first commit or the file's last write, the\nfirst two left out when a run here already recorded those bytes, which says whether the run was made before it was\nrecorded. `command` is what the caller said produced the numbers; rb did not run it. `session` is the chat session\nthat recorded it, when its runtime said, and `agent` what rb knew of the agent that recorded it. `row` is the row of\na SQLite database its numbers were read from, on a run read from one.",
+      "properties": {
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "actor": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Actor",
+          "type": "string"
+        },
+        "actor_via": {
+          "default": "",
+          "title": "Actor Via",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "rb_version": {
+          "title": "Rb Version",
+          "type": "string"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "session": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session"
+        },
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Agent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "attached": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attached"
+        },
+        "produced": {
+          "additionalProperties": true,
+          "title": "Produced",
+          "type": "object"
+        },
+        "environment": {
+          "additionalProperties": true,
+          "title": "Environment",
+          "type": "object"
+        },
+        "run_record": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Record"
+        },
+        "config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConfigCheck"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "row": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RowRead"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "at",
+        "actor",
+        "rb_version"
+      ],
+      "title": "Receipt",
+      "type": "object"
+    },
+    "Relation": {
+      "additionalProperties": false,
+      "description": "How this experiment stands to another one: it reproduces it, extends it, follows from it, or compares with it.\n`target` is the other experiment's id here, its global uid, or the address of a published manifest.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "reproduces",
+            "extends",
+            "follows_from",
+            "compares_with"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "maxLength": 600,
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "at": {
+          "title": "At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "target",
+        "by",
+        "at"
+      ],
+      "title": "Relation",
+      "type": "object"
+    },
+    "RepoFile": {
+      "additionalProperties": false,
+      "description": "A file of the repository an experiment rests on, indexed where it is and never copied: its path, what it is to\nthe experiment, its hash and size when rb indexed it, and how git held it then. A folder of many large files (arrays,\nimages) is one entry, with how many files and bytes it held. Whether each is still there and still the same bytes is\ncomputed when read.",
+      "properties": {
+        "path": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "report",
+            "manifest",
+            "results",
+            "audit",
+            "reproduction",
+            "protocol",
+            "code",
+            "check",
+            "data",
+            "other"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "files": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Files",
+          "type": "integer"
+        },
+        "git": {
+          "default": "unknown",
+          "enum": [
+            "tracked",
+            "ignored",
+            "untracked",
+            "mixed",
+            "unknown"
+          ],
+          "title": "Git",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "role"
+      ],
+      "title": "RepoFile",
+      "type": "object"
+    },
+    "Resolution": {
+      "additionalProperties": false,
+      "description": "What rb read when it verified a source. Written by rb only, and re-checked on every read.",
+      "properties": {
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "text": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "read": {
+          "default": null,
+          "title": "Read"
+        }
+      },
+      "required": [
+        "at",
+        "sha256",
+        "text"
+      ],
+      "title": "Resolution",
+      "type": "object"
+    },
+    "ResourceFile": {
+      "additionalProperties": false,
+      "description": "A dataset, checkpoint, code, environment or artifact an experiment depends on or produces: what it is (identity),\nwhere it has been (locations), and how to get it again (acquisition). Availability is not stored: it is computed\non every read as present, changed (a copy is here, but not the bytes the identity names), remote, reconstructible\nor lost, so deleting a 100 GB benchmark copy never loses what the benchmark was. Identity is as exact as what was\nrecorded: a sha256 or a digest names the bytes, a version names a release, and a name alone is said to be only\nthat. Exposures record who has looked at it and how; runs that evaluate on it expose it too, computed.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "resource"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "uid": {
+          "pattern": "^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$",
+          "title": "Uid",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "dataset",
+            "checkpoint",
+            "code",
+            "environment",
+            "artifact",
+            "other"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Version",
+          "type": "string"
+        },
+        "subset": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Subset",
+          "type": "string"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "digest": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Digest",
+          "type": "string"
+        },
+        "acquisition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Acquisition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "locations": {
+          "items": {
+            "$ref": "#/$defs/Location"
+          },
+          "title": "Locations",
+          "type": "array"
+        },
+        "exposures": {
+          "items": {
+            "$ref": "#/$defs/Exposure"
+          },
+          "title": "Exposures",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "created_by",
+        "created_at",
+        "id",
+        "uid",
+        "type",
+        "name"
+      ],
+      "title": "resource file (.rb/resources/<id>.yaml)",
+      "type": "object"
+    },
+    "ResourceUse": {
+      "additionalProperties": false,
+      "description": "A resource a run read (an input) or made (an output), in what role (`dataset`, `checkpoint`, `results`), and\nwhat rb found when the run was recorded: where the resource stood, and the bytes of the copy here when it is one\nfile. The resource says what it is; the use says what this run touched, so a later change is attributable.",
+      "properties": {
+        "resource": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Resource",
+          "type": "string"
+        },
+        "role": {
+          "default": "",
+          "maxLength": 40,
+          "title": "Role",
+          "type": "string"
+        },
+        "availability": {
+          "anyOf": [
+            {
+              "enum": [
+                "present",
+                "changed",
+                "remote",
+                "reconstructible",
+                "lost"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Availability"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        }
+      },
+      "required": [
+        "resource"
+      ],
+      "title": "ResourceUse",
+      "type": "object"
+    },
+    "Retraction": {
+      "additionalProperties": false,
+      "description": "A mistake is retracted, never deleted: it stays on record with who and why, and stops counting. `words` are the\nuser's words an agent retracted it on, verbatim, when it gave them.\n\n`scope` makes a retraction partial, for runs only: it names the measurements the retraction supersedes (a metric's\nname, or its last segment), and the run keeps counting for everything else. A timing bug that left the numerical\noutputs untouched supersedes the timings, not the run.",
+      "properties": {
+        "at": {
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "By",
+          "type": "string"
+        },
+        "why": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Why",
+          "type": "string"
+        },
+        "scope": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Scope",
+          "type": "array"
+        },
+        "words": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Words",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "by",
+        "why"
+      ],
+      "title": "Retraction",
+      "type": "object"
+    },
+    "RowRead": {
+      "additionalProperties": true,
+      "description": "The row of a SQLite database a run's numbers were read from (rb run add --from <database> --table --where).\n`store` is the kind of file rb read the row from (sqlite); whether that file is where the numbers were first\nwritten, rb does not determine. `path` is the database as the run's files name it, `sha256` its bytes when read;\n`table`, and the row's key: `where`, the columns it was picked by with the row's own values, and `rowid` when the\ntable has one. Then, for each value, the column it was read from: `columns` for a metric as the run records it,\n`per_run` for a per-run setting, and `produced_at` for the time the run was made. A key a later rb adds is kept.",
+      "properties": {
+        "store": {
+          "const": "sqlite",
+          "title": "Store",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "table": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Table",
+          "type": "string"
+        },
+        "where": {
+          "additionalProperties": true,
+          "title": "Where",
+          "type": "object"
+        },
+        "rowid": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rowid"
+        },
+        "columns": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "object"
+        },
+        "per_run": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Per Run",
+          "type": "object"
+        },
+        "produced_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Produced At"
+        }
+      },
+      "required": [
+        "store",
+        "path",
+        "sha256",
+        "table"
+      ],
+      "title": "RowRead",
+      "type": "object"
+    },
+    "RunFile": {
+      "additionalProperties": false,
+      "description": "What ran on an experiment: its results (numbers named `<variant>.<metric>`, `change.<metric>`, or plain for the\ncomparison as a whole), the per-run settings it used, the resources it read and made, where it ran, and the receipt.\nThe machine can be gone; the run is what survives it.\n\nA run is one execution, and adds evidence about its unit (by default itself; a `population.unit` setting names a\nper-run setting whose values are the units, such as the photograph). A run that `repeats` another is verification of\nit, never a new unit. `produced_at` is the earliest evidence of when its output existed, and `produced_basis` says\nwhat that evidence is: reported by the recorder, the journal's first sighting, the file's first commit, the file\nitself, or only the moment it was recorded; or that nobody knows, as for a row of a database read with no time,\nsince a database's own times are not its row's.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "run"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "uid": {
+          "pattern": "^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$",
+          "title": "Uid",
+          "type": "string"
+        },
+        "experiment": {
+          "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+          "title": "Experiment",
+          "type": "string"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Metrics",
+          "type": "object"
+        },
+        "per_run": {
+          "additionalProperties": true,
+          "title": "Per Run",
+          "type": "object"
+        },
+        "repeats": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repeats"
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_.-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Replaces"
+        },
+        "produced_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Produced At"
+        },
+        "produced_basis": {
+          "default": "recorded",
+          "enum": [
+            "reported",
+            "review",
+            "journal",
+            "git",
+            "file",
+            "recorded",
+            "unknown"
+          ],
+          "title": "Produced Basis",
+          "type": "string"
+        },
+        "review_run": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Run"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/FileRef"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/ResourceUse"
+          },
+          "title": "Inputs",
+          "type": "array"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/ResourceUse"
+          },
+          "title": "Outputs",
+          "type": "array"
+        },
+        "host": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Host",
+          "type": "object"
+        },
+        "links": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Links",
+          "type": "object"
+        },
+        "basis": {
+          "default": "typed",
+          "enum": [
+            "run",
+            "file",
+            "logged",
+            "typed"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "spec_sha256": {
+          "title": "Spec Sha256",
+          "type": "string"
+        },
+        "settings": {
+          "additionalProperties": true,
+          "title": "Settings",
+          "type": "object"
+        },
+        "arm_specs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Arm Specs",
+          "type": "object"
+        },
+        "spec_frozen": {
+          "default": false,
+          "title": "Spec Frozen",
+          "type": "boolean"
+        },
+        "synthetic": {
+          "default": false,
+          "title": "Synthetic",
+          "type": "boolean"
+        },
+        "fingerprint": {
+          "default": "",
+          "title": "Fingerprint",
+          "type": "string"
+        },
+        "receipt": {
+          "$ref": "#/$defs/Receipt"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "created_by",
+        "created_at",
+        "id",
+        "uid",
+        "experiment",
+        "spec_sha256",
+        "receipt"
+      ],
+      "title": "run file (.rb/experiments/<experiment>/runs/<id>.yaml)",
+      "type": "object"
+    },
+    "Setting": {
+      "additionalProperties": false,
+      "description": "One thing an experiment depends on: a learning rate, a seed, a CUDA version, a preprocessing choice, a checkpoint.\nA required setting that is unknown, or provisional with nobody vouching for it, keeps the experiment's criteria from\nbeing established. `per_run` settings (a seed) are given by each run rather than fixed in the spec.",
+      "properties": {
+        "name": {
+          "pattern": "^[A-Za-z0-9_.:-]{1,80}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "status": {
+          "default": "unknown",
+          "enum": [
+            "unknown",
+            "provisional",
+            "verified",
+            "inherited"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "per_run": {
+          "default": false,
+          "title": "Per Run",
+          "type": "boolean"
+        },
+        "design_factor": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Design Factor"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cited": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Cited"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Conflict"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "failed": {
+          "anyOf": [
+            {
+              "maxLength": 400,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failed"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 400,
+          "title": "Note",
+          "type": "string"
+        },
+        "set_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Set By",
+          "type": "string"
+        },
+        "set_at": {
+          "title": "Set At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "name",
+        "set_by",
+        "set_at"
+      ],
+      "title": "Setting",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "description": "Where a value or a cited number comes from.\n\n`file`: a path (relative to the directory holding .rb/) with a `key` path for YAML, JSON or TOML (`optim.lr`), or a\n`line`, or a `quote`; optionally read at a `commit`. A paper saved as text is a file source; `locator` says where a\nreader finds it (\"§4.2\", \"Table 3\") and `term` is the word a prose line uses for the setting (\"learning rate\").\n`run`: a JSON file (a run directory means its record.json) and a JSON `pointer`. `url` and `note` record where a value\ncame from but cannot be checked by reading a file.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "file",
+            "run",
+            "url",
+            "note"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "maxLength": 400,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "key": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Key"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "maxLength": 400,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote"
+        },
+        "term": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Term"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{7,40}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
+        },
+        "pointer": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pointer"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "maxLength": 600,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "locator": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locator"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 400,
+          "title": "Note",
+          "type": "string"
+        },
+        "resolved": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Resolution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "Variant": {
+      "additionalProperties": false,
+      "description": "One arm of an experiment: the baseline, a candidate, a control or an ablation. Its settings override the\nexperiment's shared ones; a setting it does not name is shared.",
+      "properties": {
+        "name": {
+          "pattern": "^[A-Za-z0-9_-]{1,40}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "baseline",
+            "candidate",
+            "control",
+            "ablation"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "settings": {
+          "items": {
+            "$ref": "#/$defs/Setting"
+          },
+          "title": "Settings",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "name",
+        "role",
+        "created_by",
+        "created_at"
+      ],
+      "title": "Variant",
+      "type": "object"
+    },
+    "VariantFile": {
+      "additionalProperties": false,
+      "description": "One arm of an experiment: the baseline, a candidate, a control or an ablation. Its settings override the\nexperiment's shared ones; a setting it does not name is shared.",
+      "properties": {
+        "rb": {
+          "const": 1,
+          "description": "the format: Rabbit Brain format 1"
+        },
+        "kind": {
+          "const": "variant"
+        },
+        "name": {
+          "pattern": "^[A-Za-z0-9_-]{1,40}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "baseline",
+            "candidate",
+            "control",
+            "ablation"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "settings": {
+          "items": {
+            "$ref": "#/$defs/Setting"
+          },
+          "title": "Settings",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Note",
+          "type": "string"
+        },
+        "created_by": {
+          "pattern": "^(human|agent):[A-Za-z0-9_.@+-]{1,80}$",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "via": {
+          "default": "cli",
+          "enum": [
+            "cli",
+            "sdk",
+            "mcp",
+            "api"
+          ],
+          "title": "Via",
+          "type": "string"
+        },
+        "retracted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retraction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "rb",
+        "kind",
+        "name",
+        "role",
+        "created_by",
+        "created_at"
+      ],
+      "title": "variant file (.rb/experiments/<experiment>/variants/<name>.yaml)",
+      "type": "object"
+    }
+  }
+}

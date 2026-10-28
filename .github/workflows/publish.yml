@@ -44,7 +44,7 @@ jobs:
           ls dist/rabbit_brain-"$ver".tar.gz dist/rabbit_brain-"$ver"-*manylinux*x86_64.whl
       - name: Test the built wheel
         run: |
-          python -m pip install twine pytest pytest-xdist
+          python -m pip install twine pytest pytest-xdist pyyaml
           python -m twine check dist/*
           python -m pip install dist/rabbit_brain-*manylinux*x86_64.whl
           python -m pytest -q -n auto
@@ -90,7 +90,7 @@ jobs:
       - name: Test the built wheel
         shell: bash
         run: |
-          python -m pip install pytest pytest-xdist
+          python -m pip install pytest pytest-xdist pyyaml
           python -m pip install dist/rabbit_brain-*win_amd64.whl
           python -m pytest -q -n auto
           rb version

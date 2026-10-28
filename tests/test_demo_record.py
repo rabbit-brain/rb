@@ -483,6 +483,16 @@ def test_a_segment_speaks_the_line_its_mode_shows():
             assert cut.voice_line(s, mode).strip(), (s["id"], mode)
 
 
+def _end_watch(out: Path, until: Path, changes: int, within: float = 60) -> None:
+    """Ends a watch step once the walk has marked `changes` changes, then 2 s on for one it should not have: a fixed
+    wait loses the race on a loaded machine, where Chrome is slow to start."""
+    marks, deadline = out / "marks.jsonl", time.monotonic() + within
+    while time.monotonic() < deadline and not (marks.is_file() and sum('"change"' in l for l in marks.read_text().splitlines()) >= changes):
+        time.sleep(0.1)
+    time.sleep(2)
+    until.write_text("")
+
+
 def _walk(tmp_path, steps, *extra, timeout=120):
     (tmp_path / "beats.json").write_text(json.dumps({"width": 800, "height": 600, "scale": 1, "beats": [{"name": "t", "steps": steps}]}))
     return subprocess.run(["node", str(MAKE_STUDY.parent / "walk.mjs"), "--script", str(tmp_path / "beats.json"), "--out", str(tmp_path / "w"),
@@ -1807,8 +1817,7 @@ setTimeout(() => {
         {"goto": "/files/p.html", "settle": 0}, {"watch": "#nav, #main", "ignore": "[data-live]", "until": str(until), "settle": 200}]}]}))
     walk = subprocess.Popen(["node", str(MAKE_STUDY.parent / "walk.mjs"), "--script", str(tmp_path / "beats.json"), "--out", str(tmp_path / "w"),
                              "--serve", str(tmp_path / "files")], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    time.sleep(6)
-    until.write_text("")
+    _end_watch(tmp_path / "w", until, 1)
     out, err = walk.communicate(timeout=60)
     assert walk.returncode == 0, out + err
     changes = [json.loads(l) for l in (tmp_path / "w" / "marks.jsonl").read_text().splitlines() if '"change"' in l]
@@ -1840,8 +1849,7 @@ setTimeout(() => { document.getElementById('n').textContent = '12 runs';
         {"goto": "/files/p.html", "settle": 0}, {"watch": "#main", "until": str(until), "settle": 100}]}]}))
     walk = subprocess.Popen(["node", str(MAKE_STUDY.parent / "walk.mjs"), "--script", str(tmp_path / "beats.json"), "--out", str(tmp_path / "w"),
                              "--serve", str(tmp_path / "files")], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    time.sleep(5)
-    until.write_text("")
+    _end_watch(tmp_path / "w", until, 2)
     out, err = walk.communicate(timeout=60)
     assert walk.returncode == 0, out + err
     changes = [json.loads(l) for l in (tmp_path / "w" / "marks.jsonl").read_text().splitlines() if '"change"' in l]
@@ -2182,8 +2190,7 @@ setTimeout(() => {{
         {"goto": "/files/p.html", "settle": 0}, {"watch": "#queue", "until": str(until), "settle": 200}]}]}))
     walk = subprocess.Popen(["node", str(MAKE_STUDY.parent / "walk.mjs"), "--script", str(tmp_path / "beats.json"), "--out", str(tmp_path / "w"),
                              "--serve", str(tmp_path / "files")], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    time.sleep(5)
-    until.write_text("")
+    _end_watch(tmp_path / "w", until, 1)
     out, err = walk.communicate(timeout=60)
     assert walk.returncode == 0, out + err
     (c,) = [json.loads(l) for l in (tmp_path / "w" / "marks.jsonl").read_text().splitlines() if '"change"' in l]
@@ -2360,8 +2367,7 @@ setTimeout(() => { document.getElementById('title').textContent = 'INT8 ResNet-5
         {"goto": "/files/p.html", "settle": 0}, {"watch": "#main", "until": str(until), "settle": 100}]}]}))
     walk = subprocess.Popen(["node", str(MAKE_STUDY.parent / "walk.mjs"), "--script", str(tmp_path / "beats.json"), "--out", str(tmp_path / "w"),
                              "--serve", str(tmp_path / "files")], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    time.sleep(4)
-    until.write_text("")
+    _end_watch(tmp_path / "w", until, 1)
     out, err = walk.communicate(timeout=60)
     assert walk.returncode == 0, out + err
     marks = [json.loads(l) for l in (tmp_path / "w" / "marks.jsonl").read_text().splitlines()]

@@ -96,7 +96,9 @@ def test_a_record_s_versions_are_its_commits_by_sha_and_time(rec):
     [v] = answer["versions"]                                     # one commit changed .rb/ on main
     sha = rec.git("rev-parse", "HEAD")
     assert set(v) == {"sha", "committed", "label", "shown", "shown_short", "note"} and v["sha"] == sha and v["note"] == ""
-    assert v["committed"] == rec.git("show", "-s", "--format=%cI", sha)
+    # git's own time, with UTC written +00:00 whichever way this git writes it
+    made = rec.git("show", "-s", "--format=%cI", sha)
+    assert v["committed"] == (made[:-1] + "+00:00" if made.endswith("Z") else made)
     assert v["label"].startswith(sha[:12] + " · 20") and v["shown"].startswith(f"main · {rec.root.resolve().as_posix()} at {sha[:12]}, 20")
     assert v["label"].endswith(" UTC") and v["shown"].endswith(" UTC: a past version, read only")
     text = json.dumps(answer["versions"])

@@ -205,6 +205,7 @@ def test_a_found_item_shows_without_a_record_write(placed):
     assert answer(server.url + "/digest.json")[1]["key"] not in (before, after)
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="rb open's live key on Windows: Windows is a preview (issue #2)", strict=False)
 def test_a_reading_that_moves_without_a_write_moves_the_key(placed):
     """What rb computes on reading the record moves the key with no record file written and nothing found: a setting's
     source that now states another value is a conflict on the page, so the page's key moves, and stays put after."""

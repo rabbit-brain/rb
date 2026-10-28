@@ -269,6 +269,9 @@ import time  # noqa: E402
 
 import pytest  # noqa: E402
 
+# the demo film's tools (tools/demo) drive a POSIX shell, rsync and scripts run by their #! line
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="the demo film's tools run on Linux and macOS")
+
 # found, never imported: torch in a pytest worker counts toward the peak memory Linux reports for each rb it starts
 _TORCH_MISSING = [m for m in ("torch", "torchvision") if importlib.util.find_spec(m) is None]
 

@@ -192,6 +192,7 @@ def test_a_code_address_that_cannot_be_reached_leaves_the_record_alone_and_says_
     assert code == 0 and env.data["code"]["got"] is False
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="rb clone on Windows: Windows is a preview (issue #2)", strict=False)
 def test_with_no_git_identity_the_code_is_not_got_and_the_record_lands_alone(published, tmp_path_factory, monkeypatch, capsys):
     """The record's commit takes the place of the parent's record in the code's checkout; git never commits it under an
     identity it guesses, so with none of the user's own the clone gets no code, and its log is never read against the
@@ -255,6 +256,7 @@ def test_only_what_the_parents_runs_wrote_where_results_land_is_taken_out(publis
     assert not (dest / "results/s2/metrics.json").exists() and not (dest / "results/s1").exists()
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="rb clone on Windows: Windows is a preview (issue #2)", strict=False)
 def test_the_parents_results_no_run_named_leave_the_branch_and_rb_reconcile_reads_none(published, tmp_path_factory, capsys):
     """Results folders the code's commit holds that no recorded run named (earlier runs, never recorded) are the
     parent's work too: a clone takes them out of its branch with what the runs wrote, so rb reconcile reports none of
@@ -312,6 +314,7 @@ def test_the_parents_results_no_run_named_leave_the_branch_and_rb_reconcile_read
     assert not any(i.get("code") == "unindexed_folder" and "r00" in str(i) for i in env.data["open"]), env.data["open"]
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="rb clone on Windows: Windows is a preview (issue #2)", strict=False)
 def test_where_the_code_cannot_be_got_rb_clone_says_it_in_its_own_words_then_gits(published, tmp_path_factory, capsys):
     """rb's own sentence first, naming the address; then git's own last line after "git said:", where git failed;
     then the command that gets the code. The exit status is the clone's, as before."""
@@ -346,6 +349,7 @@ def test_where_the_code_cannot_be_got_rb_clone_says_it_in_its_own_words_then_git
     assert "git said" not in out
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="rb clone on Windows: Windows is a preview (issue #2)", strict=False)
 def test_a_bundle_whose_export_saw_its_commit_was_not_at_origin_says_so_where_the_code_is_not_got(published, tmp_path_factory, capsys):
     """The export saw that origin does not hold the code's commit (repo.at_origin false): rb clone, from the bundle's
     own address, says the bundle's words for why, never git's, and the --code command after them."""

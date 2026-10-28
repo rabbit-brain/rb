@@ -861,7 +861,7 @@ def test_the_screenshot_runner_shoots_every_view(int8_demo, tmp_path):
 
 
 # the browser step's run line: this file, and A's app harness beside it once the workflow runs both
-RUNNER_STEPS = ("python -m pytest -q -n auto tests/test_shell.py", "python -m pytest -q -n auto tests/test_shell.py tests/app/")
+RUNNER_STEPS = ("python -m pytest -q -n auto --reruns 2 tests/test_shell.py", "python -m pytest -q -n auto --reruns 2 tests/test_shell.py tests/app/")
 
 
 def test_ci_runs_the_app_runner_on_every_system_and_never_skips_it():

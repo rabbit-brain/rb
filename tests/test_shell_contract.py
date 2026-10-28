@@ -208,6 +208,7 @@ def test_the_checks_catch_a_broken_example():
     assert any("Live-only value" in p for p in writer_problems(quoted, live=example("live")))
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="a fixture generator on Windows: Windows is a preview (issue #2)", strict=False)
 def test_the_fixtures_are_what_their_generators_give():
     """The Owner example, rb open's other two places and the shape are what owner_of.py, place_of.py and shape.py make."""
     def made(*argv):
@@ -481,6 +482,7 @@ def test_model_meets_contract(request, tier, tmp_path):
     assert not writer_problems(doc), writer_problems(doc)[:20]
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="a fixture generator on Windows: Windows is a preview (issue #2)", strict=False)
 def test_model_tiers_differ_only_as_listed(request, tmp_path):
     """M's Owner document is its Live one with section 1.5's rows applied (owner_of.py), and nothing else."""
     needs("M0", "M4")

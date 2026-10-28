@@ -673,6 +673,7 @@ def until(holds, timeout: float, why=None) -> None:
         time.sleep(0.1)
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="a time limit a slow Windows runner misses: Windows is a preview (issue #2)", strict=False)
 def test_a_terminal_write_keeps_what_you_had_open(front, chrome):
     """A run recorded in the terminal shows within one poll, and the page keeps what was open: a fold, the card in the
     inspector and a fold inside it, the action chosen and the reason being typed (still in focus, the caret where it

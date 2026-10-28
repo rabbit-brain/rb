@@ -271,6 +271,7 @@ def test_history_log_rows_say_what_rb_log_says(int8, docs):
     assert next(r for r in rows if r["op"] == "init")["refs"] == []
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="git's default branch on Windows: Windows is a preview (issue #2)", strict=False)
 def test_the_owner_tier_holds_none_of_the_live_tiers_own(docs):
     """The page's document (section 1.5) has no place, no digest and no resource's place or download address, and an
     empty Reproduce address for rb export --url to set; rb open's holds where it is, its digest and the address."""

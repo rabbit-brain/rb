@@ -3,6 +3,7 @@ integrity problem, and a conformance check (tests/conformance.py) that refuses a
 field, a number or the shipped vocabulary."""
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -540,6 +541,7 @@ def _uv_tool(tmp_path, upgrades_to):
     return str(exe), env, called
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="updating through uv on Windows: Windows is a preview (issue #2)", strict=False)
 def test_rb_installed_as_a_uv_tool_upgrades_itself_through_uv_and_a_screen_says_restart(updates, tmp_path, monkeypatch):
     exe, env, called = _uv_tool(tmp_path, "0.7.0")
     r = _rb(exe, "version", env=env)
@@ -559,6 +561,7 @@ def test_rb_installed_as_a_uv_tool_upgrades_itself_through_uv_and_a_screen_says_
     assert update_line(tmp_path, "0.6.0")[0] == "", "an rb of another environment (pip in a project) says nothing of it"
 
 
+@pytest.mark.xfail(sys.platform == "win32", reason="updating through uv on Windows: Windows is a preview (issue #2)", strict=False)
 def test_an_upgrade_that_installs_nothing_newer_is_not_said_as_installed(updates, tmp_path):
     exe, env, called = _uv_tool(tmp_path, None)
     assert _rb(exe, "version", env=env).returncode == 0

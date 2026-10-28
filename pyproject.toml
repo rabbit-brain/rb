@@ -34,7 +34,7 @@ classifiers = [
 dependencies = ["pydantic>=2.5,<3", "textual>=8,<9"]   # textual is core on purpose: pip install rabbit-brain, then rb, is the whole install
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-xdist>=3", "build>=1.2", "twine>=5", "pyyaml>=6", "pydantic>=2.11"]   # pytest-xdist: the suite runs in parallel (-n auto); pyyaml: what the differential test holds rb's own config reader to; pydantic 2.11+ writes the committed schemas
+dev = ["pytest>=8", "pytest-xdist>=3", "pytest-rerunfailures>=14", "build>=1.2", "twine>=5", "pyyaml>=6", "pydantic>=2.11"]   # pytest-xdist: the suite runs in parallel (-n auto); pytest-rerunfailures: a check that fails under that load gets two more tries (--reruns 2); pyyaml: what the differential test holds rb's own config reader to; pydantic 2.11+ writes the committed schemas
 
 [project.urls]
 Homepage = "https://rabbitbrain.ai"

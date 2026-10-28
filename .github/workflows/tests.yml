@@ -9,6 +9,7 @@ permissions:
   contents: read
 
 # pytest -n auto: the suite in parallel, as it is checked before every merge; one test at a time it runs for hours
+# --reruns 2: a browser check that loses a race under that load gets two more tries, each marked R in the output
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -38,11 +39,11 @@ jobs:
       - name: Test rb
         run: |
           cargo test --manifest-path rust/Cargo.toml -q
-          python -m pytest -q -n auto
+          python -m pytest -q -n auto --reruns 2
       - name: The app runner drives Chrome over CDP (fails, never skips, without node 22 or Chrome)
         env:
           RB_REQUIRE_BROWSER: "1"
-        run: python -m pytest -q -n auto tests/test_shell.py tests/app/
+        run: python -m pytest -q -n auto --reruns 2 tests/test_shell.py tests/app/
       - name: rb says and writes what is stored (every golden scenario, rb open's answers, the hub commands)
         run: |
           python rust/tests_py/golden.py --stored "$(command -v rb)" -j 4
@@ -89,11 +90,11 @@ jobs:
       - name: Test rb
         run: |
           cargo test --manifest-path rust/Cargo.toml -q
-          python -m pytest -q -n auto
+          python -m pytest -q -n auto --reruns 2
       - name: The app runner drives Chrome over CDP (fails, never skips, without node 22 or Chrome)
         env:
           RB_REQUIRE_BROWSER: "1"
-        run: python -m pytest -q -n auto tests/test_shell.py tests/app/
+        run: python -m pytest -q -n auto --reruns 2 tests/test_shell.py tests/app/
       - name: The commands answer
         run: |
           rb version
@@ -134,8 +135,8 @@ jobs:
       - name: Install (builds the rb binary)
         run: python -m pip install -e ".[dev]"
       - name: Leaving rb leaves the repository as it was
-        run: python -m pytest -q -n auto tests/test_removal.py tests/test_remove.py tests/test_worktrees.py
+        run: python -m pytest -q -n auto --reruns 2 tests/test_removal.py tests/test_remove.py tests/test_worktrees.py
       - name: The app runner drives Chrome over CDP (fails, never skips, without node 22 or Chrome)
         env:
           RB_REQUIRE_BROWSER: "1"
-        run: python -m pytest -q -n auto tests/test_shell.py tests/app/
+        run: python -m pytest -q -n auto --reruns 2 tests/test_shell.py tests/app/

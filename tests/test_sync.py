@@ -420,7 +420,10 @@ class _Watch:
 
     def end(self, sig=signal.SIGINT) -> int:
         if self.p.poll() is None:
-            self.p.send_signal(sig)
+            if os.name == "nt":     # Windows delivers a child no SIGINT (Popen.send_signal refuses it): end it there
+                self.p.terminate()
+            else:
+                self.p.send_signal(sig)
         try:
             return self.p.wait(timeout=30)
         finally:

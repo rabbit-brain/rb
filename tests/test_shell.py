@@ -1215,7 +1215,7 @@ def test_rbs_words_only(record):
     assert not words_problems("<p>quant int8 verified configs/int8.yaml:1</p>")
     assert words_problems("<p>the result was verified README.md:3</p>")
     doc = example()
-    doc["home"]["began"] = "4 calls wait on you; the evidence is established."
+    doc["home"]["integrity"]["affects"] = "4 calls wait on you; the evidence is established."
     doc["home"]["open_line"] = "open in the record \u2014 3"
     doc["questions"][0]["text"] = "Is it established that INT8 holds, as an agent claims?"
     doc["project"]["title"] = "INT8 ResNet-50: an agent's frozen claims"
@@ -1527,16 +1527,25 @@ def test_a_card_led_by_a_computed_comparison(record):
 
 
 def test_where_rb_looked_is_rbs_line(record):
-    """The made block says where the record started, rb's scope line and the uncited count, each verbatim from rb."""
-    home = example()["home"]
+    """The made block says rb's scope line and the uncited count, each verbatim from rb. When the record began is the
+    record's line's to say (WITNESS2): rb status's own form of it, "Kept with rb since 2026-10-06. ...", is drawn
+    nowhere, even where rb hands it in linked parts."""
+    doc = example()
+    home = doc["home"]
     block = view_text(page_of(record), "how-made")
-    for line in (home["began"], home["scope"], home["uncited_line"]):
+    for line in (home["scope"], home["uncited_line"]):
         assert said(line) in block
-    assert block.index(said(home["began"])) < block.index(said(home["scope"])) < block.index(said(home["uncited_line"]))
+    assert block.index(said(home["scope"])) < block.index(said(home["uncited_line"]))
+    began = home["began"]
+    assert began.startswith("Kept with rb since 2026-10-06.") and "recorded afterwards" in began
+    day = "2026-10-06"
+    home["began_parts"] = [[began[:began.index(day)], ""], [day, "history"], [began[began.index(day) + len(day):], ""]]
+    page = said(Html(page_of(record, doc)).text(Html(page_of(record, doc)).root))
+    assert said(began) not in page and "since 2026-10-06" not in page
 
 
 def test_how_rb_reads_this_repository_is_folded(record):
-    """OVERVIEW-V2: "How rb reads this repository" is one fold: where the record started, rb's scope line (which rb
+    """OVERVIEW-V2: "How rb reads this repository" is one fold: rb's scope line (which rb
     open's live module says again in place), the changed files nothing cites, and what rb found, each verbatim from rb;
     with no scope line, rb's short one, said again in place too."""
     doc = example()
@@ -1547,8 +1556,8 @@ def test_how_rb_reads_this_repository_is_folded(record):
     summary = next(e for e in fold["kids"] if isinstance(e, dict))
     assert summary["tag"] == "summary" and said(t.text(summary)) == "How rb reads this repository"
     inside = [said(t.raw(e)) for e in fold["kids"] if isinstance(e, dict) and e["tag"] == "p"]
-    assert inside == [said(home["began"]), said(home["scope"]), said(home["uncited_line"])]
-    assert [e["attrs"].get("data-live") for e in fold["kids"] if isinstance(e, dict) and e["tag"] == "p"] == [None, "scope", None]
+    assert inside == [said(home["scope"]), said(home["uncited_line"])]
+    assert [e["attrs"].get("data-live") for e in fold["kids"] if isinstance(e, dict) and e["tag"] == "p"] == ["scope", None]
     assert t.inside(t.by_id("found"), fold)
     home["scope"] = ""
     t = Html(page_of(record, doc))
@@ -1563,7 +1572,7 @@ def test_evidence_integrity_says_each_part_once(record):
     """OVERVIEW-V2: Evidence integrity, shown only when something weakens the whole body of evidence: each part of rb's
     line on how the record was made one plain line, the criteria linked to All criteria, "command (as given)" with its
     hint, the retracted runs linked to Runs; the document's own parts and its line on what they affect where it gives
-    them; none when nothing weakens it. The record-start line's parts link inside the fold that holds it."""
+    them; none when nothing weakens it."""
     doc = example()
     t = Html(page_of(record, doc))
     box = t.by_id("integrity")
@@ -1593,16 +1602,6 @@ def test_evidence_integrity_says_each_part_once(record):
     doc["home"]["made"].update(after_evidence=0, with_command=8, line="0 of 6 criteria were declared after their evidence existed")
     doc["home"]["counts"]["retracted"] = 0
     assert Html(page_of(record, doc)).by_id("integrity") is None
-    doc = example()
-    began = doc["home"]["began"]
-    day, runs = "2026-10-06", "after 1 of its 8 runs was made"
-    i, j = began.index(day), began.index(runs)
-    doc["home"]["began_parts"] = [[began[:i], ""], [day, "history"], [began[i + len(day):j], ""], [runs, "runs"], [began[j + len(runs):], ""]]
-    t = Html(page_of(record, doc))
-    fold = next(e for e in t.by_id("how-made")["kids"] if isinstance(e, dict))
-    first = next(e for e in fold["kids"] if isinstance(e, dict) and e["tag"] == "p")
-    assert said(t.raw(first)) == said(began)
-    assert [(e["attrs"]["href"], said(t.text(e))) for e in t.all(first) if e["tag"] == "a"] == [("#history", day), ("#runs", runs)]
 
 
 def test_found_apart_and_capped(record):
@@ -3294,7 +3293,8 @@ def test_history_as_log_rows_newest_first(record):
         assert len(links) == len(refs)
         # each object once (FIX9): linked inside the sentence where it says it, else after it, never both
         for x in refs:
-            forms = [said(f) for f in (doc["runs"].get(x, {}).get("named", ""), named(x)) if f]
+            # or by its own id, where the sentence says that ("recorded analysis a1", Look 10)
+            forms = [said(f) for f in (doc["runs"].get(x, {}).get("named", ""), named(x), x) if f]
             text_ = said(t.text(r))
             assert any(len(re.findall(rf"(?<![\w-]){re.escape(f)}(?![\w-])", text_)) == 1 for f in forms), (x, text_)
             if forms[0] in said(e["sentence"]):        # said apart in the sentence: nothing after it says it again
@@ -4367,3 +4367,174 @@ def test_a_difference_is_never_said_where_its_column_has_no_baseline(record):
     [(_, heads, rows, _)] = grids(t, "x-e1")
     assert heads == ["", "Old", "New"] and rows["INT8"] == ["Not run", "75.00 · 3 seeds"], rows
     assert rows["W8a16"] == ["76.00 · 3 seeds level with FP32", "Not run"], rows
+
+
+# ---------------------------------------------------------------- WITNESS: what rb saw, and what it read afterwards
+
+
+def _witness_said(st: dict) -> str:
+    """The record's one line as the owner worded it (WITNESS, Oct 28), from rb status's witness facts."""
+    w = st["witness"]
+    kinds = [("runs", "run", "runs"), ("analyses", "analysis", "analyses"), ("calls", "call", "calls"), ("notes", "note", "notes")]
+    def part(n, total, one, many):
+        return f"1 {one}" if n == 1 else (f"both {many}" if n == total == 2 else (f"all {n} {many}" if n == total else f"{n} {many}"))
+    parts = [part(w[k]["afterwards"], w[k]["total"], one, many) for k, one, many in kinds if w[k]["afterwards"]]
+    if not parts:
+        return "Kept with rb since it began."
+    y, m, d = w["began"][:10].split("-")
+    month = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()[int(m) - 1]
+    listed = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+    n = sum(w[k]["afterwards"] for k, *_ in kinds)
+    was = "was recorded afterwards, not as it happened" if n == 1 else "were recorded afterwards, not as they happened"
+    return f"Kept with rb since {int(d)} {month} {y}. {listed[0].upper()}{listed[1:]} {was}."
+
+
+def _page(demo, tmp_path: Path, name: str) -> str:
+    out = tmp_path / f"{name}.html"
+    r = subprocess.run([*command(), "page", "--out", str(out)], cwd=demo.root, env=demo.env, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    assert r.returncode == 0, r.stdout + r.stderr
+    return out.read_text(encoding="utf-8")
+
+
+def _witness_lines(t: "Html") -> list:
+    """Each record line drawn, with the view it sits in."""
+    return [(next(u["attrs"]["id"] for u in _ups(e) if u["tag"] == "section"), said(t.text(e))) for e in t.of_class("wit")]
+
+
+def _ups(e):
+    while e is not None:
+        yield e
+        e = e["up"]
+
+
+def test_the_record_says_once_what_rb_saw_and_what_it_recorded_afterwards(int8_demo, tmp_path):
+    """WITNESS: the INT8 demo's record says, in one quiet line on the Overview and on About, when rb began keeping it and
+    how many runs and calls were recorded afterwards, from rb status's facts; a run rb did not see happen says
+    "recorded afterwards" where a run it saw shows its receipt; a finding resting on such runs counts them in its
+    evidence line; and nothing else on the page says it: no badge, no line each."""
+    st = int8_demo.rb("status")
+    assert st["witness"]["runs"]["afterwards"] == 2 and st["witness"]["calls"]["afterwards"] == 1
+    line = _witness_said(st)
+    assert line.startswith("Kept with rb since ") and line.endswith(". 2 runs and 1 call were recorded afterwards, not as they happened.")
+    for page in (_page(int8_demo, tmp_path, "page"), _export(int8_demo, tmp_path)):
+        t = Html(page)
+        assert _witness_lines(t) == [("overview", line), ("about", line)]
+        late = {r["id"] for r in st["runs"] if r["witness"]["seen"] == "afterwards"}
+        # each run's row in a Runs table: its last cell's one link, by what rb saw of it
+        rows = [e for e in t.all() if e["tag"] == "tr" and e["attrs"].get("id", "").startswith("rr-")]
+        # every standing run has its row (a retracted one keeps its own, struck, and rb status no longer lists it)
+        assert {r["id"] for r in st["runs"]} <= {r["attrs"]["id"][3:] for r in rows}
+        for r in [r for r in rows if r["attrs"]["id"][3:] in {x["id"] for x in st["runs"]}]:
+            cell = [e for e in r["kids"] if isinstance(e, dict)][-1]
+            links = [said(t.text(a)) for a in t.all(cell) if a["tag"] == "a"]
+            assert links == (["recorded afterwards"] if r["attrs"]["id"][3:] in late else ["receipt"]), r["attrs"]["id"]
+        # a finding's evidence line counts the runs it rests on that were recorded afterwards, only where any
+        for f in st["findings"]:
+            n, total = f["witness"]["afterwards"], f["witness"]["total"]
+            for row in [e for e in t.all() if e["tag"] == "li" and e["attrs"].get("id", "").startswith(f"f-{f['criterion']}:")]:
+                units = " ".join(said(t.text(e)) for e in t.of_class("evu", row))
+                if n:
+                    want = "both its runs" if n == total == 2 else (f"all {total} of its runs" if n == total else f"{n} of its {total} runs")
+                    assert f"{want} recorded afterwards" in units, (f["criterion"], units)
+                else:
+                    assert "recorded afterwards" not in units, (f["criterion"], units)
+        assert any(f["witness"]["afterwards"] for f in st["findings"])
+        # nowhere else outside the cards: the record's line twice, a row's link each time a run's row is drawn, and the
+        # evidence lines; no badge, and no line that disclaims each item
+        cards = t.of_class("nodes")[0]
+        outside = [e for e in t.all() if isinstance(e, dict) and not t.inside(e, cards)]
+        bare = sum(k.count("recorded afterwards") for e in outside for k in e["kids"] if isinstance(k, str))
+        late_rows = sum(1 for e in t.all() if e["tag"] == "tr" and e["attrs"].get("data-go") and not t.inside(e, cards)
+                        and any(said(t.text(a)) == "recorded afterwards" for a in t.all(e) if a["tag"] == "a"))
+        evidence = sum(said(t.text(e)).count("recorded afterwards") for e in t.of_class("evu") if not t.inside(e, cards))
+        assert bare == 2 + late_rows + evidence, (bare, late_rows, evidence)
+
+
+def test_a_record_kept_with_rb_from_its_start_says_so_once(tmp_path):
+    """WITNESS: a record rb kept from its first write, whose one run was recorded as it was made, says "Kept with rb since
+    it began." on the Overview and on About, and its run's row shows its receipt."""
+    from rbtest import Recorder
+    rec = Recorder(tmp_path, "int8")
+    rec.start()
+    rec.rb("init", "INT8 ResNet-50")
+    rec.rb("question", "add", "Does INT8 cost top-1 accuracy on ImageNet?", "--id", "q1")
+    rec.rb("experiment", "add", "INT8 vs FP32 on ImageNet", "--id", "e1", "-q", "q1", "--baseline", "fp32", "--candidate", "int8", "--varies", "precision")
+    rec.rb("run", "add", "e1", "fp32.top1=76.1", "int8.top1=75.9")
+    st = rec.rb("status")
+    assert st["witness"]["runs"] == {"total": 1, "afterwards": 0, "before": 0, "unknown": 0}
+    t = Html(_page(rec, tmp_path, "page"))
+    assert _witness_lines(t) == [("overview", "Kept with rb since it began."), ("about", "Kept with rb since it began.")]
+    assert "recorded afterwards" not in said(t.text(t.root))
+
+
+def test_the_record_line_sits_under_the_questions_never_above_the_queue(record):
+    """WITNESS2: on the Overview the record's line follows the research questions and comes before the folds, so the
+    queue's first row stays on a phone's first screen; About keeps it after the record's id line."""
+    t = Html(page_of(record))
+    ov = t.by_id("overview")
+    order = [e["attrs"].get("id") or ("wit" if "wit" in e["attrs"].get("class", "").split() else None) for e in ov["kids"] if isinstance(e, dict)]
+    order = [o for o in order if o]
+    assert "wit" in order and order.index("queue") < order.index("ov-questions") < order.index("wit") < order.index("how-made"), order
+
+
+def test_no_since_it_began_where_the_record_holds_older_work(record):
+    """WITNESS2: "Kept with rb since it began." only where nothing in the record came before it as far as the facts
+    tell: a clone (its parent's structure), a record of questions alone (which may be one) and a record with an
+    experiment read from a results folder (rb reconcile --apply's work, which rb did not see happen) draw no line while
+    nothing counts as recorded afterwards; with
+    something counted, the line says it as anywhere."""
+    def line(doc):
+        return [said(Html(page_of(record, doc)).text(e)) for e in Html(page_of(record, doc)).of_class("wit")]
+    doc = example()
+    zero = {"began": "2026-10-28 09:00 UTC", "runs": {"total": 0, "afterwards": 0, "before": 0, "unknown": 0},
+            "analyses": {"total": 0, "afterwards": 0}, "calls": {"total": 0, "afterwards": 0}, "notes": {"total": 0, "afterwards": 0}}
+    doc["home"]["witness"] = zero
+    for e in doc["experiments"]:
+        e["folder"] = ""
+    doc["project"]["parent"] = ""
+    assert line(doc) == ["Kept with rb since it began."] * 2
+    doc["project"]["parent"] = "https://example.org/int8/"
+    assert line(doc) == []
+    doc["project"]["parent"] = ""
+    # a clone from a path: no address on a page, and its experiments reproduce the parent's, as rb clone relates them
+    doc["experiments"][0]["relations"] = ["reproduces exp_01M62XFCZAKSMW6RGQM8X5W0SR"]
+    assert line(doc) == []
+    doc["experiments"][0]["relations"] = ["reproduces e2"]
+    assert line(doc) == ["Kept with rb since it began."] * 2
+    # a record of questions alone: nothing tells a clone of them from a record begun here
+    kept = doc["experiments"]
+    doc["experiments"] = []
+    assert line(doc) == []
+    doc["experiments"] = kept
+    doc["experiments"][0]["folder"] = "results/"
+    assert line(doc) == []
+    doc["home"]["witness"]["runs"] = {"total": 3, "afterwards": 3, "before": 3, "unknown": 0}
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. All 3 runs were recorded afterwards, not as they happened."] * 2
+
+
+def test_a_record_rb_reconcile_started_never_says_it_was_kept_from_its_start(tmp_path):
+    """WITNESS2: rb reconcile --apply starting a record from a results folder that holds a report (INT8 calibration on
+    ImageNet), with no run recorded, counts nothing afterwards, and its page draws no "Kept with rb since it began.":
+    the folder's work came before the record, and rb did not see it happen."""
+    from rbtest import Recorder
+    rec = Recorder(tmp_path, "int8")
+    rec.start()
+    rec.write("results/calib/README.md", "# INT8 calibration\n\n## Results\n\nINT8 top-1 75.4 on ImageNet.\n")
+    rec.git("add", "-A")
+    rec.git("commit", "-qm", "calibration results")
+    rec.rb("reconcile", "--apply", "--no-agents")
+    st = rec.rb("status")
+    assert [e["id"] for e in st["experiments"]] == ["calib"] and not st["runs"]
+    assert all(v["afterwards"] == 0 for v in st["witness"].values() if isinstance(v, dict))
+    t = Html(_page(rec, tmp_path, "page"))
+    assert _witness_lines(t) == [] and "Kept with rb" not in said(t.text(t.root))
+
+
+def test_a_record_with_no_write_draws_no_record_line(record):
+    """WITNESS: a document that gives no witness facts (a record before its first write, or an older model) draws no
+    record line at all, never an empty paragraph."""
+    doc = example()
+    doc["home"].pop("witness", None)
+    assert not Html(page_of(record, doc)).of_class("wit")
+    doc["home"]["witness"] = {"began": "", "runs": {"total": 0, "afterwards": 0}}
+    assert not Html(page_of(record, doc)).of_class("wit")

@@ -450,7 +450,7 @@ def test_a_note_every_criterion_here_carries_is_said_once_on_the_questions_readi
     shared = "no run config was compared with the spec (record runs with --config)"
     for where in ("status", "show q1", "context"):
         text = rec.text(*where.split())
-        reading = text.split("Criteria")[0] if where != "show q1" else text
+        reading = re.split(r"\n(?:## )?Rules\n", text)[0] if where != "show q1" else text
         assert reading.count(shared) == 1, (where, reading)
         assert f"On every int8 criterion below: " in reading and reading.index("On every int8 criterion below: ") < reading.index("INT8 loses at most 0.01 top-1")
     q = next(x for x in rec.ok("status")["data"]["questions"] if x["id"] == "q1")

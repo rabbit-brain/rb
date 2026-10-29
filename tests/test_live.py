@@ -226,6 +226,29 @@ def test_a_reading_that_moves_without_a_write_moves_the_key(placed):
     assert answer(server.url + "/digest.json")[1]["key"] == after
 
 
+def test_a_source_rewritten_within_the_clocks_resolution_still_moves_the_key(placed):
+    """rb open reads every source afresh for each request, as a command line does: a config rewritten with another
+    value of the same length, at a time the file system keeps the same (a coarse clock, as on Windows, issue #2), is
+    a conflict on the page, so the key moves. Played here by putting the file's time back after the rewrite."""
+    rec, server = placed
+    cfg = rec.root / "configs" / "train.yaml"
+    cfg.parent.mkdir()
+    cfg.write_text("optim:\n  lr: 0.0001\n", encoding="utf-8")
+    rec.git("add", "configs")
+    rec.git("commit", "-qm", "the train config")
+    rec.rb("spec", "set", "e1", "optim.lr", "--source", "configs/train.yaml#optim.lr")
+    rec.rb("status")
+    before = answer(server.url + "/digest.json")[1]["key"]
+    assert answer(server.url + "/digest.json")[1]["key"] == before
+    was = cfg.stat()
+    cfg.write_text("optim:\n  lr: 0.0003\n", encoding="utf-8")
+    os.utime(cfg, ns=(was.st_atime_ns, was.st_mtime_ns))
+    assert cfg.stat().st_size == was.st_size and cfg.stat().st_mtime_ns == was.st_mtime_ns
+    after = answer(server.url + "/digest.json")[1]["key"]
+    assert after != before
+    assert answer(server.url + "/digest.json")[1]["key"] == after
+
+
 def test_the_digest_route_looks_on_its_cadence(placed):
     """The route itself has the journal look, at most once every 10 s as rb open always looked, so a change shows on a
     page whose polls are all that asks rb open anything."""

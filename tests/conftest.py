@@ -6,6 +6,10 @@ import pytest
 # environment clears to look like the user's; the tests of it turn it back on
 os.environ["RB_AUTO_UPDATE"] = "0"
 
+# rabbitbrain.ai is open from 0.6.1 (hub.rs HOSTED_OPEN): no test ever reaches it. RB_TEST_HOSTED_CLOSED plays the
+# service closed, for every command a test runs; the test of the open service unsets it itself
+os.environ["RB_TEST_HOSTED_CLOSED"] = "1"
+
 # Which rb the tests drive (tests/rbtest.py): RB_BIN=<path to an rb binary> names it, for every command, every SDK call
 # and the screen's reads; without it, the rb installed beside this Python.
 

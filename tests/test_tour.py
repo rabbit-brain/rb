@@ -26,7 +26,7 @@ def test_a_humans_tour_ends_with_a_standing_and_a_refusal_to_round_up(clean, cap
     assert main(["tour"]) == 0
     text = capsys.readouterr().out
     assert "$ rb init" in text and "$ rb status" in text
-    assert "Criteria: 1 criterion met · 1 criterion undetermined" in text
+    assert "Rules: 1 met · 1 can't tell yet" in text
     assert "criterion undetermined: 2 units; the criterion needs 3" in text     # two runs report step_ms, the rule asks for three
     assert "rule criterion " not in text
     assert "rb will not round that up" in text  # the closing lines name the point
@@ -65,7 +65,7 @@ def test_the_tour_never_commits_under_an_identity_git_guesses(workdir, monkeypat
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("EMAIL", "guessed@example.com")
     assert main(["tour"]) == 0
-    assert "Criteria: 1 criterion met · 1 criterion undetermined" in capsys.readouterr().out
+    assert "Rules: 1 met · 1 can't tell yet" in capsys.readouterr().out
     tour = workdir / "rb-tour"
     head = subprocess.run(["git", "rev-parse", "-q", "--verify", "HEAD"], cwd=tour, capture_output=True, text=True)
     assert head.returncode != 0 and head.stdout == ""
@@ -132,6 +132,6 @@ def test_the_tour_needs_nothing_but_the_install(clean, capsys):
     """`pip install rabbit-brain` then `rb tour`, with no extras: the tour's run configs are YAML, which rb reads
     itself. (It did not, in 0.5: the first minute failed on a clean install.)"""
     assert main(["tour"]) == 0, capsys.readouterr().err
-    assert "Criteria: 1 criterion met · 1 criterion undetermined" in capsys.readouterr().out
+    assert "Rules: 1 met · 1 can't tell yet" in capsys.readouterr().out
     runs = state(clean / "rb-tour").records("run")                 # each run's YAML config was read and compared with the spec
     assert len(runs) == 3 and all(r.receipt.config.matches == ["optim.lr", "seed"] for r in runs)

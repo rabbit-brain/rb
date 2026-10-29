@@ -11,6 +11,7 @@ import pytest
 
 from rabbit_brain.models import Envelope
 from rbtest import Mcp, as_the_user, at_home, environment, home, main
+from test_export import SERVED, served_at  # noqa: F401 (origin at an https address, served from a bare repository)
 
 ROOT = Path(__file__).resolve().parents[1]
 PASTE = "Use Rabbit Brain to track this: read rb context, then record where the work stands."
@@ -203,14 +204,14 @@ def test_the_protocol_reads_an_ordering_sets_settings_first_and_states_rules_pla
     (--better reads an interval those cells never give); a setting added after the runs voided every reading; step 7's
     "from documents only" stood against a next step stated in the chat; a criterion took the chat's first-person
     sentence as its statement; a note route had the session write its own comparison; and the report called the
-    confirm the one thing that needs the researcher while rb status listed more under Needs a human."""
+    confirm the one thing that needs the researcher while rb status listed more under Needs judgment."""
     said = flat(START)
     for rule in ("An ordering in every cell is one rule per pair and metric, --at-most 0 --each (--at-least 0 where higher is better): "
                  "the researcher's words memory quotes in --words",
                  "before the first rb status (step 6)",
                  "Set the shared settings before the runs (one set after reads them as under an earlier spec)",
                  "a statement says in plain words what the rule checks, the words it rests on in its quote or --words",
-                 "the calls and experiment designs (a gate waits with its design) that wait for their authority: rb confirm lists each, in their own terminal, with the command that confirms it; and what rb status lists under Needs a human"):
+                 "the calls and experiment designs (a gate waits with its design) that wait for their authority: rb confirm lists each, in their own terminal, with the command that confirms it; and what rb status lists under Needs judgment"):
         assert rule in said, rule
     for gone in ("Take criteria from documents only", "records what they say", "the one thing that needs their authority",
                  # recheck of group E: a design is read first, as rb confirm lists it, never confirmed unread with --all
@@ -218,7 +219,7 @@ def test_the_protocol_reads_an_ordering_sets_settings_first_and_states_rules_pla
         assert gone not in said, gone
     agents = flat((ROOT / "AGENTS.md").read_text(encoding="utf-8"))
     for rule in ("an ordering in every cell is one `--at-most 0 --each` rule per pair and metric", "set the shared settings before the runs",
-                 "each statement saying in plain words what its rule checks", "and what `rb status` lists under Needs a human"):
+                 "each statement saying in plain words what its rule checks", "and what `rb status` lists under Needs judgment"):
         assert rule in agents, rule
 
 
@@ -234,7 +235,7 @@ def test_the_protocol_keeps_session_text_off_the_researcher_and_the_cold_questio
                  "states the direction for the conditions the rule reads",
                  "never with a sentence about other conditions or another stage",
                  "the calls and experiment designs (a gate waits with its design) that wait for their authority: rb confirm lists each, in their own terminal, with the command that confirms it; and what rb status lists under "
-                 "Needs a human; nothing no command confirms"):
+                 "Needs judgment; nothing no command confirms"):
         assert rule in said, rule
     agents = flat((ROOT / "AGENTS.md").read_text(encoding="utf-8"))
     for rule in ("a session's text calls nothing the researcher's and names no chat or session as its source; `--words` is only the researcher's words memory quotes, and memory's own claims stay in the statement",
@@ -677,7 +678,7 @@ def test_a_stated_next_step_gives_its_rule_a_direction_and_a_claim_check_waits_f
                  "takes no rule",
                  "Their words give the direction of the comparison the gate rests on: a direction rule on it (rb criterion add ... --better, "
                  "no threshold, those words, as the gate takes them), so rb computes it",
-                 "A claim check takes the default role or secondary, never exploratory, so a miss waits under Needs a human",
+                 "A claim check takes the default role or secondary, never exploratory, so a miss waits under Needs judgment",
                  "The rule's statement words the claim it checks (\"the claim that INT8 ends at 0.755 top-1 is checked here\"), never the "
                  "number as a fact",
                  "A note names no one and says no memory: no \"as recalled\", \"as believed\" or \"remembered\"",
@@ -693,7 +694,7 @@ def test_a_stated_next_step_gives_its_rule_a_direction_and_a_claim_check_waits_f
     for rule in ("with no file stating the direction of the frontier's own comparison and no next step stated for when it holds, it takes no rule",
                  "its words give the direction of the comparison the gate rests on: a direction rule on it (`--better`, no threshold, those "
                  "words, as the gate takes them), so rb computes it",
-                 "a claim check takes the default role or secondary, never exploratory, so a miss waits under Needs a human",
+                 "a claim check takes the default role or secondary, never exploratory, so a miss waits under Needs judgment",
                  "the rule's statement words the claim it checks, never the number as a fact",
                  "says no memory (no \"as recalled\", \"as believed\" or \"remembered\")",
                  "never \"your words\" in any form (not \"your recalled words\")",
@@ -879,7 +880,7 @@ def a_published_parent(rb, monkeypatch, tmp_path_factory, *, repo=True, e2_comma
     git("commit", "-qm", "seed 1")
     bare = tmp_path_factory.mktemp("published") / "int8.git"
     git("clone", "-q", "--bare", ".", str(bare))
-    git("remote", "add", "origin", str(bare))
+    git("remote", "add", "origin", served_at(monkeypatch, bare))
     commit = subprocess.run(["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
     code, env = rb("export", "--with-record", *([] if repo else ["--no-repo"]), "--out", str(tmp_path_factory.mktemp("bundle") / "b"))
     assert code == 0, env.errors
@@ -910,7 +911,7 @@ def test_a_clone_s_context_and_status_open_with_what_it_takes_to_rerun_the_paren
     lines = said.splitlines()
     at = lines.index("Rerun the parent")
     assert lines[at + 1:at + 1 + len(block)] == [f"  {line}" for line in block]
-    assert at < next(i for i, line in enumerate(lines) if line.startswith("Criteria:") or line.startswith("Questions"))
+    assert at < next(i for i, line in enumerate(lines) if line.startswith("Rules:") or line.startswith("Questions"))
     code, env = rb("status")
     assert env.next[0] == first and env.data["rerun"]["code"]["state"] == "here"
 

@@ -86,6 +86,17 @@ pub fn reason_said(why: &str, by: &str) -> String {
 }
 
 /// A note as a screen line says it: its text, the words given with it, and whether the user has confirmed it.
+/// A run's note as every screen says it: its words, with no space a write left at their end, then that it is not
+/// confirmed where a session wrote it; "" for none.
+pub fn run_note(note: &str, by: &str) -> String {
+    let note = note.trim_end();
+    if note.is_empty() {
+        String::new()
+    } else {
+        note.to_string() + not_confirmed(by)
+    }
+}
+
 pub fn note_said(text: &str, words: &str, by: &str) -> String {
     with_words(text, words, by) + not_confirmed(by)
 }
@@ -2487,7 +2498,8 @@ pub struct Home {
     pub muted: Vec<String>,
     pub live: Vec<String>,
     pub weak_identity: Option<String>,
-    /// where the record began, when runs came before it: the adoption boundary, in one quiet line
+    /// the record's line (WITNESS), when anything was recorded afterwards: when rb began keeping the record and what was
+    /// recorded afterwards, in one quiet line
     pub began: Option<String>,
     pub briefs: Vec<QuestionBrief>,
     pub runs: Vec<RunRow>,
@@ -3037,7 +3049,7 @@ fn home_in(led: &Ledger, since_from: Option<Option<i64>>) -> Res<Home> {
         let last_write = last_write(led)?;
         Ok(Home {
             title: get_or(&proj, "title", ""),
-            began: led.record_start()?.map(|s| s.words()),
+            began: led.record_line()?,
             project_id: get_or(&proj, "id", ""),
             you: format!("you: {} · {source}", human_name(&get_or(&a, "id", ""))),
             since: since_line,
@@ -3315,7 +3327,7 @@ pub fn receipt_card(run: &Run) -> Dict {
         "outputs" => uses(&run.outputs),
         "host" => Value::Dict(run.host.iter().map(|(k, v)| (k.clone(), Value::Str(v.clone()))).collect()),
         "links" => Value::Dict(run.links.iter().map(|(k, v)| (k.clone(), Value::Str(v.clone()))).collect()),
-        "note" => if run.note.is_empty() { String::new() } else { run.note.clone() + not_confirmed(&run.created_by) },
+        "note" => run_note(&run.note, &run.created_by),
         // when it was produced and recorded, how rb knows its command made it, and a file written after it
         "dated" => crate::ledger::support::produced_line(run)
     };
@@ -3845,7 +3857,7 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
                     }
                 }
             }
-            c.bars_label = if c.pass_bars.is_empty() { String::new() } else { "Its criteria:".into() };
+            c.bars_label = if c.pass_bars.is_empty() { String::new() } else { "Its rules:".into() };
         }
         Some("criterion") => {
             let crit: Criterion = led.load(subject)?;
@@ -3863,7 +3875,7 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
                 .map(|e| e.get("title").map(py_str).unwrap_or_else(|| "None".into()))
                 .unwrap_or_else(|| crit.experiment.clone());
             let who = shown(&crit.created_by);
-            c.who_line = with_words(&(format!("criterion · {} · on {on}", crit.role) + &if who.is_empty() { String::new() } else { format!(" · declared by {who}") }), &crit_words, &crit.created_by);
+            c.who_line = with_words(&(format!("rule · {} · on {on}", crit.role) + &if who.is_empty() { String::new() } else { format!(" · declared by {who}") }), &crit_words, &crit.created_by);
             let review = f.get("review").filter(|r| r.truthy()).cloned().unwrap_or(Value::empty_dict());
             let decided_map: IndexMap<String, String> = list_of(&st, "decisions")
                 .iter()

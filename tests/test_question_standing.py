@@ -175,7 +175,7 @@ def test_status_text_leads_with_the_question_before_the_lists(rb, capsys):
     assert main(["status"]) == 0
     out = capsys.readouterr().out
     q = out.index("Can two prefetched batches keep the benefit of six? (open)")
-    assert q < out.index("estimate meets criterion: estimate -9.85 ≤ -5") < out.index("Needs a human") < out.index("Can be done now")
+    assert q < out.index("estimate meets criterion: estimate -9.85 ≤ -5") < out.index("Needs judgment") < out.index("Can be done now")
     assert "scope, declared: datasets = 2" in out
 
 

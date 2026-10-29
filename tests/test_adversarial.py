@@ -194,7 +194,7 @@ def test_status_fails_the_unestablished_gate(gamed, capsys):
 def test_context_says_the_criterion_was_declared_after_its_evidence(gamed, capsys):
     """rb context, what the next session reads first, says on the criterion's timing line that it was declared after
     its evidence existed."""
-    criteria = section(ok(capsys, "context").data["markdown"], "Criteria")
+    criteria = section(ok(capsys, "context").data["markdown"], "Rules")
     timing = [line for line in criteria.splitlines() if line.strip().startswith("timing:")]
     assert "c1" in criteria and len(timing) == 1 and "after the evidence existed" in timing[0]
 

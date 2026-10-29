@@ -1,4 +1,4 @@
-//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.9` of a record for one tier
+//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.11` of a record for one tier
 //! and place, from view::home and the per-object fields the build plan adds. It holds the fields rb computes today
 //! (M0), each object in the contract's shape and nothing outside it; the later phases add theirs. It names no writer:
 //! no actor, session, channel or "by <name>" enters it, and the Owner tier holds none of the Live tier's own values.
@@ -16,7 +16,7 @@ use crate::view::{self, ExperimentBrief, FindingLine, Home};
 use indexmap::IndexMap;
 
 /// The contract's version, as the document's `contract` names it.
-pub const CONTRACT: &str = "rb-shell-view/1.9";
+pub const CONTRACT: &str = "rb-shell-view/1.11";
 
 /// The document of `led` for `tier`, at `place` (rb open's chosen place and version; none on a page): drawn on rb open
 /// for the Live tier, on rb page for the Owner tier.
@@ -134,13 +134,23 @@ fn document(led: &Ledger, surface: Surface, at: Option<&At>, served: Option<&str
         overview(led, &mut doc, &st, &home)?;
         // the sentences of findings, questions, open items and a run's retraction and receipt name what rb minted an id
         // for by what it is, never by the id (FIX7); a run's recipe is P's (reproduce.rs)
-        let names = minted_names(led, &doc)?;
+        let names = minted_names(led)?;
         // each run as every line names it (contract 1.9, M8): runs.{id}.named
         if let Some(Value::Dict(runs)) = doc.get_mut("runs") {
             for (id, run) in runs.iter_mut() {
                 if let (Value::Dict(d), Some(w)) = (run, names.get(id)) {
                     let at = d.get_index_of("label").map_or(d.len(), |i| i + 1);
                     d.shift_insert(at, "named".into(), w.clone().into());
+                }
+            }
+        }
+        // each analysis as every line names it (contract 1.11): analyses.{id}.named, History's words where rb minted its
+        // id, and "analysis <id>" where its id was chosen, as every line says one
+        if let Some(Value::Dict(analyses)) = doc.get_mut("analyses") {
+            for (id, a) in analyses.iter_mut() {
+                if let Value::Dict(d) = a {
+                    let at = d.get_index_of("title").map_or(d.len(), |i| i + 1);
+                    d.shift_insert(at, "named".into(), names.get(id).cloned().unwrap_or_else(|| format!("analysis {id}")).into());
                 }
             }
         }
@@ -328,11 +338,24 @@ fn home_value(h: &Home, st: &Value) -> Value {
         "tally" => Value::List(h.tally.iter().map(|(k, n)| crate::list![k.clone(), *n]).collect()), "muted" => strs(&h.muted),
         "open_line" => h.open_besides.clone().unwrap_or_default(), "notes" => Value::List(notes), "quiet" => or(&h.quiet),
         "counts" => h.counts.clone(), "made" => h.made.clone(), "last_write" => crate::obj! {"at" => h.last_write.clone()},
+        // the record's line as facts (WITNESS): when rb began keeping it, and how much was recorded afterwards
+        "witness" => witness_value(st),
         "tree" => Value::List(h.tree.iter().map(|t| crate::obj! {
             "kind" => t.kind.clone(), "id" => t.id.clone(), "label" => t.label.clone(), "standing" => t.standing.clone(), "depth" => t.depth,
             "muted" => strs(&t.muted)
         }).collect())
     }
+}
+
+/// rb status's witness facts with its time as the model gives one: when rb began keeping the record ("" before any
+/// write), and of runs, analyses, calls and notes how many stand and how many of them were recorded afterwards.
+fn witness_value(st: &Value) -> Value {
+    let mut w = st.get("witness").cloned().unwrap_or(Value::Null);
+    if let Value::Dict(d) = &mut w {
+        let began = d.get_str("began").map(|b| if b.is_empty() { String::new() } else { minute(b) }).unwrap_or_default();
+        d.insert("began".into(), Value::Str(began));
+    }
+    w
 }
 
 /// The line that says what waits for a confirmation, as the quiet line begins with it: "1 call and 2 designs wait for
@@ -1158,7 +1181,8 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
             "numbers" => f.numbers.clone(), "row" => row, "says" => f.says.clone(), "your_words" => f.your_words.clone(),
             "observed" => f.observed.clone(), "observed_short" => f.observed_short.clone(),
             "observed_places" => Value::List(f.observed_places.iter().map(|(id, label)| crate::obj! {"id" => id.clone(), "label" => label.clone()}).collect()),
-            "other_code" => f.other_code.clone()
+            "other_code" => f.other_code.clone(),
+            "witness" => found.get("witness").cloned().unwrap_or_else(|| crate::obj! {"total" => 0, "afterwards" => 0})
         };
         if let Value::Dict(d) = &mut v {
             d.extend(fields);
@@ -2349,12 +2373,13 @@ fn runs_value(led: &Ledger, tier: Tier, recipes: &crate::reproduce::Recipes, g: 
             crate::obj! {
                 "run_id" => r.id.clone(), "experiment_id" => r.experiment.clone(), "when" => row.when, "produced" => row.produced,
                 "per_run_text" => r.per_run.iter().map(|(k, v)| format!("{k}={}", crate::ledger::show(v))).collect::<Vec<_>>().join(" · "),
-                "results" => row.results, "note" => if r.note.is_empty() { String::new() } else { r.note.clone() + view::not_confirmed(&r.created_by) }, "retracted" => retracted, "observed_in" => observed_in,
+                "results" => row.results, "note" => view::run_note(&r.note, &r.created_by), "retracted" => retracted, "observed_in" => observed_in,
                 "counts_toward" => Value::List(g.counts_toward(r).into_iter().map(|t| crate::obj! {"criterion" => t.criterion, "counted" => t.counted, "reason" => t.reason, "via" => t.via}).collect()),
                 "same_bytes" => Value::List(g.same_bytes(r).into_iter().map(|s| crate::obj! {"run" => s.run, "experiment" => s.experiment, "retracted" => s.retracted, "made" => strs(&s.made)}).collect()),
                 "made" => strs(&crate::graph::made(r)), "reproduce" => recipes.run(r)?,
                 "label" => crate::reproduce::run_label(led, exp, r), "at" => minute(if r.receipt.at.is_empty() { &r.created_at } else { &r.receipt.at }),
-                "metrics_text" => metrics_text(exp, r), "receipt_rows" => receipt_rows(r, tier), "command" => command
+                "metrics_text" => metrics_text(exp, r), "receipt_rows" => receipt_rows(r, tier), "command" => command,
+                "witness" => crate::ledger::support::run_witness(r).to_value()
             },
         );
     }
@@ -2416,40 +2441,21 @@ fn analyses_value(led: &Ledger, g: &Graph) -> Res<Value> {
     ))
 }
 
-/// What a page says for each object rb minted an id for, which it never shows as text: a run by its label ("run int8 ·
-/// seed 1", "a run of e1" where it has none), a call by what it is ("a call to accept c1"), an analysis by its title
-/// where its id is rb's, "an analysis" where it has none (one chosen, a1, stays). A note is said by what it is on, by its row (log_rows).
-fn minted_names(led: &Ledger, doc: &Dict) -> Res<IndexMap<String, String>> {
+/// What a page says for each object rb minted an id for, which it never shows as text, in History's words
+/// (history::names_of): a run by its label ("run int8 · seed 1", "a run of e1" where it has none, two that read alike
+/// told apart by when each was recorded), a call by what it is ("a call to accept c1", "a call to accept lr of e1" on a
+/// setting), an analysis by its title where its id is rb's, and by its experiment and when it was recorded where it has
+/// none ("an analysis on e1, recorded 2026-10-01 12:00 UTC"; one chosen, a1, stays). A note is said by what it is on,
+/// by its row (log_rows).
+fn minted_names(led: &Ledger) -> Res<IndexMap<String, String>> {
+    // one function names a run, an analysis and a call in every view: History's (FIX9, H's request)
+    let said = crate::history::names_of(led, &led.log_entries()?)?;
     let mut names = IndexMap::new();
-    if let Some(runs) = doc.get("runs").and_then(Value::as_dict) {
-        // when each was recorded, in the order the log recorded them
-        let mut seq: IndexMap<String, usize> = IndexMap::new();
-        for (i, row) in led.log_entries()?.iter().enumerate() {
-            if row.get_str("kind") == Some("run") {
-                if let Some(id) = row.get_str("id") {
-                    seq.entry(id.to_string()).or_insert(i);
-                }
-            }
-        }
-        let mut times: Vec<(String, String)> =
-            led.all::<Run>()?.iter().map(|r| (r.id.clone(), if r.receipt.at.is_empty() { r.created_at.clone() } else { r.receipt.at.clone() })).collect();
-        times.sort_by_key(|(id, _)| seq.get(id).copied().unwrap_or(usize::MAX));
-        names.extend(run_names(runs, &times.into_iter().collect()));
-    }
-    // a call a session recorded says so, as History's line does (history::call_said): it was never a call made
-    let auth = led.authorities()?;
-    for d in led.all::<Decision>()?.iter() {
-        let said = match auth.get(&d.id).map(|a| a.state) {
-            Some("proposed") => format!("a proposed call to {} {}, not made", d.action, d.subject),
-            Some("past_unconfirmed") => format!("a past call to {} {} mentioned, not confirmed", d.action, d.subject),
-            _ => format!("a call to {} {}", d.action, d.subject),
-        };
-        names.insert(d.id.clone(), said);
-    }
-    // one with no title is "an analysis", as a card says it (FIX9): its id stays for the link alone
-    for a in led.all::<Analysis>()?.iter() {
-        if minted(&a.id, "a") {
-            names.insert(a.id.clone(), if a.title.trim().is_empty() { "an analysis".to_string() } else { format!("analysis {}", a.title.trim()) });
+    let ids = led.all::<Run>()?.iter().map(|r| r.id.clone()).collect::<Vec<_>>();
+    let ids = ids.into_iter().chain(led.all::<Analysis>()?.iter().filter(|a| minted(&a.id, "a")).map(|a| a.id.clone()).collect::<Vec<_>>());
+    for id in ids.chain(led.all::<Decision>()?.iter().map(|d| d.id.clone()).collect::<Vec<_>>()) {
+        if let Some(w) = said.get(&id) {
+            names.insert(id, w.clone());
         }
     }
     Ok(names)
@@ -2502,55 +2508,6 @@ fn said_replaced(v: &mut Value, replacing: &[(String, String)]) {
         Value::Dict(d) => d.values_mut().for_each(|x| said_replaced(x, replacing)),
         _ => {}
     }
-}
-
-/// Each run of `runs` (the document's) by its words: "run int8 · seed 1", "a run of e1" where it has none. Two runs whose
-/// words would read alike are each said with when it was recorded ("run int8 · seed 1, recorded 2026-10-14 09:25 UTC"),
-/// to the second where the minute is shared, and by its place among them where that is shared too ("..., the 2nd of
-/// 2", in the order of `times`, the log's): a line never names two runs as one.
-fn run_names(runs: &Dict, times: &IndexMap<String, String>) -> IndexMap<String, String> {
-    let base = |r: &Value| {
-        let label = text(r, "label");
-        if label.is_empty() { format!("a run of {}", text(r, "experiment_id")) } else { format!("run {label}") }
-    };
-    let said: IndexMap<String, String> = runs.iter().map(|(id, r)| (id.clone(), base(r))).collect();
-    let mut out = IndexMap::new();
-    for (id, words) in &said {
-        let twins: Vec<&String> = said.iter().filter(|(_, w)| *w == words).map(|(k, _)| k).collect();
-        if twins.len() < 2 {
-            out.insert(id.clone(), words.clone());
-            continue;
-        }
-        let at = |k: &str| times.get(k).cloned().unwrap_or_default();
-        let to_minute = |k: &str| minute(&at(k));
-        let to_second = |k: &str| match crate::pytime::parse_iso(&at(k)) {
-            Some(t) => t.with_timezone(&chrono::Utc).format("%Y-%m-%d %H:%M:%S UTC").to_string(),
-            None => at(k),
-        };
-        let when = if twins.iter().filter(|k| to_minute(k) == to_minute(id)).count() > 1 { to_second(id) } else { to_minute(id) };
-        let mut alike: Vec<&&String> = twins.iter().filter(|k| to_second(k) == to_second(id)).collect();
-        alike.sort_by_key(|k| times.get_index_of(k.as_str()).unwrap_or(usize::MAX));
-        let place = if alike.len() > 1 {
-            let n = alike.iter().position(|k| **k == id).unwrap_or(0) + 1;
-            format!(", the {} of {}", ordinal(n), alike.len())
-        } else {
-            String::new()
-        };
-        out.insert(id.clone(), format!("{words}, recorded {when}{place}"));
-    }
-    out
-}
-
-/// "1st", "2nd", "3rd", "4th", "11th", "22nd".
-fn ordinal(n: usize) -> String {
-    let end = match (n % 10, n % 100) {
-        (_, 11..=13) => "th",
-        (1, _) => "st",
-        (2, _) => "nd",
-        (3, _) => "rd",
-        _ => "th",
-    };
-    format!("{n}{end}")
 }
 
 /// Each text of `v` a reader reads as rb's words (one that holds a space; an id, which a link or a test reads, holds
@@ -2672,7 +2629,7 @@ fn log_rows(led: &Ledger, held: &std::collections::HashSet<String>, names: &Inde
         let said = crate::cmds::reading::log_said_as(r, None, &|id| names.get(id).cloned().or_else(|| (!note.is_empty() && id == note).then(|| "a note".to_string())));
         rows.push(crate::obj! {
             "at" => minute(&text(&v, "at")), "op" => text(&v, "op"), "sentence" => said, "refs" => Value::list_of_str(refs),
-            "log_index" => i
+            "log_index" => i, "witness" => led.line_witness(r).to_value()
         });
     }
     Ok(Value::List(rows))
@@ -2762,26 +2719,6 @@ mod tests {
         assert_eq!(say("analyze analysis a6pqyge"), "analyze an analysis");
         assert_eq!(say("counted in run runk2xa9q"), "counted in a run of e1");
         assert_eq!(say("run runj53tal and rerun runj53tal"), "run int8 · seed 1 and rerun run int8 · seed 1");
-    }
-
-    /// FIX8: two runs whose words read alike are each said with when it was recorded, to the second where the minute is
-    /// shared, and by their place where that is too; a run alone keeps its words.
-    #[test]
-    fn two_runs_with_one_label_are_said_apart() {
-        let run = |label: &str| crate::obj! {"label" => label, "experiment_id" => "e1"};
-        let runs: Dict = [("r1", run("int8 · seed 1")), ("r2", run("int8 · seed 1")), ("r3", run("int8 · seed 2")), ("r4", run("int8 · seed 1"))]
-            .into_iter().map(|(k, v)| (k.to_string(), v)).collect();
-        let times: IndexMap<String, String> = [("r1", "2026-10-14T09:25:10Z"), ("r2", "2026-10-14T09:31:00Z"), ("r3", "2026-10-14T09:25:10Z"), ("r4", "2026-10-14T09:25:40Z")]
-            .into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
-        let n = run_names(&runs, &times);
-        assert_eq!(n["r1"], "run int8 · seed 1, recorded 2026-10-14 09:25:10 UTC");
-        assert_eq!(n["r2"], "run int8 · seed 1, recorded 2026-10-14 09:31 UTC");
-        assert_eq!(n["r3"], "run int8 · seed 2");
-        assert_eq!(n["r4"], "run int8 · seed 1, recorded 2026-10-14 09:25:40 UTC");
-        let same: IndexMap<String, String> = ["r1", "r2", "r3", "r4"].into_iter().map(|k| (k.to_string(), "2026-10-14T09:25:10Z".to_string())).collect();
-        let n = run_names(&runs, &same);
-        assert_eq!((n["r1"].as_str(), n["r4"].as_str()), ("run int8 · seed 1, recorded 2026-10-14 09:25:10 UTC, the 1st of 3", "run int8 · seed 1, recorded 2026-10-14 09:25:10 UTC, the 3rd of 3"));
-        assert_eq!((ordinal(2), ordinal(11), ordinal(22), ordinal(13)), ("2nd".into(), "11th".into(), "22nd".into(), "13th".into()));
     }
 
     /// FIX8: a line of rb's that says someone's words beside them (an interpretation's line and its text) keeps those

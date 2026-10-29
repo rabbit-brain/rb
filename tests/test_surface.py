@@ -535,13 +535,18 @@ def _uv_tool(tmp_path, upgrades_to):
     swap = ""
     if upgrades_to:
         swap = f'rm -f "{exe}"\nprintf \'#!/bin/sh\\nRB_TEST_VERSION={upgrades_to} exec "{real}" "$@"\\n\' > "{exe}"\nchmod 755 "{exe}"\n'
-    (bindir / "uv").write_text(f'#!/bin/sh\nprintf "%s " "$@" >> "{called}"\n{swap}exit 0\n', encoding="utf-8")
-    (bindir / "uv").chmod(0o755)
+    if os.name == "nt":
+        # a shell script does not run on Windows, where rb looks for uv.exe, then uv.cmd: a batch file that notes
+        # what it was asked (it cannot put a program in rb's place)
+        (bindir / "uv.cmd").write_text(f'@echo off\n>>"{called}" echo %*\nexit /b 0\n', encoding="utf-8")
+    else:
+        (bindir / "uv").write_text(f'#!/bin/sh\nprintf "%s " "$@" >> "{called}"\n{swap}exit 0\n', encoding="utf-8")
+        (bindir / "uv").chmod(0o755)
     env = {**os.environ, "PATH": f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}"}
     return str(exe), env, called
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="updating through uv on Windows: Windows is a preview (issue #2)", strict=False)
+@pytest.mark.xfail(sys.platform == "win32", reason="the fake uv cannot put a program in rb's place on Windows (issue #2)", strict=False)
 def test_rb_installed_as_a_uv_tool_upgrades_itself_through_uv_and_a_screen_says_restart(updates, tmp_path, monkeypatch):
     exe, env, called = _uv_tool(tmp_path, "0.7.0")
     r = _rb(exe, "version", env=env)
@@ -561,7 +566,6 @@ def test_rb_installed_as_a_uv_tool_upgrades_itself_through_uv_and_a_screen_says_
     assert update_line(tmp_path, "0.6.0")[0] == "", "an rb of another environment (pip in a project) says nothing of it"
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="updating through uv on Windows: Windows is a preview (issue #2)", strict=False)
 def test_an_upgrade_that_installs_nothing_newer_is_not_said_as_installed(updates, tmp_path):
     exe, env, called = _uv_tool(tmp_path, None)
     assert _rb(exe, "version", env=env).returncode == 0

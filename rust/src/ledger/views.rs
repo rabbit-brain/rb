@@ -1152,15 +1152,18 @@ impl Ledger {
                 }
             } else if f.rule_outcome == "misses" && claim && last.is_none() {
                 gate.insert("undecided".into(), true);
+                // a call proposed on it, or a past call mentioned, is recorded and not made: never "no call"
+                let waits = self.pending_calls()?.iter().any(|(d, _)| d.subject == c.id);
                 item(
                     &mut items,
                     "human",
                     "undecided",
                     &c.id,
                     &format!(
-                        "{} {} and no call on it is recorded: {}",
+                        "{} {} and {}: {}",
                         c.id,
                         if assess::rule_word("misses", &c.role, &c.origin) == "not reproduced" { "is not reproduced" } else { "misses its rule" },
+                        if waits { "the call recorded on it is not made yet: it waits for a confirmation" } else { "no call on it is recorded" },
                         c.statement
                     ),
                     &decide_do(&c.id, UNDECIDED_ACTIONS),
@@ -1703,6 +1706,7 @@ impl Ledger {
             let mut row = d.dump(false);
             row.insert("authority".into(), a.to_value());
             row.insert("confirm".into(), Value::Str(format!("rb confirm {}", d.id)));
+            row.insert("witness".into(), super::support::decision_witness(&d).to_value());
             if !after.is_empty() {
                 row.insert("runs_after".into(), Value::list_of_str(after));
             }
@@ -1867,6 +1871,7 @@ impl Ledger {
         for d in &decisions {
             let mut dd = d.dump(false);
             dd.insert("current".into(), Value::Bool(self.decision_current(d)?.0));
+            dd.insert("witness".into(), super::support::decision_witness(d).to_value());
             if let Some(a) = auth.get(&d.id) {
                 dd.insert("authority".into(), a.to_value());
             }
@@ -1890,7 +1895,8 @@ impl Ledger {
                     "outputs" => Value::List(x.outputs.iter().map(|u| Value::Dict(u.dump(false))).collect()),
                     "superseded_for" => Value::list_of_str(x.retracted.as_ref().map(|r| r.scope.clone()).unwrap_or_default()),
                     "command" => super::support::run_command(x).map(|g| g.to_value()), "made_before_recorded" => made_before_recorded(x),
-                    "file_written_after" => super::support::written_after(x), "file_written" => super::support::file_written(x)
+                    "file_written_after" => super::support::written_after(x), "file_written" => super::support::file_written(x),
+                    "witness" => super::support::run_witness(x).to_value()
                 }
             })
             .collect();
@@ -1903,7 +1909,8 @@ impl Ledger {
                     "supersedes" => Value::list_of_str(a.supersedes.clone()), "why" => a.why.clone(), "superseded_by" => superseded_by.get(&a.id).cloned(),
                     "retracted" => a.retracted.as_ref().map(|r| Value::Dict(r.dump(false))), "recorded" => a.created_at.clone(), "by" => a.created_by.clone(),
                     "comparisons" => Value::List(a.comparisons.iter().map(|c| { let mut d = c.dump(false); d.shift_remove("source"); Value::Dict(d) }).collect()),
-                    "command" => super::support::analysis_command(a).map(|g| g.to_value())
+                    "command" => super::support::analysis_command(a).map(|g| g.to_value()),
+                    "witness" => super::support::analysis_witness(a).to_value()
                 }
             })
             .collect();
@@ -1933,13 +1940,23 @@ impl Ledger {
             "experiment_id" => experiment,
             // the record-start line's facts, while runs it holds were made before it began
             "record_start" => self.record_start()?.map(|s| s.to_value()),
+            // how rb knows of what the record holds: seen as it ran, or recorded afterwards (WITNESS)
+            "witness" => self.witness()?,
             "counts" => crate::obj! {
                 "question_count" => questions.len(), "experiment_count" => experiments.len(), "criterion_count" => criteria.len(), "run_count" => runs.len(),
                 "analysis_count" => analyses.iter().filter(|a| a.retracted.is_none()).count(), "resource_count" => resources.len(), "decision_count" => decisions.len(),
                 "pending_count" => pending_rows.len(), "design_pending_count" => designs_pending.len()
             },
             "tally" => counts(tally), "results" => counts(results),
-            "findings" => Value::List(findings.values().map(|f| Value::Dict(f.dump(false))).collect()),
+            "findings" => {
+                let mut rows = Vec::new();
+                for f in findings.values() {
+                    let mut d = f.dump(false);
+                    d.insert("witness".into(), self.finding_witness(f)?);
+                    rows.push(Value::Dict(d));
+                }
+                Value::List(rows)
+            },
             "experiments" => Value::List(exp_rows), "runs" => Value::List(runs_v), "analyses" => Value::List(analyses_v),
             "questions" => Value::List(q_rows), "resources" => Value::List(res_rows), "decisions" => Value::List(dec_rows), "pending" => Value::List(pending_rows),
             "gates_pending" => Value::List(gates_pending), "designs_pending" => Value::List(designs_pending),

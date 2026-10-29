@@ -2495,6 +2495,11 @@ fn found_in(led: &Ledger, st: &Dict, all_entries: &[Dict], dismissed: &HashSet<S
                 }
             }
         }
+        // the command rb watched write the file and exit 0, so the run reads it as observed, and a clone of the record can
+        // run it again; a command that failed made no run to name, as a printed number's proposal needs exit 0 too
+        if let Some(c) = commands.get(rel).filter(|_| wrote_ok.contains(rel)) {
+            argv.extend(["--command".to_string(), c.clone()]);
+        }
         (argv, fill)
     };
     for (rel, meta) in &files {
@@ -2950,8 +2955,21 @@ pub fn baseline(led: &Ledger) -> Res<Baseline> {
         }
     }
     let first = led.first_write()?;
-    let began_on = first.as_ref().filter(|w| w.get_str("op") == Some("init")).and_then(|w| w.get("detail")).and_then(|d| d.get_str("head")).map(str::to_string);
+    let detail = first.as_ref().and_then(|w| w.get("detail"));
+    let began_on = match first.as_ref().and_then(|w| w.get_str("op")) {
+        Some("init") => detail.and_then(|d| d.get_str("head")).map(str::to_string),
+        // a clone that got the code counts from the commit that put its record in place of the parent's, which git
+        // dates after the record's first write (seconds after, on a slow machine)
+        Some("clone") => detail.and_then(|d| d.get("code")).filter(|c| c.get("got").map_or(false, Value::truthy)).and_then(|c| c.get_str("commit")).and_then(|c| record_commit(&led.root, c)),
+        _ => None,
+    };
     Ok(Baseline { at: led.began()?, commit: None, applied: false, began_on })
+}
+
+/// The first commit after `code` on HEAD's line: a clone's commit of its record, where git made it.
+fn record_commit(root: &Path, code: &str) -> Option<String> {
+    let range = format!("{code}..HEAD");
+    git(root, &["rev-list", "--ancestry-path", "--topo-order", "--reverse", &range]).and_then(|out| out.lines().next().map(|l| l.trim().to_string())).filter(|c| !c.is_empty())
 }
 
 /// The keys of the changed files an rb reconcile --apply recorded by path, each while its bytes are those: the user's

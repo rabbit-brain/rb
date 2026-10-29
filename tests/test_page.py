@@ -2,6 +2,7 @@
 match what rb status computes, with no writer and none of the user's words, since a page is sent to anyone, or this
 fails."""
 import html as html_mod
+import json
 import re
 import shutil
 import subprocess
@@ -555,13 +556,29 @@ def test_an_export_with_an_address_offers_the_prompt_that_reruns_it(repo, tmp_pa
     folder = state().project.id
     # the page by the one address the reader has: the folder it was published at, as the hub's rb-page meta names it
     assert prompt.startswith("Rerun this research with Rabbit Brain (rb). Its record: https://lab.example/int8/\n\n")
-    assert f"2. Clone the record into a new folder: rb clone https://lab.example/int8/bundle.zip {folder}. It gets the code too," in prompt
-    assert "rb clone https://lab.example/int8/bundle.zip <another new folder> --code <that address> gets it.\n" in prompt
+    # no remote here: the bundle holds the record alone, and step 2 says the code is its owner's to give
+    assert (f"2. Clone the record into a new folder: rb clone https://lab.example/int8/bundle.zip {folder}. This bundle"
+            " holds the record alone: the code is its owner's to give, and the runs need it.") in prompt
+    assert "rb clone https://lab.example/int8/bundle.zip <another new folder> --code <that address> gets it at the commit" in prompt
+    assert "This bundle names the code" not in prompt and "gets it too" not in prompt
     assert "where rb context names a command that puts a run's code here, run that one first." in prompt and "git " not in prompt
     assert "5. Then run rb status, and tell me which rules reproduced and which did not, with their numbers." in prompt
     assert "Run experiment e1, \u201cthe experiment\u201d: its commands in the order rb context names them" in _plain(page.split('id="x-e1:prompt">', 1)[1].split("</pre>", 1)[0])
     assert "The runs need the code; this bundle doesn't say where it is." in plain          # no remote here
     assert "—" not in page
+    # with an origin a reader can use, the prompt says what the bundle names: rb clone gets the code, or the record alone
+    subprocess.run(["git", "remote", "add", "origin", "https://github.com/ana/int8-resnet.git"], check=True, capture_output=True)
+    code, env = repo("export", "--with-record", "--url", "https://lab.example/int8/", "--out", str(tmp_path / "named"))
+    assert code == 0
+    named = Path(env.data["path"])
+    named_prompt = _plain((named / "page.html").read_text(encoding="utf-8").split('id="rerun-prompt">', 1)[1].split("</pre>", 1)[0])
+    if json.loads((named / "manifest.json").read_text(encoding="utf-8")).get("repo"):
+        assert (f"rb clone https://lab.example/int8/bundle.zip {folder}. This bundle names the code: rb clone gets it too,"
+                " at the commit the record names, and puts the record in it.") in named_prompt
+        assert "holds the record alone" not in named_prompt
+    else:
+        assert "holds the record alone" in named_prompt
+    subprocess.run(["git", "remote", "remove", "origin"], check=True, capture_output=True)
     code, env = repo("export", "--with-record", "--out", str(tmp_path / "unpublished"))
     assert code == 0 and "Rerun this research" not in (Path(env.data["path"]) / "page.html").read_text(encoding="utf-8")
     # the steps work as written: the clone lands in the folder the prompt names, and rb works there

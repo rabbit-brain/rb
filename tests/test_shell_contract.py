@@ -31,7 +31,7 @@ shape_py = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(shape_py)
 
 
-CONTRACT = "rb-shell-view/1.9"   # a minor bump adds fields only (section 1.8), so a document of an earlier minor still meets it
+CONTRACT = "rb-shell-view/1.11"   # a minor bump adds fields only (section 1.8), so a document of an earlier minor still meets it
 
 
 def same_major(contract) -> bool:
@@ -208,7 +208,6 @@ def test_the_checks_catch_a_broken_example():
     assert any("Live-only value" in p for p in writer_problems(quoted, live=example("live")))
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="a fixture generator on Windows: Windows is a preview (issue #2)", strict=False)
 def test_the_fixtures_are_what_their_generators_give():
     """The Owner example, rb open's other two places and the shape are what owner_of.py, place_of.py and shape.py make."""
     def made(*argv):
@@ -218,6 +217,16 @@ def test_the_fixtures_are_what_their_generators_give():
     for state in ("away", "past"):
         assert made("place_of.py", state, live) == (HERE / f"int8-demo.{state}.view.json").read_text(encoding="utf-8")
     assert made("shape.py", live, "int8-demo.away.view.json", "int8-demo.past.view.json") == (HERE / "view-1.shape.tsv").read_text(encoding="utf-8")
+
+
+def test_the_generators_write_utf8_whatever_the_terminal_says():
+    """Windows writes a pipe in its code page (cp1252), which has no ○, ◐ or ✓: each generator says UTF-8 itself."""
+    wrap = ("import io, runpy, sys; sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='cp1252'); "
+            "sys.argv = sys.argv[1:]; runpy.run_path(sys.argv[0], run_name='__main__')")
+    live = "int8-demo.live.view.json"
+    for argv, fixture in ((["owner_of.py", live], "int8-demo.owner.view.json"), (["place_of.py", "away", live], "int8-demo.away.view.json")):
+        out = subprocess.run([sys.executable, "-I", "-c", wrap, *argv], cwd=HERE, capture_output=True, check=True).stdout
+        assert out.decode("utf-8") == (HERE / fixture).read_text(encoding="utf-8")
 
 
 def test_every_owned_path_is_one_owners():
@@ -338,9 +347,16 @@ class Tree(html.parser.HTMLParser):
             yield k
             yield from self.all(k)
 
+    # elements that flow inside a line of text: their words join the words around them as written ("(e2)" with e2 a link)
+    INLINE = {"a", "abbr", "b", "code", "em", "i", "kbd", "mark", "q", "s", "small", "span", "strong", "sub", "sup", "time", "u"}
+
     def text(self, el) -> str:
-        """The element's text in document order: its own text where it sits among its children's."""
-        return "".join(x if isinstance(x, str) else " " + self.text(x) for x in el["seq"])
+        """The element's text in document order: its own text where it sits among its children's, an inline child's
+        joined to the text beside it as written, and any other child, or one right after another element, set apart by a space."""
+        seq = el["seq"]
+        return "".join(x if isinstance(x, str) else
+                       ("" if x["tag"] in self.INLINE and (k == 0 or isinstance(seq[k - 1], str)) else " ") + self.text(x)
+                       for k, x in enumerate(seq))
 
     def by_id(self, ident: str):
         return next((e for e in self.all() if e["attrs"].get("id") == ident), None)
@@ -418,11 +434,14 @@ def values(doc, spec: str) -> list:
 VIEWS = {
     "frame": (None, "R1", ["project.title", "at", "rb_version"]),
     "nav": ("nav", "R1", ["questions[*].text", "experiments[*].short_title"]),
-    "overview": ("overview", "R1", ["home.latest.head", "home.began", "home.scope", "home.uncited_line", "home.found[*].title",
+    "overview": ("overview", "R1", ["home.latest.head", "home.scope", "home.uncited_line", "home.found[*].title",
                                     "pending.rows[*].text", "home.open_line", "home.notes[*].text", "questions[*].text",
                                     "home.standing[*].line", "home.standing[*].state_word",
                                     "home.standing[*].tallies[*].label", "home.integrity.parts[*].line", "home.integrity.affects",
-                                    "home.queue[*].title", "home.queue[*].detail"]),
+                                    "home.queue[*].title", "home.queue[*].detail",
+                                    # WITNESS: the record's line counts what was recorded afterwards; rb status's
+                                    # own line (home.began, "Kept with rb since <day>. ...") is drawn nowhere, its fact is the line's
+                                    "home.witness.runs.afterwards", "home.witness.calls.afterwards"]),
     "overview-sitting": ("overview", "H2", ["history.sittings[0].head"]),
     "overview-recent": ("overview", "H2", ["history.sittings[0].lines[*].sentence"]),
     "your-call": ("your-call", "R1", ["home.quiet", "calls[*].title", "calls[*].reason.label", "calls[*].reason.detail", "calls[*].actions[*].line",
@@ -482,7 +501,6 @@ def test_model_meets_contract(request, tier, tmp_path):
     assert not writer_problems(doc), writer_problems(doc)[:20]
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="a fixture generator on Windows: Windows is a preview (issue #2)", strict=False)
 def test_model_tiers_differ_only_as_listed(request, tmp_path):
     """M's Owner document is its Live one with section 1.5's rows applied (owner_of.py), and nothing else."""
     needs("M0", "M4")

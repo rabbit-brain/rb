@@ -86,6 +86,35 @@ def test_a_bit_identical_watched_rerun_is_proposed(repo, capsys):
     assert not any("holds bytes git already kept" in line for line in env.data.get("unplaced", []))
 
 
+def test_the_proposed_run_of_a_watched_command_carries_the_command(repo, capsys):
+    """The run rb reconcile proposes from a file a watched command wrote carries that command, so the run reads it as
+    observed and a clone of the record can run it again."""
+    committed_then_cleared(repo)
+    assert main(["journal", "run", "--", sys.executable, "eval.py"]) == 0
+    capsys.readouterr()
+    code, env = repo("reconcile")
+    argv = {f["path"]: f for f in env.data["found"]}["results/run1/metrics.json"]["argv"]
+    assert "--command" in argv, argv
+    command = argv[argv.index("--command") + 1]
+    assert command.endswith("eval.py"), command
+    code, env = repo("reconcile", "--apply")
+    assert code == 0, env.errors
+    code, env = repo("status")
+    (run,) = env.data["runs"]
+    assert run["command"]["text"] == command and run["command"]["given"] == "observed", run["command"]
+
+
+def test_a_failed_command_is_no_command_of_the_run_it_wrote(repo, capsys):
+    """A watched command that wrote results and then failed made no run to name: its line carries no --command."""
+    declare(repo)
+    Path("eval.py").write_text(EVAL + "raise SystemExit(3)\n", encoding="utf-8")
+    assert main(["journal", "run", "--", sys.executable, "eval.py"]) != 0
+    capsys.readouterr()
+    code, env = repo("reconcile")
+    found = {f["path"]: f for f in env.data["found"]}
+    assert "--command" not in found["results/run1/metrics.json"]["argv"], found
+
+
 def test_bytes_git_itself_puts_back_are_not_proposed(repo, capsys):
     committed_then_cleared(repo)
     assert main(["journal", "run", "--", "git", "checkout", "HEAD", "--", "results/run1/metrics.json"]) == 0

@@ -1001,6 +1001,9 @@ fn do_get(c: &mut Conn, root: &Path, req: &Request) {
 }
 
 fn handle(stream: TcpStream, root: PathBuf) {
+    // each request reads the sources afresh, as a command line does: rb open lives long, and a file rewritten with as
+    // many bytes at a time its file system keeps the same (a coarse clock) is not the file an earlier request read
+    crate::sources::forget_reads();
     let Ok(read_half) = stream.try_clone() else { return };
     let mut r = BufReader::new(read_half);
     let mut c = Conn { w: stream, version: "HTTP/0.9".into(), command: String::new() };

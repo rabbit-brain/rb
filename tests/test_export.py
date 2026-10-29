@@ -518,23 +518,63 @@ def test_a_published_export_carries_its_own_reproduction(repo, capsys):
 
 
 def test_the_code_repository_is_recorded_as_git_names_it_without_credentials(repo, capsys, tmp_path_factory):
-    """The address of the code a record was played against is published as git names the origin remote, with the
-    credentials a remote may carry before its host taken out, whatever its scheme (a remote helper's prefix kept), and
-    nothing else about it changed."""
+    """The address of the code a record was played against is published only where a reader can use it: origin as the
+    checkout's config writes it, an https address, with the credentials before its host and the query and fragment
+    after its path taken out, and nothing else about it changed."""
     out = tmp_path_factory.mktemp("exports")
     for i, (remote, published) in enumerate([
-        ("hg::https://alice:pw@host/repo", "hg::https://host/repo"),
-        ("gcrypt::https://alice:pw@github.com/org/repo.git", "gcrypt::https://github.com/org/repo.git"),
-        ("git_ssh://alice:pw@host/r.git", "git_ssh://host/r.git"),
-        ("file:///home/me/c#proj/repo.git", "file:///home/me/c#proj/repo.git"),
-        ("https://host/repo.git?ref=main", "https://host/repo.git?ref=main"),
-        ("git@host:org/repo", "git@host:org/repo"),
+        ("https://alice:pw@github.com/org/repo.git", "https://github.com/org/repo.git"),
+        ("https://ana@github.com/org/repo.git", "https://github.com/org/repo.git"),
+        ("https://host/repo.git?ref=main#top", "https://host/repo.git"),
+        ("HTTPS://host/repo.git", "https://host/repo.git"),
     ]):
         subprocess.run(["git", "remote", "set-url", "origin", remote], check=True)
         code, env = repo("export", "--with-record", "--url", "https://lab.example/inv/", "--out", str(out / f"e{i}"))
-        assert code == 0 and env.data["repo"]["url"] == published, remote
+        assert code == 0 and env.data["repo"]["url"] == published and "repo_unnamed" not in env.data, remote
         assert json.loads((out / f"e{i}" / "manifest.json").read_text(encoding="utf-8"))["repo"]["url"] == published, remote
         assert "alice:pw" not in (out / f"e{i}" / "page.html").read_text(encoding="utf-8"), remote
+
+
+UNNAMED = ("The bundle names no address for the code: origin is not an https address a reader can fetch. A reader gets "
+           "the code with rb clone --code <address>.")
+
+
+def test_an_export_names_no_code_where_origin_is_no_address_a_reader_can_use(repo, capsys, tmp_path_factory, monkeypatch):
+    """A path of this machine, file://, ssh, plain http or a remote helper's address is no address a reader can fetch
+    the code from: the export names none, in its answer, its manifest or the Rerun panel, says so in one line, and no
+    path of this machine is anywhere in the bundle. git's own rewrite of the address for this machine (insteadOf) is
+    this machine's: the address as the config writes it is the one named."""
+    out = tmp_path_factory.mktemp("exports")
+    bare = tmp_path_factory.mktemp("published") / "int8-resnet50.git"
+    _git("clone", "-q", "--bare", ".", str(bare))
+    for i, remote in enumerate([str(bare), bare.as_uri(), "ssh://ana@host/org/repo.git", "git@host:org/repo",
+                                "http://host/repo.git", "hg::https://host/repo", "https:///srv/rb/repo.git"]):
+        subprocess.run(["git", "remote", "set-url", "origin", remote], check=True)
+        dest = out / f"e{i}"
+        code, env = repo("export", "--with-record", "--url", "https://lab.example/inv/", "--out", str(dest))
+        assert code == 0 and env.data["repo"] is None and env.data["repo_unnamed"] == UNNAMED, (remote, env.data["repo"])
+        assert "repo" not in json.loads((dest / "manifest.json").read_text(encoding="utf-8")), remote
+        page = (dest / "page.html").read_text(encoding="utf-8")
+        assert "say where it is" in page and "The code the runs used" not in page, remote
+        # nothing in the bundle, the zip beside it included, holds origin's address or a path of this machine
+        for f in sorted(p for p in dest.rglob("*") if p.is_file()):
+            data = f.read_bytes()
+            if f.name == "bundle.zip":
+                with zipfile.ZipFile(f) as z:
+                    data = b"".join(z.read(n) for n in z.namelist())
+            for said in {remote, str(bare), str(bare.parent), str(Path.cwd())}:
+                assert said.encode() not in data, (remote, f.relative_to(dest), said)
+    # the page alone says the same, and --no-repo, which leaves the code out by choice, says nothing of it
+    code, env = repo("export", "--out", str(out / "page"))
+    assert code == 0 and env.data["repo"] is None and env.data["repo_unnamed"] == UNNAMED
+    code, env = repo("export", "--with-record", "--no-repo", "--out", str(out / "norepo"))
+    assert code == 0 and env.data["repo"] is None and "repo_unnamed" not in env.data
+    # an insteadOf that sends the https address to this machine's copy: the https address is named, never the copy
+    subprocess.run(["git", "remote", "set-url", "origin", served_at(monkeypatch, bare)], check=True)
+    assert _git("remote", "get-url", "origin") == str(bare)
+    code, env = repo("export", "--with-record", "--out", str(out / "served"))
+    assert code == 0 and env.data["repo"]["url"] == SERVED, env.data["repo"]
+    assert str(bare).encode() not in (out / "served" / "manifest.json").read_bytes()
 
 
 def test_a_published_address_is_kept_without_what_it_carried(repo, capsys, tmp_path_factory):
@@ -1232,6 +1272,18 @@ def _git(*argv, cwd=None):
     return subprocess.run(["git", *argv], check=True, capture_output=True, text=True, cwd=cwd).stdout.strip()
 
 
+SERVED = "https://lab.example/int8-resnet50.git"
+
+
+def served_at(monkeypatch, bare, address=SERVED):
+    """origin as a reader is given it, an https address, which git on this machine fetches from the bare repository
+    `bare` (url.<bare>.insteadOf): an export names only an address a reader can use, so a test's origin is one."""
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", f"url.{bare}.insteadOf")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", address)
+    return address
+
+
 def test_the_manifest_names_what_the_working_tree_changes_of_its_commit(repo, capsys, tmp_path_factory):
     """A rerun gets the code at the bundle's commit, so the manifest names what the checkout changed of it: the paths
     git status names (modified, added, deleted, untracked; not ignored), sorted, from the repository's root. The record
@@ -1299,7 +1351,7 @@ def test_a_forks_export_names_the_code_commit_origin_holds(workdir, monkeypatch,
     _git("add", "-A")
     _git("commit", "-qm", "record")
     _git("clone", "-q", "--bare", str(parent), str(w / "origin.git"))
-    _git("remote", "add", "origin", str(w / "origin.git"))
+    _git("remote", "add", "origin", served_at(monkeypatch, w / "origin.git"))
     _git("fetch", "-q", "origin")
     head = _git("rev-parse", "HEAD")
     code, env = rb("export", "--with-record", "--out", str(w / "bundle"))
@@ -1342,7 +1394,7 @@ def test_what_the_tree_changes_is_named_from_the_repositorys_root(workdir, monke
     (top / "int8").mkdir(parents=True)
     monkeypatch.chdir(top)
     _git("init", "-q")
-    _git("remote", "add", "origin", str(w / "origin.git"))
+    _git("remote", "add", "origin", served_at(monkeypatch, w / "origin.git"))
     Path("train eval.py").write_text("print(1)\n", encoding="utf-8")
     monkeypatch.chdir(top / "int8")
     assert rb("init", "INT8 ResNet-50", "--no-agents")[0] == 0

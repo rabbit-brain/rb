@@ -501,6 +501,29 @@ fn controls(surface: Surface) -> String {
     }
 }
 
+/// The record's one line (WITNESS), as the Overview and About draw it: when rb began keeping the record and how much of it
+/// was recorded afterwards, not as it happened, quiet, from M's facts (`home.witness`); nothing where the document gives
+/// none. "Kept with rb since it began." only where the facts show the record holds nothing that came before it: never on
+/// a clone (its structure came from its parent: a parent's address, or an experiment that reproduces one elsewhere, by
+/// its uid or address, as rb clone relates each) or a record with an experiment read from a results folder (work the
+/// folder held, which rb did not see happen), where the counts cannot tell; nor on a record with no experiment, where
+/// nothing tells a clone of questions alone from a record begun here.
+fn witness(doc: &Value) -> String {
+    let n = |k: &str| count(doc, &format!("home.witness.{k}.afterwards")).unwrap_or(0);
+    let t = |k: &str| count(doc, &format!("home.witness.{k}.total")).unwrap_or(0);
+    let kinds = [("runs", "run"), ("analyses", "analysis"), ("calls", "call"), ("notes", "note")];
+    let elsewhere = |r: &Value| r.as_str().and_then(|r| r.strip_prefix("reproduces ")).map_or(false, |to| to.starts_with("exp_") || to.contains('/'));
+    let exps = list(doc, "experiments");
+    let older = !text(doc, "project.parent").is_empty()
+        || exps.is_empty()
+        || exps.iter().any(|e| !text(e, "folder").is_empty() || list(e, "relations").iter().any(elsewhere));
+    if older && kinds.iter().all(|(k, _)| n(k) == 0) {
+        return String::new();
+    }
+    let line = w::witness_line(text(doc, "home.witness.began"), &kinds.map(|(k, one)| (n(k), t(k), one, k)));
+    if line.is_empty() { line } else { format!("<p class=\"dim sm wit\">{}</p>", esc(&line)) }
+}
+
 /// About's line on the record itself: its id, rb's version, and the project it was cloned from, when that is an address.
 fn record_line(doc: &Value) -> String {
     let parent = text(doc, "project.parent");
@@ -594,7 +617,7 @@ fn footer(doc: &Value, surface: Surface) -> String {
 /// The About view (design pass 1, P10, target 11): what made the page, the honesty line, how to read the record and the
 /// words it uses, once, reached from the top bar; never at the foot of every view. Glossary hovers on terms stay.
 fn about(doc: &Value, surface: Surface, words: &str) -> String {
-    let body = format!("<h1 id=\"h-about\">{}</h1>{}{}{words}", w::ABOUT_TITLE, record_line(doc), footer(doc, surface));
+    let body = format!("<h1 id=\"h-about\">{}</h1>{}{}{}{words}", w::ABOUT_TITLE, record_line(doc), witness(doc), footer(doc, surface));
     format!("<div class=\"sec\" id=\"sec-about\">{}</div>", section("about", &with_project(doc, w::ABOUT), w::ABOUT, "insp-none", &body))
 }
 
@@ -2439,8 +2462,9 @@ impl<'a> Page<'a> {
                     if anchors { format!(" id=\"rr-{}\"", esc(rid)) } else { String::new() },
                     esc(&self.run_to(rid)),
                     if gone { " class=\"gone\"" } else { "" },
-                    // the row names the run; its last cell opens its receipt, never saying its id
-                    a(&self.run_to(rid), w::RECEIPT_LINK, "")
+                    // the row names the run; its last cell opens its receipt, never saying its id; a run rb did not
+                    // see happen says so there instead (WITNESS), and the link still opens what its card holds
+                    a(&self.run_to(rid), if text(r, "witness.seen") == "afterwards" { w::RECORDED_AFTERWARDS } else { w::RECEIPT_LINK }, "")
                 )
             })
             .collect();
@@ -2588,7 +2612,9 @@ impl<'a> Page<'a> {
                 let n = count(e, "log_index").map(|n| format!(" id=\"log-{n}\"")).unwrap_or_default();
                 // rb's sentence with each object it names linked where it says it (a run by its name, an id as it
                 // is), then only the objects it does not say, so no row says a run or a call twice
-                let forms: Vec<Form> = texts(e, "refs")
+                let refs = texts(e, "refs");
+                let is_run = |r: &str| d.get("runs").and_then(|m| m.get(r)).is_some_and(Value::is_dict);
+                let forms: Vec<Form> = refs
                     .iter()
                     .filter_map(|r| {
                         let to = self.object_to(r)?;
@@ -2596,14 +2622,28 @@ impl<'a> Page<'a> {
                         if n == *r {
                             return Some((vec![n], to, "mono"));
                         }
-                        // a run as every line names it (told apart from one whose label reads the same), else by its label
+                        // a run as every line names it (told apart from one whose label reads the same), else by its
+                        // label; and any object by its own id, where the sentence says that ("analysis a1", Look 10)
                         let apart = d.get("runs").and_then(|m| m.get(r)).map_or("", |x| text(x, "named"));
-                        Some((if apart.is_empty() { vec![n] } else { vec![apart.to_string(), n] }, to, ""))
+                        let mut said = if apart.is_empty() { vec![n] } else { vec![apart.to_string(), n] };
+                        said.push(r.clone());
+                        Some((said, to, ""))
                     })
                     .collect();
                 let (sentence, unsaid) = linked_forms(text(e, "sentence"), &forms);
-                let refs: Vec<String> = unsaid.iter().map(|(n, to, c)| a(to, &esc(&n[0]), c)).collect();
-                let refs = if refs.is_empty() { String::new() } else { format!("<span class=\"refs\"> \u{b7} {}</span>", refs.join(" ")) };
+                // a run's line names the run it records first; another run it names is the one it replaces (the log
+                // line's `replaces`), which follows it with that word, never as a second run it recorded (Look 10)
+                let recorded = (text(e, "op") == "record").then(|| refs.first().filter(|r| is_run(r))).flatten();
+                let refs: Vec<String> = unsaid
+                    .iter()
+                    .map(|f| {
+                        let (n, to, c) = f;
+                        let replaced = recorded.is_some_and(|first| refs.iter().any(|r| r != first && is_run(r) && self.object_to(r).as_deref() == Some(to.as_str())));
+                        let link = a(to, &esc(&n[0]), c);
+                        if replaced { format!("{}{link}", w::REPLACING) } else { link }
+                    })
+                    .collect();
+                let refs = if refs.is_empty() { String::new() } else { format!("<span class=\"refs\"> \u{b7} {}</span>", refs.join(" \u{b7} ")) };
                 format!("<li{n}><span class=\"t\">{}</span> <span>{sentence}</span>{refs}</li>", esc(text(e, "at")))
             })
             .collect();
@@ -3051,6 +3091,11 @@ impl<'a> Page<'a> {
     fn units_line_bare(&self, cid: &str, f: &Value) -> String {
         let units = text(f, "units_line");
         let mut out = if units.is_empty() { String::new() } else { a(&self.criterion_part(cid, "runs"), &esc(units), "") };
+        // how many of the runs it rests on rb did not see happen (WITNESS), only where any
+        let late = w::rests_afterwards(count(f, "witness.afterwards").unwrap_or(0), count(f, "witness.total").unwrap_or(0));
+        if !late.is_empty() {
+            out.push_str(&format!("{}{late}", if out.is_empty() { "" } else { DOT }));
+        }
         let detail = text(f, "rule_detail");
         if !detail.is_empty() {
             out.push_str(&format!("<span class=\"rdt\"> \u{b7} {}</span>", a(&self.criterion_part(cid, "rule"), &esc(&nb(detail)), "")));
@@ -3411,8 +3456,8 @@ impl<'a> Page<'a> {
     /// The Overview (OVERVIEW-V2.md): not the record but its projection onto the user's calls, top to bottom. The title
     /// and one line (the place, the recorded runs, when the record last changed); a standing card per top-level
     /// question; Evidence integrity, only when something weakens the whole body of evidence; Needs your judgment, the
-    /// one queue; the research questions, a row each; then, folded, how rb reads this repository, the recent changes and
-    /// the project's notes. Its inspector shows its empty state, never a second copy of the queue.
+    /// one queue; the research questions, a row each; the record's line (WITNESS); then, folded, how rb reads this
+    /// repository, the recent changes and the project's notes. Its inspector shows its empty state, never a second copy of the queue.
     fn overview(&self) -> String {
         let d = self.doc;
         let title = text(d, "project.title");
@@ -3422,6 +3467,9 @@ impl<'a> Page<'a> {
         h.push(self.queue_section());
         h.push(self.waiting_fold());
         h.push(self.question_rows());
+        // the record's line under the questions, above how rb reads it: quiet, and never between the head and the
+        // queue, whose first row stays on a phone's first screen
+        h.push(witness(d));
         h.push(self.how_rb_reads());
         h.push(self.recent_fold());
         h.push(self.notes());
@@ -3850,15 +3898,14 @@ impl<'a> Page<'a> {
         format!("<section class=\"qrows\" id=\"ov-questions\" aria-labelledby=\"h-ov-questions\"><h2 id=\"h-ov-questions\">{}</h2><ul class=\"qlist\">{rows}</ul></section>", w::RESEARCH_QUESTIONS)
     }
 
-    /// How rb reads this repository, folded: where the record started, rb's scope line, the changed files nothing
-    /// cites, and what rb found, each verbatim from rb.
+    /// How rb reads this repository, folded: rb's scope line, the changed files nothing cites, and what rb found, each
+    /// verbatim from rb.
     fn how_rb_reads(&self) -> String {
         let p = |s: String, live: &str| if s.is_empty() { s } else { format!("<p{live}>{s}</p>") };
         // its time sits in the span rb's scope line keeps a time in (`nw`), the one rb sync --watch reads as the clock's
         let short = nowrap_times(&esc(text(self.doc, "home.scope_short")));
         let short = if short.is_empty() { short } else { format!("<span data-live=\"scope_short\">{short}</span>") };
         let body = [
-            p(self.began(), ""),
             p(nowrap_times(&esc(text(self.doc, "home.scope"))), " data-live=\"scope\""),
             if text(self.doc, "home.scope").is_empty() { p(short, "") } else { String::new() },
             {
@@ -3959,29 +4006,6 @@ impl<'a> Page<'a> {
             out.push(QItem { kind: "uncited".into(), title: esc(&w::inspect_uncited(uncited as usize)), reader: String::new(), detail: String::new(), target: "how-made".into(), action: w::INSPECT.into(), src: QSrc::Uncited });
         }
         out
-    }
-
-    /// Where the record started, in rb's words: its day linked to History and its runs to Runs, when rb hands the line
-    /// in parts (`began_parts`, pieces and where each links) that read as the line does; otherwise the line as it is.
-    fn began(&self) -> String {
-        let line = text(self.doc, "home.began");
-        let parts: Vec<(&str, &str)> = list(self.doc, "home.began_parts")
-            .iter()
-            .filter_map(|p| match p.as_list().map(Vec::as_slice) {
-                Some([t, to]) => Some((t.as_str()?, to.as_str()?)),
-                _ => None,
-            })
-            .collect();
-        if parts.is_empty() || parts.iter().map(|(t, _)| *t).collect::<String>() != line {
-            return esc(line);
-        }
-        parts
-            .iter()
-            .map(|(t, to)| match *to {
-                "history" | "runs" => a(self.to(to, "overview"), &esc(t), ""),
-                _ => format!("<span>{}</span>", esc(t)),
-            })
-            .collect()
     }
 
     /// Found in the repository (N): what rb found and nobody recorded, each with rb's hint, capped "and N more". Never
@@ -4107,7 +4131,9 @@ impl<'a> Page<'a> {
     /// The prompt a reader copies, as HTML: rb's words whole and escaped.
     fn rerun_prompt_html(&self, experiment: Option<(&str, &str, &[String])>) -> Option<String> {
         let (page, bundle) = self.rerun_at()?;
-        Some(esc(&w::rerun_prompt(&page, &bundle, text(self.doc, "project.id"), experiment)))
+        // the bundle names the code where its manifest has a repo (rb export names one only where a reader can use it)
+        let code = !text(self.doc, "reproduce_repo.url").is_empty();
+        Some(esc(&w::rerun_prompt(&page, &bundle, text(self.doc, "project.id"), code, experiment)))
     }
 
     /// rb's own addresses on what says them (`data-rb-page`, `data-rb-bundle`), so the hub's metas (rb-page, rb-clone)
@@ -5040,7 +5066,7 @@ mod tests {
         let panel = &panel[..panel.find("</aside>").unwrap()];
         let id = text(&live, "project.id").to_string();
         // the page by the one address the reader has, as the hub's rb-page meta names it: the folder --url gave
-        let prompt = w::rerun_prompt("https://example.org/int8/", at, &id, None);
+        let prompt = w::rerun_prompt("https://example.org/int8/", at, &id, false, None);
         let shown = &panel[panel.find("id=\"rerun-prompt\">").unwrap() + 18..];
         let shown = &shown[..shown.find("</pre>").unwrap()];
         // rb's text whole; rb's own addresses on the panel, for the hub's metas to take the place of
@@ -5054,12 +5080,15 @@ mod tests {
         // with no script, a Close back to the Overview, before the title (A's script draws its own in the dialog)
         assert!(panel.contains(&format!("><a class=\"rrclose\" href=\"#overview\">{}</a><h2 id=\"h-rerun\">", w::CLOSE)), "{panel}");
         assert!(panel.contains(w::CODE_UNNAMED) && panel.contains(w::REPRODUCE_AFTER));
+        // a bundle that names no code: step 2 says it holds the record alone, the code the owner's to give
+        assert!(shown.contains(&format!("rb clone {at} {id}. This bundle holds the record alone: the code is its owner&#x27;s to give")), "{shown}");
+        assert!(!shown.contains("This bundle names the code") && !shown.contains("gets it too"), "{shown}");
         // an experiment's own prompt, in its Reproduce place
         let rules = texts(&list(&live, "experiments")[0], "findings");
         let eid = text(&list(&live, "experiments")[0], "id").to_string();
         let title = text(&list(&live, "experiments")[0], "title").to_string();
         assert!(!rules.is_empty());
-        let own = w::rerun_prompt("P", "B", &id, Some((&eid, &title, &rules)));
+        let own = w::rerun_prompt("P", "B", &id, false, Some((&eid, &title, &rules)));
         assert!(own.contains(&format!("Run experiment {eid}, \u{201c}{title}\u{201d}: its commands")));
         // the experiment's own prompt names its rules by id, its gates left out: a gate is met or missed, never reproduced
         let gates: Vec<&String> = rules.iter().filter(|c| text(&live, &format!("findings.{c}.role")) == "gate").collect();
@@ -5077,6 +5106,9 @@ mod tests {
         let html = page(&live, Surface::Export);
         let said = "The code the runs used: <a href=\"https://github.com/ana/int8-resnet.git\">https://github.com/ana/int8-resnet.git</a> at commit <span class=\"oid\">5f04ee1180</span>";
         assert!(html.contains(&format!("{said}. The record and")) && !html.contains(w::CODE_UNNAMED) && !html.contains("played against"), "{html}");
+        // and step 2 of every prompt says the bundle names the code, rb clone getting it at the record's commit
+        assert!(html.contains(&esc(&w::rerun_prompt("https://example.org/int8/", at, &id, true, None))), "{html}");
+        assert!(!html.contains("holds the record alone") && html.contains("This bundle names the code: rb clone gets it too"), "{html}");
         // what the copy had not committed (C's repo.changed, where the manifest has it), after the commit
         let repo = crate::pyjson::loads(r#"{"url": "https://github.com/ana/int8-resnet.git", "commit": "5f04ee1180aa", "changed": ["configs/sweep.yaml"]}"#).unwrap();
         live.as_dict_mut().unwrap().insert("reproduce_repo".into(), repo);
@@ -5151,7 +5183,8 @@ mod tests {
             let log = &log[..log.find("</ol>").unwrap()];
             let row = log.split("<li").find(|r| r.contains(">run fp32 and int8 \u{b7} seed 1</a>")).expect("runs1's row");
             assert!(row.contains("<span>record <a href=\"#") && row.matches("seed 1").count() == 1, "{surface:?}: {row}");
-            let an = html.split("<li>").find(|r| r.starts_with("<a") && r.contains(">per-class accuracy, int8 against fp32</a>")).expect("the analysis");
+            let an = html.split("<li>").find(|r| r.starts_with("<a href=\"#a-a1\"><span class=\"au\">per-class accuracy, int8 against fp32</span></a>")).expect("the analysis");
+            let an = &an[..an.find("</li>").unwrap()];
             assert!(an.contains(">fp32 and int8 \u{b7} seed 1</a>"), "{surface:?}: {an}");
         }
     }
@@ -5172,7 +5205,10 @@ mod tests {
             assert!(run.matches("seed 3").count() == 1 && !run.contains("class=\"refs\""), "{surface:?}: {run}");
             // two runs with one label: the replacing run linked in its sentence, the replaced one after it, said apart
             let again = row("seed 2, recorded 2026-10-13 14:12 UTC</a>");
-            assert!(again.contains("<span class=\"refs\"> \u{b7} <a href=\"#") && again.contains(">run fp32 and int8 \u{b7} seed 2, recorded 2026-10-06 10:32 UTC</a></span>"), "{surface:?}: {again}");
+            assert!(again.contains(&format!("<span class=\"refs\"> \u{b7} {}<a href=\"#", w::REPLACING)) && again.contains(">run fp32 and int8 \u{b7} seed 2, recorded 2026-10-06 10:32 UTC</a></span>"), "{surface:?}: {again}");
+            // an analysis its sentence names by its own id is linked there, with no "an analysis" after it (Look 10)
+            let an = row("recorded analysis <a href=\"#");
+            assert!(an.contains(">a1</a>") && !an.contains("class=\"refs\"") && !an.contains(">an analysis<"), "{surface:?}: {an}");
             // a ref the sentence does not say still follows it
             let made = row(">run fp32 and int8 \u{b7} seed 1</a>");
             assert!(made.contains("class=\"refs\"") && made.contains("ckpt-int8-s1"), "{surface:?}: {made}");
@@ -5215,9 +5251,9 @@ mod tests {
     /// in words, never as git's line, so the step holds if rb's line changes.
     #[test]
     fn a_prompt_names_its_experiments_rules() {
-        let one = w::rerun_prompt("P", "B", "int8", Some(("e1", "INT8 vs FP32", &["c1".to_string()])));
-        assert!(one.contains("tell me whether its rule c1 reproduced, with its numbers.") && one.starts_with("Rerun this research with Rabbit Brain (rb). Its record: P\n\n1. Install rb: pip install rabbit-brain\n2. Clone the record into a new folder: rb clone B int8. It gets the code too,"));
-        let all = w::rerun_prompt("P", "B", "int8", None);
+        let one = w::rerun_prompt("P", "B", "int8", true, Some(("e1", "INT8 vs FP32", &["c1".to_string()])));
+        assert!(one.contains("tell me whether its rule c1 reproduced, with its numbers.") && one.starts_with("Rerun this research with Rabbit Brain (rb). Its record: P\n\n1. Install rb: pip install rabbit-brain\n2. Clone the record into a new folder: rb clone B int8. This bundle names the code: rb clone gets it too,"));
+        let all = w::rerun_prompt("P", "B", "int8", true, None);
         assert!(all.contains("4. Get those resources. Run each experiment's commands in the order rb context names them, each as rb journal run -- <command>;") && all.contains("which rules reproduced and which did not, with their numbers."));
         assert!(all.contains("tell me what it says and stop: once I give you an address of the code, rb clone B <another new folder> --code <that address> gets it."));
         assert!(all.contains("where rb context names a command that puts a run's code here, run that one first.") && !all.contains("git ") && !all.contains("checkout"));
@@ -5231,7 +5267,7 @@ mod tests {
     /// typographic, so a copied prompt never reads `"INT8 vs "FP32" ..."`.
     #[test]
     fn a_title_holding_a_quote_is_quoted_once() {
-        let own = w::rerun_prompt("P", "B", "int8", Some(("e1", "INT8 vs \"FP32\" on ana's held-out set", &["c1".to_string()])));
+        let own = w::rerun_prompt("P", "B", "int8", true, Some(("e1", "INT8 vs \"FP32\" on ana's held-out set", &["c1".to_string()])));
         assert!(own.contains("Run experiment e1, \u{201c}INT8 vs \u{201c}FP32\u{201d} on ana\u{2019}s held-out set\u{201d}: its commands"), "{own}");
         let step = own.lines().find(|l| l.starts_with("4. ")).unwrap();
         assert!(!step.contains('"') && !step.contains("ana's"), "{step}");

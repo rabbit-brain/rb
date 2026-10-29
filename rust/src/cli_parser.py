@@ -407,7 +407,7 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser) -> None:
     s.add_argument("--model", default=None, metavar="ID",
                    help="an agent's own model, as its provider names it: kept with every later write in this agent session (RB_MODEL gives it for one command)")
     s.add_argument("--provider", default=None, metavar="NAME",
-                   help="who provides that model, kept the same way (RB_PROVIDER for one command); rb fills in Claude Code's, Codex's and Gemini CLI's when none is given")
+                   help="who provides that model, kept the same way (RB_PROVIDER for one command); rb fills in Claude Code's and Codex's when none is given")
     s.set_defaults(func="cmd_context")
 
     s = sub.add_parser("fmt", parents=rc, help="write Rabbit Brain YAML files in their canonical form, comments kept (default: every record file under .rb/)")
@@ -462,7 +462,7 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser) -> None:
     e = esub.add_parser("check", parents=rc, help="compare; differences are said, never fatal (exit 0)")
     e.set_defaults(func="cmd_env_check")
 
-    s = sub.add_parser("login", parents=rc, help="rabbitbrain.ai, optional: sign this machine in with a short code, approved on any device where you are signed in (hosted service not yet available)")
+    s = sub.add_parser("login", parents=rc, help="rabbitbrain.ai, optional: sign this machine in with a short code, approved on any device where you are signed in")
     s.add_argument("--hub", default=None, help="the hub's address (default RB_HUB_URL, else rabbitbrain.ai)")
     s.set_defaults(func="cmd_login")
 
@@ -470,7 +470,7 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser) -> None:
     s.add_argument("--hub", default=None, help="the hub's address (default RB_HUB_URL, else rabbitbrain.ai)")
     s.set_defaults(func="cmd_logout")
 
-    s = sub.add_parser("sync", parents=rc, help="rabbitbrain.ai, optional: a private copy of this record's page in your account, for your own eyes from anywhere (hosted service not yet available)")
+    s = sub.add_parser("sync", parents=rc, help="rabbitbrain.ai, optional: a private copy of this record's page in your account, for your own eyes from anywhere")
     s.add_argument("--hub", default=None, help="the hub's address (default RB_HUB_URL, else rabbitbrain.ai)")
     s.add_argument("--with-record", action="store_true", help="send the record too: its files and log keep who made each write, agent sessions and the user's words")
     s.add_argument("--watch", action="store_true", help="keep the hosted copy current: look every 30 s and sync again when the record changed, at most once a minute, until Ctrl-C")

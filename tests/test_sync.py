@@ -189,9 +189,54 @@ def test_sync_without_a_credential_says_where_to_get_one(hub):
     assert _Hub.received == {}                                   # nothing left the machine
 
 
-def test_rabbitbrain_ai_while_it_is_not_open_is_said_and_nothing_is_sent(hub, monkeypatch):
+class _Proxy:
+    """A proxy on this machine that refuses every tunnel and keeps the first line of each: what rb asked to reach, with
+    nothing leaving the machine."""
+
+    def __init__(self):
+        import socket
+        self.asked = []
+        self.sock = socket.socket()
+        self.sock.bind(("127.0.0.1", 0))
+        self.sock.listen(8)
+        self.url = f"http://127.0.0.1:{self.sock.getsockname()[1]}"
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def _serve(self):
+        while True:
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                return
+            with conn:
+                head = b""
+                while b"\r\n\r\n" not in head:
+                    got = conn.recv(4096)
+                    if not got:
+                        break
+                    head += got
+                self.asked.append(head.split(b"\r\n")[0].decode("latin-1"))
+                conn.sendall(b"HTTP/1.1 403 Forbidden\r\ncontent-length: 0\r\n\r\n")
+
+    def close(self):
+        self.sock.close()
+
+
+@pytest.fixture
+def refusing_proxy(monkeypatch):
+    """_Proxy as the proxy every https call goes through, so a call to rabbitbrain.ai never leaves the machine."""
+    proxy = _Proxy()
+    monkeypatch.setenv("HTTPS_PROXY", proxy.url)
+    monkeypatch.setenv("https_proxy", proxy.url)
+    yield proxy
+    proxy.close()
+
+
+def test_rabbitbrain_ai_while_it_is_not_open_is_said_and_nothing_is_sent(hub, monkeypatch, refusing_proxy):
     """rb login and rb sync addressed to rabbitbrain.ai, whose hosted service is not open, say so and what works
-    without it, and call no address: not with a credential in RB_HUB_TOKEN either. A hub the user names is called."""
+    without it, and call no address: not with a credential in RB_HUB_TOKEN either. A hub the user names is called.
+    RB_TEST_HOSTED_CLOSED plays the service closed, as it was until 0.6.1 and can be again."""
+    monkeypatch.setenv("RB_TEST_HOSTED_CLOSED", "1")
     stub = os.environ["RB_HUB_URL"]
     monkeypatch.delenv("RB_HUB_URL")
     for argv, token in ((["login"], None), (["sync"], None), (["sync", "--with-record"], "rb_testtoken"), (["login", "--hub", "https://rabbitbrain.ai/"], None)):
@@ -201,9 +246,23 @@ def test_rabbitbrain_ai_while_it_is_not_open_is_said_and_nothing_is_sent(hub, mo
         assert code == 2 and env.errors[0].code == "E_NOT_AVAILABLE", (argv, env.errors)
         assert "hosted service is not open yet" in env.errors[0].message and "sent nothing" in env.errors[0].message
         assert all(c in env.errors[0].fix for c in ("rb page", "rb open", "rb export --with-record")), env.errors[0].fix
-    assert _Hub.received == {} and _Hub.polls == 0
+    assert _Hub.received == {} and _Hub.polls == 0 and refusing_proxy.asked == []
     code, env = hub("login", "--hub", stub)
     assert code == 0 and _Hub.polls == 2
+
+
+def test_rabbitbrain_ai_is_open_and_called(hub, monkeypatch, refusing_proxy):
+    """0.6.1 opens rabbitbrain.ai: rb login and rb sync addressed to it call it, as any hub. A proxy on this machine
+    that refuses every tunnel shows what rb asked to reach, and nothing leaves the machine."""
+    monkeypatch.delenv("RB_HUB_URL")
+    monkeypatch.delenv("RB_TEST_HOSTED_CLOSED", raising=False)
+    monkeypatch.setenv("RB_HUB_TOKEN", "rb_testtoken")
+    for argv in (["login"], ["sync"], ["sync", "--with-record"]):
+        code, env = hub(*argv)
+        assert code == 2 and env.errors[0].code != "E_NOT_AVAILABLE", (argv, env.errors)
+        assert "rabbitbrain.ai" in env.errors[0].message, env.errors
+    asked = refusing_proxy.asked
+    assert len(asked) == 3 and all(line.startswith("CONNECT rabbitbrain.ai:443 ") for line in asked), asked
 
 
 def test_publish_is_gone_and_says_what_replaced_it(hub, monkeypatch):
@@ -327,18 +386,73 @@ def test_a_sync_ended_by_a_signal_leaves_nothing_behind(hub, monkeypatch, tmp_pa
 
 # ---------------------------------------------------------------- what the hosted page shows, and how it is said
 
-def test_sync_sends_no_repository_identity(hub, monkeypatch):
-    """The hub is told nothing of the repository: in one with an origin remote and a commit, the uploaded manifest
-    names no repository, and neither the page nor the manifest holds its address."""
+def test_a_page_synced_alone_sends_no_repository_identity(hub, monkeypatch):
+    """Plain rb sync tells the hub nothing of the repository: in one with an https origin and a commit, the uploaded
+    manifest names no repository, and neither the page nor the manifest holds its address."""
     monkeypatch.setenv("RB_HUB_TOKEN", "rb_testtoken")
     subprocess.run(["git", "remote", "add", "origin", "https://github.com/ana/int8-resnet50.git"], check=True)
     subprocess.run(["git", "add", "-A"], check=True)
     subprocess.run(["git", "commit", "-qm", "the INT8 record"], check=True)
-    for argv in (["sync"], ["sync", "--with-record"]):
-        code, env = hub(*argv)
-        assert code == 0, env.errors
-        assert "repo" not in _Hub.received["manifest"], argv
-        assert b"github.com/ana/int8-resnet50" not in _Hub.received["bytes"], argv
+    code, env = hub("sync")
+    assert code == 0, env.errors
+    assert "repo" not in _Hub.received["manifest"] and env.data["repo"] is None
+    assert b"github.com/ana/int8-resnet50" not in _Hub.received["bytes"]
+
+
+def _sent_files() -> dict:
+    with zipfile.ZipFile(io.BytesIO(_Hub.received["bytes"])) as z:
+        return {n: z.read(n) for n in z.namelist()}
+
+
+def test_a_record_synced_names_its_code_only_at_an_https_origin(hub, monkeypatch, capsys):
+    """rb sync --with-record names the code by rb export's one rule: where origin, as the checkout's config writes it,
+    is an https address, with any user:password@, query and fragment taken out, so a share link's Rerun reaches it; a
+    local path, file://, ssh and scp-like name none, and rb sync then says rb export's line. An insteadOf that sends
+    the https address to this machine's copy changes nothing: the https address is named. No credential and no path
+    of this machine is in the bundle, either way. The named words are the Rerun panel's."""
+    monkeypatch.setenv("RB_HUB_TOKEN", "rb_testtoken")
+    subprocess.run(["git", "add", "-A"], check=True)
+    subprocess.run(["git", "commit", "-qm", "the INT8 record"], check=True)
+    head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+    here = os.path.realpath(os.getcwd())
+    machine = {here.encode(), os.getcwd().encode(), str(Path.home()).encode(), tempfile.gettempdir().encode()}
+    named = {"https://github.com/ana/int8-resnet50.git": "https://github.com/ana/int8-resnet50.git",
+             "https://ana:hunter2@github.com/ana/int8-resnet50.git": "https://github.com/ana/int8-resnet50.git",
+             "https://github.com/ana/int8-resnet50.git?token=hunter2": "https://github.com/ana/int8-resnet50.git",
+             "https://github.com/ana/int8-resnet50.git#hunter2": "https://github.com/ana/int8-resnet50.git",
+             "HTTPS://github.com/ana/int8-resnet50.git": "https://github.com/ana/int8-resnet50.git",
+             "\x1chttps://github.com/ana/int8-resnet50.git": "https://github.com/ana/int8-resnet50.git"}
+    unnamed = [here, "file://" + here, "ssh://git@github.com/ana/int8-resnet50.git", "git@github.com:ana/int8-resnet50.git",
+               "http://github.com/ana/int8-resnet50.git"]
+    # git's own rewrite for this machine's fetches: the https address goes to this machine's copy, which is never named
+    subprocess.run(["git", "config", f"url.{here}.insteadOf", "https://github.com/ana/"], check=True)
+    subprocess.run(["git", "remote", "add", "origin", here], check=True)
+    for origin in [*named, *unnamed]:
+        subprocess.run(["git", "remote", "set-url", "origin", origin], check=True)
+        assert main(["sync", "--with-record"]) == 0
+        said = capsys.readouterr().out
+        man, files = _Hub.received["manifest"], _sent_files()
+        everything = b"\n".join(files.values())
+        for p in machine:
+            assert p not in everything, (origin, p)
+        assert b"hunter2" not in everything, origin
+        if origin in named:
+            assert man["repo"]["url"] == named[origin] and man["repo"]["commit"] == head, (origin, man.get("repo"))
+            page = next(b for n, b in files.items() if n.endswith("page.html")).decode("utf-8")
+            assert named[origin] in page and "The runs need the code; this bundle doesn&#x27;t say where it is." not in page
+            assert f"The code the runs used: {named[origin]} at commit {head[:10]}. Readers who rerun it get the code with the record." in said
+            assert "without the code" not in said
+        else:
+            assert "repo" not in man, (origin, man["repo"])
+            assert b"github.com/ana" not in everything, origin
+            assert ("The bundle names no address for the code: origin is not an https address a reader can fetch. A reader gets "
+                    "the code with rb clone --code <address>.") in said, said
+            assert "The code the runs used" not in said
+    code, env = hub("sync", "--with-record")
+    assert code == 0 and env.data["repo"] is None
+    subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/ana/int8-resnet50.git"], check=True)
+    code, env = hub("sync", "--with-record")
+    assert code == 0 and env.data["repo"]["url"] == "https://github.com/ana/int8-resnet50.git"
 
 
 def test_sync_says_how_the_copy_is_shared_and_login_and_logout_say_where(hub, monkeypatch, capsys, tmp_path):
@@ -618,7 +732,7 @@ def test_watch_ends_clean_on_a_signal(hub, monkeypatch, tmp_path_factory):
     _Hub.held = None
 
 
-def test_watch_without_a_credential_or_an_open_hub_says_so_at_once(hub, monkeypatch):
+def test_watch_without_a_credential_or_an_open_hub_says_so_at_once(hub, monkeypatch, refusing_proxy):
     """What stops rb sync stops rb sync --watch before it watches: no credential, or rabbitbrain.ai while its hosted
     service is not open. Nothing is sent and nothing waits."""
     _watching()
@@ -634,8 +748,9 @@ def test_watch_without_a_credential_or_an_open_hub_says_so_at_once(hub, monkeypa
     # --json has one answer to print, and a watch never ends with one
     assert "has no one answer for --json" in watch("--json") and _Hub.puts == []
     monkeypatch.delenv("RB_HUB_URL")
+    monkeypatch.setenv("RB_TEST_HOSTED_CLOSED", "1")
     assert "hosted service is not open yet" in watch()
-    assert _Hub.puts == [] and _Hub.received == {}
+    assert _Hub.puts == [] and _Hub.received == {} and refusing_proxy.asked == []
 
 
 def test_watch_stops_on_a_refusal_waiting_does_not_change(hub, monkeypatch):
@@ -674,6 +789,33 @@ def test_watch_sends_what_rb_computes_without_a_write(hub, monkeypatch):
         assert n >= 2 and "settings: 1 conflict" in _sent()
         time.sleep(MINUTE + 3 * LOOK)
         assert len(_taken()) == n
+    finally:
+        w.end()
+
+
+def test_watch_reads_a_source_again_at_each_look(hub, monkeypatch):
+    """A source rewritten with as many bytes at a time the file system keeps the same (a coarse clock, issue #2) is
+    read again at the watch's next look, as a command line reads it: the conflict is sent. Played here by putting the
+    file's time back after the rewrite."""
+    _watching()
+    monkeypatch.setenv("RB_HUB_TOKEN", "rb_testtoken")
+    cfg = Path("configs/train.yaml")
+    cfg.parent.mkdir()
+    cfg.write_text("optim:\n  lr: 0.0001\n", encoding="utf-8")
+    subprocess.run(["git", "add", "configs"], check=True)
+    subprocess.run(["git", "commit", "-qm", "the train config"], check=True)
+    assert main(["spec", "set", "e1", "optim.lr", "--source", "configs/train.yaml#optim.lr"]) == 0
+    w = _Watch()
+    try:
+        w.until(lambda: len(_taken()) == 1, "the first upload never came")
+        time.sleep(MINUTE + 2 * LOOK)
+        assert len(_taken()) == 1
+        was = cfg.stat()
+        _put(str(cfg), "optim:\n  lr: 0.0003\n")
+        os.utime(cfg, ns=(was.st_atime_ns, was.st_mtime_ns))
+        assert cfg.stat().st_size == was.st_size and cfg.stat().st_mtime_ns == was.st_mtime_ns
+        _sends_what_it_reads_now(w, "the conflict was never sent")
+        assert "settings: 1 conflict" in _sent()
     finally:
         w.end()
 

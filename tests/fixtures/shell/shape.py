@@ -9,7 +9,10 @@ The phase column follows SPRINT-OCT24.md section 1.3; the longest matching prefi
 import json
 import sys
 
+sys.stdout.reconfigure(encoding="utf-8", newline="\n")  # UTF-8 with LF, as the fixture is, whatever the terminal says (cp1252 on Windows)
+
 PHASE = [  # (path prefix, phase, where today's code computes it, or what builds it)
+    ("home.witness", "WIT", "WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the record's line as facts: when rb began keeping it, and of runs, analyses, calls and notes how many stand and how many were recorded afterwards (runs: how many were made before it began, and at a time nobody knows)"), ("history.log[].witness", "WIT", "WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the write a log line records"),
     ("contract", "c", "new: shell/model.rs (M0)"), ("surface", "c", "new: shell/model.rs (M0)"), ("tier", "c", "new: M0 from view::Reader; shell/tier.rs holds the table in 1b"),
     ("rb_version", "today", "webui state payload"), ("at", "today", "webui state payload"), ("digest", "today", "Ledger::state_digest; 4a adds the journal key"),
     ("escaped", "today", "webui drawn()"), ("project", "today", "Home.title, Home.project_id"),
@@ -37,13 +40,13 @@ PHASE = [  # (path prefix, phase, where today's code computes it, or what builds
     ("findings.{id}.source", "1a", "comparison.source"), ("findings.{id}.design_cells", "1a", "comparison.design.cells"),
     ("findings.{id}.rests_on", "1a", "graph.rs (SS calls it FindingLine.rests_on: what rests on this)"),
     ("findings.{id}.receipt_rows", "1b", "finding.declared and the Criterion (SS 5.1 receipts), as rows"),
-    ("findings.{id}.cited", "1b", "the criterion's source: path, line, the quote as the file reads it, commit, sha256"),
+    ("findings.{id}.witness", "WIT", "WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards"), ("findings.{id}.cited", "1b", "the criterion's source: path, line, the quote as the file reads it, commit, sha256"),
     ("experiments", "today", "ExperimentBrief"), ("experiments[].short_title", "1b", "new"),
     ("experiments[].who_line", "today", "Card.who_line (object_card)"), ("experiments[].run_ids", "today", "status experiments[].run_ids"),
     ("experiments[].reproduce", "1c", "new: reproduce.rs; rerunnability today"),
     ("experiments[].amendments", "1b", "the experiment's amendments[] after frozen.at (unit_amended links here)"),
     ("runs", "today", "RunRow (by and session never enter)"), ("runs.{id}.label", "1b", "new"), ("runs.{id}.named", "M8", "contract 1.9 (FIX8): model.rs run_names, the run as every line names it: run <label>, told apart from a run whose label reads the same by when it was recorded"), ("runs.{id}.at", "1b", "receipt.at"),
-    ("runs.{id}.metrics_text", "1b", "new: rb's %.6g"), ("runs.{id}.per_run_text", "today", "run values as k=v (view.rs)"),
+    ("runs.{id}.metrics_text", "1b", "new: rb's %.6g"), ("runs.{id}.witness", "WIT", "WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code"), ("runs.{id}.per_run_text", "today", "run values as k=v (view.rs)"),
     ("runs.{id}.receipt_rows", "1b", "receipt_card and run_facts today, as prose"), ("runs.{id}.command", "1b", "command kinds (support.rs)"),
     ("runs.{id}.counts_toward", "1a", "graph.rs"), ("runs.{id}.same_bytes", "1a", "graph.rs"), ("runs.{id}.made", "1a", "run outputs"),
     ("runs.{id}.retracted", "today", "retraction_words"), ("runs.{id}.recorded_in", "4b", "places (webui)"),
@@ -52,7 +55,7 @@ PHASE = [  # (path prefix, phase, where today's code computes it, or what builds
     ("resources.{id}.acquisition", "1c", "computed on read from Acquisition.recipe"),
     ("resources.{id}.read_by", "1a", "cmds/reading.rs read/made split"), ("resources.{id}.made_by", "1a", "run outputs"),
     ("resources.{id}.rests_on", "1a", "graph.rs"),
-    ("analyses", "today", "status analyses (no card today: /card.json 404)"), ("analyses.{id}.used_by", "1a", "graph.rs"),
+    ("analyses", "today", "status analyses (no card today: /card.json 404)"), ("analyses.{id}.named", "NAMED", "contract 1.11 (061D): model.rs minted_names, the analysis as every line names it: history::names_of's words where rb minted its id (analysis <title>, or an analysis on <experiment>, recorded <minute> UTC where it has no title), analysis <id> where its id was chosen"), ("analyses.{id}.used_by", "1a", "graph.rs"),
     ("history", "5H", "new: history.rs over delta::wrote"), ("history.sittings[].lines[].note", "5H", "history.rs: a session's reason apart from why (contract 1.2)"), ("history.log", "today", "Ledger::log_entries, screen form with no actor (M0)"),
     ("places", "today", "webui place, places, versions, elsewhere"), ("places.scope_bar", "4b", "new"), ("places.place.line", "today", "places.rs place line"),
     ("reproduce_url", "today", "rb export --url"),

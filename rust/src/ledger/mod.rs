@@ -1179,9 +1179,12 @@ pub fn forget_files() {
 }
 
 /// Forget what the last ledger worked out: a new command line reads the record afresh.
+/// What it read of the sources goes too, so a source rewritten with as many bytes inside the clock's resolution reads as
+/// it is now (rb ui's bridge answers every request in one process).
 pub fn forget_worked() {
     WORKED.with(|w| *w.borrow_mut() = None);
     sources::forget_git();
+    sources::forget_reads();
 }
 
 impl Drop for Ledger {
@@ -4521,5 +4524,26 @@ mod checkout_tests {
         write(&root.join("v/.git"), "gitdir: /nowhere/at/all\n");
         assert_eq!(checkout_of(&root.join("v"), &root), root);
         assert_eq!(linked_top(&root.join("v")), None);
+    }
+}
+
+#[cfg(test)]
+mod forget_tests {
+    /// A request after forget_worked reads a source as it is now, though it was rewritten with as many bytes and the
+    /// same modified time (inside the clock's resolution): rb ui's bridge answers every request in one process.
+    #[test]
+    fn a_new_request_rereads_a_source_rewritten_with_as_many_bytes() {
+        let d = std::env::temp_dir().join(format!("rb-forget-{}-{:08x}", std::process::id(), crate::rng::os_randbits(32)));
+        std::fs::create_dir_all(&d).unwrap();
+        let p = d.join("train.yaml");
+        std::fs::write(&p, "lr: 0.1\n").unwrap();
+        let at = std::fs::metadata(&p).unwrap().modified().unwrap();
+        assert_eq!(crate::sources::read_file(&d, "train.yaml", None).unwrap().0, b"lr: 0.1\n");
+        std::fs::write(&p, "lr: 0.3\n").unwrap();
+        std::fs::File::options().write(true).open(&p).unwrap().set_modified(at).unwrap();
+        super::forget_worked();
+        let now = crate::sources::read_file(&d, "train.yaml", None).unwrap().0;
+        let _ = std::fs::remove_dir_all(&d);
+        assert_eq!(now, b"lr: 0.3\n");
     }
 }

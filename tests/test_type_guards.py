@@ -442,23 +442,27 @@ def test_a_file_from_the_last_hour_dates_the_run_and_rb_says_so(rec, monkeypatch
 
 
 def test_status_and_context_say_when_the_record_began(rec, tmp_path, monkeypatch):
-    """A record begun after some of its runs were made says so under its title, from the log's first write and the
-    runs' produced times, and that what came before it is Retrospective: the adoption boundary, in one quiet line, on
-    rb status, rb context, a page, rb open and rb ui alike. One whose runs all came after says nothing."""
-    assert "Recorded since" not in rec.text("status") and rec.ok("status")["data"]["record_start"] is None
+    """A record begun after some of its runs were made says so under its title, from the witness facts, in the record
+    line's sentence (0.6.1: one wording in every view), the day as rb's text gives days: in one quiet line, on rb
+    status, rb context, rb open's data and rb ui alike. One whose runs all came after says nothing. A page says the
+    same fact in the record line's words, its day as a page gives days, and never the old began line."""
+    assert "Kept with rb since" not in rec.text("status") and rec.ok("status")["data"]["record_start"] is None
     rec.ok("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.9", "--set", "seed=1", "--produced-at", MAY)
     rec.ok("run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.8", "--set", "seed=2", "--produced-at", "2026-05-08")
     rec.ok("run", "add", "int8", "fp32.top1=76.2", "int8.top1=75.7", "--set", "seed=3")
     day = rec.ok("log", "-n", "500")["data"]["entries"][0]["at"][:10]
-    line = f"Recorded since {day}, after 2 of its 3 runs were made; what came before it is Retrospective"
+    line = f"Kept with rb since {day}. 2 runs were recorded afterwards, not as they happened."
     assert rec.text("status").splitlines()[1] == line
     assert rec.text("context").splitlines()[2] == line
     start = rec.ok("status")["data"]["record_start"]
     assert {k: start[k] for k in ("before", "runs", "unknown")} == {"before": 2, "runs": 3, "unknown": 0}
     rec.ok("page", "--out", str(tmp_path / "page.html"))
     page = (tmp_path / "page.html").read_text(encoding="utf-8")
-    assert f'<div class="howblk" id="how-made"><details class="fold how" data-fold="how-made"><summary>How rb reads this repository</summary><p>{line}</p>' in page
-    assert page.count(line) == 1
+    assert line not in page and "what came before it is" not in page
+    y, m, d = day.split("-")
+    month = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()[int(m) - 1]
+    said = f"Kept with rb since {int(d)} {month} {y}. 2 runs were recorded afterwards, not as they happened."
+    assert page.count(f'<p class="dim sm wit">{said}</p>') == 2         # the Overview and About
     from rbtest import home
     monkeypatch.chdir(rec.root)
     for k, v in rec.env.items():
@@ -471,11 +475,11 @@ def test_status_and_context_say_when_the_record_began(rec, tmp_path, monkeypatch
 def test_the_record_start_line_counts_two_runs_as_both(rec):
     """The pilot's record said 'after all 2 of its runs were made': two runs made before the record began read as both."""
     rec.ok("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.9", "--set", "seed=1", "--produced-at", MAY)
-    assert ", after its one run was made; " in rec.text("status").splitlines()[1]
+    assert rec.text("status").splitlines()[1].endswith(". 1 run was recorded afterwards, not as it happened.")
     rec.ok("run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.8", "--set", "seed=2", "--produced-at", "2026-05-08")
     for screen in ("status", "context"):
-        said = [x for x in rec.text(screen).splitlines() if x.startswith("Recorded since ")]
-        assert len(said) == 1 and said[0].endswith(", after both its runs were made; what came before it is Retrospective"), screen
+        said = [x for x in rec.text(screen).splitlines() if x.startswith("Kept with rb since ")]
+        assert len(said) == 1 and said[0].endswith(". Both runs were recorded afterwards, not as they happened."), screen
 
 
 # ---------------------------------------------------------------- words about the writing

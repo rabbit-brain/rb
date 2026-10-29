@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.1 (2026-10-30)
+
+rabbitbrain.ai opens for everyone, every view says one wording, and the record says what rb saw happen and what it recorded afterwards.
+
+- **rabbitbrain.ai is open.** `rb login` and `rb sync` work for anyone who signs up. `rb sync --with-record` names the code where the repository's origin is an https address, with any credentials taken out, so a reader who reruns a shared record gets the code with it; otherwise it names none and says so. Plain `rb sync` names no repository.
+- **One rule for the code's address.** `rb export` and `rb sync` name the code only at an https address a reader can fetch, with credentials, query and fragment taken out, and otherwise say in one line that the bundle names none (`data.repo_unnamed`).
+- **What rb saw, and what it recorded afterwards.** Each run, analysis, call and finding says whether rb saw it as it happened or recorded it afterwards (`witness` in `rb status --json`). One line says it for the record, on the page, in `rb open`, `rb status`, `rb context` and `rb ui`: "Kept with rb since 2026-10-28. 2 runs and 1 call were recorded afterwards, not as they happened." (the page and `rb open` write the day as 28 Oct 2026), in place of "Recorded since ..., what came before it is Retrospective". A run recorded afterwards says so in the Runs table and on its card, and a finding counts the runs it rests on that were.
+- **One wording in every view.** `rb status`, `rb context` and `rb ui` say "Rules: 1 met · 1 can't tell yet", and `rb status` and `rb context` say "Needs judgment", as the page does (`rb open` says "Needs your judgment"). Commands, flags, `--json` keys and MCP tool names are unchanged. History, the cards and the model name a run, an analysis and a call the same way: an analysis with no title reads by its experiment and the minute it was recorded (`analyses.{id}.named`).
+- **Words.** `rb freeze` says a rule a session declared is locked now; `rb confirm` names the notes a design leaves not confirmed, in `--json` too; `rb log` and a setting's history say each op in words; a cited value that differs is said where it is set, by the CLI and the SDK alike; a miss with a call proposed on it says the call waits.
+- **Reconcile carries the command.** The `rb run add` line `rb reconcile` proposes for a file a watched command wrote carries that command, so the run's command reads as observed. A recipe tells runs with the same label apart.
+- **The rerun prompt says what the bundle holds:** whether it names the code, and whether it holds the record.
+- **Sources read again.** `rb open` and `rb sync --watch` read each source again at each look, and `rb ui` notices a source rewritten with as many bytes.
+- **Windows** (still a preview, [#2](https://github.com/rabbit-brain/rb/issues/2)): a clone counts its changes from its record's commit, however late git dates it; the code's address is said with `/`, with git's own error rather than a fragment of its advice; rb's generators write UTF-8 on any terminal.
+- The README and the manual lead with `pip install rabbit-brain`.
+- rb no longer infers a provider for Gemini CLI, which it does not detect.
+
 ## 0.6.0 (2026-10-28)
 
 The record is plain YAML in `.rb/`, `rb reconcile` compiles what the repository already says, every write records who made it, and every finding is read on its axes.

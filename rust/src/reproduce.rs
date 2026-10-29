@@ -88,35 +88,65 @@ pub fn run_label(led: &Ledger, exp: Option<&Experiment>, r: &Run) -> String {
     parts.join(" · ")
 }
 
-/// What tells each run apart from the others of its experiment whose label reads the same: when rb recorded it, to the
-/// minute in UTC, and where that is the same too, its place among them in record order ("recorded 2026-10-26 14:51 UTC,
-/// the 2nd of 3 that minute"). A run whose label is its own gets none: two runs never read alike, and no minted id says it.
-fn apart(led: &Ledger, experiments: &IndexMap<String, Experiment>, runs: &[Run]) -> HashMap<String, String> {
-    let mut alike: IndexMap<(String, String), Vec<&Run>> = IndexMap::new();
-    for r in runs {
-        alike.entry((r.experiment.clone(), run_label(led, experiments.get(&r.experiment), r))).or_default().push(r);
-    }
-    let minute = |r: &Run| {
-        let at = if r.receipt.at.is_empty() { &r.created_at } else { &r.receipt.at };
-        match crate::pytime::parse_iso(at) {
-            Some(t) => t.with_timezone(&chrono::Utc).format("%Y-%m-%d %H:%M UTC").to_string(),
-            None => at.chars().take(16).collect::<String>().replace('T', " "),
-        }
-    };
-    let mut out = HashMap::new();
-    for (_, mut rs) in alike.into_iter().filter(|(_, rs)| rs.len() > 1) {
-        rs.sort_by(|a, b| (&a.created_at, &a.id).cmp(&(&b.created_at, &b.id)));
-        let mut by_minute: IndexMap<String, Vec<&Run>> = IndexMap::new();
-        for r in rs {
-            by_minute.entry(minute(r)).or_default().push(r);
-        }
-        for (m, same) in by_minute {
-            let n = same.len();
-            for (i, r) in same.iter().enumerate() {
-                let place = if n > 1 { format!(", the {} of {n} that minute", ordinal(i + 1)) } else { String::new() };
-                out.insert(r.id.clone(), format!(" · recorded {m}{place}"));
+/// Each run as every line of rb's names it (the shell's `runs.{id}.named`, contract 1.9): "run <its label>", or "a run
+/// of e1" where it has none, and where another run of the record reads the same, what tells it apart (`apart`).
+pub fn run_names(led: &Ledger) -> Res<IndexMap<String, String>> {
+    let runs = led.all::<Run>()?;
+    let experiments: IndexMap<String, Experiment> = led.all::<Experiment>()?.iter().map(|e| (e.id.clone(), e.clone())).collect();
+    let apart = apart(led, &experiments, &runs)?;
+    Ok(runs.iter().map(|r| (r.id.clone(), format!("{}{}", base_name(&run_label(led, experiments.get(&r.experiment), r), &r.experiment), apart.get(&r.id).map_or("", String::as_str)))).collect())
+}
+
+/// A run's name before what tells it apart: "run <label>", or "a run of <experiment>" with no label.
+fn base_name(label: &str, experiment: &str) -> String {
+    if label.is_empty() { format!("a run of {experiment}") } else { format!("run {label}") }
+}
+
+/// What tells each run apart from the others of the record whose name reads the same, as the shell's `named` says it:
+/// when rb recorded it, to the minute in UTC, or to the second where another of them was recorded that minute, and
+/// where the second is the same too, its place among them in the log's order (", recorded 2026-10-26 14:51:40 UTC, the
+/// 2nd of 2"). A run whose name is its own gets none: two runs never read alike, and no minted id says it.
+fn apart(led: &Ledger, experiments: &IndexMap<String, Experiment>, runs: &[Run]) -> Res<HashMap<String, String>> {
+    // when each was recorded, in the order the log recorded them
+    let mut seq: HashMap<String, usize> = HashMap::new();
+    for (i, row) in led.log_entries()?.iter().enumerate() {
+        if row.get_str("kind") == Some("run") {
+            if let Some(id) = row.get_str("id") {
+                seq.entry(id.to_string()).or_insert(i);
             }
         }
+    }
+    let mut named: Vec<(String, String, String)> = runs
+        .iter()
+        .map(|r| (r.id.clone(), base_name(&run_label(led, experiments.get(&r.experiment), r), &r.experiment), if r.receipt.at.is_empty() { r.created_at.clone() } else { r.receipt.at.clone() }))
+        .collect();
+    named.sort_by_key(|(id, _, _)| seq.get(id).copied().unwrap_or(usize::MAX));
+    Ok(told_apart(&named))
+}
+
+/// `apart` over (id, name, when recorded), in the log's order.
+fn told_apart(named: &[(String, String, String)]) -> HashMap<String, String> {
+    let utc = |at: &str, f: &str, n: usize| match crate::pytime::parse_iso(at) {
+        Some(t) => t.with_timezone(&chrono::Utc).format(f).to_string(),
+        None => if n == 16 { at.chars().take(16).collect::<String>().replace('T', " ") } else { at.to_string() },
+    };
+    let minute = |at: &str| utc(at, "%Y-%m-%d %H:%M UTC", 16);
+    let second = |at: &str| utc(at, "%Y-%m-%d %H:%M:%S UTC", 19);
+    let mut out = HashMap::new();
+    for (id, words, at) in named {
+        let twins: Vec<&(String, String, String)> = named.iter().filter(|(_, w, _)| w == words).collect();
+        if twins.len() < 2 {
+            continue;
+        }
+        let when = if twins.iter().filter(|(_, _, a)| minute(a) == minute(at)).count() > 1 { second(at) } else { minute(at) };
+        let alike: Vec<&&(String, String, String)> = twins.iter().filter(|(_, _, a)| second(a) == second(at)).collect();
+        let place = if alike.len() > 1 {
+            let n = alike.iter().position(|(k, _, _)| k == id).unwrap_or(0) + 1;
+            format!(", the {} of {}", ordinal(n), alike.len())
+        } else {
+            String::new()
+        };
+        out.insert(id.clone(), format!(", recorded {when}{place}"));
     }
     out
 }
@@ -310,8 +340,8 @@ pub struct Recipes<'a> {
     listings: RefCell<HashMap<String, Option<Rc<BTreeMap<String, String>>>>>,
     /// rb status's open items, when the caller hands them (`with_open`): the request asks for the run rb suggests
     open: Vec<Value>,
-    /// what tells a run apart from another of its experiment whose label reads the same (" · recorded <minute>", with
-    /// its place in record order where the minute is the same too), by run id; none for a run whose label is its own
+    /// what tells a run apart from another of the record whose name reads the same (", recorded <minute>", as the
+    /// shell's `named` says it), by run id; none for a run whose name is its own
     apart: HashMap<String, String>,
 }
 
@@ -325,7 +355,7 @@ impl<'a> Recipes<'a> {
             }
         }
         let experiments: IndexMap<String, Experiment> = led.all::<Experiment>()?.iter().map(|e| (e.id.clone(), e.clone())).collect();
-        let apart = apart(led, &experiments, &runs);
+        let apart = apart(led, &experiments, &runs)?;
         Ok(Recipes {
             led,
             experiments,
@@ -1399,8 +1429,9 @@ fn holds_files(led: &Ledger) -> bool {
 
 /// How this checkout's code differs from a commit's, file by file, as git says it (`M` changed, `D` the commit holds
 /// it and this checkout does not, `A` this checkout holds it and the commit does not, `U` an untracked file git does
-/// not ignore, which a run's code holds too): the record, what rb clone took out of the branch (`taken`,
-/// the parent's) and the files the record's runs name (what they wrote) aside. None where this is no checkout.
+/// not ignore, which a run's code holds too): the record, what rb clone took out of the branch as the parent's
+/// (`taken`: what the parent's runs wrote, and every other results folder no recorded run named) and the files the
+/// record's runs name aside. None where this is no checkout.
 fn code_differs(led: &Ledger, commit: &str, taken: &[String]) -> Option<Vec<(String, String)>> {
     #[cfg(test)]
     DIFFS.with(|n| n.set(n.get() + 1));
@@ -2136,26 +2167,68 @@ mod tests {
     }
 
     #[test]
-    fn runs_that_read_alike_are_told_apart_by_when_rb_recorded_them() {
-        let rec = int8_record("apart");
-        let seed1 = rec.load_run("seed1");
-        let experiments: IndexMap<String, Experiment> = rec.led.all::<Experiment>().unwrap().iter().map(|e| (e.id.clone(), e.clone())).collect();
-        let at = |id: &str, when: &str| {
-            let mut r = seed1.clone();
-            r.id = id.into();
-            r.created_at = when.into();
-            r.receipt.at = when.into();
-            r
-        };
-        // three runs of e1 that read "fp32 and int8 · seed 1": two recorded in one minute, one in another
-        let runs = vec![at("rb", "2026-10-26T14:51:40+00:00"), at("ra", "2026-10-26T14:51:10+00:00"), at("rc", "2026-10-26T16:02:00+02:00"), rec.load_run("seed2")];
-        let a = apart(&rec.led, &experiments, &runs);
-        assert_eq!(a["ra"], " · recorded 2026-10-26 14:51 UTC, the 1st of 2 that minute");
-        assert_eq!(a["rb"], " · recorded 2026-10-26 14:51 UTC, the 2nd of 2 that minute");
-        assert_eq!(a["rc"], " · recorded 2026-10-26 14:02 UTC");
-        // a run whose label is its own is said by its label alone
-        assert!(!a.contains_key(&rec.id("seed2")), "{a:?}");
+    fn runs_that_read_alike_are_told_apart_as_the_shell_names_them() {
+        let n = |id: &str, words: &str, at: &str| (id.to_string(), words.to_string(), at.to_string());
+        // in the log's order: four runs that read "run fp32 and int8 · seed 1", one of their names its own, and a run of
+        // another experiment that reads the same (the name holds no experiment)
+        let named = vec![
+            n("ra", "run fp32 and int8 · seed 1", "2026-10-26T14:51:40+00:00"),
+            n("rb", "run fp32 and int8 · seed 1", "2026-10-26T14:51:40+00:00"),
+            n("rc", "run fp32 and int8 · seed 1", "2026-10-26T14:51:10+00:00"),
+            n("rd", "run fp32 and int8 · seed 1", "2026-10-26T16:02:00+02:00"),
+            n("re", "run fp32 and int8 · seed 2", "2026-10-26T14:51:40+00:00"),
+            n("rf", "a run of e1", "2026-10-26T14:51:40+00:00"),
+            n("rg", "a run of e2", "2026-10-26T14:51:40+00:00"),
+        ];
+        let a = told_apart(&named);
+        // two others that minute: to the second, and the same second, by its place in the log
+        assert_eq!(a["ra"], ", recorded 2026-10-26 14:51:40 UTC, the 1st of 2");
+        assert_eq!(a["rb"], ", recorded 2026-10-26 14:51:40 UTC, the 2nd of 2");
+        assert_eq!(a["rc"], ", recorded 2026-10-26 14:51:10 UTC");
+        assert_eq!(a["rd"], ", recorded 2026-10-26 14:02 UTC");
+        // a run whose name is its own is said by its name alone
+        for own in ["re", "rf", "rg"] {
+            assert!(!a.contains_key(own), "{a:?}");
+        }
         assert_eq!([1, 2, 3, 4, 11, 12, 13, 21, 22, 112].map(ordinal), ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "112th"]);
+    }
+
+    /// The recipe names a run as the shell's `runs.{id}.named` does: what tells it apart is the same words, read across
+    /// the record's runs in the log's order, never per experiment.
+    #[test]
+    fn a_recipe_tells_runs_apart_in_the_words_runs_named_holds() {
+        let mut rec = int8_record("named");
+        rec.led
+            .add_experiment(&NewExperiment {
+                title: "INT8 latency on a second GPU".into(),
+                id: Some("e4".into()),
+                question: Some("q1".into()),
+                purpose: "how fast the INT8 model answers there".into(),
+                candidates: vec!["int8".into()],
+                ..Default::default()
+            })
+            .unwrap();
+        // a run of e3 and one of e4 that both read "int8": the shell tells them apart, and so must the recipe
+        let t3 = rec.run("t3", "e3", NewRun { metrics: metrics(&[("int8.latency_ms", 4.4)]), ..Default::default() });
+        let t4 = rec.run("t4", "e4", NewRun { metrics: metrics(&[("int8.latency_ms", 4.1)]), ..Default::default() });
+        let names = run_names(&rec.led).unwrap();
+        let r = Recipes::new(&rec.led, Tier::Live).unwrap();
+        for (id, exp) in [(&t3, "e3"), (&t4, "e4")] {
+            let named = &names[id];
+            assert!(named.starts_with("run int8, recorded "), "{named}");
+            let words = &named["run ".len()..];
+            assert_eq!(r.said(&rec.led.load::<Run>(id).unwrap(), false), words);
+            let recipe = r.run(&rec.led.load::<Run>(id).unwrap()).unwrap();
+            let script = text(&recipe, "script");
+            assert!(script.starts_with(&format!("# Reproduce a run of {exp} · {words}\n")), "{script}");
+        }
+        assert_ne!(names[&t3], names[&t4]);
+        // every run of the record: the recipe's name is the shell's, after its "run "
+        for run in rec.led.all::<Run>().unwrap().iter() {
+            let said = r.said(run, false);
+            let named = &names[&run.id];
+            assert_eq!(named.strip_prefix("run ").unwrap_or(named), said, "{named}");
+        }
     }
 
     #[test]
@@ -2272,7 +2345,7 @@ mod tests {
         let e3 = r3.experiment(&rec.exp("e3")).unwrap();
         // another run of e3 reads "int8" too: when rb recorded each tells them apart
         let apart = &r3.apart[&id];
-        assert!(apart.starts_with(" · recorded "), "{apart}");
+        assert!(apart.starts_with(", recorded "), "{apart}");
         assert!(text(&e3, "script").contains(&format!("\n#   int8{apart}: command (as given): python bench.py (rb journal run watched it make these numbers, ")), "{}", text(&e3, "script"));
         assert!(!text(&e3, "script").contains(&id), "{}", text(&e3, "script"));
         assert_eq!(list(&e3, "commands").iter().filter(|c| get(c, "observed").truthy()).count(), 1);
@@ -2360,7 +2433,7 @@ mod tests {
         // the runs by their labels in the words, each "int8" told apart by when rb recorded it; their ids in refs,
         // where a link needs them
         let (a1, a2) = (&r.apart[&m1], &r.apart[&m2]);
-        assert!(a1 != a2 && a1.starts_with(" · recorded ") && a2.starts_with(" · recorded "), "{a1} {a2}");
+        assert!(a1 != a2 && a1.starts_with(", recorded ") && a2.starts_with(", recorded "), "{a1} {a2}");
         let line = format!("training data · x1, which int8{a2} read to make x2 · made by int8{a1}; the recipe stops here, 4 makers back: no recipe recorded");
         let at = steps.iter().position(|l| *l == line).unwrap_or_else(|| panic!("{line} in {steps:?}"));
         assert_eq!(list(&list(&v, "steps")[at], "refs"), &[Value::str("x1"), Value::str(&m2), Value::str(&m1)]);
@@ -2991,7 +3064,8 @@ mod tests {
         assert_eq!(text(&v, "code.text"), format!("{url} at {short}, here with changes: 1 file differs from it (eval.py)"));
         git(&code, &["checkout", "-q", "--", "eval.py"]);
         assert_eq!(text(&rerun(&led).unwrap().unwrap(), "code.state"), "here");
-        // what the parent's runs wrote, taken out of the branch, and a file a run here names are no difference in code
+        // what rb clone took out of the branch as the parent's (here what its runs wrote), and a file a run here names,
+        // are no difference in code
         std::fs::create_dir_all(code.join("results/s1")).unwrap();
         std::fs::write(code.join("results/s1/metrics.json"), "{\"int8\": {\"top1\": 0.7581}}\n").unwrap();
         std::fs::write(code.join("results/s2.json"), "{\"int8\": {\"top1\": 0.7574}}\n").unwrap();

@@ -23,7 +23,7 @@ Run relevant focused checks while developing. The normal suite is:
 
 ```sh
 cargo test --manifest-path rust/Cargo.toml -q
-python -m pytest -q
+python -m pytest -q -n auto
 python .github/scripts/test-public-content.py
 python .github/scripts/test-attribution.py
 ```

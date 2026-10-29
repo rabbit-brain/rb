@@ -321,7 +321,7 @@ pub const HELP_GROUPS: &[(&str, &[&str])] = &[
     ("Upkeep", &["doctor", "fmt", "telemetry", "config"]),
     ("Leaving", &["remove"]),
     ("Reference", &["tour", "docs", "schema", "version", "feedback"]),
-    ("rabbitbrain.ai (not yet available)", &["login", "logout", "sync"]),
+    ("rabbitbrain.ai", &["login", "logout", "sync"]),
 ];
 
 pub fn print_help() {

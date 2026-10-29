@@ -9,6 +9,8 @@ scope bar, where each run was recorded and the commands, not what the record hel
 import json
 import sys
 
+sys.stdout.reconfigure(encoding="utf-8", newline="\n")  # UTF-8 with LF, as the fixture is, whatever the terminal says (cp1252 on Windows)
+
 state, doc = sys.argv[1], json.load(open(sys.argv[2], encoding="utf-8"))
 MAIN = {"id": "main", "label": "main · ~/int8-resnet50", "path": "/home/ana/int8-resnet50", "commit": "3f2a9c1"}
 EXPB = {"id": "exp-b", "label": "exp-b · .worktrees/b", "path": "/home/ana/int8-resnet50/.worktrees/b", "commit": "5d1e0a7"}

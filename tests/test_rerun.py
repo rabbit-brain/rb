@@ -8,12 +8,14 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
 
 from rabbit_brain.models import Envelope
 from rbtest import as_the_user, main, state
+from test_export import SERVED, served_at  # noqa: F401 (origin at an https address, served from a bare repository)
 
 # like most evaluation scripts, it keeps when it ran beside its numbers, so a rerun's file holds bytes of its own
 EVAL = '''import json, os, sys, time
@@ -81,7 +83,7 @@ def published(workdir, monkeypatch, tmp_path_factory, capsys):
     git("commit", "-qm", "seed 1")
     bare = tmp_path_factory.mktemp("published") / "int8.git"
     git("clone", "-q", "--bare", str(code_dir), str(bare))
-    git("remote", "add", "origin", str(bare))
+    git("remote", "add", "origin", served_at(monkeypatch, bare))
     commit = git("rev-parse", "HEAD")
     code, env = rb("export", "--with-record")
     assert code == 0
@@ -96,7 +98,7 @@ def test_a_rerun_goes_from_a_bundle_to_each_inherited_rule_s_reading(published, 
     code, env = rb_in(fresh, capsys, "clone", str(bundle), "int8-rerun")
     assert code == 0, env.errors
     dest = fresh / "int8-rerun"
-    assert {k: env.data["code"][k] for k in ("url", "commit", "got", "branch", "why")} == {"url": str(bare), "commit": commit, "got": True, "branch": "rerun", "why": ""}
+    assert {k: env.data["code"][k] for k in ("url", "commit", "got", "branch", "why")} == {"url": SERVED, "commit": commit, "got": True, "branch": "rerun", "why": ""}
     assert (dest / "eval.py").is_file() and git("rev-parse", "--abbrev-ref", "HEAD", cwd=dest) == "rerun"
     # one commit on top of the bundle's, and it changes the record alone; the parent's record stays at that commit
     assert git("rev-parse", "HEAD~1", cwd=dest) == commit
@@ -192,7 +194,6 @@ def test_a_code_address_that_cannot_be_reached_leaves_the_record_alone_and_says_
     assert code == 0 and env.data["code"]["got"] is False
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="rb clone on Windows: Windows is a preview (issue #2)", strict=False)
 def test_with_no_git_identity_the_code_is_not_got_and_the_record_lands_alone(published, tmp_path_factory, monkeypatch, capsys):
     """The record's commit takes the place of the parent's record in the code's checkout; git never commits it under an
     identity it guesses, so with none of the user's own the clone gets no code, and its log is never read against the
@@ -211,7 +212,7 @@ def test_with_no_git_identity_the_code_is_not_got_and_the_record_lands_alone(pub
     code, env = rb_in(dest, capsys, "status")
     assert not any(i.get("code") == "edited_outside_rb" for i in env.data["open"])
     assert env.data["rerun"]["code"]["state"] == "elsewhere"
-    assert env.next[0] == f"rb clone {bundle.as_posix()} <new folder> --code {bare.as_posix()}"
+    assert env.next[0] == f"rb clone {bundle.as_posix()} <new folder> --code {SERVED}"
 
 
 def test_a_path_with_a_space_is_quoted_in_the_command_rb_clone_names(published, tmp_path_factory, capsys):
@@ -256,8 +257,7 @@ def test_only_what_the_parents_runs_wrote_where_results_land_is_taken_out(publis
     assert not (dest / "results/s2/metrics.json").exists() and not (dest / "results/s1").exists()
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="rb clone on Windows: Windows is a preview (issue #2)", strict=False)
-def test_the_parents_results_no_run_named_leave_the_branch_and_rb_reconcile_reads_none(published, tmp_path_factory, capsys):
+def test_the_parents_results_no_run_named_leave_the_branch_and_rb_reconcile_reads_none(published, tmp_path_factory, capsys, monkeypatch):
     """Results folders the code's commit holds that no recorded run named (earlier runs, never recorded) are the
     parent's work too: a clone takes them out of its branch with what the runs wrote, so rb reconcile reports none of
     them as this record's. A folder that holds what a run reads stays, and so does a file that sits in no results
@@ -290,7 +290,10 @@ def test_the_parents_results_no_run_named_leave_the_branch_and_rb_reconcile_read
     code, env = rb_in(code_dir, capsys, "export", "--with-record", "--out", str(tmp_path_factory.mktemp("b3") / "b"))
     assert code == 0
     fresh = tmp_path_factory.mktemp("reader")
+    # as on a slow machine (GitHub's Windows runners): git dates the record's commit seconds after the record's first write
+    monkeypatch.setenv("GIT_COMMITTER_DATE", f"@{int(time.time()) + 60} +0000")
     code, env = rb_in(fresh, capsys, "clone", env.data["path"], "r")
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
     assert code == 0 and env.data["code"]["got"] is True
     dest = fresh / "r"
     assert env.data["code"]["taken_out"] == ["results/r001/", "results/r002/", "results/r003/", "results/s1/", "results/s2/metrics.json"]
@@ -314,9 +317,8 @@ def test_the_parents_results_no_run_named_leave_the_branch_and_rb_reconcile_read
     assert not any(i.get("code") == "unindexed_folder" and "r00" in str(i) for i in env.data["open"]), env.data["open"]
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="rb clone on Windows: Windows is a preview (issue #2)", strict=False)
 def test_where_the_code_cannot_be_got_rb_clone_says_it_in_its_own_words_then_gits(published, tmp_path_factory, capsys):
-    """rb's own sentence first, naming the address; then git's own last line after "git said:", where git failed;
+    """rb's own sentence first, naming the address; then git's own message after "git said:", where git failed;
     then the command that gets the code. The exit status is the clone's, as before."""
     bundle, bare, commit = published
     fresh = tmp_path_factory.mktemp("reader")
@@ -349,7 +351,6 @@ def test_where_the_code_cannot_be_got_rb_clone_says_it_in_its_own_words_then_git
     assert "git said" not in out
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="rb clone on Windows: Windows is a preview (issue #2)", strict=False)
 def test_a_bundle_whose_export_saw_its_commit_was_not_at_origin_says_so_where_the_code_is_not_got(published, tmp_path_factory, capsys):
     """The export saw that origin does not hold the code's commit (repo.at_origin false): rb clone, from the bundle's
     own address, says the bundle's words for why, never git's, and the --code command after them."""
@@ -375,7 +376,7 @@ def test_a_bundle_whose_export_saw_its_commit_was_not_at_origin_says_so_where_th
     finally:
         os.chdir(cwd)
     assert code == 0
-    words = f"rb clone could not get the code from {bare.as_posix()}: the bundle says its code's commit {ahead[:12]} is not at {bare.as_posix()}."
+    words = f"rb clone could not get the code from {SERVED}: the bundle says its code's commit {ahead[:12]} is not at {SERVED}."
     assert words in lines, lines
     assert not any("git said" in line or "has no commit" in line for line in lines), lines
     assert lines[lines.index(words) + 1].startswith("With access, or a copy you can reach: rb clone ")

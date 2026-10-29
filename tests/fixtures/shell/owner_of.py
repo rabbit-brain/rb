@@ -7,6 +7,8 @@ import json
 import re
 import sys
 
+sys.stdout.reconfigure(encoding="utf-8", newline="\n")  # UTF-8 with LF, as the fixture is, whatever the terminal says (cp1252 on Windows)
+
 doc = json.load(open(sys.argv[1], encoding="utf-8"))
 QUOTED = re.compile(r' · "[^"]*"$')  # the user's own words at the end of a call line
 

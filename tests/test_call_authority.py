@@ -31,6 +31,8 @@ import os
 import re
 import shutil
 import subprocess
+import sys
+import time
 import urllib.request
 import warnings
 from pathlib import Path
@@ -174,7 +176,7 @@ def test_a_call_recorded_in_an_agent_session_is_proposed_and_changes_nothing(rec
     every = "rb confirm " + " ".join(d["id"] for d in calls)
     assert "Proposed, not made (4)" in text and f"Confirm all 4: {every}" in text
     assert f"  - reject q-width · note: the sweep is done · confirm: rb confirm {calls[0]['id']}" in text
-    assert "call: " not in text and "Needs a human" not in text
+    assert "call: " not in text and "Needs judgment" not in text
     assert f"  {calls[0]['id']}: proposed, not made: reject q-width · note: the sweep is done · confirm: rb confirm {calls[0]['id']}" in rec.text("show", "q-width")
     context = rec.text("context")
     assert "## Proposed, not made" in context and f"- park int8 · note: later · confirm: rb confirm {calls[1]['id']}" in context
@@ -991,7 +993,8 @@ def test_a_run_note_a_session_wrote_shows_as_not_confirmed(rec, tmp_path, monkey
 
 def test_the_json_only_grows(rec):
     """Every key rb status, rb show and rb decide gave before stays; a decision gains its authority beside them, and
-    rb status what waits for a confirmation and the found runs that need a per-run value (found_needs)."""
+    rb status what waits for a confirmation, the found runs that need a per-run value (found_needs) and how rb knows of
+    what the record holds (witness)."""
     made = rec.decide("q-width", "reject", "--why", "the sweep is done", agent=None)
     rec.decide("int8", "park", "--why", "later")
     env = rec.ok("status")
@@ -999,12 +1002,13 @@ def test_the_json_only_grows(rec):
     st = env["data"]
     old = {"project", "root", "actor", "experiment_id", "counts", "tally", "results", "findings", "experiments", "runs", "analyses", "questions",
            "resources", "decisions", "retracted", "metrics", "repository", "open", "gate", "found_unrecorded", "elsewhere", "fail_on", "outcome"}
-    assert old <= set(st) and set(st) - old == {"pending", "record_start", "gates_pending", "designs_pending", "scope", "uncited_changes", "found_needs"}
+    assert old <= set(st) and set(st) - old == {"pending", "record_start", "gates_pending", "designs_pending", "scope", "uncited_changes", "found_needs",
+                                                 "witness"}
     assert {"question_count", "experiment_count", "criterion_count", "run_count", "analysis_count", "resource_count", "decision_count"} <= set(st["counts"])
     [row] = st["decisions"]
     old_row = {"id", "subject", "action", "why", "revisit", "by", "at", "via", "session", "words", "basis", "inquiry_basis", "value", "across",
                "retracted", "current"}
-    assert old_row <= set(row) and set(row) - old_row == {"authority", "past"} and row["past"] is None
+    assert old_row <= set(row) and set(row) - old_row == {"authority", "past", "witness"} and row["past"] is None
     assert {"who", "code", "subject", "what", "do"} <= set(next(i for i in st["open"] if i["code"] == "call_proposed"))
     shown = rec.ok("show", made["id"])["data"]
     assert {"object", "current", "authority"} <= set(shown)
@@ -1037,3 +1041,101 @@ def test_an_older_rb_reads_the_record_after_an_ordinary_call_and_a_confirmation(
     older("note", "add", "an older rb's note", "-e", "int8")
     code, env = rec.rb("doctor")
     assert code == 0 and not env["data"].get("problems")
+
+
+# ---------------------------------------------------------------- what rb 0.6.0 said wrong in a real session (0.6.1)
+
+
+def test_a_run_rb_watched_write_its_file_is_not_told_to_say_when_it_ran(rec):
+    """A file a command run under rb journal run wrote is that run's: rb run add --from it says nothing of a file
+    written minutes ago, while a file no watched command wrote, or one changed by hand since, still gets the line."""
+    (rec.root / "eval.py").write_text("import json, os, sys\nd = sys.argv[1]\nos.makedirs(d, exist_ok=True)\n"
+                                      "json.dump({'fp32': {'val_loss': 5.61}, 'int8': {'val_loss': 5.6 + int(d[-1]) / 100}}, open(d + '/metrics.json', 'w'))\n",
+                                      encoding="utf-8")
+    assert rec.run("journal", "run", "--", sys.executable, "eval.py", "out/seed1").returncode == 0
+    watched = rec.run("run", "add", "int8", "--from", "out/seed1/metrics.json")
+    assert watched.returncode == 0 and "before this run was recorded" not in watched.stdout + watched.stderr, watched.stderr
+    # the same file changed by hand after the command ran is no longer that run's: the line comes back
+    assert rec.run("journal", "run", "--", sys.executable, "eval.py", "out/seed3").returncode == 0
+    time.sleep(3)
+    (rec.root / "out" / "seed3" / "metrics.json").write_text('{"fp32": {"val_loss": 5.61}, "int8": {"val_loss": 5.7}}', encoding="utf-8")
+    edited = rec.run("run", "add", "int8", "--from", "out/seed3/metrics.json")
+    assert "out/seed3/metrics.json was written less than a minute before this run was recorded" in edited.stdout + edited.stderr
+    subprocess.run([sys.executable, "eval.py", "out/seed2"], cwd=rec.root, check=True)
+    unwatched = rec.run("run", "add", "int8", "--from", "out/seed2/metrics.json")
+    assert "out/seed2/metrics.json was written less than a minute before this run was recorded" in unwatched.stdout + unwatched.stderr
+
+
+def test_a_freeze_in_a_session_says_the_lock_as_done(rec):
+    """rb freeze prints its review after it has frozen: a rule a session declared is said as locked now, with how to
+    change it, never as something to check before locking it."""
+    rec.ok("criterion", "add", "INT8 adds at most 0.1 validation loss", "-e", "int8", "--metric", "change.val_loss", "--at-most", "0.1", "--id", "c2",
+           agent=AGENT)
+    out = rec.text("freeze", "int8", "-m", "before the held-out runs", agent=AGENT)
+    assert "int8 frozen" in out and "before locking it" not in out
+    assert '    look: c2 is locked as the test now. Check it is the one you mean: a change to it needs --amend --why "<reason>".' in out
+
+
+def test_a_miss_with_a_proposed_call_on_it_does_not_say_no_call_is_recorded(rec):
+    """A rule that misses with a call proposed on it says the call is recorded and not made yet, never that no call on
+    it is recorded; with no call at all it says so."""
+    rec.ok("run", "add", "int8", "fp32.val_loss=5.61", "int8.val_loss=5.80", "--command", "python eval.py --seed 2")
+    [before] = [i for i in rec.status()["open"] if i["code"] == "undecided" and i["subject"] == "c1"]
+    assert before["what"] == "c1 misses its rule and no call on it is recorded: INT8 adds at most 0.05 validation loss"
+    rec.decide("c1", "reject", "--why", "INT8 costs too much")
+    [after] = [i for i in rec.status()["open"] if i["code"] == "undecided" and i["subject"] == "c1"]
+    assert after["what"] == ("c1 misses its rule and the call recorded on it is not made yet: it waits for a confirmation: "
+                             "INT8 adds at most 0.05 validation loss")
+    assert "no call on it is recorded" not in rec.text("status")
+
+
+def test_confirming_a_design_says_the_notes_on_it_stay_not_confirmed_and_how_to_say_one(rec):
+    """A session's note is not part of the design: rb confirm lists the design with a line that names the note, says
+    it stays not confirmed, and how the user says it in their own name; the confirmation says it again."""
+    rec.ok("criterion", "add", "INT8 adds at most 0.1 validation loss", "-e", "int8", "--metric", "change.val_loss", "--at-most", "0.1", "--id", "c2",
+           agent=AGENT)
+    note = rec.ok("note", "add", "the calibration draw is fixed", "-e", "int8", agent=AGENT)["data"]["object"]["id"]
+    line = (f"note {note} on int8 stays not confirmed: a note is not part of the design. To say one as yours, write it in your own "
+            'terminal: rb note add "<its words>" -e int8, then rb retract <note> --why "<reason>".')
+    listed = rec.text("confirm", "int8")
+    assert line in listed
+    assert [d["notes_left"] for d in rec.ok("confirm", "int8")["data"]["designs_pending"]] == [line]
+    confirm = next(w for w in listed.split() if w.startswith("int8@"))
+    done = rec.text("confirm", confirm)
+    assert "int8's design is confirmed." in done and line in done
+    assert "the calibration draw is fixed · not confirmed" in rec.text("show", "int8")
+
+
+def test_a_cited_value_that_differs_is_said_where_it_is_set_and_once_on_its_criterion(rec, monkeypatch):
+    """rb spec set with --cited says at once that the cited source used another value, and so does the SDK; rb show of
+    the cited criterion says the difference once, as the problem it is."""
+    rec.commit("configs/eval.yaml", "data:\n  batch_size: 256\n")
+    rec.commit("docs/paper.md", "# INT8 ResNet-50\n\nINT8 validation loss is 5.64 on the held-out set.\n")
+    set_ = rec.run("spec", "set", "int8", "data.batch_size", "--source", "configs/eval.yaml#data.batch_size", "--cited", "128", "--cited-source",
+                   "docs/paper.md")
+    said = set_.stdout + set_.stderr
+    assert "verified" in said and ("data.batch_size is 256 here and 128 in the cited source: while they differ, a criterion of int8 that cites a "
+                                   "number is not comparable, and its rule reads undetermined.") in said
+    # the SDK says it beside the setting too, as an RBWarning
+    at_the_users_terminal(rec, monkeypatch)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        rabbit_brain.open().experiment("int8").spec.set("data.batch_size", source="configs/eval.yaml#data.batch_size", cited=128)
+    assert any("data.batch_size is 256 here and 128 in the cited source" in str(w.message) for w in caught), [str(w.message) for w in caught]
+    rec.ok("criterion", "add", "INT8 reproduces the paper's validation loss", "-e", "int8", "--metric", "int8.val_loss", "--equals", "5.64",
+           "--tolerance", "0.005", "--source", "docs/paper.md", "--quote", "INT8 validation loss is 5.64", "--locator", "line 3", "--id", "c3")
+    shown = rec.text("show", "c3")
+    assert shown.count("data.batch_size 256 here vs 128 in the cited source") == 1, shown
+
+
+def test_a_run_recorded_again_has_one_space_before_not_confirmed(rec):
+    """A run a session recorded again from the same file keeps "recorded again: <why>." as its note, with no space left
+    after it, so every screen says "<why>. · not confirmed"."""
+    (rec.root / "out").mkdir()
+    (rec.root / "out" / "m.json").write_text('{"fp32": {"val_loss": 5.61}, "int8": {"val_loss": 5.63}}', encoding="utf-8")
+    rec.ok("run", "add", "int8", "--from", "out/m.json", "--produced-at", "2026-10-01T10:00:00Z", agent=AGENT)
+    again = rec.ok("run", "add", "int8", "--from", "out/m.json", "--produced-at", "2026-10-02T10:00:00Z", "--again", "--why", "rerun from its receipt.",
+                   agent=AGENT)["data"]["object"]
+    assert again["note"] == "recorded again: rerun from its receipt."
+    shown = rec.text("show", again["id"])
+    assert "  note: recorded again: rerun from its receipt. · not confirmed\n" in shown and ".  ·" not in shown

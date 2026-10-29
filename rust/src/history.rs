@@ -68,7 +68,7 @@ pub struct Latest {
 pub fn of(led: &Ledger) -> Res<History> {
     let rows = led.log_entries()?;
     let mut facts = Facts::of(led)?;
-    facts.names = names_of(led, &rows)?;
+    (facts.names, facts.bases) = named_apart(led, &rows)?;
     Ok(told(&rows, &facts))
 }
 
@@ -173,6 +173,8 @@ struct Facts {
     owned_links: HashMap<(String, String), String>,
     /// what a screen says for a record rb minted an id for, which it never shows as text (FIX7): a run, an analysis, a call
     names: HashMap<String, String>,
+    /// the words before ", recorded <when>" of a record rb told apart by when it was recorded (`named_apart`)
+    bases: HashMap<String, String>,
 }
 
 impl Facts {
@@ -183,6 +185,11 @@ impl Facts {
             (None, "note") => "a note".to_string(),
             _ => format!("{} {id}", noun(kind)),
         }
+    }
+
+    /// A record's words as a line History opens with "Recorded" says them: the time rb told it apart by said once.
+    fn at_words(&self, id: &str) -> Option<String> {
+        self.names.get(id).map(|w| as_recorded(w, self.bases.get(id).map_or("", String::as_str)))
     }
 
     /// A record a line lists by its words where it has them, else by its id.
@@ -196,8 +203,15 @@ impl Facts {
 /// e1" where it has none, told apart from a run whose words read the same by when it was recorded, to the second where
 /// the minute is shared, then ", the 2nd of 2" where that is shared too; an analysis by its title ("analysis <title>");
 /// a call by what it is ("a call to accept c1", "a proposed call to accept c1, not made"); an analysis with no title by
-/// its experiment and when it was recorded.
+/// its experiment and when it was recorded ("an analysis on e1, recorded 2026-10-14 09:30 UTC", M's settled words).
 pub fn names_of(led: &Ledger, rows: &[Dict]) -> Res<HashMap<String, String>> {
+    Ok(named_apart(led, rows)?.0)
+}
+
+/// Each record's words (`names_of`), and the words before ", recorded <when>" where rb told a record apart by when it
+/// was recorded (a run whose words another's share, an analysis with no title), so History's own "Recorded" says that
+/// time once and never rewrites a label's own words (`as_recorded`).
+fn named_apart(led: &Ledger, rows: &[Dict]) -> Res<(HashMap<String, String>, HashMap<String, String>)> {
     let mut seq: HashMap<String, usize> = HashMap::new();
     for (i, row) in rows.iter().enumerate() {
         if row.get_str("kind") == Some("run") {
@@ -219,10 +233,14 @@ pub fn names_of(led: &Ledger, rows: &[Dict]) -> Res<HashMap<String, String>> {
     times.sort_by_key(|(id, _)| seq.get(id).copied().unwrap_or(usize::MAX));
     let times: IndexMap<String, String> = times.into_iter().collect();
     let mut names = twins_told_apart(&said, &times);
+    let mut bases: HashMap<String, String> = said.iter().filter(|(id, w)| names.get(*id) != Some(*w)).map(|(id, w)| (id.clone(), w.clone())).collect();
     for a in led.all::<Analysis>()?.iter().filter(|a| minted_id(&a.id, "a")) {
         // one with no title is said by its experiment and when it was recorded
         let words = match a.title.trim() {
-            "" => format!("an analysis on {}, recorded {}", a.experiment, minute(&a.created_at)),
+            "" => {
+                bases.insert(a.id.clone(), format!("{UNTITLED}{}", a.experiment));
+                format!("{UNTITLED}{}, recorded {}", a.experiment, minute(&a.created_at))
+            }
             t => format!("analysis {t}"),
         };
         names.insert(a.id.clone(), words);
@@ -238,7 +256,28 @@ pub fn names_of(led: &Ledger, rows: &[Dict]) -> Res<HashMap<String, String>> {
         };
         names.insert(d.id.clone(), words);
     }
-    Ok(names)
+    Ok((names, bases))
+}
+
+/// How the words of an analysis with no title open: "an analysis on e1, recorded <minute> UTC".
+const UNTITLED: &str = "an analysis on ";
+
+/// A record's words where History's own "Recorded" opens the sentence: "run X at 2026-10-14 09:25 UTC" for "run X,
+/// recorded 2026-10-14 09:25 UTC", so a line never says "recorded" twice of one record. Only the time rb adds after
+/// `base`, the words it told apart, is said so; words of a label itself ("tag alpha, recorded 2026-10-14 09:20 UTC"
+/// as a setting's value) stay as recorded.
+pub(crate) fn as_recorded(words: &str, base: &str) -> String {
+    match words.strip_prefix(base).and_then(|r| r.strip_prefix(", recorded ")) {
+        Some(when) if !base.is_empty() && is_minute(when) => format!("{base} at {when}"),
+        _ => words.to_string(),
+    }
+}
+
+/// Whether `t` opens with a time as rb says one when it tells runs apart: "2026-10-14 09:25 UTC", or to the second.
+fn is_minute(t: &str) -> bool {
+    let b = t.as_bytes();
+    let digits = |r: std::ops::Range<usize>| b[r].iter().all(u8::is_ascii_digit);
+    b.len() >= 20 && digits(0..4) && b[4] == b'-' && digits(5..7) && b[7] == b'-' && digits(8..10) && b[10] == b' ' && digits(11..13) && b[13] == b':' && digits(14..16)
 }
 
 /// Each run's words (`said`), with a run whose words another's share told apart by when it was recorded (`times`, in
@@ -394,6 +433,8 @@ struct Said {
     /// the part as a sentence that lists it says it: a run or an analysis by its words, never the id rb minted; empty
     /// where it is the part itself
     shown: String,
+    /// a run's words as a line History opens with "Recorded" lists them, its time said once ("run X at <when>")
+    at: String,
     /// the experiment a run or a change is on, for a line that counts them by experiment
     on: String,
     one: String,
@@ -408,7 +449,7 @@ struct Said {
 
 impl Said {
     fn new(kind: Kind, target: &str, part: &str, one: String, refs: Vec<String>, why: &str) -> Said {
-        Said { kind, target: target.to_string(), part: part.to_string(), shown: String::new(), on: String::new(), one, refs, why: why.to_string(), note: false, call: false, checked: None }
+        Said { kind, target: target.to_string(), part: part.to_string(), shown: String::new(), at: String::new(), on: String::new(), one, refs, why: why.to_string(), note: false, call: false, checked: None }
     }
 }
 
@@ -522,8 +563,15 @@ fn sentence(members: &[&Said]) -> String {
     let n = parts.len();
     let t = &lead.target;
     // each part as the line lists it: by its words where a write gave them
+    let ids = parts.clone();
     let parts: Vec<String> =
         parts.iter().map(|p| members.iter().find(|s| s.part == *p && !s.shown.is_empty()).map_or_else(|| p.clone(), |s| s.shown.clone())).collect();
+    // runs a line opened with "Recorded" lists say when each was recorded without the word again
+    let parts: Vec<String> = if lead.kind == Kind::Runs {
+        parts.into_iter().zip(&ids).map(|(p, id)| members.iter().find(|s| s.part == **id && !s.at.is_empty()).map_or(p, |s| s.at.clone())).collect()
+    } else {
+        parts
+    };
     match lead.kind {
         Kind::Question if t.is_empty() => format!("Added {n} questions: {}", listed(&parts)),
         Kind::Question => format!("Added {n} questions under {t}: {}", listed(&parts)),
@@ -585,7 +633,15 @@ fn sentence(members: &[&Said]) -> String {
         }
         Kind::Retracted if t == "run" || t == "decision" => format!("Retracted {n} {}: {}", plural_of(t), parted(&parts)),
         Kind::Retracted => format!("Retracted {n} {}: {}", plural_of(t), listed(&parts)),
-        Kind::Analyses => format!("Recorded {n} analyses on {t}: {}", parted(&parts)),
+        Kind::Analyses => {
+            // analyses with no title are counted, never listed as "an analysis on e1, recorded ..." again and again
+            let titled: Vec<String> = parts.iter().filter(|p| !p.starts_with(UNTITLED)).cloned().collect();
+            match n - titled.len() {
+                0 => format!("Recorded {n} analyses on {t}: {}", parted(&parts)),
+                k if titled.is_empty() => format!("Recorded {k} analyses on {t}, with no title"),
+                k => format!("Recorded {n} analyses on {t}: {}, and {k} with no title", parted(&titled)),
+            }
+        }
         Kind::Notes => format!("Added {n} notes on {t}"),
         Kind::Filed => format!("Filed {} under {t}", and_joined(&parts)),
         Kind::Unfiled => format!("Took {} out of {t}", and_joined(&parts)),
@@ -858,7 +914,8 @@ fn write_said(i: usize, row: &Dict, f: &Facts) -> Said {
             let run = f.runs.get(&id).cloned().unwrap_or_default();
             let exp = Some(text("experiment")).filter(|e| !e.is_empty()).unwrap_or(run.experiment);
             // the run by its words, never the id rb minted, which its link keeps (FIX7)
-            let mut one = match f.names.get(&id) {
+            let at = f.at_words(&id);
+            let mut one = match at.clone() {
                 Some(w) if w.starts_with(&format!("a run of {exp}")) => format!("Recorded {w}"),
                 Some(w) => format!("Recorded a run on {exp}: {w}"),
                 None => format!("Recorded a run on {exp}"),
@@ -882,6 +939,7 @@ fn write_said(i: usize, row: &Dict, f: &Facts) -> Said {
             refs.push(exp.clone());
             let mut s = Said::new(Kind::Runs, "", &id, one, refs, &why);
             s.shown = f.names.get(&id).cloned().unwrap_or_default();
+            s.at = at.unwrap_or_default();
             s.on = exp;
             s
         }
@@ -914,7 +972,8 @@ fn write_said(i: usize, row: &Dict, f: &Facts) -> Said {
             let replacing: Vec<String> = d.get("supersedes").and_then(Value::as_list).map(|l| l.iter().map(crate::pyjson::py_str).collect()).unwrap_or_default();
             // an analysis rb minted an id for by its title, which its link keeps (FIX7); one with a chosen id by that id
             let mut one = match f.names.get(&id) {
-                Some(w) if w.starts_with("an analysis on ") => format!("Recorded {w}"),
+                // one with no title says when it was recorded once: "Recorded an analysis on e1 at <minute> UTC"
+                Some(w) if w.starts_with(UNTITLED) => format!("Recorded {}", f.at_words(&id).unwrap_or_default()),
                 Some(w) => format!("Recorded an analysis on {exp}: {w}"),
                 None => format!("Recorded an analysis on {exp}"),
             };
@@ -1964,10 +2023,12 @@ mod tests {
         .into_iter()
         .map(|(a, b)| (a.to_string(), b.to_string()))
         .collect();
-        let f = Facts { names, ..Default::default() };
+        let seed1 = "run fp32 and int8 · seed 1".to_string();
+        let bases: HashMap<String, String> = [("runaaaaaa".to_string(), seed1.clone()), ("runbbbbbb".to_string(), seed1)].into_iter().collect();
+        let f = Facts { names, bases, ..Default::default() };
         let rec = |t: i64, id: &str, d: Value| line_at(t, ana, "", "cli", "record", "run", id, d);
         let h = told(&[rec(0, "runaaaaaa", crate::obj! {"experiment" => "e1"}), rec(10, "runcccccc", crate::obj! {"experiment" => "e1"})], &f);
-        assert_eq!(sentences(&h)[0], vec!["Recorded 2 runs: run fp32 and int8 · seed 1, recorded 2026-10-14 09:20 UTC; run fp32 and int8 · seed 2"]);
+        assert_eq!(sentences(&h)[0], vec!["Recorded 2 runs: run fp32 and int8 · seed 1 at 2026-10-14 09:20 UTC, run fp32 and int8 · seed 2"]);
         assert_eq!(h.sittings[0].lines[0].refs, vec!["runaaaaaa", "e1", "runcccccc"]);
         let rows = [
             rec(0, "runbbbbbb", crate::obj! {"experiment" => "e1", "replaces" => "runaaaaaa"}),
@@ -1976,7 +2037,7 @@ mod tests {
         let h = told(&rows, &f);
         assert_eq!(
             sentences(&h)[0],
-            vec!["Recorded a run on e1: run fp32 and int8 · seed 1, recorded 2026-10-14 09:25 UTC, replacing run fp32 and int8 · seed 1, recorded 2026-10-14 09:20 UTC"]
+            vec!["Recorded a run on e1: run fp32 and int8 · seed 1 at 2026-10-14 09:25 UTC, replacing run fp32 and int8 · seed 1, recorded 2026-10-14 09:20 UTC"]
         );
         assert_eq!(h.sittings[0].lines[0].refs, vec!["runbbbbbb", "runaaaaaa", "e1"]);
         let retract = |t: i64, kind: &str, id: &str, d: Value| line_at(t, ana, "", "cli", "retract", kind, id, d);
@@ -1992,19 +2053,46 @@ mod tests {
         for (op, said) in [("adopt", "Kept run fp32 and int8 · seed 2 as it reads now"), ("restore", "Restored run fp32 and int8 · seed 2"), ("clone", "Copied run fp32 and int8 · seed 2 from the clone"), ("future", "Changed run fp32 and int8 · seed 2")] {
             assert_eq!(sentences(&told(&[line_at(0, ana, "", "cli", op, "run", "runcccccc", crate::obj! {})], &f))[0], vec![said]);
         }
-        // review: an analysis with no title is said by its experiment and time; a proposal taken back stays a proposal
+        // an analysis with no title is said by its experiment and when it was recorded (M's words), "recorded" once where
+        // History's own "Recorded" opens the line; a proposal taken back stays a proposal
         let f2 = Facts {
-            names: [("aggggggg", "an analysis on e1, recorded 2026-10-14 09:30 UTC"), ("dhhhhhh", "a proposed call to park e1, not made")]
+            names: [("aggggggg", "an analysis on e1, recorded 2026-10-14 09:30 UTC"), ("ahhhhhh", "an analysis on e1, recorded 2026-10-14 09:31 UTC"), ("dhhhhhh", "a proposed call to park e1, not made")]
                 .into_iter()
                 .map(|(a, b)| (a.to_string(), b.to_string()))
                 .chain(f.names.clone())
                 .collect(),
+            bases: [("aggggggg", "an analysis on e1"), ("ahhhhhh", "an analysis on e1")].into_iter().map(|(a, b)| (a.to_string(), b.to_string())).chain(f.bases.clone()).collect(),
             ..Default::default()
         };
-        assert_eq!(sentences(&told(&[an(0, "aggggggg", crate::obj! {"experiment" => "e1"})], &f2))[0], vec!["Recorded an analysis on e1, recorded 2026-10-14 09:30 UTC"]);
+        assert_eq!(sentences(&told(&[an(0, "aggggggg", crate::obj! {"experiment" => "e1"})], &f2))[0], vec!["Recorded an analysis on e1 at 2026-10-14 09:30 UTC"]);
         let calls = [retract(0, "decision", "dhhhhhh", crate::obj! {}), retract(1, "decision", "deeeeee", crate::obj! {})];
         assert_eq!(sentences(&told(&calls, &f2))[0], vec!["Retracted 2 calls: a proposed call to park e1, not made; a call to accept c1"]);
         assert_eq!(sentences(&told(&[retract(0, "analysis", "aggggggg", crate::obj! {})], &f2))[0], vec!["Retracted an analysis on e1, recorded 2026-10-14 09:30 UTC"]);
+        // analyses with no title are counted, never listed one by one
+        let three = [an(0, "aggggggg", crate::obj! {"experiment" => "e1"}), an(1, "ahhhhhh", crate::obj! {"experiment" => "e1"}), an(2, "adddddd", crate::obj! {"experiment" => "e1"})];
+        assert_eq!(sentences(&told(&three, &f2))[0], vec!["Recorded 3 analyses on e1: analysis per-image accuracy, and 2 with no title"]);
+        assert_eq!(sentences(&told(&three[..2], &f2))[0], vec!["Recorded 2 analyses on e1, with no title"]);
+        let anew = an(0, "adddddd", crate::obj! {"experiment" => "e1", "supersedes" => crate::list!["aggggggg"]});
+        assert_eq!(sentences(&told(&[anew], &f2))[0], vec!["Recorded an analysis on e1: analysis per-image accuracy, replacing an analysis on e1, recorded 2026-10-14 09:30 UTC"]);
+        // a run told apart by when it was recorded says "recorded" once (MP-1028-0216): History's own "Recorded" opens it
+        let f3 = Facts {
+            names: [("runaaaaaa".to_string(), "a run of e1, recorded 2026-10-14 09:20:05 UTC, the 2nd of 2".to_string())].into_iter().collect(),
+            bases: [("runaaaaaa".to_string(), "a run of e1".to_string())].into_iter().collect(),
+            ..Default::default()
+        };
+        assert_eq!(sentences(&told(&[rec(0, "runaaaaaa", crate::obj! {"experiment" => "e1"})], &f3))[0], vec!["Recorded a run of e1 at 2026-10-14 09:20:05 UTC, the 2nd of 2"]);
+        assert_eq!(as_recorded("run a, recorded 2026-10-14 09:20 UTC", "run a"), "run a at 2026-10-14 09:20 UTC");
+        assert_eq!(as_recorded("run a · seed 1", "run a · seed 1"), "run a · seed 1");
+        // words of the label itself are the run's own (review): only the time rb adds after the words it told apart is
+        // said with "at", even where the label reads like rb's time (Codex, 061b)
+        assert_eq!(as_recorded("run a · tag alpha, recorded beta", ""), "run a · tag alpha, recorded beta");
+        assert_eq!(as_recorded("run a · tag alpha, recorded 2026-10-14 09:20 UTC", ""), "run a · tag alpha, recorded 2026-10-14 09:20 UTC");
+        assert_eq!(
+            as_recorded("run a · tag alpha, recorded beta, recorded 2026-10-14 09:20:05 UTC, the 2nd of 2", "run a · tag alpha, recorded beta"),
+            "run a · tag alpha, recorded beta at 2026-10-14 09:20:05 UTC, the 2nd of 2"
+        );
+        let own = Facts { names: [("runaaaaaa".to_string(), "run fp32 and int8 · tag alpha, recorded 2026-10-14 09:20 UTC".to_string())].into_iter().collect(), ..Default::default() };
+        assert_eq!(sentences(&told(&[rec(0, "runaaaaaa", crate::obj! {"experiment" => "e1"})], &own))[0], vec!["Recorded a run on e1: run fp32 and int8 · tag alpha, recorded 2026-10-14 09:20 UTC"]);
         // a run with no label is a run of its experiment, said once
         let f = Facts { names: [("runaaaaaa".to_string(), "a run of e1".to_string())].into_iter().collect(), ..Default::default() };
         assert_eq!(sentences(&told(&[rec(0, "runaaaaaa", crate::obj! {"experiment" => "e1"})], &f))[0], vec!["Recorded a run of e1"]);

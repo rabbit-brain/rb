@@ -278,10 +278,10 @@
     "  version      print the version",
     "  feedback     a link to send feedback on rb: the page shows what it would send before you send it; rb sends nothing",
     "",
-    "rabbitbrain.ai (not yet available):",
-    "  login        rabbitbrain.ai, optional: sign this machine in with a short code, approved on any device where you are signed in (hosted service not yet available)",
+    "rabbitbrain.ai:",
+    "  login        rabbitbrain.ai, optional: sign this machine in with a short code, approved on any device where you are signed in",
     "  logout       revoke this machine's hub credential and remove it from the credentials file",
-    "  sync         rabbitbrain.ai, optional: a private copy of this record's page in your account, for your own eyes from anywhere (hosted service not yet available)",
+    "  sync         rabbitbrain.ai, optional: a private copy of this record's page in your account, for your own eyes from anywhere",
     "",
     "rb <command> --help for its arguments. Start: rb init \"<the work's theme>\", then rb question add for each question the work asks, and rb context.",
     ""

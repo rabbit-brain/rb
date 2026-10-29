@@ -210,10 +210,37 @@ fn make_repo(dest: &Path, project_id: &str, src: &str) -> String {
 /// The branch a clone that got the code checks it out on, at the commit.
 const BRANCH: &str = "rerun";
 
-/// What marks a reason as git's own last line, where get_code failed in git: rb clone says it after "git said:".
+/// What marks a reason as git's own message, where get_code failed in git: rb clone says it after "git said:".
 const GIT_SAID: char = '\u{1}';
 
-/// A reason get_code gave, as rb's words and as git's own line, apart: (why, git_said).
+/// What git said when it failed, in one line: the paragraph that holds its error (git's advice after a blank line
+/// left out, as is its `fatal: `), each line ending in a stop. Its last line alone can be a fragment of that advice
+/// ("and the repository exists.").
+fn git_message(stderr: &str) -> String {
+    let lines: Vec<&str> = stderr.lines().map(str::trim).collect();
+    let paragraphs: Vec<&[&str]> = lines.split(|l| l.is_empty()).filter(|p| !p.is_empty()).collect();
+    let error = |p: &[&str]| p.iter().any(|l| l.starts_with("fatal: ") || l.starts_with("error: "));
+    let Some(para) = paragraphs.iter().copied().find(|p| error(p)).or_else(|| paragraphs.first().copied()) else { return "git failed".to_string() };
+    let said: Vec<String> = para
+        .iter()
+        .map(|l| l.trim_start_matches("fatal: ").trim_start_matches("error: "))
+        .map(|l| if l.ends_with(['.', '!', '?']) { l.to_string() } else { format!("{l}.") })
+        .collect();
+    said.join(" ")
+}
+
+/// An address as rb says it and keeps it: a web address without what it carried for the download alone, and a path
+/// on this machine with `/` between its parts, as rb writes every path (on Windows `C:\code\int8.git` is
+/// `C:/code/int8.git`, which git reads too).
+fn said_address(a: &str) -> String {
+    if a.contains("://") {
+        crate::http::shareable(a)
+    } else {
+        crate::sys::typed(a)
+    }
+}
+
+/// A reason get_code gave, as rb's words and as git's own message, apart: (why, git_said).
 fn said_apart(why: &str) -> (String, String) {
     match why.strip_prefix(GIT_SAID) {
         Some(line) => (line.to_string(), line.to_string()),
@@ -343,8 +370,7 @@ fn get_code(dest: &Path, address: &str, commit: Option<&str>, given: &[String], 
         if o.status.success() {
             return Ok(String::from_utf8_lossy(&o.stdout).trim().to_string());
         }
-        let said = String::from_utf8_lossy(&o.stderr).lines().map(str::trim).filter(|l| !l.is_empty()).last().unwrap_or("git failed").to_string();
-        Err(format!("{GIT_SAID}{}", said.trim_start_matches("fatal: ")))
+        Err(format!("{GIT_SAID}{}", git_message(&String::from_utf8_lossy(&o.stderr))))
     };
     let d = dest.to_string_lossy().to_string();
     let done = (|| {
@@ -567,7 +593,7 @@ pub fn clone(source: &str, dest: Option<&Path>, code: Option<&str>) -> Res<Dict>
             let failed = matches!(&got, Some(Err(why)) if why != NO_IDENTITY);
             detail.insert(
                 "code".into(),
-                crate::obj! {"url" => crate::http::shareable(a), "commit" => commit.map(Value::Str).unwrap_or(Value::Null), "taken_out" => Value::list_of_str(taken),
+                crate::obj! {"url" => said_address(a), "commit" => commit.map(Value::Str).unwrap_or(Value::Null), "taken_out" => Value::list_of_str(taken),
                     "got" => matches!(&got, Some(Ok(_))), "failed" => failed},
             );
         }
@@ -700,17 +726,17 @@ pub fn clone(source: &str, dest: Option<&Path>, code: Option<&str>) -> Res<Dict>
     };
     let code_out = match (&address, &got) {
         (Some(a), Some(Ok((commit, taken)))) => crate::obj! {
-            "url" => crate::http::shareable(a), "commit" => commit.clone(), "got" => true, "branch" => BRANCH, "why" => "", "git_said" => "", "taken_out" => Value::list_of_str(taken.clone())
+            "url" => said_address(a), "commit" => commit.clone(), "got" => true, "branch" => BRANCH, "why" => "", "git_said" => "", "taken_out" => Value::list_of_str(taken.clone())
         },
         (Some(a), Some(Err(why))) => {
             let (mut why, git_said) = said_apart(why);
             // the bundle's own address, which its export saw does not hold the code's commit: the bundle's words
             let not_there = code.is_none() && named.and_then(|r| r.get("at_origin")).map_or(false, |v| matches!(v, Value::Bool(false)));
             if let (true, Some(c)) = (not_there, wanted.as_deref()) {
-                why = format!("the bundle says its code's commit {} is not at {}", c.chars().take(12).collect::<String>(), crate::http::shareable(a));
+                why = format!("the bundle says its code's commit {} is not at {}", c.chars().take(12).collect::<String>(), said_address(a));
             }
             crate::obj! {
-                "url" => crate::http::shareable(a), "commit" => wanted.clone().map(Value::Str).unwrap_or(Value::Null), "got" => false, "branch" => Value::Null, "why" => why,
+                "url" => said_address(a), "commit" => wanted.clone().map(Value::Str).unwrap_or(Value::Null), "got" => false, "branch" => Value::Null, "why" => why,
                 "git_said" => git_said, "taken_out" => Value::List(Vec::new())
             }
         }
@@ -747,5 +773,24 @@ mod tests {
         assert_eq!(plain_path("./results/r001/"), "results/r001/");
         // code is never the parent's results, by its suffix
         assert!(is_code("results/tools/summarise.py") && is_code("results/plot.IPYNB") && !is_code("results/s1/metrics.json") && !is_code("results/.py"));
+    }
+
+    #[test]
+    fn git_is_quoted_by_its_error_never_a_fragment_of_its_advice() {
+        // git for Windows on a path that is no repository, CRLF and all; ssh that cannot connect, anywhere
+        let windows = "fatal: 'C:\\Users\\ana\\no-such-repo.git' does not appear to be a git repository\r\nfatal: Could not read from remote repository.\r\n\r\nPlease make sure you have the correct access rights\r\nand the repository exists.\r\n";
+        assert_eq!(git_message(windows), "'C:\\Users\\ana\\no-such-repo.git' does not appear to be a git repository. Could not read from remote repository.");
+        let ssh = "ssh: connect to host example.org port 22: Connection refused\nfatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.\n";
+        assert_eq!(git_message(ssh), "ssh: connect to host example.org port 22: Connection refused. Could not read from remote repository.");
+        assert_eq!(git_message("fatal: repository '/srv/no-such-repo.git' does not exist\n"), "repository '/srv/no-such-repo.git' does not exist.");
+        assert_eq!(git_message(""), "git failed");
+    }
+
+    #[test]
+    fn an_address_is_kept_as_a_reader_can_use_it() {
+        assert_eq!(said_address("https://ana:secret@example.org/ana/int8.git?token=1"), "https://example.org/ana/int8.git");
+        assert_eq!(said_address("git@github.com:ana/int8.git"), "git@github.com:ana/int8.git");
+        let local = if cfg!(windows) { "C:\\Users\\ana\\int8.git" } else { "/home/ana/int8.git" };
+        assert_eq!(said_address(local), if cfg!(windows) { "C:/Users/ana/int8.git" } else { "/home/ana/int8.git" });
     }
 }

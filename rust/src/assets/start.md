@@ -35,7 +35,7 @@ and open calls around it. Older work waits and can be backfilled later.
    by x or less") --equals 0 --tolerance x. The rule's statement words the claim
    it checks ("the claim that INT8 ends at 0.755 top-1 is checked here"), never
    the number as a fact. A claim check takes the default role or secondary,
-   never exploratory, so a miss waits under Needs a human. Where no rule reads
+   never exploratory, so a miss waits under Needs judgment. Where no rule reads
    it, a note names the file and rows (step 11). Your own query alone checks
    nothing. Backfill is for older work the frontier does not rest on, never for
    a claim it rests on.
@@ -135,7 +135,7 @@ housekeeping or a past call from memory. Say:
   compute yet;
 - the calls and experiment designs (a gate waits with its design) that wait for
   their authority: rb confirm lists each, in their own terminal, with the
-  command that confirms it; and what rb status lists under Needs a human;
+  command that confirms it; and what rb status lists under Needs judgment;
   nothing no command confirms;
 - when rb init installed nothing, the commands it gave for later sessions;
 - when a write said rb put the code in git (refs/rb/snapshots/<tree>), where it

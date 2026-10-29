@@ -122,7 +122,10 @@ def test_numbers_and_standing_drill(record):
             # digits on hover, drilling to the run
             said_as = [t for h, t in links if h == f"#run-{o['run']}" and re.fullmatch(r"[+-]?\d+(\.\d+)?", t)]
             assert any(abs(float(t) - float(o["value_text"])) <= 0.5 * 10 ** -len((t.split(".") + [""])[1]) + 1e-12 for t in said_as), (cid, o["run"], said_as)
-            assert any(o["run"] in t for h, t in links if h == f"#run-{o['run']}"), (cid, o["run"])
+            # the run drills by what the page calls it (FIX7): a link in words beside the number's, whatever History's
+            # own lines say of it
+            named = [t for h, t in links if h == f"#run-{o['run']}" and t not in said_as and t.strip() and t != o["run"]]
+            assert named, (cid, o["run"])
 
 
 def test_a_page_names_no_place_platform_or_writer(record):

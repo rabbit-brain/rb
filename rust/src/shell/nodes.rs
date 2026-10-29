@@ -366,7 +366,8 @@ fn rule_term(inner: &str) -> String {
 /// "what depends on this": the part of a card that lists what reads the record it is on.
 const DEPENDS: &str = "What depends on this";
 /// A run or an analysis named where it has no label or title, never by the id rb minted (FIX7; R's FIX6 words).
-const RUN_OF: &str = "run of ";
+/// "a run of warmup", as History and the model say it (runs.{id}.named).
+const RUN_OF: &str = "a run of ";
 const A_RUN: &str = "a run";
 const AN_ANALYSIS: &str = "an analysis";
 
@@ -599,12 +600,45 @@ impl Doc<'_> {
         format!("{base}{}", self.apart.get(rid).map_or("", String::as_str))
     }
 
-    /// An analysis as the page names it: its title, never the id rb minted.
+    /// An analysis as the page names it: its title, else an id someone chose, said as History and the model say it
+    /// ("analysis a1", contract 1.11's analyses.{id}.named), never the id rb minted: one with neither is said as
+    /// History and the model say it (history::names_of), by its experiment and when it was recorded ("an analysis on
+    /// e1, recorded 2026-10-13 14:56 UTC"), its analyses.{id}.named where the model gives it; "an analysis" only where
+    /// the page holds neither.
     fn analysis_named(&self, aid: &str) -> String {
-        match at(self.doc, "analyses").and_then(|m| m.get(aid)).map_or("", |a| s(a, "title")) {
-            "" => AN_ANALYSIS.to_string(),
+        let a = at(self.doc, "analyses").and_then(|m| m.get(aid)).filter(|a| a.is_dict());
+        if let Some(a) = a.filter(|a| s(a, "title").is_empty() && !s(a, "named").is_empty()) {
+            return s(a, "named").to_string();
+        }
+        match a.map_or("", |a| s(a, "title")) {
+            "" if minted(aid, "a") => {
+                let Some(a) = a else { return AN_ANALYSIS.to_string() };
+                // the minute its "analysis · recorded <minute> UTC · basis ..." line says, in the model's words
+                let when = s(a, "recorded").split(" · ").find_map(|p| p.strip_prefix("recorded ")).unwrap_or("");
+                match (self.analysis_experiment(a), when) {
+                    ("", _) | (_, "") => AN_ANALYSIS.to_string(),
+                    (x, w) => format!("{AN_ANALYSIS} on {x}, recorded {w}"),
+                }
+            }
+            "" => format!("analysis {aid}"),
             t => t.to_string(),
         }
+    }
+
+    /// An analysis's experiment: the one the rules that read it are on, else the one the runs it reads are in.
+    fn analysis_experiment<'v>(&'v self, a: &'v Value) -> &'v str {
+        strs(a, "used_by")
+            .into_iter()
+            .filter_map(|c| self.finding_of(c))
+            .map(|f| s(f, "experiment"))
+            .chain(strs(a, "reads").into_iter().filter_map(|r| at(self.doc, "runs").and_then(|m| m.get(r))).map(|r| s(r, "experiment_id")))
+            .find(|x| !x.is_empty())
+            .unwrap_or("")
+    }
+
+    /// An analysis with neither a title nor an id someone chose: the page says it by what it is, never by a name.
+    fn untitled(&self, aid: &str) -> bool {
+        minted(aid, "a") && at(self.doc, "analyses").and_then(|m| m.get(aid)).is_some_and(|a| a.is_dict() && s(a, "title").is_empty())
     }
 
     /// What the page calls an object it links: a run by its label, an analysis by its title, anything else (an
@@ -629,13 +663,13 @@ impl Doc<'_> {
         link(&analysis_anchor(aid), &self.analysis_named(aid))
     }
 
-    /// An analysis in a sentence (FIX8): "the analysis <its title>", or "an analysis" where it has none, never "the
-    /// analysis an analysis".
+    /// An analysis in a sentence (FIX8): "the analysis <its title>", else as it is named ("analysis a1", "an
+    /// analysis on e1, recorded <minute> UTC"), never "the analysis an analysis" or "the analysis analysis a1".
     fn the_analysis(&self, aid: &str) -> String {
-        if self.analysis_named(aid) == AN_ANALYSIS {
-            link(&analysis_anchor(aid), AN_ANALYSIS)
-        } else {
+        if at(self.doc, "analyses").and_then(|m| m.get(aid)).is_some_and(|a| a.is_dict() && !s(a, "title").is_empty()) {
             format!("the analysis {}", self.analysis_link(aid))
+        } else {
+            self.analysis_link(aid)
         }
     }
 
@@ -655,7 +689,7 @@ impl Doc<'_> {
         let mut after: Vec<String> = Vec::new();
         let mut names: Vec<String> = Vec::new();
         let mut seen: Vec<&str> = Vec::new();
-        let mut untitled: Vec<String> = Vec::new();
+        let mut untitled: Vec<(String, String)> = Vec::new();
         for r in refs.iter().filter(|r| !r.is_empty()) {
             // each id once: a line that names one twice (a run that made what it recorded) links it once
             if seen.contains(r) {
@@ -666,7 +700,7 @@ impl Doc<'_> {
             match whole_word(text, r) {
                 Some(i) if !spans.iter().any(|(a, b, _)| i < *b && i + r.len() > *a) => spans.push((i, i + r.len(), anchor)),
                 Some(_) => {}
-                None if self.named(r) == AN_ANALYSIS && at(self.doc, "analyses").and_then(|m| m.get(r)).is_some_and(Value::is_dict) => untitled.push(anchor),
+                None if self.untitled(r) => untitled.push((anchor, self.analysis_named(r))),
                 None => {
                     names.push(self.named(r));
                     after.push(link(&anchor, &self.named(r)));
@@ -675,10 +709,10 @@ impl Doc<'_> {
         }
         // the line's own words link to the one untitled analysis where they link nothing else; else it is named after
         let whole = match untitled.as_slice() {
-            [anchor] if spans.is_empty() && !text.is_empty() => Some(anchor.clone()),
+            [(anchor, _)] if spans.is_empty() && !text.is_empty() => Some(anchor.clone()),
             _ => {
-                names.extend(untitled.iter().map(|_| AN_ANALYSIS.to_string()));
-                after.extend(untitled.iter().map(|a| link(a, AN_ANALYSIS)));
+                names.extend(untitled.iter().map(|(_, w)| w.clone()));
+                after.extend(untitled.iter().map(|(a, w)| link(a, w)));
                 None
             }
         };
@@ -1159,6 +1193,12 @@ impl Doc<'_> {
             ("why", if detail.is_empty() || says_rule.contains(detail) { String::new() } else { esc(detail) }),
             ("timing", esc(s(f, "says.timing"))),
             ("comparison", esc(s(f, "says.comparison"))),
+            // its evidence line (WITNESS): how many of the runs its reading rests on rb did not see happen, only where
+            // any; never "how rb knows", the label of how rb knows a command, which a past version drops with it
+            ("evidence", {
+                let n = |k: &str| at(f, k).and_then(Value::as_i64).unwrap_or(0);
+                esc(&w::rests_afterwards(n("witness.afterwards"), n("witness.total")))
+            }),
         ]);
         rows += &self.rows(list(f, "receipt_rows"), "");
         if let Some(c) = at(f, "cited") {
@@ -1290,6 +1330,13 @@ impl Doc<'_> {
         let at_ = s(r, "at");
         if !at_.is_empty() && !list(r, "receipt_rows").iter().any(|c| c.as_list().and_then(|c| c.get(1)).and_then(Value::as_str).map_or(false, |t| t.contains(at_))) {
             rows += &format!("<dt>recorded</dt><dd>{}</dd>", esc(at_));
+        }
+        // the run's type (WITNESS): rb saw it happen, or recorded it afterwards; a fact a past version keeps, so never
+        // under "how rb knows", the label of how rb knows its command, which a past version drops with the command
+        match s(r, "witness.seen") {
+            "as_it_ran" => rows += &format!("<dt>type</dt><dd>{}</dd>", w::RECORDED_AS_IT_RAN),
+            "afterwards" => rows += &format!("<dt>type</dt><dd>{}</dd>", w::RECORDED_AFTERWARDS),
+            _ => {}
         }
         // rb's own line of its results, which the card draws as rows (P8)
         let mets = s(r, "metrics_text");
@@ -1724,20 +1771,13 @@ impl Doc<'_> {
         let id = analysis_anchor(aid);
         let reads: Vec<&str> = strs(a, "reads");
         let used_by: Vec<&str> = strs(a, "used_by");
-        // its experiment: the one its criteria are on, else the one its runs are in
-        let x = used_by
-            .iter()
-            .filter_map(|c| self.finding_of(c))
-            .map(|f| s(f, "experiment"))
-            .chain(reads.iter().filter_map(|r| at(self.doc, "runs").and_then(|m| m.get(r))).map(|r| s(r, "experiment_id")))
-            .find(|x| !x.is_empty())
-            .unwrap_or("");
+        let x = self.analysis_experiment(a);
         let (home, within) = if x.is_empty() { ("runs-analyses".to_string(), String::new()) } else { (format!("x-{x}"), format!("<span class=\"dim sm\">in {}</span>", self.xlink(x, "", x, ""))) };
         // its title first, the id last (P3)
         let top = format!(
             "<h3 class=\"tt\">{}</h3><div class=\"hd\"><span class=\"kind\">analysis</span>{within}<span class=\"dim sm\">{}</span></div>",
             match s(a, "title") {
-                "" => esc(AN_ANALYSIS),
+                "" => esc(&self.analysis_named(aid)),
                 t => au(t),
             },
             esc(s(a, "recorded")),
@@ -2222,11 +2262,26 @@ impl Doc<'_> {
                         "past" => format!("A past call to {} {subject} mentioned, not confirmed", esc(action)),
                         _ => format!("A proposed call to {} {subject}, not made", esc(action)),
                     }
+                } else if let Some(row) = list(self.doc, "pending.rows").iter().find(|r| s(r, "id") == id && s(r, "kind") == "gate") {
+                    // a gate waits with its design: said by its experiment, never by the design's hash
+                    let x = id.split('@').next().unwrap_or("");
+                    let x = if s(row, "subject").is_empty() { x } else { s(row, "subject") };
+                    format!("The gate on {}, not confirmed", self.xlink(x, "", x, ""))
+                } else if minted(id, "d") {
+                    // a decision the document does not say: "a call", never the id rb minted
+                    "A call".to_string()
                 } else {
                     format!("A call on {}", self.id_link(id, ""))
                 }
             }
-            "run" => format!("Run {}", self.id_link(id, "mono")),
+            // "Run fp32 and int8, seed 1", or "A run of e1" where it has no label, never "Run a run of e1"
+            "run" => match self.run_named(id).strip_prefix('a') {
+                Some(rest) if rest.starts_with(" run") => match self.anchor_of(id) {
+                    Some(a) => link(&a, &format!("A{rest}")),
+                    None => esc(&format!("A{rest}")),
+                },
+                _ => format!("Run {}", self.id_link(id, "mono")),
+            },
             _ => esc(id),
         }
     }
@@ -2789,6 +2844,12 @@ fn after_list(names: &[String], links: Vec<String>) -> String {
 
 /// A run's title in human words, from rb's label of it ("fp32 and int8 · seed 0 · scheme per_tensor · calib_images
 /// 128"): "FP32 and INT8, seed 0, per-tensor, calib images 128". The label itself stays the run's crumb.
+/// Whether `id` is one rb minted for its kind (`prefix` and six random characters), as the model reads it
+/// (model.rs minted): an id someone chose (`a1`, `boot-images`) is named by itself.
+fn minted(id: &str, prefix: &str) -> bool {
+    id.strip_prefix(prefix).is_some_and(|t| t.len() == 6 && t.chars().all(|c| matches!(c, 'a'..='z' | '2'..='7')) && !t.chars().all(|c| c.is_ascii_digit()))
+}
+
 fn run_title(label: &str) -> String {
     let mut parts = label.split(DOT);
     let mut out: Vec<String> = Vec::new();
@@ -3749,34 +3810,37 @@ mod tests {
         assert!(card(&all(&doc, Surface::Page), "c-c4").contains("the reading comes from the analysis <a href=\"#a-a1\">per-class accuracy, int8 against fp32</a>"));
     }
 
-    /// An analysis with no title is "an analysis" where a sentence names it, never "the analysis an analysis", and a
-    /// line rb gives it ("95% interval") gets no "· an analysis" after it: the line itself links to it (FIX8). A list of
+    /// An analysis with no title is said as History says it ("an analysis on e1, recorded <minute> UTC") where a
+    /// sentence names it, never "the analysis an analysis", and a line rb gives it ("95% interval") gets no "· an analysis" after it: the line itself links to it (FIX8). A list of
     /// runs whose names hold commas ("FP32 and INT8, seed 1") is said with semicolons, so it reads one way only.
     #[test]
     fn an_untitled_analysis_and_runs_named_with_commas_read_one_way() {
-        let mut doc = example("owner");
-        dig(&mut doc, &["analyses", "a1"]).as_dict_mut().unwrap().insert("title".into(), Value::str(""));
+        // an analysis whose id rb minted (an id someone chose, a1, is "analysis a1": the test after this one), with
+        // no title and no analyses.{id}.named: a1's "analysis a1" (contract 1.11) is not this analysis's name
+        let mut doc = crate::pyjson::loads(&crate::pyjson::dumps(&example("owner")).replace("\"a1\"", "\"akq3m2x\"")).unwrap();
+        dig(&mut doc, &["analyses", "akq3m2x"]).as_dict_mut().unwrap().insert("title".into(), Value::str(""));
+        dig(&mut doc, &["analyses", "akq3m2x"]).as_dict_mut().unwrap().shift_remove("named");
         // the method row as model.rs gives it now: rb's line, the analysis in its refs and not in its words
         dig(&mut doc, &["findings", "c4", "receipt_rows"]).as_list_mut().unwrap()[4].as_list_mut().unwrap()[1] = Value::str("95% interval");
         let page = all(&doc, Surface::Page);
         let c4 = card(&page, "c-c4");
         let said = text_of(c4);
-        assert!(said.contains("the reading comes from an analysis") && !said.contains("the analysis an analysis"), "{said}");
-        assert!(c4.contains("the reading comes from <a href=\"#a-a1\">an analysis</a>"), "{c4}");
+        assert!(said.contains("the reading comes from an analysis on e1, recorded 2026-10-13 14:56 UTC") && !said.contains("the analysis an analysis"), "{said}");
+        assert!(c4.contains("the reading comes from <a href=\"#a-akq3m2x\">an analysis on e1, recorded 2026-10-13 14:56 UTC</a>"), "{c4}");
         assert!(!said.contains("\u{b7} an analysis") && !said.contains("interval, an analysis"), "{said}");
-        assert!(c4.contains("<a href=\"#a-a1\">95% interval</a>"), "{c4}");
+        assert!(c4.contains("<a href=\"#a-akq3m2x\">95% interval</a>"), "{c4}");
         // with runs in its refs too: the line links to the analysis, the runs follow, said with semicolons
         let mut doc2 = doc.clone();
         let row = &mut dig(&mut doc2, &["findings", "c4", "receipt_rows"]).as_list_mut().unwrap()[4];
-        row.as_list_mut().unwrap()[2] = Value::List(vec![Value::str("a1"), Value::str("runs1"), Value::str("runs2")]);
+        row.as_list_mut().unwrap()[2] = Value::List(vec![Value::str("akq3m2x"), Value::str("runs1"), Value::str("runs2")]);
         let c4b = card(&all(&doc2, Surface::Page), "c-c4").to_string();
-        assert!(c4b.contains("<a href=\"#a-a1\">95% interval</a><span> \u{b7} </span><a href=\"#run-runs1\">FP32 and INT8, seed 1</a><span>; </span><a href=\"#run-runs2\">FP32 and INT8, seed 2, recorded 2026-10-06 10:32 UTC</a>"), "{c4b}");
+        assert!(c4b.contains("<a href=\"#a-akq3m2x\">95% interval</a><span> \u{b7} </span><a href=\"#run-runs1\">FP32 and INT8, seed 1</a><span>; </span><a href=\"#run-runs2\">FP32 and INT8, seed 2, recorded 2026-10-06 10:32 UTC</a>"), "{c4b}");
         assert!(!text_of(&c4b).contains("\u{b7} an analysis") && !text_of(&c4b).contains("seed 2, an analysis"), "{}", text_of(&c4b));
-        // a line that names a run it links where it says it, the untitled analysis after it as "an analysis"
-        assert_eq!(Doc::new(&doc2, Surface::Page).with_refs("same as runs1", &["runs1", "a1"]), "<span>same as </span><a href=\"#run-runs1\">runs1</a><span> \u{b7} </span><a href=\"#a-a1\">an analysis</a>");
+        // a line that names a run it links where it says it, the untitled analysis after it as History names it
+        assert_eq!(Doc::new(&doc2, Surface::Page).with_refs("same as runs1", &["runs1", "akq3m2x"]), "<span>same as </span><a href=\"#run-runs1\">runs1</a><span> \u{b7} </span><a href=\"#a-akq3m2x\">an analysis on e1, recorded 2026-10-13 14:56 UTC</a>");
         // the analysis's reads: three runs, each a name with a comma in it
         assert!(said.contains("FP32 and INT8, seed 1; FP32 and INT8, seed 2, recorded 2026-10-13 14:12 UTC; FP32 and INT8, seed 3"), "{said}");
-        // where the analysis is in a list, it is "an analysis" too
+        // where the analysis is in a list, it is never "the analysis an analysis" either
         assert!(!text_of(&page).contains("the analysis an analysis"));
         // "same bytes as" two runs whose names hold commas
         let mut doc3 = example("owner");
@@ -3789,6 +3853,54 @@ mod tests {
         // names with no comma keep commas between them
         assert_eq!(listed(&["seed 1".into(), "seed 2".into()], vec!["a".into(), "b".into()]), "a, b");
         assert_eq!(listed(&["x, seed 1".into(), "seed 2".into()], vec!["a".into(), "b".into()]), "a; b");
+    }
+
+    /// 061 item 2: an analysis with no title and an id someone chose is named as History and the model name it
+    /// ("the reading comes from analysis a1", contract 1.11's analyses.{id}.named), never "an analysis", the bare
+    /// "a1" or "the analysis analysis a1"; a run with no label is "a run of e1",
+    /// as History and runs.{id}.named say it, and a card that cites it "A run of e1", never "Run a run of e1".
+    #[test]
+    fn an_analysis_with_a_chosen_id_and_a_run_with_no_label_are_said_as_history_says_them() {
+        let mut doc = example("owner");
+        dig(&mut doc, &["analyses", "a1"]).as_dict_mut().unwrap().insert("title".into(), Value::str(""));
+        // as the model gives it (analyses.{id}.named, contract 1.11), and as an older model's page says it, with none
+        let mut unnamed = doc.clone();
+        dig(&mut unnamed, &["analyses", "a1"]).as_dict_mut().unwrap().shift_remove("named");
+        dig(&mut doc, &["analyses", "a1"]).as_dict_mut().unwrap().insert("named".into(), Value::str("analysis a1"));
+        for doc in [&doc, &unnamed] {
+            let page = all(doc, Surface::Page);
+            let said = text_of(card(&page, "c-c4"));
+            assert!(said.contains("the reading comes from analysis a1") && !said.contains("an analysis") && !said.contains("analysis analysis"), "{said}");
+            assert!(card(&page, "a-a1").contains("<h3 class=\"tt\">analysis a1</h3>"), "{}", card(&page, "a-a1"));
+            let d = Doc::new(doc, Surface::Page);
+            assert_eq!(d.analysis_named("a1"), "analysis a1");
+            assert_eq!(d.analysis_named("akq3m2x"), AN_ANALYSIS);
+        }
+        // one with neither a title nor a chosen id: by its experiment and the minute it was recorded, as History and
+        // the model say it (history::names_of), on its card, in the sentence that names it and in a line's links
+        let mut a = dig(&mut doc, &["analyses", "a1"]).clone();
+        a.as_dict_mut().unwrap().insert("id".into(), Value::str("akq3m2x"));
+        // a1's name is not this one's: the model's own for it comes below
+        a.as_dict_mut().unwrap().shift_remove("named");
+        dig(&mut doc, &["analyses"]).as_dict_mut().unwrap().insert("akq3m2x".into(), a);
+        dig(&mut doc, &["analyses"]).as_dict_mut().unwrap().shift_remove("a1");
+        dig(&mut doc, &["findings", "c4", "source"]).as_dict_mut().unwrap().insert("id".into(), Value::str("akq3m2x"));
+        let said_so = "an analysis on e1, recorded 2026-10-13 14:56 UTC";
+        assert_eq!(Doc::new(&doc, Surface::Page).analysis_named("akq3m2x"), said_so);
+        let page = all(&doc, Surface::Page);
+        assert!(card(&page, "a-akq3m2x").contains(&format!("<h3 class=\"tt\">{said_so}</h3>")), "{}", card(&page, "a-akq3m2x"));
+        let said = text_of(card(&page, "c-c4"));
+        assert!(said.contains(&format!("the reading comes from {said_so}")) && !said.contains("the analysis an analysis"), "{said}");
+        // the model's analyses.{id}.named, where it gives it, is the one name
+        dig(&mut doc, &["analyses", "akq3m2x"]).as_dict_mut().unwrap().insert("named".into(), Value::str("an analysis on e1, recorded 2026-10-13 14:57 UTC"));
+        assert_eq!(Doc::new(&doc, Surface::Page).analysis_named("akq3m2x"), "an analysis on e1, recorded 2026-10-13 14:57 UTC");
+        dig(&mut doc, &["runs", "runs1"]).as_dict_mut().unwrap().insert("label".into(), Value::str(""));
+        dig(&mut doc, &["runs", "runs1"]).as_dict_mut().unwrap().shift_remove("named");
+        assert_eq!(Doc::new(&doc, Surface::Page).run_named("runs1"), "a run of e1");
+        let by: Value = crate::pyjson::loads(r#"[{"kind": "run", "id": "runs1"}]"#).unwrap();
+        dig(&mut doc, &["citations", "notes.md:3"]).as_dict_mut().unwrap().insert("cited_by".into(), by);
+        let src = text_of(card(&all(&doc, Surface::Page), "cite-notes.md:3"));
+        assert!(src.contains("A run of e1") && !src.contains("Run a run"), "{src}");
     }
 
     /// The call card: why rb asks, once, what rb read, and each action with its line and what the review will read;
@@ -4262,8 +4374,8 @@ mod tests {
         let mut doc = example("owner");
         dig(&mut doc, &["runs", "runs1"]).as_dict_mut().unwrap().insert("label".into(), Value::str(""));
         let page = all(&doc, Surface::Page);
-        assert!(card(&page, "run-runs1").contains("<h3 class=\"tt\">run of e1</h3>"), "{}", card(&page, "run-runs1"));
-        assert!(card(&page, "run-runc512").contains("same bytes as</dt><dd><a href=\"#run-runs1\">run of e1</a> (e1)"));
+        assert!(card(&page, "run-runs1").contains("<h3 class=\"tt\">a run of e1</h3>"), "{}", card(&page, "run-runs1"));
+        assert!(card(&page, "run-runc512").contains("same bytes as</dt><dd><a href=\"#run-runs1\">a run of e1</a> (e1)"));
     }
 
     /// The review of design pass 1: a sentence is true on whichever side of its threshold the reading falls, says what
@@ -4458,6 +4570,34 @@ mod tests {
         let d = Doc::new(&doc, Surface::Page);
         let html = d.with_refs("Made ckpt-int8-s1.", &["runs2", "runs2", "ckpt-int8-s1"]);
         assert_eq!(html.matches("href=\"#run-runs2\"").count(), 1, "{html}");
+    }
+
+    /// WITNESS: a run's card says, underneath, its type: whether rb saw it happen or recorded it afterwards, and a
+    /// finding's card, in its evidence line, how many of the runs its reading rests on were recorded afterwards; a
+    /// document with no such fact draws neither. A past version keeps both: they are facts, not commands.
+    #[test]
+    fn a_card_says_how_rb_knows_of_its_run() {
+        let mut doc = example("owner");
+        dig(&mut doc, &["runs", "runs1"]).as_dict_mut().unwrap().insert("witness".into(), crate::obj! {"seen" => "as_it_ran", "basis" => "watched"});
+        dig(&mut doc, &["runs", "runs2"]).as_dict_mut().unwrap().insert("witness".into(), crate::obj! {"seen" => "afterwards", "basis" => "made_before"});
+        dig(&mut doc, &["findings", "c1"]).as_dict_mut().unwrap().insert("witness".into(), crate::obj! {"total" => 4, "afterwards" => 1});
+        let page = all(&doc, Surface::Page);
+        let page = all(&doc, Surface::Page);
+        assert!(card(&page, "run-runs1").contains("<dt>type</dt><dd>recorded as it ran</dd>"));
+        assert!(card(&page, "run-runs2").contains("<dt>type</dt><dd>recorded afterwards</dd>"));
+        assert!(card(&page, "c-c1").contains("<dt>evidence</dt><dd>1 of its 4 runs recorded afterwards</dd>"));
+        // rb open at a past version keeps the run's type, which is no command
+        let mut past = crate::pyjson::loads(include_str!("../../../tests/fixtures/shell/int8-demo.past.view.json")).unwrap();
+        dig(&mut past, &["runs", "runs1"]).as_dict_mut().unwrap().insert("witness".into(), crate::obj! {"seen" => "afterwards", "basis" => "made_before"});
+        assert!(card(&all(&past, Surface::Open), "run-runs1").contains("<dt>type</dt><dd>recorded afterwards</dd>"));
+        let mut doc = example("owner");
+        for path in [["runs", "runs1"], ["runs", "runs2"], ["findings", "c1"]] {
+            dig(&mut doc, &path).as_dict_mut().unwrap().shift_remove("witness");
+        }
+        let page = all(&doc, Surface::Page);
+        for id in ["run-runs1", "run-runs2", "c-c1"] {
+            assert!(!card(&page, id).contains("<dt>type</dt>") && !card(&page, id).contains("<dt>evidence</dt>"), "{id}");
+        }
     }
 
     /// A row says its label once: the declared criterion's margin is its number, and a receipt row that opens with its
@@ -5519,6 +5659,18 @@ mod tests {
         dig(&mut d, &["citations", "notes.md:3"]).as_dict_mut().unwrap().insert("cited_by".into(), by);
         let src = text_of(card(&all(&d, Surface::Page), "cite-notes.md:3"));
         assert!(src.contains("A proposed call to accept c3, not made") && !src.contains("dec7"), "{src}");
+        // 061 item 3: a gate that waits is said by its experiment, and a decision the document does not say by no id
+        for (id, said) in [("e2@fd981c33ec98", "The gate on e2, not confirmed"), ("dwv225b", "A call")] {
+            let mut d = doc.clone();
+            if id.contains('@') {
+                let row: Value = crate::pyjson::loads(&format!(r#"{{"id": "{id}", "kind": "gate", "subject": "e2", "text": "e2 gates: if it holds: INT8 ships"}}"#)).unwrap();
+                dig(&mut d, &["pending"]).as_dict_mut().unwrap().entry("rows".into()).or_insert(Value::List(vec![])).as_list_mut().unwrap().push(row);
+            }
+            let by: Value = crate::pyjson::loads(&format!(r#"[{{"kind": "call", "id": "{id}"}}]"#)).unwrap();
+            dig(&mut d, &["citations", "notes.md:3"]).as_dict_mut().unwrap().insert("cited_by".into(), by);
+            let src = text_of(card(&all(&d, Surface::Page), "cite-notes.md:3"));
+            assert!(src.contains(said) && !src.contains(id) && !src.contains("fd981c"), "{src}");
+        }
     }
 
     /// FIX9 (M's request 151): two runs with one label read apart on every card that names them, as the model's

@@ -1,6 +1,6 @@
 [package]
 name = "rabbit-brain"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 # the oldest Rust that builds rb: File::try_lock, which holds the analytics queue, is stable from 1.89
 rust-version = "1.89"

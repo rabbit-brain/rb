@@ -424,7 +424,8 @@ def test_a_run_an_earlier_rb_journaled_owns_only_what_it_wrote_while_it_ran(rb):
     rec = rb("reconcile")
     commit = _git("rev-parse", "HEAD")
     assert [f["argv"] for f in rec.data["found"]] == [
-        ["run", "add", "int8", "--from", "results/seed4/metrics.json", "--set", "seed=4", "--config", "results/seed4/config.yaml", "--commit", commit]]
+        ["run", "add", "int8", "--from", "results/seed4/metrics.json", "--set", "seed=4", "--config", "results/seed4/config.yaml", "--commit", commit,
+         "--command", ran["command"]]]                                       # the command rb watched write it and exit 0
     [applied] = rb("reconcile", "--apply").data["recorded"]
     assert applied.split(": ", 1)[1].startswith("rb run add int8 --from results/seed4/metrics.json --set seed=4 "), applied
     assert rb("reconcile").data["found"] == []

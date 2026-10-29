@@ -239,7 +239,7 @@ fn login() -> String {
 
 /// The provider a runtime's models usually come from: what rb records, marked inferred, when the agent says none. Every
 /// other runtime's provider is only what its agent says.
-pub const AGENT_PROVIDERS: &[(&str, &str)] = &[("claude-code", "anthropic"), ("codex", "openai"), ("gemini-cli", "google")];
+pub const AGENT_PROVIDERS: &[(&str, &str)] = &[("claude-code", "anthropic"), ("codex", "openai")];
 /// What Claude Code reads to run its models through another provider's API than Anthropic's (Amazon Bedrock, Google
 /// Vertex AI, Microsoft Foundry, Claude Platform on AWS or on Google Cloud, Bedrock's Mantle, a cloud gateway): while
 /// one is on, rb infers no provider for it.

@@ -117,7 +117,7 @@
     "",
     "Nothing recorded yet. Start: rb question add \"<what are you trying to find out?>\", then rb experiment add \"<what you are testing>\" -q <question> --hypothesis \"<what you expect>\" --baseline <name> --candidate <name>",
     "",
-    "Criteria: none yet",
+    "Rules: none yet",
     "",
     "Can be done now (2)",
     "  - No question is recorded, and the repository holds work already done: 1 results folder",

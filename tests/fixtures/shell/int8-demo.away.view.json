@@ -1,5 +1,5 @@
 {
- "contract": "rb-shell-view/1.9",
+ "contract": "rb-shell-view/1.11",
  "surface": "open",
  "tier": "live",
  "rb_version": "0.6.0",
@@ -38,7 +38,28 @@
    "with_command": 1,
    "line": "2 of 6 rules were written after their results came in · 1 of 8 runs records its command (as given)"
   },
-  "began": "Recorded since 2026-10-06, after 1 of its 8 runs was made; what came before it is Retrospective",
+  "witness": {
+   "began": "2026-10-06 10:02 UTC",
+   "runs": {
+    "total": 8,
+    "afterwards": 1,
+    "before": 1,
+    "unknown": 0
+   },
+   "analyses": {
+    "total": 1,
+    "afterwards": 0
+   },
+   "calls": {
+    "total": 4,
+    "afterwards": 1
+   },
+   "notes": {
+    "total": 2,
+    "afterwards": 0
+   }
+  },
+  "began": "Kept with rb since 2026-10-06. 1 run and 1 call were recorded afterwards, not as they happened.",
   "scope": "rb looks at results/, configs/ and results/runs.db; it last looked 2026-10-19 09:40 UTC. It does not read code or docs, and it does not see commands not run under rb journal run.",
   "scope_short": "rb looked 2026-10-19 09:40 UTC at results/, configs/ and results/runs.db",
   "uncited": 1,
@@ -978,6 +999,10 @@
     }
    ],
    "other_code": "",
+   "witness": {
+    "total": 3,
+    "afterwards": 0
+   },
    "receipt_rows": [
     [
      "declared",
@@ -1138,6 +1163,10 @@
     }
    ],
    "other_code": "",
+   "witness": {
+    "total": 3,
+    "afterwards": 0
+   },
    "receipt_rows": [
     [
      "declared",
@@ -1295,6 +1324,10 @@
     }
    ],
    "other_code": "",
+   "witness": {
+    "total": 1,
+    "afterwards": 0
+   },
    "receipt_rows": [
     [
      "declared",
@@ -1421,6 +1454,10 @@
    "observed_short": "",
    "observed_places": [],
    "other_code": "",
+   "witness": {
+    "total": 3,
+    "afterwards": 0
+   },
    "receipt_rows": [
     [
      "declared",
@@ -1650,6 +1687,10 @@
     }
    ],
    "other_code": "",
+   "witness": {
+    "total": 4,
+    "afterwards": 0
+   },
    "receipt_rows": [
     [
      "declared",
@@ -1787,6 +1828,10 @@
     }
    ],
    "other_code": "",
+   "witness": {
+    "total": 1,
+    "afterwards": 1
+   },
    "receipt_rows": [
     [
      "declared",
@@ -2949,6 +2994,10 @@
     "text": "",
     "kind": "not recorded"
    },
+   "witness": {
+    "seen": "as_it_ran",
+    "basis": "recorded_as_made"
+   },
    "counts_toward": [
     {
      "criterion": "c1",
@@ -3195,6 +3244,10 @@
     "text": "",
     "kind": "not recorded"
    },
+   "witness": {
+    "seen": "as_it_ran",
+    "basis": "recorded_as_made"
+   },
    "counts_toward": [
     {
      "criterion": "c1",
@@ -3321,7 +3374,7 @@
      "line": "the run records no command (as given)"
     },
     "made": [],
-    "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2 · recorded 2026-10-06 10:32 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
+    "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
     "commands": [],
     "prompt": ""
    }
@@ -3363,6 +3416,10 @@
    "command": {
     "text": "",
     "kind": "not recorded"
+   },
+   "witness": {
+    "seen": "as_it_ran",
+    "basis": "recorded_as_made"
    },
    "counts_toward": [
     {
@@ -3511,7 +3568,7 @@
      "line": "the run records no command (as given)"
     },
     "made": [],
-    "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2 · recorded 2026-10-13 14:12 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
+    "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2, recorded 2026-10-13 14:12 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
     "commands": [],
     "prompt": ""
    }
@@ -3553,6 +3610,10 @@
    "command": {
     "text": "python train.py --seed 3 --quant int8",
     "kind": "observed"
+   },
+   "witness": {
+    "seen": "as_it_ran",
+    "basis": "watched"
    },
    "counts_toward": [
     {
@@ -3754,6 +3815,10 @@
     "text": "python bench.py --t4",
     "kind": "given later, not observed"
    },
+   "witness": {
+    "seen": "afterwards",
+    "basis": "made_before"
+   },
    "counts_toward": [
     {
      "criterion": "c6",
@@ -3866,8 +3931,8 @@
   "runc128": {
    "run_id": "runc128",
    "experiment_id": "e2",
-   "label": "fp32 and int8 · calib_images 128",
-   "named": "run fp32 and int8 · calib_images 128",
+   "label": "fp32 and int8 · calib images 128",
+   "named": "run fp32 and int8 · calib images 128",
    "at": "2026-10-13 14:44 UTC",
    "when": "2026-10-13",
    "produced": "2026-10-13",
@@ -3895,6 +3960,10 @@
    "command": {
     "text": "",
     "kind": "not recorded"
+   },
+   "witness": {
+    "seen": "as_it_ran",
+    "basis": "recorded_as_made"
    },
    "counts_toward": [
     {
@@ -3990,7 +4059,7 @@
      "line": "the run records no command (as given)"
     },
     "made": [],
-    "script": "# Reproduce a run of e2 · fp32 and int8 · calib_images 128\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 128\n# command (as given): not recorded\n",
+    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 128\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 128\n# command (as given): not recorded\n",
     "commands": [],
     "prompt": ""
    }
@@ -4027,6 +4096,10 @@
    "command": {
     "text": "",
     "kind": "not recorded"
+   },
+   "witness": {
+    "seen": "as_it_ran",
+    "basis": "recorded_as_made"
    },
    "counts_toward": [
     {
@@ -4148,8 +4221,8 @@
   "runc1024": {
    "run_id": "runc1024",
    "experiment_id": "e2",
-   "label": "fp32 and int8 · calib_images 1024",
-   "named": "run fp32 and int8 · calib_images 1024",
+   "label": "fp32 and int8 · calib images 1024",
+   "named": "run fp32 and int8 · calib images 1024",
    "at": "2026-10-13 14:48 UTC",
    "when": "2026-10-13",
    "produced": "2026-10-13",
@@ -4177,6 +4250,10 @@
    "command": {
     "text": "",
     "kind": "not recorded"
+   },
+   "witness": {
+    "seen": "as_it_ran",
+    "basis": "recorded_as_made"
    },
    "counts_toward": [
     {
@@ -4272,7 +4349,7 @@
      "line": "the run records no command (as given)"
     },
     "made": [],
-    "script": "# Reproduce a run of e2 · fp32 and int8 · calib_images 1024\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 1024\n# command (as given): not recorded\n",
+    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 1024\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 1024\n# command (as given): not recorded\n",
     "commands": [],
     "prompt": ""
    }
@@ -4280,8 +4357,8 @@
   "runc2048": {
    "run_id": "runc2048",
    "experiment_id": "e2",
-   "label": "fp32 and int8 · calib_images 2048",
-   "named": "run fp32 and int8 · calib_images 2048",
+   "label": "fp32 and int8 · calib images 2048",
+   "named": "run fp32 and int8 · calib images 2048",
    "at": "2026-10-13 14:50 UTC",
    "when": "2026-10-13",
    "produced": "2026-10-13",
@@ -4309,6 +4386,10 @@
    "command": {
     "text": "",
     "kind": "not recorded"
+   },
+   "witness": {
+    "seen": "as_it_ran",
+    "basis": "recorded_as_made"
    },
    "counts_toward": [
     {
@@ -4404,7 +4485,7 @@
      "line": "the run records no command (as given)"
     },
     "made": [],
-    "script": "# Reproduce a run of e2 · fp32 and int8 · calib_images 2048\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 2048\n# command (as given): not recorded\n",
+    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 2048\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 2048\n# command (as given): not recorded\n",
     "commands": [],
     "prompt": ""
    }
@@ -4627,6 +4708,7 @@
   "a1": {
    "id": "a1",
    "title": "per-class accuracy, int8 against fp32",
+   "named": "analysis a1",
    "recorded": "analysis · recorded 2026-10-13 14:56 UTC · basis per-class top1 over 1000 classes",
    "reads": [
     "runs1",
@@ -4650,7 +4732,11 @@
     "refs": [
      "notes.md"
     ],
-    "log_index": 46
+    "log_index": 46,
+    "witness": {
+     "seen": "afterwards",
+     "basis": "past_call"
+    }
    },
    {
     "at": "2026-10-19 09:35 UTC",
@@ -4659,7 +4745,11 @@
     "refs": [
      "c3"
     ],
-    "log_index": 45
+    "log_index": 45,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-19 09:30 UTC",
@@ -4668,7 +4758,11 @@
     "refs": [
      "q1a"
     ],
-    "log_index": 44
+    "log_index": 44,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-19 09:25 UTC",
@@ -4677,7 +4771,11 @@
     "refs": [
      "e2"
     ],
-    "log_index": 43
+    "log_index": 43,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-19 09:12 UTC",
@@ -4686,7 +4784,11 @@
     "refs": [
      "e1"
     ],
-    "log_index": 42
+    "log_index": 42,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-16 07:30 UTC",
@@ -4696,7 +4798,11 @@
      "e1",
      "n1"
     ],
-    "log_index": 41
+    "log_index": 41,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "written"
+    }
    },
    {
     "at": "2026-10-15 09:09 UTC",
@@ -4705,7 +4811,11 @@
     "refs": [
      "q1"
     ],
-    "log_index": 40
+    "log_index": 40,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-15 09:05 UTC",
@@ -4714,7 +4824,11 @@
     "refs": [
      "c4"
     ],
-    "log_index": 39
+    "log_index": 39,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-14 16:40 UTC",
@@ -4723,7 +4837,11 @@
     "refs": [
      "c4"
     ],
-    "log_index": 38
+    "log_index": 38,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-14 08:30 UTC",
@@ -4732,7 +4850,11 @@
     "refs": [
      "c1"
     ],
-    "log_index": 37
+    "log_index": 37,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-13 15:02 UTC",
@@ -4742,7 +4864,11 @@
      "c2",
      "q1"
     ],
-    "log_index": 36
+    "log_index": 36,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 15:00 UTC",
@@ -4752,7 +4878,11 @@
      "e1",
      "c2"
     ],
-    "log_index": 35
+    "log_index": 35,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 14:56 UTC",
@@ -4761,7 +4891,11 @@
     "refs": [
      "a1"
     ],
-    "log_index": 34
+    "log_index": 34,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-13 14:51 UTC",
@@ -4770,25 +4904,37 @@
     "refs": [
      "runs3"
     ],
-    "log_index": 33
+    "log_index": 33,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "watched"
+    }
    },
    {
     "at": "2026-10-13 14:50 UTC",
     "op": "record",
-    "sentence": "record run fp32 and int8 · calib_images 2048",
+    "sentence": "record run fp32 and int8 · calib images 2048",
     "refs": [
      "runc2048"
     ],
-    "log_index": 32
+    "log_index": 32,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-13 14:48 UTC",
     "op": "record",
-    "sentence": "record run fp32 and int8 · calib_images 1024",
+    "sentence": "record run fp32 and int8 · calib images 1024",
     "refs": [
      "runc1024"
     ],
-    "log_index": 31
+    "log_index": 31,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-13 14:46 UTC",
@@ -4797,16 +4943,24 @@
     "refs": [
      "runc512"
     ],
-    "log_index": 30
+    "log_index": 30,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-13 14:44 UTC",
     "op": "record",
-    "sentence": "record run fp32 and int8 · calib_images 128",
+    "sentence": "record run fp32 and int8 · calib images 128",
     "refs": [
      "runc128"
     ],
-    "log_index": 29
+    "log_index": 29,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-13 14:40 UTC",
@@ -4815,7 +4969,11 @@
     "refs": [
      "e2"
     ],
-    "log_index": 28
+    "log_index": 28,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 14:36 UTC",
@@ -4825,7 +4983,11 @@
      "c5",
      "q1a"
     ],
-    "log_index": 27
+    "log_index": 27,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 14:34 UTC",
@@ -4835,7 +4997,11 @@
      "e2",
      "q1a"
     ],
-    "log_index": 26
+    "log_index": 26,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 14:31 UTC",
@@ -4844,7 +5010,11 @@
     "refs": [
      "e2"
     ],
-    "log_index": 25
+    "log_index": 25,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 14:28 UTC",
@@ -4853,7 +5023,11 @@
     "refs": [
      "c5"
     ],
-    "log_index": 24
+    "log_index": 24,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 14:24 UTC",
@@ -4862,7 +5036,11 @@
     "refs": [
      "e2"
     ],
-    "log_index": 23
+    "log_index": 23,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 14:20 UTC",
@@ -4871,7 +5049,11 @@
     "refs": [
      "e2"
     ],
-    "log_index": 22
+    "log_index": 22,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 14:16 UTC",
@@ -4881,7 +5063,11 @@
      "q1a",
      "q1"
     ],
-    "log_index": 21
+    "log_index": 21,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-13 14:12 UTC",
@@ -4891,7 +5077,11 @@
      "runs2b",
      "runs2"
     ],
-    "log_index": 20
+    "log_index": 20,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-13 14:10 UTC",
@@ -4900,7 +5090,11 @@
     "refs": [
      "runs2"
     ],
-    "log_index": 19
+    "log_index": 19,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-12 08:06 UTC",
@@ -4910,7 +5104,11 @@
      "e1",
      "c6"
     ],
-    "log_index": 18
+    "log_index": 18,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-12 08:02 UTC",
@@ -4919,7 +5117,11 @@
     "refs": [
      "runsql7"
     ],
-    "log_index": 17
+    "log_index": 17,
+    "witness": {
+     "seen": "afterwards",
+     "basis": "made_before"
+    }
    },
    {
     "at": "2026-10-06 10:32 UTC",
@@ -4928,7 +5130,11 @@
     "refs": [
      "runs2"
     ],
-    "log_index": 16
+    "log_index": 16,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-06 10:28 UTC",
@@ -4938,7 +5144,11 @@
      "runs1",
      "ckpt-int8-s1"
     ],
-    "log_index": 15
+    "log_index": 15,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-06 10:24 UTC",
@@ -4947,7 +5157,11 @@
     "refs": [
      "e1"
     ],
-    "log_index": 14
+    "log_index": 14,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "recorded_as_made"
+    }
    },
    {
     "at": "2026-10-06 10:20 UTC",
@@ -4956,7 +5170,11 @@
     "refs": [
      "e1"
     ],
-    "log_index": 13
+    "log_index": 13,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:19 UTC",
@@ -4965,7 +5183,11 @@
     "refs": [
      "resnet50-fp32"
     ],
-    "log_index": 12
+    "log_index": 12,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:18 UTC",
@@ -4974,7 +5196,11 @@
     "refs": [
      "imagenet-calib-512"
     ],
-    "log_index": 11
+    "log_index": 11,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:17 UTC",
@@ -4983,7 +5209,11 @@
     "refs": [
      "imagenet-val"
     ],
-    "log_index": 10
+    "log_index": 10,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:16 UTC",
@@ -4993,7 +5223,11 @@
      "c4",
      "q1"
     ],
-    "log_index": 9
+    "log_index": 9,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:15 UTC",
@@ -5003,7 +5237,11 @@
      "c3",
      "q1"
     ],
-    "log_index": 8
+    "log_index": 8,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:14 UTC",
@@ -5013,7 +5251,11 @@
      "c1",
      "q1"
     ],
-    "log_index": 7
+    "log_index": 7,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:12 UTC",
@@ -5022,7 +5264,11 @@
     "refs": [
      "c4"
     ],
-    "log_index": 6
+    "log_index": 6,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:11 UTC",
@@ -5031,7 +5277,11 @@
     "refs": [
      "c3"
     ],
-    "log_index": 5
+    "log_index": 5,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:10 UTC",
@@ -5040,7 +5290,11 @@
     "refs": [
      "c1"
     ],
-    "log_index": 4
+    "log_index": 4,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:08 UTC",
@@ -5049,7 +5303,11 @@
     "refs": [
      "e1"
     ],
-    "log_index": 3
+    "log_index": 3,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:06 UTC",
@@ -5058,7 +5316,11 @@
     "refs": [
      "e1"
     ],
-    "log_index": 2
+    "log_index": 2,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:04 UTC",
@@ -5067,14 +5329,22 @@
     "refs": [
      "q1"
     ],
-    "log_index": 1
+    "log_index": 1,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    },
    {
     "at": "2026-10-06 10:02 UTC",
     "op": "init",
     "sentence": "started the record: INT8 ResNet-50 on ImageNet",
     "refs": [],
-    "log_index": 0
+    "log_index": 0,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
    }
   ],
   "sittings": [
@@ -5089,7 +5359,7 @@
       "first": "2026-10-19 09:25 UTC",
       "last": "2026-10-19 09:25 UTC",
       "n": 1,
-      "sentence": "amended e2 after locking it: unit run -> calib_images",
+      "sentence": "Amended e2 after locking it: unit run -> calib_images",
       "refs": [
        "e2"
       ],
@@ -5101,8 +5371,9 @@
       "first": "2026-10-19 09:30 UTC",
       "last": "2026-10-19 09:30 UTC",
       "n": 1,
-      "sentence": "recorded an interpretation on q1a, not confirmed",
+      "sentence": "Added a note on what rule c5 means for q1a, not confirmed",
       "refs": [
+       "c5",
        "q1a"
       ],
       "why": "",
@@ -5113,7 +5384,7 @@
       "first": "2026-10-19 09:35 UTC",
       "last": "2026-10-19 09:35 UTC",
       "n": 1,
-      "sentence": "proposed a call: accept c3, not made",
+      "sentence": "Proposed a call to accept c3, not made",
       "refs": [
        "c3"
       ],
@@ -5125,7 +5396,7 @@
       "first": "2026-10-19 09:40 UTC",
       "last": "2026-10-19 09:40 UTC",
       "n": 1,
-      "sentence": "mentioned a past call on int8, from notes.md:3",
+      "sentence": "Mentioned a past call to park int8, dated 2026-05-07, from notes.md:3, not confirmed",
       "refs": [
        "notes.md"
       ],
@@ -5146,7 +5417,7 @@
       "first": "2026-10-19 09:12 UTC",
       "last": "2026-10-19 09:12 UTC",
       "n": 1,
-      "sentence": "amended e1 after locking it: hypothesis",
+      "sentence": "Amended e1 after locking it: hypothesis",
       "refs": [
        "e1"
       ],
@@ -5167,7 +5438,7 @@
       "first": "2026-10-16 07:30 UTC",
       "last": "2026-10-16 07:30 UTC",
       "n": 1,
-      "sentence": "added a note on e1",
+      "sentence": "Added a note on e1",
       "refs": [
        "e1",
        "n1"
@@ -5189,7 +5460,7 @@
       "first": "2026-10-15 09:05 UTC",
       "last": "2026-10-15 09:05 UTC",
       "n": 1,
-      "sentence": "confirmed a call: accepted c4",
+      "sentence": "Confirmed a call: accepted c4",
       "refs": [
        "c4"
       ],
@@ -5201,8 +5472,9 @@
       "first": "2026-10-15 09:09 UTC",
       "last": "2026-10-15 09:09 UTC",
       "n": 1,
-      "sentence": "recorded an interpretation on q1",
+      "sentence": "Added a note on what rule c4 means for q1",
       "refs": [
+       "c4",
        "q1"
       ],
       "why": "c1 and c4 hold on three seeds",
@@ -5222,7 +5494,7 @@
       "first": "2026-10-14 16:40 UTC",
       "last": "2026-10-14 16:40 UTC",
       "n": 1,
-      "sentence": "proposed a call: accept c4, not made",
+      "sentence": "Proposed a call to accept c4, not made",
       "refs": [
        "c4"
       ],
@@ -5243,7 +5515,7 @@
       "first": "2026-10-14 08:30 UTC",
       "last": "2026-10-14 08:30 UTC",
       "n": 1,
-      "sentence": "made a call: accepted c1",
+      "sentence": "Made a call: accepted c1",
       "refs": [
        "c1"
       ],
@@ -5264,7 +5536,7 @@
       "first": "2026-10-13 14:10 UTC",
       "last": "2026-10-13 14:10 UTC",
       "n": 1,
-      "sentence": "retracted runs2",
+      "sentence": "Retracted run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC",
       "refs": [
        "runs2"
       ],
@@ -5276,7 +5548,7 @@
       "first": "2026-10-13 14:12 UTC",
       "last": "2026-10-13 14:12 UTC",
       "n": 1,
-      "sentence": "recorded runs2b on e1, replacing runs2",
+      "sentence": "Recorded a run on e1: run fp32 and int8 · seed 2 at 2026-10-13 14:12 UTC, replacing run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC",
       "refs": [
        "runs2b",
        "runs2"
@@ -5289,7 +5561,7 @@
       "first": "2026-10-13 14:16 UTC",
       "last": "2026-10-13 14:16 UTC",
       "n": 1,
-      "sentence": "added question q1a under q1",
+      "sentence": "Added question q1a under q1",
       "refs": [
        "q1a",
        "q1"
@@ -5302,7 +5574,7 @@
       "first": "2026-10-13 14:20 UTC",
       "last": "2026-10-13 14:20 UTC",
       "n": 1,
-      "sentence": "added experiment e2: calibration set size: how many images INT8 needs",
+      "sentence": "Added an experiment: calibration set size: how many images INT8 needs (e2)",
       "refs": [
        "e2"
       ],
@@ -5314,7 +5586,7 @@
       "first": "2026-10-13 14:24 UTC",
       "last": "2026-10-13 14:24 UTC",
       "n": 1,
-      "sentence": "specified e2: int8 by calib_images 128, 512, 1024, 2048",
+      "sentence": "Specified e2: int8 by calib_images 128, 512, 1024, 2048",
       "refs": [
        "e2"
       ],
@@ -5326,7 +5598,7 @@
       "first": "2026-10-13 14:28 UTC",
       "last": "2026-10-13 14:28 UTC",
       "n": 1,
-      "sentence": "added criterion c5 on e2",
+      "sentence": "Added rule c5 to e2",
       "refs": [
        "c5"
       ],
@@ -5338,7 +5610,7 @@
       "first": "2026-10-13 14:31 UTC",
       "last": "2026-10-13 14:31 UTC",
       "n": 1,
-      "sentence": "set the gate of e2",
+      "sentence": "Set the gate of e2",
       "refs": [
        "e2"
       ],
@@ -5350,7 +5622,7 @@
       "first": "2026-10-13 14:34 UTC",
       "last": "2026-10-13 14:36 UTC",
       "n": 2,
-      "sentence": "filed e2 and c5 under q1a",
+      "sentence": "Filed e2 and c5 under q1a",
       "refs": [
        "e2",
        "q1a",
@@ -5364,7 +5636,7 @@
       "first": "2026-10-13 14:40 UTC",
       "last": "2026-10-13 14:40 UTC",
       "n": 1,
-      "sentence": "locked e2",
+      "sentence": "Locked e2",
       "refs": [
        "e2"
       ],
@@ -5376,7 +5648,7 @@
       "first": "2026-10-13 14:44 UTC",
       "last": "2026-10-13 14:51 UTC",
       "n": 5,
-      "sentence": "recorded 5 runs: runc128, runc512, runc1024, runc2048, runs3",
+      "sentence": "Recorded 5 runs: run fp32 and int8 · calib images 128, run fp32 and int8 · calib images 512, run fp32 and int8 · calib images 1024, run fp32 and int8 · calib images 2048, run fp32 and int8 · seed 3",
       "refs": [
        "runc128",
        "runc512",
@@ -5392,7 +5664,7 @@
       "first": "2026-10-13 14:56 UTC",
       "last": "2026-10-13 14:56 UTC",
       "n": 1,
-      "sentence": "recorded analysis a1 on e1",
+      "sentence": "Recorded an analysis on e1 (a1)",
       "refs": [
        "a1"
       ],
@@ -5404,7 +5676,7 @@
       "first": "2026-10-13 15:00 UTC",
       "last": "2026-10-13 15:00 UTC",
       "n": 1,
-      "sentence": "amended e1 after locking it: criterion c2 added",
+      "sentence": "Amended e1 after locking it: added rule c2",
       "refs": [
        "e1",
        "c2"
@@ -5417,7 +5689,7 @@
       "first": "2026-10-13 15:02 UTC",
       "last": "2026-10-13 15:02 UTC",
       "n": 1,
-      "sentence": "filed c2 under q1",
+      "sentence": "Filed c2 under q1",
       "refs": [
        "c2",
        "q1"
@@ -5439,7 +5711,7 @@
       "first": "2026-10-12 08:02 UTC",
       "last": "2026-10-12 08:02 UTC",
       "n": 1,
-      "sentence": "recorded runsql7 on e1, from results/runs.db row 7",
+      "sentence": "Recorded a run on e1: run fp32 and int8 · results/runs.db row 7, from row 7 of table runs",
       "refs": [
        "runsql7"
       ],
@@ -5451,7 +5723,7 @@
       "first": "2026-10-12 08:06 UTC",
       "last": "2026-10-12 08:06 UTC",
       "n": 1,
-      "sentence": "amended e1 after locking it: criterion c6 added",
+      "sentence": "Amended e1 after locking it: added rule c6",
       "refs": [
        "e1",
        "c6"
@@ -5473,7 +5745,7 @@
       "first": "2026-10-06 10:02 UTC",
       "last": "2026-10-06 10:02 UTC",
       "n": 1,
-      "sentence": "started the record: INT8 ResNet-50 on ImageNet",
+      "sentence": "Started the record: INT8 ResNet-50 on ImageNet",
       "refs": [],
       "why": "",
       "note": "",
@@ -5483,7 +5755,7 @@
       "first": "2026-10-06 10:04 UTC",
       "last": "2026-10-06 10:04 UTC",
       "n": 1,
-      "sentence": "added question q1",
+      "sentence": "Added question q1",
       "refs": [
        "q1"
       ],
@@ -5495,7 +5767,7 @@
       "first": "2026-10-06 10:06 UTC",
       "last": "2026-10-06 10:06 UTC",
       "n": 1,
-      "sentence": "added experiment e1: int8 against fp32",
+      "sentence": "Added an experiment: int8 against fp32 (e1)",
       "refs": [
        "e1"
       ],
@@ -5507,7 +5779,7 @@
       "first": "2026-10-06 10:08 UTC",
       "last": "2026-10-06 10:08 UTC",
       "n": 1,
-      "sentence": "specified e1: fp32 against int8, paired by seed",
+      "sentence": "Specified e1: fp32 against int8, paired by seed",
       "refs": [
        "e1"
       ],
@@ -5519,7 +5791,7 @@
       "first": "2026-10-06 10:10 UTC",
       "last": "2026-10-06 10:12 UTC",
       "n": 3,
-      "sentence": "added 3 criteria on e1: c1, c3, c4",
+      "sentence": "Added 3 rules to e1: c1, c3, c4",
       "refs": [
        "c1",
        "c3",
@@ -5533,7 +5805,7 @@
       "first": "2026-10-06 10:14 UTC",
       "last": "2026-10-06 10:16 UTC",
       "n": 3,
-      "sentence": "filed c1, c3 and c4 under q1",
+      "sentence": "Filed c1, c3 and c4 under q1",
       "refs": [
        "c1",
        "q1",
@@ -5548,7 +5820,7 @@
       "first": "2026-10-06 10:17 UTC",
       "last": "2026-10-06 10:19 UTC",
       "n": 3,
-      "sentence": "added 3 resources: imagenet-val, imagenet-calib-512, resnet50-fp32",
+      "sentence": "Added 3 resources: imagenet-val, imagenet-calib-512, resnet50-fp32",
       "refs": [
        "imagenet-val",
        "imagenet-calib-512",
@@ -5562,7 +5834,7 @@
       "first": "2026-10-06 10:20 UTC",
       "last": "2026-10-06 10:20 UTC",
       "n": 1,
-      "sentence": "locked e1",
+      "sentence": "Locked e1",
       "refs": [
        "e1"
       ],
@@ -5574,7 +5846,7 @@
       "first": "2026-10-06 10:24 UTC",
       "last": "2026-10-06 10:24 UTC",
       "n": 1,
-      "sentence": "confirmed the design of e1",
+      "sentence": "Confirmed the design of e1",
       "refs": [
        "e1"
       ],
@@ -5586,7 +5858,7 @@
       "first": "2026-10-06 10:28 UTC",
       "last": "2026-10-06 10:32 UTC",
       "n": 2,
-      "sentence": "recorded 2 runs: runs1, runs2",
+      "sentence": "Recorded 2 runs: run fp32 and int8 · seed 1, run fp32 and int8 · seed 2 at 2026-10-06 10:32 UTC",
       "refs": [
        "runs1",
        "ckpt-int8-s1",

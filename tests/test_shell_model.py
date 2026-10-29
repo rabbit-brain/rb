@@ -1,4 +1,4 @@
-"""The shell's model (SPRINT-OCT24.md section 1, track M): the document rb builds of a record, rb-shell-view/1.9, read
+"""The shell's model (SPRINT-OCT24.md section 1, track M): the document rb builds of a record, rb-shell-view/1.11, read
 through RB_TEST_SHELL_DUMP while rb page (the Owner tier) and rb open's `/` (the Live tier) draw it under RB_TEST_SHELL.
 Its fields are the contract's (tests/fixtures/shell/view-1.shape.tsv); here, those rb computes today (M0)."""
 import json
@@ -252,7 +252,7 @@ def test_history_log_rows_say_what_rb_log_says(int8, docs):
     assert len(writes) < len(entries)                      # the session that wrote the note and the call has its own line
     for tier in ("live", "owner"):
         rows = docs[tier]["history"]["log"]
-        assert [set(r) for r in rows] == [{"at", "op", "sentence", "refs", "log_index"}] * len(writes)
+        assert [set(r) for r in rows] == [{"at", "op", "sentence", "refs", "log_index", "witness"}] * len(writes)
         assert [r["log_index"] for r in rows] == writes[::-1]
         assert [r["op"] for r in rows] == [entries[i]["op"] for i in writes[::-1]]
         # rb log's text: the time as the log keeps it, to the minute, then the sentence, where a page names what rb
@@ -271,7 +271,6 @@ def test_history_log_rows_say_what_rb_log_says(int8, docs):
     assert next(r for r in rows if r["op"] == "init")["refs"] == []
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="git's default branch on Windows: Windows is a preview (issue #2)", strict=False)
 def test_the_owner_tier_holds_none_of_the_live_tiers_own(docs):
     """The page's document (section 1.5) has no place, no digest and no resource's place or download address, and an
     empty Reproduce address for rb export --url to set; rb open's holds where it is, its digest and the address."""
@@ -289,7 +288,7 @@ def test_the_owner_tier_holds_none_of_the_live_tiers_own(docs):
     # path, which place.path says whole for their tooltips
     assert only["id"] == place["id"] and only["can_show"] and place["line"] == only["label"] and live["places"]["elsewhere"] == []
     assert place["label"] == place["line"] and place["line"] in ("main", "master", place["path"].rstrip("/").rsplit("/", 1)[-1])
-    assert "/" not in place["line"] and " \u00b7 " not in place["line"] and place["path"].startswith("/")
+    assert "/" not in place["line"] and " \u00b7 " not in place["line"] and re.match(r"/|[A-Za-z]:/", place["path"])
     assert all(f["your_words"] == "" and f["observed_places"] == [] for f in owner["findings"].values())
 
 
@@ -342,7 +341,7 @@ def test_the_records_objects_are_its_own(fuller, fuller_docs):
         assert (q["id"], q["findings"], q["experiments"]) == ("q1", ["c1", "c2"], ["e1"])
         assert q["overview"]["interpretations"] == [{"text": "INT8 is accurate enough to ship", "active": True, "confirmed": True, "criteria": ["c1"],
                                                      "holds": "Its rule is met.", "calls": [], "declared": "declared 2026-10-19 17:10 UTC"}]
-        assert doc["analyses"] == {"a1": {"id": "a1", "title": "per-image accuracy, int8 against fp32", "recorded":
+        assert doc["analyses"] == {"a1": {"id": "a1", "title": "per-image accuracy, int8 against fp32", "named": "analysis a1", "recorded":
                                           "analysis · recorded 2026-10-19 17:40 UTC · basis reported", "reads": [runs[0], again, runs[2]], "script": "",
                                           "sha256": "", "used_by": []}}
         [e] = doc["experiments"]
@@ -515,8 +514,9 @@ def test_a_proposed_call_is_never_your_call(calls, calls_docs):
         assert not [c for c in doc["calls"] if c["code"] in ("call_proposed", "past_call_unconfirmed")]
         assert (calls_of(doc)["c2"]["code"], doc["your_call"]["n"]) == ("undecided", len(doc["calls"]))
         assert "c2" not in [m["subject"] for m in doc["made_calls"]]
-        # an absence said of the record, never of anyone: no call on it is recorded (P05)
-        assert re.match(r"c2 misses its rule and no call on it is recorded: ", calls_of(doc)["c2"]["what"]), calls_of(doc)["c2"]["what"]
+        # the call proposed on it is recorded and not made, said of the record, never of anyone (P05; 0.6.1 item 3)
+        assert re.match(r"c2 misses its rule and the call recorded on it is not made yet: it waits for a confirmation: ", calls_of(doc)["c2"]["what"]), \
+            calls_of(doc)["c2"]["what"]
 
 
 def test_a_confirmed_call_keeps_the_sessions_reason_as_a_note(calls_docs):
@@ -2923,9 +2923,20 @@ def test_an_untitled_analysis_is_an_analysis_and_each_run_is_named_as_its_lines_
     again = rec.json(CLAUDE_CODE, "run", "add", "e1", "fp32.top1=75.72", "int8.top1=75.57", "--set", "seed=2", "--replaces", two, "--why", "the first read calibrated on training images")["data"]["object"]["id"]
     aid = rec.json(Writers.HUMAN, "analysis", "add", "e1", "--compare", "int8/fp32:top1=-0.15[-0.31,0.01]", "--method", "paired bootstrap over images",
                    "--unit", "image", "--units", "50000", "--reads", again)["data"]["object"]["id"]
+    titled = rec.json(Writers.HUMAN, "analysis", "add", "e1", "--title", "per-class accuracy, int8 against fp32", "--compare",
+                      "int8/fp32:top1=-0.14[-0.30,0.02]", "--method", "per-class top-1", "--reads", again)["data"]["object"]["id"]
+    rec.json(Writers.HUMAN, "analysis", "add", "e1", "--id", "a1", "--compare", "int8/fp32:top1=-0.16[-0.32,0.00]", "--method", "per-image top-1",
+             "--reads", again)
     (tmp_path / "dumps").mkdir()
     for tier, doc in both_tiers(rec.root, tmp_path / "dumps").items():
         assert doc["analyses"][aid]["title"] == "", (tier, doc["analyses"][aid])
+        # analyses.{id}.named (contract 1.11): each analysis as every line names it, History's words, after its title
+        named = {k: a["named"] for k, a in doc["analyses"].items()}
+        assert re.fullmatch(r"an analysis on e1, recorded \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", named[aid]), (tier, named)
+        assert named[titled] == "analysis per-class accuracy, int8 against fp32" and named["a1"] == "analysis a1", (tier, named)
+        assert all(list(a)[list(a).index("title") + 1] == "named" for a in doc["analyses"].values()), tier
+        logged = {r["refs"][0]: r["sentence"] for r in doc["history"]["log"] if r["op"] == "analyze" and r["refs"]}
+        assert all(logged[k].startswith(f"analyze {n}") or logged[k].startswith(f"recorded {n}") for k, n in named.items()), (tier, logged, named)
         rows = [r["sentence"] for r in doc["history"]["log"]]
         assert any(r.startswith("analyze an analysis") for r in rows), (tier, rows)
         assert not any(aid in r for r in rows), (tier, [r for r in rows if aid in r])
@@ -2936,3 +2947,248 @@ def test_an_untitled_analysis_is_an_analysis_and_each_run_is_named_as_its_lines_
         assert len(set(named.values())) == len(named), (tier, named)
         for rid, n in named.items():
             assert any(r == f"record {n}" or r.startswith(f"record {n}: ") for r in rows), (tier, rid, n, rows)
+
+
+# ---- WITNESS: whether rb saw a thing happen, or recorded it afterwards from what the project's files say
+
+def afterwards_by_the_rule(run: dict) -> bool:
+    """The rule, said apart from rb's code: a run rb's journal did not watch, made more than an hour before it was
+    recorded or at a time nobody knows, was recorded afterwards."""
+    return run["made_before_recorded"] and (run["command"] or {}).get("given") != "observed"
+
+
+def test_a_record_kept_with_rb_from_its_start_holds_nothing_recorded_afterwards(int8, docs):
+    """INT8 ResNet-50, kept with rb from its first write: every run, call, note and log line was seen as it ran, and
+    the record's line, the finding and the model say none was recorded afterwards."""
+    st = int8.json(Writers.HUMAN, "status")["data"]
+    w = st["witness"]
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T.*", w["began"])
+    assert {k: v for k, v in w.items() if k != "began"} == {
+        "runs": {"total": 3, "afterwards": 0, "before": 0, "unknown": 0}, "analyses": {"total": 0, "afterwards": 0},
+        "calls": {"total": 1, "afterwards": 0}, "notes": {"total": 2, "afterwards": 0}}
+    assert {r["witness"]["seen"] for r in st["runs"]} == {"as_it_ran"} and {r["witness"]["basis"] for r in st["runs"]} == {"recorded_as_made"}
+    assert [f["witness"] for f in st["findings"] if f["criterion"] == "c1"] == [{"total": 3, "afterwards": 0}]
+    for tier in ("live", "owner"):
+        doc = docs[tier]
+        assert doc["home"]["witness"]["runs"] == w["runs"] and doc["home"]["witness"]["calls"] == w["calls"]
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", doc["home"]["witness"]["began"])
+        assert {r["witness"]["seen"] for r in doc["runs"].values()} == {"as_it_ran"}
+        assert doc["findings"]["c1"]["witness"] == {"total": 3, "afterwards": 0}
+        assert {r["witness"]["seen"] for r in doc["history"]["log"]} == {"as_it_ran"}
+
+
+def test_the_int8_demo_counts_what_its_log_holds(int8_demo, tmp_path):
+    """The INT8 demo: its two runs typed in May are recorded afterwards and made before the record began, the run rb's
+    journal watched is seen as it ran, and its past call from notes/2026-05-07.md is the
+    one call recorded afterwards; every count is the rule applied to what the record holds, and the model's History
+    types each run's line as its run."""
+    st = int8_demo.rb("status")
+    w = st["witness"]
+    late = [r["id"] for r in st["runs"] if afterwards_by_the_rule(r)]
+    assert w["runs"]["total"] == len(st["runs"]) == 10 and w["runs"]["afterwards"] == len(late) == 2 and w["runs"]["before"] == 2
+    assert {r["id"] for r in st["runs"] if r["witness"]["seen"] == "afterwards"} == set(late)
+    assert {r["witness"]["basis"] for r in st["runs"] if r["id"] in late} == {"made_before"}
+    [watched] = [r for r in st["runs"] if r["witness"]["basis"] == "watched"]
+    assert watched["command"]["given"] == "observed"
+    from rbtest import rbyaml
+    log = [json.loads(line) for line in (int8_demo.root / ".rb" / "log.jsonl").read_text(encoding="utf-8").splitlines()]
+    calls = {e["id"] for e in log if e["kind"] == "decision" and e["op"] == "decide" and "confirms" not in (e.get("detail") or {})}
+    past = {d for d in calls if rbyaml.loads((int8_demo.root / ".rb" / "decisions" / f"{d}.yaml").read_text(encoding="utf-8")).get("past")}
+    assert len(past) == 1 and w["calls"] == {"total": len(calls), "afterwards": 1}
+    analyses = {a["id"]: a for a in st["analyses"]}
+    for f in st["findings"]:
+        counted = {o["run"] for o in f["observations"] if o["counted"]}
+        if not counted and (f["comparison"] or {}).get("source") in analyses:
+            # a reading an analysis gives rests on the runs the analysis read
+            counted = {r for r in analyses[f["comparison"]["source"]]["reads"] if r in {x["id"] for x in st["runs"]}}
+        assert f["witness"] == {"total": len(counted), "afterwards": len(counted & set(late))}, f["criterion"]
+    assert any(f["witness"]["afterwards"] for f in st["findings"])
+    copy = tmp_path / "int8"
+    import shutil
+    shutil.copytree(int8_demo.root, copy, symlinks=True)
+    doc, _ = dumped(copy, "page", tmp_path)
+    assert doc["home"]["witness"]["runs"] == w["runs"] and doc["home"]["witness"]["calls"] == w["calls"]
+    for row in doc["history"]["log"]:
+        rid = row["refs"][0] if row["refs"] else ""
+        if rid in doc["runs"] and row["op"] == "record":
+            assert row["witness"] == doc["runs"][rid]["witness"], row
+
+
+def test_rb_status_rb_context_and_rb_uis_head_say_the_record_line(int8_demo, int8, monkeypatch):
+    """One wording for when the record began (0.6.1): rb status and rb context under the title, and rb ui's head, say
+    the record line's sentence from the witness facts, the day as rb's text gives days: the INT8 demo's two runs typed
+    in May and its past call, each count with its noun. A record kept with rb from its first write says nothing there,
+    and never "what came before it is Retrospective"."""
+    st = int8_demo.rb("status")
+    w = st["witness"]
+    assert (w["runs"]["afterwards"], w["calls"]["afterwards"], w["analyses"]["afterwards"], w["notes"]["afterwards"]) == (2, 1, 0, 0)
+    line = f"Kept with rb since {w['began'][:10]}. 2 runs and 1 call were recorded afterwards, not as they happened."
+    def text(*argv: str) -> list:
+        r = subprocess.run([*command(), *argv], cwd=int8_demo.root, env=int8_demo.env, capture_output=True, encoding="utf-8",
+                           stdin=subprocess.DEVNULL)
+        return r.stdout.splitlines()
+    status, context = text("status"), text("context")
+    assert status[1] == line, status[:3]
+    assert context.count(line) == 1 and context[2] == line, context[:4]
+    assert not [x for x in status + context if "Retrospective" in x and "came before it" in x]
+    assert {k: st["record_start"][k] for k in ("before", "runs")} == {"before": 2, "runs": 10}    # its data keeps its shape
+    from rbtest import AGENT_VARS
+    monkeypatch.chdir(int8_demo.root)
+    for k, v in int8_demo.env.items():
+        monkeypatch.setenv(k, v)
+    for k in AGENT_VARS:
+        monkeypatch.delenv(k, raising=False)
+    assert home_view(int8_demo.root).began == line
+    kept = int8.rb(Writers.HUMAN, "status")
+    assert "Kept with rb since" not in kept and "Retrospective" not in kept
+    assert "Kept with rb since" not in int8.rb(Writers.HUMAN, "context")
+
+
+def test_a_past_call_from_a_file_is_recorded_afterwards_and_still_waits(int8_demo):
+    """The demo's past call a session quoted from notes/2026-05-07.md reads as recorded afterwards, and still waits for
+    the user's confirmation: knowing it was recorded afterwards confirms nothing."""
+    st = int8_demo.rb("status")
+    [row] = [p for p in st["pending"] if p.get("past")]
+    assert row["witness"] == {"seen": "afterwards", "basis": "past_call"}
+    assert row["authority"]["state"] == "past_unconfirmed" and row["authority"]["pending"] is True
+    assert row["id"] not in {d["id"] for d in st["decisions"]}
+    assert any(i["code"] == "past_call_unconfirmed" and i.get("decision") == row["id"] for i in st["open"])
+
+
+def test_what_an_analysis_rests_on_a_retraction_and_a_clones_notes_are_typed_by_what_rb_saw(tmp_path):
+    """A finding an analysis gives counts the runs the analysis read, a run typed in from October 1 among them; the
+    retraction of that run is rb's own write, seen as it was made, though the run was recorded afterwards; and a clone
+    did not see its parent's notes written: they read as recorded afterwards, inherited."""
+    rec = Writers(tmp_path / "int8")
+    rec.root.mkdir(parents=True)
+    you, rb = Writers.HUMAN, rec.rb
+    rec.git("init", "-q")
+    rec.git("config", "user.email", "ana@example.org")
+    rec.git("config", "user.name", "ana")
+    rb(you, "init", "INT8 ResNet-50 on ImageNet", "--no-agents")
+    rb(you, "metric", "add", "top1", "--maximize", "--unit", "%")
+    rb(you, "experiment", "add", "int8 against fp32", "--id", "e1", "--baseline", "fp32", "--candidate", "int8")
+    rb(you, "note", "add", "the eval host ran offline", "-e", "e1")
+    rb(you, "criterion", "add", "INT8 keeps top-1 within a point of FP32", "-e", "e1", "--metric", "change.top1", "--at-least", "-1", "--id", "c1")
+    old = rec.json(you, "run", "add", "e1", "fp32.top1=75.69", "int8.top1=75.53", "--produced-at", "2026-10-01T12:00:00Z")["data"]["object"]["id"]
+    rb(you, "analysis", "add", "e1", "--compare", "int8/fp32:top1=-0.16[-0.3,-0.02]", "--method", "paired bootstrap over images", "--unit",
+       "image", "--units", "50000", "--reads", old, "--id", "a1")
+    st = rec.json(you, "status")["data"]
+    [f] = [f for f in st["findings"] if f["criterion"] == "c1"]
+    assert not [o for o in f["observations"] if o["counted"]] and f["witness"] == {"total": 1, "afterwards": 1}
+    rb(you, "retract", old, "--why", "evaluated on the train split")
+    doc, _ = dumped(rec.root, "page", tmp_path)
+    [row] = [r for r in doc["history"]["log"] if r["op"] == "retract"]
+    assert row["witness"] == {"seen": "as_it_ran", "basis": "declared"}
+    [recorded] = [r for r in doc["history"]["log"] if r["op"] == "record"]
+    assert recorded["witness"] == {"seen": "afterwards", "basis": "made_before"}
+    bundle, clone = tmp_path / "bundle", tmp_path / "clone"
+    rb(you, "export", "--with-record", "--out", str(bundle))
+    rec.run(you, "clone", str(bundle), str(clone), cwd=tmp_path)
+    cloned = json.loads(subprocess.run([*command(), "status", "--json"], cwd=clone, env=rec.env, capture_output=True, encoding="utf-8").stdout)["data"]
+    assert cloned["witness"]["notes"] == {"total": 1, "afterwards": 1}
+    assert st["witness"]["notes"] == {"total": 1, "afterwards": 0}
+
+
+def test_a_call_on_a_setting_and_an_untitled_analysis_read_as_history_says_them(tmp_path):
+    """One wording in every view (0.6.1 item 9): History's log rows say a call on a setting as "lr of e1" and an analysis
+    with no title by its experiment and when it was recorded, never by an id or as "e1/lr"; runs.{id}.named is the
+    name the rows give the run."""
+    rec = Writers(tmp_path / "int8")
+    rec.root.mkdir(parents=True)
+    you, rb = Writers.HUMAN, rec.rb
+    rec.git("init", "-q")
+    rec.git("config", "user.email", "ana@example.org")
+    rec.git("config", "user.name", "ana")
+    rb(you, "init", "INT8 ResNet-50 on ImageNet", "--no-agents")
+    rb(you, "metric", "add", "top1", "--maximize", "--unit", "%")
+    rb(you, "experiment", "add", "int8 against fp32", "--id", "e1", "--baseline", "fp32", "--candidate", "int8")
+    rb(you, "spec", "set", "e1", "lr", "0.1", "--no-verify")
+    rb(you, "decide", "e1/lr", "accept", "--why", "read it off the launch script")
+    run = rec.json(you, "run", "add", "e1", "fp32.top1=75.69", "int8.top1=75.53")["data"]["object"]["id"]
+    made = rec.json(you, "analysis", "add", "e1", "--compare", "int8/fp32:top1=-0.16[-0.3,-0.02]", "--method", "paired bootstrap over images",
+                    "--unit", "image", "--units", "50000", "--reads", run)["data"]["object"]["id"]
+    doc, _ = dumped(rec.root, "page", tmp_path)
+    rows = doc["history"]["log"]
+    said = " | ".join(r["sentence"] for r in rows)
+    assert "lr of e1" in said and "e1/lr" not in said, said
+    [analyzed] = [r for r in rows if r["op"] == "analyze"]
+    assert re.search(r"an analysis on e1, recorded \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", analyzed["sentence"]) and made not in said, analyzed
+    assert made in analyzed["refs"]
+    [recorded] = [r for r in rows if r["op"] == "record"]
+    assert doc["runs"][run]["named"] in recorded["sentence"]
+
+
+def test_a_log_line_says_its_op_in_words(tmp_path):
+    """rb log, a setting's history on rb show and History's rows say an op in words ("add variant", "spec set", "spec
+    check"), never rb's key with its underscore, and a check of a source never as "verify" (0.6.1 item 10)."""
+    rec = Writers(tmp_path / "int8")
+    rec.root.mkdir(parents=True)
+    you, rb = Writers.HUMAN, rec.rb
+    rec.git("init", "-q")
+    rec.git("config", "user.email", "ana@example.org")
+    rec.git("config", "user.name", "ana")
+    (rec.root / "configs").mkdir()
+    (rec.root / "configs" / "eval.yaml").write_text("data:\n  batch_size: 256\n", encoding="utf-8")
+    rb(you, "init", "INT8 ResNet-50 on ImageNet", "--no-agents")
+    rb(you, "experiment", "add", "int8 against fp32", "--id", "e1", "--baseline", "fp32", "--candidate", "int8")
+    rb(you, "variant", "add", "e1", "int4", "--role", "ablation")
+    rb(you, "spec", "set", "e1", "data.batch_size", "--source", "configs/eval.yaml#data.batch_size")
+    rb(you, "spec", "verify", "e1")
+    text = subprocess.run([*command(), "log", "-n", "0"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout
+    doc, _ = dumped(rec.root, "page", tmp_path)
+    for said in [line[17:] for line in text.splitlines()] + [r["sentence"] for r in doc["history"]["log"]]:
+        assert not re.match(r"\w+_\w+ ", said) and "verif" not in said, said
+    # a setting's own history says them the same way
+    shown = subprocess.run([*command(), "show", "e1/data.batch_size"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout
+    assert " spec set: " in shown and " spec check: " in shown and "spec_" not in shown, shown
+    ops = {r["op"]: r["sentence"] for r in doc["history"]["log"]}
+    assert ops["add_variant"].startswith("add variant ") and ops["spec_set"].startswith("spec set ") and ops["spec_verify"].startswith("spec check ")
+
+
+def test_rb_status_and_rb_context_say_rules_and_needs_judgment_as_the_page_does(tmp_path):
+    """One wording for rules and the queue (0.6.1): rb status's tally line leads with the page's "Rules: " and says its
+    tally words exactly ("1 met · 1 not met · 1 not reproduced"), "none yet" and "none standing (N retracted)" with
+    the same lead; the findings are under "Rules" (rb context's "## Rules", its own guidance under "## How to record");
+    the calls that wait are under "Needs judgment (N)" and "## Needs judgment". The JSON keeps its words (`human`)."""
+    root = tmp_path / "int8"
+    root.mkdir()
+    rec = Writers(root)
+    you, rb = Writers.HUMAN, rec.rb
+    rec.git("init", "-q")
+    rec.git("config", "user.email", "ana@example.org")
+    rec.git("config", "user.name", "ana")
+    rb(you, "init", "INT8 ResNet-50", "--no-agents")
+    status = rb(you, "status").splitlines()
+    assert "Rules: none yet" in status and not [x for x in status if x.startswith("Criteria")]
+    rb(you, "question", "add", "Does INT8 cost top-1 on ImageNet?", "--id", "q1")
+    rb(you, "experiment", "add", "INT8 vs FP32 on ImageNet", "--id", "int8", "-q", "q1", "--baseline", "fp32", "--candidate", "int8",
+       "--varies", "precision")
+    rb(you, "metric", "add", "top1", "--unit", "%", "--maximize")
+    rb(you, "spec", "set", "int8", "seed", "--per-run")
+    (root / "paper.md").write_text("Table 2: INT8 top-1 75.4\n")
+    rb(you, "criterion", "add", "INT8 loses at most 0.5 top-1", "-e", "int8", "-q", "q1", "--metric", "change.top1", "--at-least", "-0.5",
+       "--id", "c1")
+    rb(you, "criterion", "add", "INT8 loses at most 0.1 top-1", "-e", "int8", "-q", "q1", "--metric", "change.top1", "--at-least", "-0.1",
+       "--id", "c2")
+    rb(you, "criterion", "add", "INT8 reaches the paper's 75.4 top-1", "-e", "int8", "-q", "q1", "--metric", "int8.top1", "--equals", "75.4",
+       "--tolerance", "0.05", "--source", "paper.md", "--quote", "INT8 top-1 75.4", "--locator", "Table 2", "--id", "c3")
+    for seed, (fp32, int8) in enumerate([(76.1, 75.9), (76.0, 75.8), (76.2, 75.7)], 1):
+        rb(you, "run", "add", "int8", f"fp32.top1={fp32}", f"int8.top1={int8}", "--set", f"seed={seed}")
+    status = rb(you, "status").splitlines()
+    rb(you, "page", "--out", str(tmp_path / "page.html"))
+    page = (tmp_path / "page.html").read_text(encoding="utf-8")
+    import html as _html
+    tallies = {_html.unescape(re.sub(r"<[^>]+>", "", m)) for m in re.findall(r'<p class="stt"><span class="k">Rules: </span>(.*?)</p>', page)}
+    assert tallies == {"1 met · 1 not met · 1 not reproduced"}, tallies
+    assert "Rules: 1 met · 1 not met · 1 not reproduced" in status
+    assert "Needs judgment (2)" in status and "Rules" in status
+    assert not [x for x in status if "Needs a human" in x or x.startswith("Criteria")]
+    context = rb(you, "context").splitlines()
+    headings = [x for x in context if x.startswith("## ")]
+    assert {"## Rules", "## Needs judgment", "## How to record"} <= set(headings) and headings.count("## Rules") == 1, headings
+    assert not [x for x in context if "Needs a human" in x or x == "## Criteria"]
+    assert [i["who"] for i in json.loads(rb(you, "status", "--json"))["data"]["open"] if i["code"] == "undecided"] == ["human", "human"]
+    for c in ("c1", "c2", "c3"):
+        rb(you, "retract", c, "--why", "the wrong split")
+    assert "Rules: none standing (3 retracted)" in rb(you, "status").splitlines()

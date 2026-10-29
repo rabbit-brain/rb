@@ -386,7 +386,7 @@ def test_a_sessions_reason_is_drawn_as_rbs_note(tmp_path):
     """A line whose reason is a session's (`note`) reads "note: ... · not confirmed", never as a why in the user's voice."""
     doc = owner_example()
     line = doc["history"]["sittings"][0]["lines"][2]
-    assert line["sentence"] == "proposed a call: accept c3, not made"
+    assert line["sentence"] == "Proposed a call to accept c3, not made"
     reason = "one seed is enough for the export check"
     line["why"], line["note"] = "", reason
     history = section(drawn_page(tmp_path, doc), "history")
@@ -447,7 +447,10 @@ def sittings_name_runs_as_the_log_does(root: Path, tmp: Path) -> list:
             assert len(rows) == 1 and rows[0].startswith("record "), rows
             words = rows[0][len("record "):].split(": ")[0]
             assert words == runs[r].get("named", words) and (words.startswith(f"run {runs[r]['label']}") or words.startswith("a run of ")), (words, runs[r])
-            assert re.search(rf"(: |; |, |replacing |^Recorded ){re.escape(words)}(;|,|$)", line["sentence"]), (line["sentence"], words)
+            # where History's own "Recorded" opens the line, a run told apart by when says it once: "<run> at <when>"
+            said = (words, re.sub(r", recorded ", " at ", words, count=1))
+            assert any(re.search(rf"(: |; |, |replacing |^Recorded ){re.escape(w)}(;|,|$)", line["sentence"]) for w in said), (line["sentence"], words)
+            assert len(re.findall(r"\brecorded\b", line["sentence"], re.I)) <= 1 + line["sentence"].count("replacing "), line["sentence"]
             named.append(line["sentence"])
         for a in (a for a in line["refs"] if a in analyses and a in minted):
             assert f"analysis {analyses[a]['title'].strip()}" in line["sentence"], line["sentence"]
@@ -485,15 +488,17 @@ def test_a_run_and_the_run_that_replaced_it_read_apart(int8, tmp_path):
     assert re.fullmatch(r"run[a-z2-7]{6}", again) and re.fullmatch(r"a[a-z2-7]{6}", an), (again, an)
     named = sittings_name_runs_as_the_log_does(root, tmp_path)
     [line] = {s for s in named if ", replacing " in s}
-    assert line == "Recorded a run on e1: run fp32 and int8 · seed 1, recorded 2026-10-20 09:02 UTC, replacing run fp32 and int8 · seed 1, " \
+    assert line == "Recorded a run on e1: run fp32 and int8 · seed 1 at 2026-10-20 09:02 UTC, replacing run fp32 and int8 · seed 1, " \
                    "recorded 2026-10-20 09:00 UTC", line
     doc = json.loads((tmp_path / "page.view.json").read_text(encoding="utf-8"))
     assert "Recorded an analysis on e1: analysis per-image accuracy, int8 against fp32" in [l["sentence"] for l in lines_of(doc)]
 
 
 def test_an_untitled_analysis_and_a_proposal_taken_back_are_said_by_what_they_are(int8, tmp_path):
-    """Review of FIX9: an analysis rb minted an id for with no title is said by its experiment and when it was recorded;
-    two proposals a session takes back together read as proposals, never as calls made."""
+    """Review of FIX9: an analysis rb minted an id for with no title is said by its experiment and when it was recorded,
+    in M's settled words ("an analysis on e1, recorded <minute> UTC", 0.6.1 item 9), with "recorded" said once where
+    History's own "Recorded" opens the line; two proposals a session takes back together read as proposals, never as
+    calls made."""
     rec, root = int8
     at = lambda who, k: {**who, "RB_TEST_NOW": k}  # noqa: E731
     an = rec.write(at(Writers.HUMAN, "2026-10-21T10:00:00.000+00:00"), "analysis", "add", "e1", "--compare", "int8/fp32:top1=-0.2[-0.3,-0.1]",
@@ -504,5 +509,8 @@ def test_an_untitled_analysis_and_a_proposal_taken_back_are_said_by_what_they_ar
         rec.write(at(CLAUDE_CODE, f"2026-10-22T10:0{k + 3}:00.000+00:00"), "retract", d, "--why", "asked for too early")
     doc = dumped(root, tmp_path)
     said = [l["sentence"] for l in lines_of(doc)]
-    assert "Recorded an analysis on e1, recorded 2026-10-21 10:00 UTC" in said and not [s for s in said if an in s], said
+    assert "Recorded an analysis on e1 at 2026-10-21 10:00 UTC" in said and not [s for s in said if an in s], said
+    # the model's rows say it in the same words, which History's names_of gives them
+    rows = [x["sentence"] for x in doc["history"]["log"] if x["op"] == "analyze"]
+    assert rows and all("an analysis on e1, recorded 2026-10-21 10:00 UTC" in r and an not in r for r in rows), rows
     assert "Retracted 2 calls: a proposed call to park e1, not made; a proposed call to continue e1, not made" in said, said

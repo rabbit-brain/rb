@@ -143,8 +143,13 @@ fn finding_block_without(f: &Value, limit: Option<usize>, said: &[String]) -> Ve
             lines.push(format!("          ✗ {}", gs(c, "text")));
         }
     }
-    let notes: Vec<&Value> =
-        items(f, "caveats").iter().filter(|c| c.get("code").and_then(|x| x.as_str()) != Some("single_unit") && !said.contains(&gs(c, "text"))).collect();
+    // a cited value that differs is said once: by the not_comparable problem that names it, where there is one
+    let comparable_said = problems.iter().any(|c| gs(c, "code") == "not_comparable");
+    let notes: Vec<&Value> = items(f, "caveats")
+        .iter()
+        .filter(|c| c.get("code").and_then(|x| x.as_str()) != Some("single_unit") && !said.contains(&gs(c, "text")))
+        .filter(|c| !(comparable_said && gs(c, "code") == "cited_differs"))
+        .collect();
     let shown = match limit {
         None => notes.len(),
         Some(l) => l.min(notes.len()),
@@ -450,14 +455,14 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
         _ => Vec::new(),
     };
     tally.sort_by_key(|(k, _)| tally_order(k));
-    let tally = tally.iter().map(|(k, n)| format!("{n} {}", crate::assess::rule_label(k, n.parse().unwrap_or(0)))).collect::<Vec<_>>().join(" · ");
+    let tally = tally.iter().map(|(k, n)| tally_word(k, n)).collect::<Vec<_>>().join(" · ");
     let retracted = items(&stv, "retracted");
     // a title that is its id is said once
     let (title, pid) = (gs(&proj, "title"), gs(&proj, "id"));
     let head = if title == pid { title } else { format!("{title} · {pid}") };
     out.say(head + &experiment.filter(|e| !e.is_empty()).map(|e| format!(" · experiment {e}")).unwrap_or_default());
-    if let Some(start) = led.record_start()? {
-        out.say(start.words());
+    if let Some(line) = led.record_line()? {
+        out.say(line);
     }
     if let Some(line) = crate::elsewhere::nested_line(&led) {
         out.say(line);
@@ -472,11 +477,11 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
         }
     }
     let tally_line = if !tally.is_empty() {
-        format!("Criteria: {tally}")
+        format!("{}{tally}", RULES_LEAD)
     } else if !retracted.is_empty() {
-        format!("Criteria: none standing ({} retracted)", retracted.len())
+        format!("{}none standing ({} retracted)", RULES_LEAD, retracted.len())
     } else {
-        "Criteria: none yet".to_string()
+        format!("{}none yet", RULES_LEAD)
     };
     if let Some(last) = stv.get("repository").filter(|r| r.truthy()).and_then(|r| r.get("last_reconcile")).filter(|l| l.truthy()) {
         let at: String = gs(last, "at").chars().take(16).collect::<String>().replace('T', " ");
@@ -565,7 +570,7 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
     out.say(tally_line);
     if !human.is_empty() {
         out.say("");
-        out.say(format!("Needs a human ({})", human.len()));
+        out.say(format!("{NEEDS_JUDGMENT} ({})", human.len()));
         let (k, more) = first_n(&human, SHOWN, "  ", "items", "rb status --json lists every one");
         out.say_all(items_text(&human[..k]));
         out.say_all(more);
@@ -630,7 +635,7 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
     st.insert("elsewhere".into(), Value::List(places.into_iter().map(|p| p.value).collect()));
     if !findings.is_empty() {
         out.say("");
-        out.say("Criteria");
+        out.say(RULES_HEADING);
         let (k, more) = first_n(findings, SHOWN_ROWS, "  ", "criteria", "rb show <id> reads one, and rb status --json lists every one");
         for block in finding_blocks(&findings[..k], Some(STATUS_CAVEATS)) {
             out.say_all(block);
@@ -1212,8 +1217,8 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             for (k, url) in &r.links {
                 out.say(format!("  {k}: {url}"));
             }
-            if !r.note.is_empty() {
-                out.say(format!("  note: {}{}", r.note, view::not_confirmed(&r.created_by)));
+            if !r.note.trim().is_empty() {
+                out.say(format!("  note: {}", view::run_note(&r.note, &r.created_by)));
             }
         }
         Obj::Resource(res) => {
@@ -1648,7 +1653,7 @@ fn show_setting(led: &Ledger, subject: &str, out: &mut Out) -> R {
                 "    {}{} {}: {what}",
                 cut(&rv.get("at").map(pyjson::py_str).unwrap_or_default(), 19),
                 shown_writer(&gs(&rv, "actor")).map(|name| format!(" {name}")).unwrap_or_default(),
-                rv.get("op").map(pyjson::py_str).unwrap_or_else(|| "None".into())
+                op_said(&rv.get("op").map(pyjson::py_str).unwrap_or_else(|| "None".into()))
             ));
         }
     }
@@ -1864,9 +1869,31 @@ fn show_experiment(led: &Ledger, exp: &Experiment, out: &mut Out, data: &mut Dic
     Ok(())
 }
 /// The rules, words and reporting example `rb context` opens with, after the title and who you are.
+/// What leads the tally of rules, as the page says it (R's strings.rs RULES_LEAD): "Rules: 1 met · 1 not reproduced".
+const RULES_LEAD: &str = crate::shell::strings::RULES_LEAD;
+/// The heading over each rule's finding, on rb status and rb context.
+const RULES_HEADING: &str = "Rules";
+/// The heading over the calls that wait on someone's judgment: in no one's voice, the same to the user and to a session.
+const NEEDS_JUDGMENT: &str = "Needs judgment";
+const NEEDS_JUDGMENT_MD: &str = "## Needs judgment";
+
+/// A rule word of the tally as the page's tally says it: "1 met", "2 not met", "1 can't tell yet", "1 not tested", any
+/// other ("1 not reproduced", "1 gate missed") as rb gives it, in plain words (shell/views.rs short_rule, then
+/// strings.rs plain_word).
+fn tally_word(key: &str, n: &str) -> String {
+    let short = match key {
+        "meets" => "met",
+        "misses" => "not met",
+        "undetermined" => "can't tell yet",
+        "untested" => "not tested",
+        other => other,
+    };
+    crate::shell::strings::plain_word(&format!("{n} {short}"))
+}
+
 pub const CONTEXT_RULES: &[&str] = &[
     "",
-    "## Rules",
+    "## How to record",
     "",
     "- You and the user both record; rb checks sources and computes findings; every write records who made it and in which chat. Record questions (a tree: a top-level question for each inquiry, a sub-question under its parent with rb question add --parent), experiments (with their hypothesis), variants, settings with their sources, criteria, runs, analyses and resources.",
     "- Declare a criterion before the evidence it reads: its role (--role primary, secondary, exploratory or gate), what it compares (--subject, --reference, --metric, --estimand) and its rule. Evidence that already existed, or data already seen, is labelled so on the finding's timing, never hidden and never counted as prospective.",
@@ -2263,7 +2290,16 @@ fn line_said_as(rv: &Value, named: &dyn Fn(&str) -> Option<String>) -> String {
         let gate = if part("if_holds").is_some() || part("if_not").is_some() { ", with its gate" } else { "" };
         return format!("design {} {} confirmed{gate}", opt_str(rv, "kind", "None"), opt_str(rv, "id", "None"));
     }
-    format!("{} {}", opt_str(rv, "op", "None"), line_target(rv, named))
+    format!("{} {}", op_said(&opt_str(rv, "op", "None")), line_target(rv, named))
+}
+
+/// An op as a line says it, in words: "add variant", "spec set", never rb's key with its underscore; a check of a
+/// setting's source is "spec check", as rb says a source checked, never "verify" for what a file says.
+fn op_said(op: &str) -> String {
+    match op {
+        "spec_verify" => "spec check".to_string(),
+        _ => op.replace('_', " "),
+    }
 }
 
 /// What a log line wrote to, as its text names it: a retraction of a note, a variant or a setting names that part,
@@ -2422,9 +2458,9 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
     if let Some(said) = start_now(led, &stv)? {
         l.extend([String::new(), "## First, record where the work stands".to_string(), String::new(), said]);
     }
-    if let Some(start) = led.record_start()? {
+    if let Some(line) = led.record_line()? {
         l.push(String::new());
-        l.push(start.words());
+        l.push(line);
     }
     if let Some(line) = crate::elsewhere::nested_line(led) {
         l.push(String::new());
@@ -2455,7 +2491,7 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
         }
         l.push(String::new());
     }
-    l.push("## Criteria".into());
+    l.push(format!("## {RULES_HEADING}"));
     l.push(String::new());
     let findings = items(&stv, "findings");
     if findings.is_empty() {
@@ -2471,13 +2507,13 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
     let open = items(&stv, "open");
     let human: Vec<&Value> = open.iter().filter(|i| gs(i, "who") == "human" && !pending_item(i)).collect();
     let (agent, quiet): (Vec<&Value>, Vec<&Value>) = open.iter().filter(|i| gs(i, "who") != "human").partition(|i| !gs(i, "do").is_empty());
-    for (title, its) in [("## Needs a human", &human), ("## Can be done now", &agent), ("## Nothing to do", &quiet)] {
+    for (title, its) in [(NEEDS_JUDGMENT_MD, &human), ("## Can be done now", &agent), ("## Nothing to do", &quiet)] {
         if title == "## Nothing to do" && its.is_empty() {
             continue;
         }
         l.push(title.into());
         l.push(String::new());
-        let (k, more) = first_n(its, if title == "## Needs a human" { SHOWN } else { its.len() }, "- ", "items", "rb status --json lists every one");
+        let (k, more) = first_n(its, if title == NEEDS_JUDGMENT_MD { SHOWN } else { its.len() }, "- ", "items", "rb status --json lists every one");
         let text = items_text(&its[..k]);
         if text.is_empty() {
             l.push("- Nothing.".into());
@@ -2486,7 +2522,7 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
             l.extend(more);
         }
         l.push(String::new());
-        if title == "## Needs a human" {
+        if title == NEEDS_JUDGMENT_MD {
             // what waits for the user's confirmation, in its own place: it changes nothing until then
             let (sections, designs, all) = pending_sections(&stv, None, drawn);
             for (title, lines) in sections {
@@ -2662,7 +2698,7 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
                     + &crate::ledger::support::run_command(&run).map(|g| format!(" · {}", g.line())).unwrap_or_default()
                     + &commit.map(|c| format!(" · produced at {}", cut(&c, 12))).unwrap_or_default()
                     + &crate::ledger::support::file_words(&run).map(|w| format!(" · {w}")).unwrap_or_default()
-                    + &if run.note.is_empty() { String::new() } else { format!(" · note: {}{}", run.note, view::not_confirmed(&run.created_by)) }
+                    + &if run.note.trim().is_empty() { String::new() } else { format!(" · note: {}", view::run_note(&run.note, &run.created_by)) }
                     + &run.repeats.as_ref().filter(|r| !r.is_empty()).map(|r| format!(" · repeats {r}")).unwrap_or_default(),
             );
         }

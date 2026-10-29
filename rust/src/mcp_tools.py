@@ -55,8 +55,8 @@ TOOLS: list[dict] = [
                                         "with every later write on this connection and in this session."),
      "args": [], "opts": {"model": "--model", "provider": "--provider"},
      "props": {"model": _d(S, "your own model, as its provider names it"),
-               "provider": _d(S, "who provides that model; rb fills in Claude Code's, Codex's and Gemini CLI's when none is given")}},
-    {"name": "status", "description": ("Criteria with their findings on axes, what needs a human, what can be done now, every record (JSON). "
+               "provider": _d(S, "who provides that model; rb fills in Claude Code's and Codex's when none is given")}},
+    {"name": "status", "description": ("Rules with their findings on axes, what needs judgment, what can be done now, every record (JSON). "
                                        "The folders no experiment reads keep their first 100 (data.cut), unless all is given."),
      "args": ["experiment"], "props": {"experiment": _d(S, "only this experiment"), "all": _d(B, "every folder in full, however many")}},
     {"name": "show", "description": ("One record in full: a criterion with its finding on axes, its observations and its history, an experiment "

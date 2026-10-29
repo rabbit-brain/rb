@@ -545,6 +545,7 @@ pub fn cmd_spec_set(ns: &Namespace, out: &mut Out) -> R {
         out.say(SPEC_CHANGED);
     }
     out.notes.extend(later);
+    out.notes.extend(cited_differs(&experiment, &name, &setting));
     out.notes.extend(varies_same(&led, &experiment, Some(&name))?);
     actor_line(out, &led)?;
     let failures: Vec<Value> = match &row {
@@ -563,6 +564,17 @@ pub fn cmd_spec_set(ns: &Namespace, out: &mut Out) -> R {
 /// A factor the experiment varies that every variant holds at one value, said by the write that leaves it so as rb
 /// status says it after the runs (varies_unchanged), with how each variant gets its own. With `touched`, only the
 /// factor that setting is.
+/// A cited value the source here does not match, said where it is set, as its findings will read it: the command
+/// line, the SDK and MCP say it beside the setting.
+pub(crate) fn cited_differs(experiment: &str, name: &str, setting: &crate::record::Setting) -> Option<String> {
+    let c = setting.cited.as_ref().filter(|c| !setting.per_run && !ledger::same_value(&c.value, &setting.value))?;
+    Some(format!(
+        "{name} is {} here and {} in the cited source: while they differ, a criterion of {experiment} that cites a number is not comparable, and its rule reads undetermined.",
+        show(&setting.value),
+        show(&c.value)
+    ))
+}
+
 pub(crate) fn varies_same(led: &Ledger, experiment: &str, touched: Option<&str>) -> Res<Vec<String>> {
     let Ok(exp) = led.load::<Experiment>(experiment) else { return Ok(Vec::new()) };
     Ok(led
@@ -2108,9 +2120,10 @@ pub fn freeze_review(led: &Ledger, exp: &Experiment) -> Res<Vec<String>> {
             None => String::new(),
         };
         lines.push(format!("    criterion {} ({}): {}{said}", c.id, c.role, c.rule()));
-        // a rule no human declared is put to whoever locks it, in words that name no writer
+        // a rule no human declared is put to whoever locked it, in words that name no writer: rb freeze says this after
+        // the freeze is written, so it says the lock as done
         if !c.created_by.starts_with("human:") {
-            look.push(format!("    look: check {} before locking it; freezing locks it as the test. Is it the one you mean?", c.id));
+            look.push(format!("    look: {} is locked as the test now. Check it is the one you mean: a change to it needs --amend --why \"<reason>\".", c.id));
         }
     }
     let caveats = led.setting_caveats(exp, led.has_origin(exp)?, None)?;
@@ -2291,6 +2304,20 @@ pub fn cmd_decide(ns: &Namespace, out: &mut Out) -> R {
 /// and a design as it was listed, outside an agent session only: a confirmation an agent passes makes nothing the
 /// user's. With no id it lists what waits; with an experiment's id alone it lists that design; with --all it says what
 /// it confirms, then confirms it.
+/// What a design's confirmation leaves as it was: the notes on the experiment that read as not confirmed, which are
+/// not part of its design, and how the user says one in their own name. None when there are none.
+fn notes_left(e: &Experiment) -> Option<String> {
+    let ids: Vec<String> = e.notes.iter().filter(|n| n.retracted.is_none() && !crate::view::not_confirmed(&n.by).is_empty()).map(|n| n.id.clone().unwrap_or_default()).collect();
+    if ids.is_empty() {
+        return None;
+    }
+    let (them, stay) = if ids.len() == 1 { (format!("note {}", ids[0]), "stays") } else { (format!("notes {}", ids.join(", ")), "stay") };
+    Some(format!(
+        "{them} on {} {stay} not confirmed: a note is not part of the design. To say one as yours, write it in your own terminal: rb note add \"<its words>\" -e {}, then rb retract <note> --why \"<reason>\".",
+        e.id, e.id
+    ))
+}
+
 pub fn cmd_confirm(ns: &Namespace, out: &mut Out) -> R {
     let led = Ledger::open(None)?;
     // what it lists and what its receipt says are drawn as the record read before the confirmation
@@ -2369,6 +2396,7 @@ pub fn cmd_confirm(ns: &Namespace, out: &mut Out) -> R {
         if command {
             l.push(format!("    confirm: {}", d.confirm()));
         }
+        l.extend(notes_left(e).map(|x| format!("    {x}")));
         Ok(l)
     };
     let design_rows = |w: &[(Experiment, ledger::Design)]| -> Res<Value> {
@@ -2376,7 +2404,8 @@ pub fn cmd_confirm(ns: &Namespace, out: &mut Out) -> R {
         for (e, d) in w {
             rows.push(crate::obj! {
                 "experiment" => e.id.clone(), "title" => e.title.clone(), "standing" => d.state, "key" => d.key.clone(), "confirm" => d.waiting_command(),
-                "changes" => Value::List(d.changes.iter().map(|c| c.to_value()).collect()), "lines" => Value::list_of_str(led.design_said(e, d)?)
+                "changes" => Value::List(d.changes.iter().map(|c| c.to_value()).collect()), "lines" => Value::list_of_str(led.design_said(e, d)?),
+                "notes_left" => notes_left(e).unwrap_or_default()
             });
         }
         Ok(Value::List(rows))
@@ -2593,6 +2622,9 @@ pub fn cmd_confirm(ns: &Namespace, out: &mut Out) -> R {
         };
         let e: Experiment = led.load(id)?;
         out.say(format!("{id}'s design is confirmed."));
+        if let Some(left) = notes_left(&e) {
+            out.say(format!("  {left}"));
+        }
         // its gate is the user's now, with its words
         if !(e.if_holds.is_empty() && e.if_not.is_empty()) {
             let (words, by) = led.gate_words()?.remove(&e.id).unwrap_or_default();

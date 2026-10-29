@@ -182,10 +182,40 @@ def standing_class(part: str) -> str:
     return "dim"
 
 
-def rule_label(word: str, count: int) -> str:
-    noun = "criterion" if count == 1 else "criteria"
-    return {"meets": f"{noun} met", "misses": f"{noun} not met",
-            "undetermined": f"{noun} undetermined", "untested": f"{noun} untested"}.get(word, word)
+# rb's rule words as every screen says them (strings.rs plain_word, which rb status, rb context, the page and rb open
+# say): the noun is "rule", undetermined reads "can't tell yet", untested "not tested". Display only: the colours and
+# every key still read rb's own words.
+_PLAIN = {"criteria met": ("rule met", "rules met"), "criterion met": ("rule met", "rules met"),
+          "criteria not met": ("rule not met", "rules not met"), "criterion not met": ("rule not met", "rules not met"),
+          "criteria undetermined": "can't tell yet", "criterion undetermined": "can't tell yet",
+          "undetermined": "can't tell yet", "criteria untested": "not tested", "criterion untested": "not tested",
+          "untested": "not tested", "gate undetermined": "gate, can't tell yet", "gate untested": "gate not tested",
+          "estimate meets criterion": "estimate meets the rule",
+          "recorded values meet criterion": "recorded values meet the rule",
+          "point only": "no interval", "No interval": "no interval",
+          "Retrospective": "rule written after the results", "retrospective": "rule written after the results"}
+
+# A rule word as a tally says it, short (views.rs short_rule): "met", "not met", "can't tell yet", "not tested".
+_SHORT_RULE = {"meets": "met", "misses": "not met", "undetermined": "can't tell yet", "untested": "not tested"}
+
+RULES_LEAD = "Rules: "
+
+
+def plain_word(phrase: str) -> str:
+    """One part of rb's standing as the screens say it: '2 criteria met' is '2 rules met', '1 criterion undetermined'
+    '1 can't tell yet'. A leading count is kept; any other phrase ('not reproduced', 'gate missed') is as rb gives it."""
+    head, _, rest = phrase.partition(" ")
+    n, rest = (head, rest) if head.isdigit() else (None, phrase)
+    said = _PLAIN.get(rest, rest)
+    if isinstance(said, tuple):
+        said = said[0] if n in (None, "1") else said[1]
+    return f"{n} {said}" if n is not None else said
+
+
+def tally_word(word: str, n) -> str:
+    """One count of the tally as the page and rb status say it: ('meets', 1) is '1 met', ('undetermined', 1) '1 can't
+    tell yet', ('gate undetermined', 2) '2 gate, can't tell yet'."""
+    return plain_word(f"{n} {_SHORT_RULE.get(word, word)}")
 
 
 def _colour(part: str, muted=()) -> str:
@@ -202,12 +232,51 @@ def _bar_colour(standing: str, muted=()) -> str:
 
 
 def _short_count(part: str) -> str:
-    """A count of criteria in the catalogue's short words: '2 criteria not met' is '2 not met'. Anything else stays."""
+    """A count of criteria in the catalogue's short words, as a tally says it: '2 criteria not met' is '2 not met',
+    '1 criterion undetermined' '1 can't tell yet'. Anything else as the screens say it (plain_word)."""
     count, _, rest = part.partition(" ")
     noun, _, word = rest.partition(" ")
     if count.isdigit() and noun in ("criterion", "criteria") and word in ("met", "not met", "undetermined", "untested"):
-        return f"{count} {word}"
-    return part
+        return tally_word({"met": "meets", "not met": "misses"}.get(word, word), count)
+    return plain_word(part)
+
+
+def said_part(part: str, short: bool = False) -> str:
+    """One part of rb's standing as a catalogue row draws it: in short count words if `short`, else plain."""
+    return _short_count(part) if short else plain_word(part)
+
+
+def said_lead(line: str) -> str:
+    """rb's clauses (split at '; ') as the screens say them: a clause that is a rule word ('criterion untested') in
+    plain words, and one that leads with one ('criterion met: estimate 0.785 ≥ 0.7') with its lead so ('rule met: ...',
+    views.rs said_lead), the rest as rb gives it. Only rb's own words go through it, never text someone wrote."""
+    out = []
+    for clause in line.split("; "):
+        end = "." if clause.endswith(".") else ""
+        bare = clause[:-1] if end else clause
+        lead, colon, rest = bare.partition(": ")
+        if plain_word(bare) != bare:
+            out.append(plain_word(bare) + end)
+        elif colon and plain_word(lead) != lead:
+            out.append(f"{plain_word(lead)}: {rest}{end}")
+        else:
+            out.append(clause)
+    return "; ".join(out)
+
+
+def said_sentence(sentence: str, statement: str) -> str:
+    """A finding's sentence on a card ('<statement>. <rb's clauses>'): the statement as written, rb's clauses after it
+    as the screens say them (said_lead). A sentence that does not open with the statement is left as rb gives it."""
+    head = statement.strip()
+    head = head if head.endswith((".", "?", "!", ":")) else head + "."
+    if not head or head == "." or not sentence.startswith(head + " "):
+        return sentence
+    return f"{head} {said_lead(sentence[len(head) + 1:])}"
+
+
+def said_standing(standing: str, short: bool = False) -> str:
+    """A whole standing as a catalogue row draws it, every part said as the screens say it."""
+    return " · ".join(said_part(part, short) for part in standing.split(" · "))
 
 
 def standing_ways(standing: str, muted=(), *, short: bool = False) -> list[Text]:
@@ -227,7 +296,7 @@ def standing_ways(standing: str, muted=(), *, short: bool = False) -> list[Text]
         for i, part in enumerate(kept):
             if i:
                 out.append(" · ", style=DIM)
-            out.append(_short_count(part) if short else part, style=_colour(part, muted))
+            out.append(said_part(part, short), style=_colour(part, muted))
         if len(kept) < len(parts):
             out.append(" …", style=DIM)
         drawn.append(out)
@@ -252,17 +321,15 @@ def standing_text(standing: str, muted=(), *, short: bool = False, room: Optiona
     return out
 
 
-def tally_text(tally, muted=(), *, short: bool = False) -> Text:
-    """The line counting the record's criteria by their reading, each count coloured as rb's own words for it are, in
-    short count words if `short`."""
+def tally_text(tally, muted=()) -> Text:
+    """The line counting the record's rules by their reading, as the page and rb status say it ('Rules: 1 met · 1 can't
+    tell yet'), each count coloured as rb's own words for it are. Its words are short already."""
     out = Text(no_wrap=True, overflow="ellipsis")
-    out.append("criteria", style=DIM)
-    out.append("   ")
+    out.append(RULES_LEAD, style=DIM)
     for i, (word, n) in enumerate(tally):
         if i:
             out.append(" · ", style=DIM)
-        said = f"{n} {rule_label(word, n)}"
-        out.append(_short_count(said) if short else said, style=_colour(word, muted))
+        out.append(tally_word(word, n), style=_colour(word, muted))
     return out
 
 
@@ -274,10 +341,13 @@ def build_card_widgets(c: View) -> list[Widget]:
         Static(f"[{DIM}]{_esc(c.who_line)}[/{DIM}]"),
     ]
     if c.lead:
-        out.append(Static(_esc(c.lead), classes="lead"))
+        out.append(Static(_esc(said_standing(c.lead)), classes="lead"))      # a rule's words as rb open's card says them
     for s in c.sentences:
-        out.append(Static(_esc(s), classes="lead"))     # the brief, full ink: the state is the content
+        out.append(Static(_esc(said_sentence(s, c.title)), classes="lead"))     # the brief, full ink: the state is the content
     for f in c.facts:
+        key, colon, said = f.partition(": ")
+        if key in ("rule", "result") and colon:
+            f = f"{key}: {said_lead(said_standing(said))}"
         out.append(Static(f"[{DIM}]{_esc(f)}[/{DIM}]", classes="block"))
     if c.runs:
         out.append(Static(f"\n[{ACCENT}]Its runs (open one for its receipt):[/{ACCENT}]", classes="section"))
@@ -291,7 +361,7 @@ def build_card_widgets(c: View) -> list[Widget]:
             colour = _bar_colour(p.standing, p.get("muted", ()))
             bar = Horizontal(
                 Static(f"[b {TEAL}]{_esc(p.criterion_id)}[/b {TEAL}]", classes="bar-id"),
-                Static(f"{_esc(p.text)}\n[{DIM}]{_esc(p.rule)}[/{DIM}] · [{colour}]{_esc(p.standing)}[/{colour}]",
+                Static(f"{_esc(p.text)}\n[{DIM}]{_esc(p.rule)}[/{DIM}] · [{colour}]{_esc(said_standing(p.standing))}[/{colour}]",
                        classes="bar-body"),
                 classes="bar",
             )
@@ -709,7 +779,7 @@ class HomeScreen(Screen):
             yield Static(id="head")
             yield Static(id="since")
         yield Static(id="place")              # which place and version the screen shows: one quiet line
-        yield Static(id="began")              # where the record began, when runs came before it: one quiet line
+        yield Static(id="began")              # the record's line, when anything was recorded afterwards: one quiet line
         with Horizontal(id="top"):
             with Vertical(id="tree-panel"):
                 yield OptionList(id="tree-list")
@@ -879,9 +949,7 @@ class HomeScreen(Screen):
         began.update(f"[{DIM}]{_esc(h.get('began') or '')}[/{DIM}]" if h.get("began") else "")
         began.display = bool(h.get("began"))
         muted = h.get("muted", ())
-        tally = tally_text(h.tally, muted)
-        if len(tally) > self.size.width:        # one line as wide as the screen: past it, every count in short words
-            tally = tally_text(h.tally, muted, short=True)
+        tally = tally_text(h.tally, muted)     # one line, cut with a '…' past the screen's width
         self.query_one("#tally", Static).update(tally if h.tally else "")
         calls_panel = self.query_one("#calls-panel")
         calls_panel.border_title = f"YOUR CALL ({len(self._asks)})"
@@ -951,7 +1019,7 @@ class HomeScreen(Screen):
             floor = min(len(r.label), 16)
             # the standing takes what it needs before the title is cut; the title keeps 16 columns, or a shorter one all
             laid.append((r, gutter, head, floor, max(width - head - floor - 1, 1)))
-        short = any(len(r.standing) > room for r, *_, room in laid)    # one row short of room: every row counts short
+        short = any(len(said_standing(r.standing)) > room for r, *_, room in laid)    # one row short of room: every row counts short
         for r, gutter, head, floor, room in laid:
             # counts that do not fit beside the title's floor take what they need of it, down to its last column
             standing = standing_text(r.standing, r.get("muted", ()), short=short, room=room, spare=width - head - 2 - room)

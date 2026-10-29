@@ -15,13 +15,23 @@ use std::time::{Duration, Instant};
 
 pub const DEFAULT_HUB: &str = "https://rabbitbrain.ai";
 
-/// Whether rabbitbrain.ai's hosted service is open. Until it is, rb login and rb sync addressed to it send nothing.
-const HOSTED_OPEN: bool = false;
+/// Whether rabbitbrain.ai's hosted service is open. While it is not, rb login and rb sync addressed to it send nothing.
+const HOSTED_OPEN: bool = true;
+
+/// Whether the hosted service is open for this command: HOSTED_OPEN, unless RB_TEST_HOSTED_CLOSED plays it closed, so
+/// the closed path keeps its tests while the service is open.
+fn hosted_open() -> bool {
+    HOSTED_OPEN && std::env::var_os("RB_TEST_HOSTED_CLOSED").is_none()
+}
 
 /// rabbitbrain.ai while its hosted service is not open: said plainly, with what works without it, and nothing sent. A
 /// hub named with --hub or RB_HUB_URL is the user's to call.
 fn not_open(hub: &str, cmd: &str) -> Res<()> {
-    if HOSTED_OPEN || !is_rabbitbrain(hub) {
+    closed_to(hosted_open(), hub, cmd)
+}
+
+fn closed_to(open: bool, hub: &str, cmd: &str) -> Res<()> {
+    if open || !is_rabbitbrain(hub) {
         return Ok(());
     }
     let what = if cmd == "login" { "no account to sign in to" } else { "no account to keep a copy in" };
@@ -421,22 +431,30 @@ fn call(url: &str, token: &Value, method: &str, body: Option<Vec<u8>>, ctype: Op
 }
 
 /// The page as `rb export --zip --no-repo` writes it (the manifest names no remote address or commit of the repository), or with `record` (the address the record will have) the bundle `rb export
-/// --zip --no-repo --with-record --url <url>` writes, built in a folder of its own under the temporary directory that is gone when
-/// this returns.
-/// With the bytes, what a watch compares (`Shown`) of what they hold, read under the same hold of the record.
-fn bundle_bytes(led: &Ledger, record: Option<&str>) -> Res<(Vec<u8>, Shown)> {
+/// --zip --with-record --url <url>` writes, built in a folder of its own under the temporary directory that is gone when
+/// this returns. The bundle names the code (`--no-repo` left off) only where `names_code` says origin is an address a
+/// reader can use, by rb export's rule: a share link's reader who reruns it gets the code from there, and nothing of
+/// this machine travels.
+/// With the bytes, what a watch compares (`Shown`) of what they hold, and the code the bundle names (its manifest's
+/// `repo`), read under the same hold of the record.
+fn bundle_bytes(led: &Ledger, record: Option<&str>) -> Res<(Vec<u8>, Shown, Option<Dict>)> {
+    let names_code = record.is_some() && names_code(&led.root);
     led.locked(|| {
         let td = mkdtemp("rb-sync-").map_err(|e| RBError::could_not_write(&e, &std::env::temp_dir().join("rb-sync")))?;
         let out = td.join("bundle.zip");
         // the clock's minutes for this build: from just before it to just after, and when rb last looked, read either side
         let (before, looked) = (crate::pytime::now_dt(), crate::journal::Scope::of(led).looked_at);
-        let read = crate::export::build(led, Some(&out), true, record, true, record.is_some()).and_then(|_| {
+        let read = crate::export::build(led, Some(&out), true, record, !names_code, record.is_some()).and_then(|said| {
             let clock = Clock::between(before, crate::pytime::now_dt(), [looked, crate::journal::Scope::of(led).looked_at]);
             let bytes = std::fs::read(&out).map_err(|e| RBError::could_not_read(&e, &crate::sys::slashed(&out)))?;
             let entries = crate::zipfile::read_zip(&out).map_err(|e| RBError::msg("E_INTERNAL", format!("rb itself failed: the bundle it wrote does not read ({e:?})")))?;
             let page = entries.iter().find(|(name, _)| name == "bundle/page.html").map(|(_, b)| String::from_utf8_lossy(b).into_owned());
             let page = page.ok_or_else(|| RBError::msg("E_INTERNAL", "rb itself failed: the bundle it wrote has no page.html"))?;
-            Ok((bytes, Shown { digest: led.state_digest()?, page, clock }))
+            let code = match said.get("repo") {
+                Some(Value::Dict(r)) => Some(r.clone()),
+                _ => None,
+            };
+            Ok((bytes, Shown { digest: led.state_digest()?, page, clock }, code))
         });
         let _ = std::fs::remove_dir_all(&td);
         read
@@ -459,7 +477,7 @@ fn upload(led: &Ledger, token: &Value, hub: &str, with_record: bool) -> Res<Sent
     let proj = led.project()?;
     // the record is held first, so a wait for it ends at once on Ctrl-C
     let record = with_record.then(|| format!("{base}/{}/bundle.zip", proj.id));
-    let (bytes, shown) = led.locked(|| {
+    let (bytes, shown, code) = led.locked(|| {
         // a signal that would end rb while the bundle is in the temporary directory ends it once that is gone
         let endings = crate::sys::catch_endings();
         let read = bundle_bytes(led, record.as_deref());
@@ -478,15 +496,16 @@ fn upload(led: &Ledger, token: &Value, hub: &str, with_record: bool) -> Res<Sent
     if !d.contains_key("url") {
         return Err(res.odd("its answer has no url"));
     }
-    Ok(Sent { said: d, shown, record })
+    Ok(Sent { said: d, shown, record, code })
 }
 
-/// An upload: the site's answer with the handle, what it sent (`Shown`), and the address the record went with, which
-/// a watch builds its next looks with.
+/// An upload: the site's answer with the handle, what it sent (`Shown`), the address the record went with, which
+/// a watch builds its next looks with, and the code the bundle names (its manifest's `repo`).
 struct Sent {
     said: Dict,
     shown: Shown,
     record: Option<String>,
+    code: Option<Dict>,
 }
 
 pub fn cmd_sync(hub_flag: Option<String>, with_record: bool, out: &mut Out) -> Res<i32> {
@@ -494,23 +513,25 @@ pub fn cmd_sync(hub_flag: Option<String>, with_record: bool, out: &mut Out) -> R
     let hub = address(hub_flag)?;
     not_open(&hub, "sync")?;
     let token = token_for(&hub)?;
-    let res = upload(&led, &token, &hub, with_record)?.said;
-    let url = res.get("url").map(py_str).unwrap_or_default();
+    let sent = upload(&led, &token, &hub, with_record)?;
+    let url = sent.said.get("url").map(py_str).unwrap_or_default();
     out.say(format!("Synced, privately: {url}"));
-    for line in synced_words(&led, with_record, false) {
+    for line in synced_words(&led, with_record, sent.code.as_ref(), false) {
         out.say(line);
     }
-    for (k, v) in res {
+    for (k, v) in sent.said {
         out.data.insert(k, v);
     }
     out.data.insert("with_record".into(), Value::Bool(with_record));
+    // the code the bundle names, as its manifest's repo says it; none for a page alone
+    out.data.insert("repo".into(), sent.code.map(Value::Dict).unwrap_or(Value::Null));
     Ok(0)
 }
 
 /// What a sync says after its address: who can open the copy, how it is shared and kept current, what went, and what a
 /// share link's readers can rerun (only a record sent, once its owner lets them on the site). A watch keeps it current
 /// itself, so it says that instead of asking for rb sync again.
-fn synced_words(led: &Ledger, with_record: bool, watching: bool) -> Vec<String> {
+fn synced_words(led: &Ledger, with_record: bool, code: Option<&Dict>, watching: bool) -> Vec<String> {
     let (again, updates) = if watching {
         ("rb sync --watch sends it again each time the record changes", "each sync updates what the link shows")
     } else {
@@ -523,11 +544,37 @@ fn synced_words(led: &Ledger, with_record: bool, watching: bool) -> Vec<String> 
     if with_record {
         said.push("The record went with its page, and the record in this repository stays the store. Only you can download the record, unless you let a share link's readers rerun it on the site.".into());
         said.push(format!("{} Anyone who can open the copy can read all of it.", crate::export::record_carries(led)));
+        said.push(code_words(code));
     } else {
         said.push("Its page went alone: the record stays in this repository, the store, and rb sync --with-record sends it too.".into());
         said.push("A share link's readers can rerun only a sync made with --with-record.".into());
     }
     said
+}
+
+/// What a record sent says of its code: in the Rerun panel's words, the code the runs used, at its commit; or, where it
+/// names none, the line rb export says then (`export::CODE_UNNAMED`), so the two say one thing in one wording.
+fn code_words(code: Option<&Dict>) -> String {
+    use crate::shell::strings as w;
+    let url = code.and_then(|c| c.get("url")).map(py_str).unwrap_or_default();
+    if url.is_empty() {
+        return crate::export::CODE_UNNAMED.to_string();
+    }
+    let commit: String = code.and_then(|c| c.get("commit")).map(py_str).unwrap_or_default().chars().take(10).collect();
+    let at = if commit.is_empty() { String::new() } else { format!("{}{commit}", w::AT_COMMIT) };
+    format!("{}{url}{at}. Readers who rerun it get the code with the record.", w::CODE_THE_RUNS_USED)
+}
+
+/// Whether a record sent names the code: by rb export's one rule (`export::readable_code_address`), over origin's
+/// address as the checkout's config writes it, which rb export reads too (an insteadOf's rewrite for this machine's
+/// own fetches is this machine's). The address named is the one rb export names, with any credentials, query and
+/// fragment taken out.
+fn names_code(root: &std::path::Path) -> bool {
+    let Ok(r) = std::process::Command::new("git").args(["config", "--get", "remote.origin.url"]).current_dir(root).stdin(std::process::Stdio::null()).output() else {
+        return false;
+    };
+    // read as rb export reads it (git_out): stripped as Python strips, which takes more than Rust's trim
+    r.status.success() && crate::export::readable_code_address(crate::rbyaml::py_strip(&String::from_utf8_lossy(&r.stdout))).is_some()
 }
 
 /// How often rb sync --watch looks at the record, and the least time between two uploads.
@@ -666,15 +713,16 @@ impl Clock {
 /// the upload. The look and the key are taken under rb's catch of the signals that end it, so
 /// a signal then ends rb once nothing of the look is half written.
 fn look(root: &std::path::Path, hub: &str, with_record: bool, sent: Option<(&Shown, Option<&str>)>, last: Option<Instant>) -> Looked {
-    // each look reads the record and git afresh, as a new command line does: nothing an earlier look worked out holds
+    // each look reads the record, its sources and git afresh, as a new command line does: nothing an earlier look worked out holds
     crate::ledger::forget_worked();
+    crate::sources::forget_reads();
     let endings = crate::sys::catch_endings();
     let read = Ledger::open(Some(root)).and_then(|led| {
         let _ = crate::journal::scan(&led); // observation is best effort, as on rb open
         match sent {
             // the first look sends: there is nothing to compare it with
             None => Ok((led, None)),
-            Some((_, record)) => bundle_bytes(&led, record).map(|(_, k)| (led, Some(k))),
+            Some((_, record)) => bundle_bytes(&led, record).map(|(_, k, _)| (led, Some(k))),
         }
     });
     drop(endings);
@@ -698,7 +746,7 @@ fn look(root: &std::path::Path, hub: &str, with_record: bool, sent: Option<(&Sho
             let at = crate::pytime::now_dt().format("%H:%M UTC");
             eprintln_err(&format!("Synced at {at}, privately: {url}"));
             if sent.is_none() {
-                for line in synced_words(&led, with_record, true) {
+                for line in synced_words(&led, with_record, up.code.as_ref(), true) {
                     eprintln_err(&format!("  {line}"));
                 }
             }
@@ -777,7 +825,16 @@ fn with_fix(e: &RBError) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Clock, Shown};
+    use super::{closed_to, Clock, Shown};
+
+    #[test]
+    fn rabbitbrain_ai_closed_sends_nothing_and_open_goes_on() {
+        let closed = closed_to(false, "https://rabbitbrain.ai", "sync").unwrap_err();
+        assert_eq!(closed.code, "E_NOT_AVAILABLE");
+        assert!(closed_to(false, "http://127.0.0.1:8787", "sync").is_ok());
+        assert!(closed_to(true, "https://www.rabbitbrain.ai/", "login").is_ok());
+        assert!(super::HOSTED_OPEN, "0.6.1 opens rabbitbrain.ai");
+    }
 
     fn at(t: &str) -> chrono::DateTime<chrono::Utc> {
         chrono::DateTime::parse_from_rfc3339(t).unwrap().with_timezone(&chrono::Utc)

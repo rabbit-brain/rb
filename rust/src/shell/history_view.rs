@@ -216,7 +216,14 @@ fn linked(doc: &Value, sentence: &str, refs: &[&str], held: &dyn Fn(&str) -> boo
         if said.iter().any(|(x, _, _)| x == r) {
             continue;
         }
-        let words = words_for(doc, r).filter(|w| !words_at(sentence, r).any(|_| true) && words_at(sentence, w).next().is_some());
+        // a run's words, or as History's own "Recorded" says them ("run X at <when>", history::as_recorded): the line's
+        // own record first that way, a record it names after the lead first as written
+        let lead = refs.first() == Some(r);
+        let (raw, at): (Vec<String>, Vec<String>) = words_for(doc, r, sentence).into_iter().unzip();
+        let words = if lead { at.into_iter().chain(raw).collect::<Vec<_>>() } else { raw.into_iter().chain(at).collect() };
+        let words = words
+            .into_iter()
+            .find(|w| !words_at(sentence, r).any(|_| true) && words_at(sentence, w).next().is_some());
         said.push(match words {
             Some(w) => (r, w, false),
             None => (r, r.to_string(), true),
@@ -224,8 +231,12 @@ fn linked(doc: &Value, sentence: &str, refs: &[&str], held: &dyn Fn(&str) -> boo
     }
     said.sort_by_key(|(_, t, _)| std::cmp::Reverse(t.len()));
     let mut marks: Vec<(usize, usize, Option<String>, bool)> = Vec::new();
+    // the words just after the line's verb ("Recorded an analysis on e1: ...") are its own record's: an untitled
+    // analysis the line also names ("..., replacing an analysis") never takes them
+    let own = sentence.find(' ').map(|k| k + 1);
     for (r, t, mono) in said {
-        let free = |at: &usize| !marks.iter().any(|(s, e, _, _)| *at < *e && at + t.len() > *s);
+        let theirs = |at: &usize| t.starts_with(UNTITLED) && refs.first() != Some(&r) && Some(*at) == own;
+        let free = |at: &usize| !marks.iter().any(|(s, e, _, _)| *at < *e && at + t.len() > *s) && !theirs(at);
         // a record told by its words then its id ("Added an experiment: e1 against e1 baseline (e1)") is set at the id
         // that closes the sentence, never at its own words
         let chip = sentence.ends_with(&format!("({t})")).then(|| sentence.len() - t.len() - 1).filter(|at| free(at));
@@ -251,16 +262,56 @@ fn linked(doc: &Value, sentence: &str, refs: &[&str], held: &dyn Fn(&str) -> boo
     out
 }
 
-/// What a sentence says for a record by its words, not its id: a run as the document names it (`runs.{id}.named`; "run
-/// <label>", how its words open, in a document that does not hold them), an analysis rb minted an id for by its title.
-fn words_for(doc: &Value, r: &str) -> Option<String> {
-    let run = at(doc, "runs").and_then(|m| m.get(r)).map(|x| match text(x, "named") {
-        "" if text(x, "label").is_empty() => format!("a run of {}", text(x, "experiment_id")),
-        "" => format!("run {}", text(x, "label")),
-        w => w.to_string(),
+/// How History's line and every view open the words of an analysis with no title (history::names_of): "an analysis on
+/// e1, recorded <minute>".
+const UNTITLED: &str = "an analysis on ";
+
+/// What a sentence may say for a record by its words, not its id, each as written and as History's own "Recorded"
+/// says it (history::as_recorded): a run as the document names it (`runs.{id}.named`; "run <label>", how its words
+/// open, in a document that does not hold them), an analysis rb minted an id for by its title, one with no title by
+/// its experiment and when it was recorded.
+fn words_for(doc: &Value, r: &str, sentence: &str) -> Vec<(String, String)> {
+    let run = at(doc, "runs").and_then(|m| m.get(r)).map(|x| {
+        let base = match text(x, "label") {
+            "" => format!("a run of {}", text(x, "experiment_id")),
+            l => format!("run {l}"),
+        };
+        let named = match text(x, "named") {
+            "" => base.clone(),
+            w => w.to_string(),
+        };
+        (crate::history::as_recorded(&named, &base), named)
     });
-    let analysis = || at(doc, "analyses").and_then(|m| m.get(r)).map(|x| format!("analysis {}", text(x, "title").trim())).filter(|w| w != "analysis ");
-    run.filter(|w| w != "a run of ").or_else(analysis)
+    if let Some((at, named)) = run.filter(|(_, w)| w != "a run of ") {
+        return vec![(named, at)];
+    }
+    match at(doc, "analyses").and_then(|m| m.get(r)) {
+        Some(x) => match text(x, "title").trim() {
+            "" => untitled_words(text(x, "recorded"), sentence),
+            t => vec![(format!("analysis {t}"), format!("analysis {t}"))],
+        },
+        None => Vec::new(),
+    }
+}
+
+/// The words a sentence may say an analysis with no title by, "an analysis on e1, recorded 2026-10-14 09:30 UTC" and
+/// "an analysis on e1 at <minute>" after History's own "Recorded", for each experiment the sentence names after "an
+/// analysis on ", from the minute its card says it was recorded ("analysis · recorded <minute> · basis ...").
+fn untitled_words(recorded: &str, sentence: &str) -> Vec<(String, String)> {
+    let Some(when) = recorded.strip_prefix("analysis · recorded ").and_then(|r| r.split(" · ").next()) else {
+        return Vec::new();
+    };
+    let mut out: Vec<(String, String)> = Vec::new();
+    for (k, _) in sentence.match_indices(UNTITLED) {
+        let rest = &sentence[k + UNTITLED.len()..];
+        let base = format!("{UNTITLED}{}", &rest[..rest.find([',', ' ']).unwrap_or(rest.len())]);
+        let w = format!("{base}, recorded {when}");
+        let pair = (crate::history::as_recorded(&w, &base), w);
+        if !out.iter().any(|(x, _)| *x == pair.1) {
+            out.push((pair.1, pair.0));
+        }
+    }
+    out
 }
 
 /// Each place `word` stands alone in `s`, in order: bounded by the text's ends or by a character no id holds there. An
@@ -421,7 +472,7 @@ mod tests {
     #[test]
     fn a_runs_words_link_to_its_card_in_the_sentences_type() {
         // FIX9: a sentence names a run and an analysis rb minted an id for by their words, which link where the id would
-        let d = doc(r#"{"runs": {"runaaaaaa": {"named": "run fp32 and int8 · seed 1, recorded 2026-10-14 09:20 UTC"}, "runbbbbbb": {"named": "run fp32 and int8 · seed 1, recorded 2026-10-14 09:25 UTC"}, "runcccccc": {"named": "a run of e1"}},
+        let d = doc(r#"{"runs": {"runaaaaaa": {"label": "fp32 and int8 · seed 1", "named": "run fp32 and int8 · seed 1, recorded 2026-10-14 09:20 UTC"}, "runbbbbbb": {"label": "fp32 and int8 · seed 1", "named": "run fp32 and int8 · seed 1, recorded 2026-10-14 09:25 UTC"}, "runcccccc": {"label": "", "experiment_id": "e1", "named": "a run of e1"}},
             "analyses": {"adddddd": {"title": " per-image accuracy "}}, "experiments": [{"id": "e1"}]}"#);
         let s = "Recorded a run on e1: run fp32 and int8 · seed 1, recorded 2026-10-14 09:25 UTC, replacing run fp32 and int8 · seed 1, recorded 2026-10-14 09:20 UTC";
         let html = linked(&d, s, &["runbbbbbb", "runaaaaaa", "e1"], &all);
@@ -429,6 +480,49 @@ mod tests {
             html,
             "Recorded a run on <a class=\"mono\" href=\"#x-e1\">e1</a>: <a href=\"#run-runbbbbbb\">run fp32 and int8 · seed 1, recorded 2026-10-14 09:25 UTC</a>, replacing \
              <a href=\"#run-runaaaaaa\">run fp32 and int8 · seed 1, recorded 2026-10-14 09:20 UTC</a>"
+        );
+        // as History's own "Recorded" says a run told apart by when ("run X at <when>", history::as_recorded), it links too
+        let at = "Recorded a run on e1: run fp32 and int8 · seed 1 at 2026-10-14 09:25 UTC, replacing run fp32 and int8 · seed 1, recorded 2026-10-14 09:20 UTC";
+        assert_eq!(
+            linked(&d, at, &["runbbbbbb", "runaaaaaa", "e1"], &all),
+            "Recorded a run on <a class=\"mono\" href=\"#x-e1\">e1</a>: <a href=\"#run-runbbbbbb\">run fp32 and int8 · seed 1 at 2026-10-14 09:25 UTC</a>, replacing \
+             <a href=\"#run-runaaaaaa\">run fp32 and int8 · seed 1, recorded 2026-10-14 09:20 UTC</a>"
+        );
+        // an analysis with no title links by the words its line says it by: its experiment and when it was recorded
+        let rec = |m: &str| format!("analysis · recorded 2026-10-14 {m} UTC · basis computed");
+        let un = doc(&format!(r#"{{"analyses": {{"aggggggg": {{"title": "", "recorded": "{}"}}}}, "experiments": [{{"id": "e1"}}]}}"#, rec("09:30")));
+        assert_eq!(
+            linked(&un, "Recorded an analysis on e1 at 2026-10-14 09:30 UTC", &["aggggggg", "e1"], &all),
+            "Recorded <a href=\"#a-aggggggg\">an analysis on e1 at 2026-10-14 09:30 UTC</a>"
+        );
+        assert_eq!(
+            linked(&un, "Retracted an analysis on e1, recorded 2026-10-14 09:30 UTC", &["aggggggg"], &all),
+            "Retracted <a href=\"#a-aggggggg\">an analysis on e1, recorded 2026-10-14 09:30 UTC</a>"
+        );
+        // a titled analysis replacing an untitled one: the old one's link is at "replacing", never the lead (review)
+        let two = doc(&format!(r#"{{"analyses": {{"aold": {{"title": "", "recorded": "{}"}}, "anew": {{"title": "Replacement"}}}}}}"#, rec("09:30")));
+        assert_eq!(
+            linked(&two, "Recorded an analysis on e1: analysis Replacement, replacing an analysis on e1, recorded 2026-10-14 09:30 UTC", &["anew", "aold"], &all),
+            "Recorded an analysis on e1: <a href=\"#a-anew\">analysis Replacement</a>, replacing <a href=\"#a-aold\">an analysis on e1, recorded 2026-10-14 09:30 UTC</a>"
+        );
+        // two untitled in the same minute: each to its own words
+        let two = doc(&format!(r#"{{"analyses": {{"aold": {{"title": "", "recorded": "{0}"}}, "anew": {{"title": "", "recorded": "{0}"}}}}}}"#, rec("09:30")));
+        assert_eq!(
+            linked(&two, "Recorded an analysis on e1 at 2026-10-14 09:30 UTC, replacing an analysis on e1, recorded 2026-10-14 09:30 UTC", &["anew", "aold"], &all),
+            "Recorded <a href=\"#a-anew\">an analysis on e1 at 2026-10-14 09:30 UTC</a>, replacing <a href=\"#a-aold\">an analysis on e1, recorded 2026-10-14 09:30 UTC</a>"
+        );
+        // an untitled analysis on e1 replacing one on e2 recorded the same minute: each links to its own words (Codex,
+        // 061b)
+        let two = doc(&format!(r#"{{"analyses": {{"aold": {{"title": "", "recorded": "{0}"}}, "anew": {{"title": "", "recorded": "{0}"}}}}}}"#, rec("09:30")));
+        assert_eq!(
+            linked(&two, "Recorded an analysis on e1 at 2026-10-14 09:30 UTC, replacing an analysis on e2, recorded 2026-10-14 09:30 UTC", &["anew", "aold"], &all),
+            "Recorded <a href=\"#a-anew\">an analysis on e1 at 2026-10-14 09:30 UTC</a>, replacing <a href=\"#a-aold\">an analysis on e2, recorded 2026-10-14 09:30 UTC</a>"
+        );
+        // a run whose own label reads like rb's time keeps its words, and links by them
+        let own = doc(r#"{"runs": {"runx": {"label": "fp32 and int8 · tag alpha, recorded 2026-10-14 09:20 UTC", "named": "run fp32 and int8 · tag alpha, recorded 2026-10-14 09:20 UTC"}}}"#);
+        assert_eq!(
+            linked(&own, "Recorded a run on e1: run fp32 and int8 · tag alpha, recorded 2026-10-14 09:20 UTC", &["runx"], &all),
+            "Recorded a run on e1: <a href=\"#run-runx\">run fp32 and int8 · tag alpha, recorded 2026-10-14 09:20 UTC</a>"
         );
         // the experiment inside a run's words is the run's link, never its own
         assert_eq!(linked(&d, "Recorded a run of e1", &["runcccccc", "e1"], &all), "Recorded <a href=\"#run-runcccccc\">a run of e1</a>");
@@ -473,9 +567,9 @@ mod tests {
         // the newest sitting first, and inside it the newest line first
         assert!(at("2026-10-19 · 09:25 to 09:40 UTC") < at("2026-10-19 · 09:12 UTC"));
         assert!(at("2026-10-19 · 09:12 UTC") < at("2026-10-06 · 10:02 to 10:32 UTC"));
-        assert!(at("mentioned a past call on int8") < at("proposed a call: accept c3, not made"));
-        assert!(at("proposed a call: accept c3, not made") < at("amended e2 after locking it"));
-        assert!(at("09:40 mentioned a past call") < at("09:35 proposed a call"));
+        assert!(at("Mentioned a past call to park int8") < at("Proposed a call to accept c3, not made"));
+        assert!(at("Proposed a call to accept c3, not made") < at("Amended e2 after locking it"));
+        assert!(at("09:40 Mentioned a past call") < at("09:35 Proposed a call"));
     }
 
     #[test]
@@ -589,10 +683,10 @@ mod tests {
         // group's, so view() and overview_sitting() never link one
         let d = example();
         let html = view(&d);
-        assert!(html.contains("amended <a class=\"mono\" href=\"#x-e2\">e2</a> after locking it"), "{html}");
-        assert!(html.contains("recorded an interpretation on <a class=\"mono\" href=\"#q-q1a\">q1a</a>"), "{html}");
-        assert!(html.contains("proposed a call: accept <a class=\"mono\" href=\"#criteria\">c3</a>, not made"), "{html}");
-        assert!(html.contains("<a class=\"mono\" href=\"#runs\">runs2</a>"), "{html}");
+        assert!(html.contains("Amended <a class=\"mono\" href=\"#x-e2\">e2</a> after locking it"), "{html}");
+        assert!(html.contains("means for <a class=\"mono\" href=\"#q-q1a\">q1a</a>"), "{html}");
+        assert!(html.contains("Proposed a call to accept <a class=\"mono\" href=\"#criteria\">c3</a>, not made"), "{html}");
+        assert!(html.contains("Retracted <a href=\"#runs\">run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC</a>"), "{html}");
         assert!(!html.contains("href=\"#c-") && !html.contains("href=\"#run-") && !html.contains("href=\"#log-"), "{html}");
         assert!(!html.contains("href=\"#x-e9\""));
         assert_eq!(view(&d), sittings(&d, &|id| framed(&d, id)));

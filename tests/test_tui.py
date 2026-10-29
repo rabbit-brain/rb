@@ -67,16 +67,18 @@ def _shown(screen) -> str:
 
 
 def _colour_of(line, part: str) -> str:
-    """The colour a line the screen drew puts `part` in."""
-    at = line.plain.index(part)
+    """The colour a line the screen drew puts `part` in: rb's own words for it ('1 criterion met'), found as the screen
+    says them ('1 rule met')."""
+    from rabbit_brain.tui import plain_word
+    at = line.plain.index(plain_word(part))
     return next(str(s.style) for s in line.spans if s.start <= at < s.end)
 
 
 def status_counts(capsys) -> tuple:
-    """How many items rb status lists under Needs a human and under Can be done now."""
+    """How many items rb status lists under Needs judgment and under Can be done now."""
     assert main(["status"]) == 0
     text = capsys.readouterr().out
-    return tuple(int(m.group(1)) if m else 0 for m in (re.search(rf"^{t} \((\d+)\)$", text, re.M) for t in ("Needs a human", "Can be done now")))
+    return tuple(int(m.group(1)) if m else 0 for m in (re.search(rf"^{t} \((\d+)\)$", text, re.M) for t in ("Needs judgment", "Can be done now")))
 
 
 def test_the_home_view_counts_only_what_the_user_can_clear(repo, monkeypatch, capsys):
@@ -108,8 +110,8 @@ def test_the_home_view_counts_only_what_the_user_can_clear(repo, monkeypatch, ca
 
 
 def test_the_head_says_where_the_record_began_in_one_quiet_line(repo):
-    """A run made before the record began: under the title, one dim line says where the record began and that what
-    came before it is Retrospective; with none, there is no such line."""
+    """A run made before the record began: under the title, one dim line, the record line's sentence, says when rb
+    began keeping the record and what was recorded afterwards; with nothing recorded afterwards, there is no such line."""
     from rabbit_brain.tui import DIM, RBApp
 
     async def drawn():
@@ -122,7 +124,7 @@ def test_the_head_says_where_the_record_began_in_one_quiet_line(repo):
     assert home().began is None and asyncio.run(drawn())[0] is False
     assert repo("run", "add", "e1", "top1=0.75", "--produced-at", "2026-05-07T12:00:00Z")[0] == 0
     line = home().began
-    assert line.startswith("Recorded since ") and line.endswith("; what came before it is Retrospective")
+    assert line.startswith("Kept with rb since ") and line.endswith(". 1 run was recorded afterwards, not as it happened.")
     assert asyncio.run(drawn()) == (True, f"[{DIM}]{line}[/{DIM}]")
 
 
@@ -639,7 +641,7 @@ def test_a_rule_met_only_on_its_estimate_is_never_drawn_green(repo):
         async with app.run_test(size=(120, 36)) as pilot:
             await pilot.pause(0.3)
             d = drawn(app)
-            assert d["tree"] == {"o:q1": colour, "o:e1": colour} and _colour_of(d["tally"], "1 criterion met") == colour
+            assert d["tree"] == {"o:q1": colour, "o:e1": colour} and _colour_of(d["tally"], "1 met") == colour
             assert d["quiet"].startswith(f"[{colour}]Nothing waits on you. 1 rule is met;")
             tree = app.screen.query_one("#tree-list")
             tree.focus()
@@ -647,7 +649,7 @@ def test_a_rule_met_only_on_its_estimate_is_never_drawn_green(repo):
             await pilot.pause(0.2)
             await pilot.press("enter")
             await until(pilot, lambda: isinstance(app.screen, ObjectScreen))
-            label = "criterion met" if colour == GOOD else "estimate meets criterion"
+            label = "rule met" if colour == GOOD else "estimate meets the rule"
             assert f"[{colour}]{label} · " in "\n".join(str(w.content) for w in app.screen.query(".bar-body"))
             await pilot.press("escape")
 
@@ -695,13 +697,15 @@ async def catalogue(width: int) -> dict:
 
 def short_words(part: str) -> str:
     """A count as the catalogue says it in short words: '2 criteria not met' is '2 not met'."""
-    return re.sub(r"^(\d+) criteri(?:on|a) ", r"\1 ", part)
+    from rabbit_brain.tui import _short_count
+    return _short_count(part)
 
 
 def _standing_at(line, part: str):
     """Where `part` stands whole on a catalogue row: after a space, and before a separator, the '…' that ends a row
     leaving something out, or the row's end."""
-    found = re.search(rf"(?:^| )({re.escape(part)})(?: ·| …|$)", line.plain)
+    from rabbit_brain.tui import plain_word
+    found = re.search(rf"(?:^| )({re.escape(plain_word(part))})(?: ·| …|$)", line.plain)
     return found.start(1) if found else None
 
 
@@ -808,10 +812,9 @@ def test_on_a_narrow_terminal_the_catalogue_takes_the_room_of_the_card_beside_it
 
 
 def test_the_lines_over_the_catalogue_never_hide_what_they_leave_out(repo):
-    """The project's title and the count of its criteria by their reading are one line each. Five readings do not fit
-    in rb's own words at 100 columns, so there every count is said in short ones, each whole, shown and in its colour;
-    at 160 columns they are rb's own words. Where even short words do not fit, as at 60 columns, the line ends in '…',
-    as a title too long for its line does."""
+    """The project's title and the count of its rules by their reading are one line each. The count says the page's
+    and rb status's words at 100 and at 160 columns, each whole, shown and in its colour. Where they do not fit, as at
+    60 columns, the line ends in '…', as a title too long for its line does."""
     from textual.geometry import Region
     from rabbit_brain.tui import BAD, DIM, GOOD, WARN, HomeScreen, RBApp
 
@@ -837,14 +840,14 @@ def test_the_lines_over_the_catalogue_never_hide_what_they_leave_out(repo):
             shown = [w.render_lines(Region(0, 0, w.size.width, 1))[0].text.rstrip() for w in (head, tally)]
             return *shown, tally.content
 
-    for width, said in ((100, ("1 met", "1 not met", "1 undetermined", "1 untested", "1 gate missed")),
-                        (160, ("1 criterion met", "1 criterion not met", "1 criterion undetermined", "1 criterion untested", "1 gate missed"))):
+    for width, said in ((100, ("1 met", "1 not met", "1 can't tell yet", "1 not tested", "1 gate missed")),
+                        (160, ("1 met", "1 not met", "1 can't tell yet", "1 not tested", "1 gate missed"))):
         head, shown, drawn = asyncio.run(lines(width))
         assert all(re.search(rf"(?:^| ){re.escape(part)}(?: ·|$)", shown) for part in said), (width, shown)
         assert [whole(drawn, part) for part in said] == [GOOD, BAD, WARN, DIM, WARN]
         assert head == title or (head.endswith("…") and title.startswith(head[:-1])), head
     head, shown, _ = asyncio.run(lines(60))
-    assert shown.startswith("criteria   1 met · 1 not met · ") and shown.endswith("…"), shown
+    assert shown.startswith("Rules: 1 met · 1 not met · ") and shown.endswith("…"), shown
     assert title.startswith(head[:-1]) and head.endswith("…"), head
 
 
@@ -860,7 +863,7 @@ def test_the_criterion_card_says_the_words_it_was_declared_on_and_no_writer(repo
     assert any(f.startswith("timing: declared") and f.endswith('· words (as given): "track score for wide too"') for f in c2.facts)
     assert "your words" not in " ".join([c2.who_line, *c2.facts, *c2.sentences])
     c1 = object_card("c1")
-    assert c1.who_line.startswith("criterion · ") and "track score" not in " ".join([c1.who_line, *c1.facts])
+    assert c1.who_line.startswith("rule · ") and "track score" not in " ".join([c1.who_line, *c1.facts])
     assert not [f for f in [c1.who_line, c2.who_line, *c1.facts, *c2.facts] if "claude-code" in f]
     assert "grant" not in " ".join([c2.who_line, *c2.facts, *c2.sentences])
 
@@ -1777,3 +1780,70 @@ time.sleep(60)
         os.close(user_side)
         os.close(main_side)
     assert not views.exists()
+
+
+def test_rb_ui_says_rules_as_the_page_and_rb_status_do(repo, capsys, tmp_path):
+    """One wording for rules (0.6.1): rb ui's tally says the page's and rb status's line exactly ("Rules: 1 met · 1 not
+    met · 1 can't tell yet · 1 gate missed"), its catalogue rows and pass bars say a rule's words as the page does ("1
+    rule met", "rule not met"), and an experiment's card heads its pass bars "Its rules:", as rb open's pane does. The
+    model keeps rb's own words ("1 criterion met"), which the colours read."""
+    import html as _html
+    from rabbit_brain.tui import plain_word, said_standing, tally_text
+
+    for top1 in ("0.78", "0.8"):
+        assert repo("run", "add", "e1", f"top1={top1}")[0] == 0
+    for c in (["top5 holds", "--metric", "top5", "--at-least", "0.99", "--noise", "0.001"],
+              ["loss holds", "--metric", "loss", "--at-most", "1.0", "--min-n", "5"],
+              ["top1 clears the bar", "--metric", "top1", "--at-least", "0.9", "--role", "gate"]):
+        assert repo("criterion", "add", c[0], "-e", "e1", *c[1:], "-q", "q1")[0] == 0
+    for top5, loss in (("0.9", "0.5"), ("0.91", "0.4"), ("0.92", "0.45")):
+        assert repo("run", "add", "e1", "top1=0.79", f"top5={top5}", f"loss={loss}")[0] == 0
+    assert main(["status"]) == 0
+    [status] = [x for x in capsys.readouterr().out.splitlines() if x.startswith("Rules: ")]
+    assert main(["page", "--out", str(tmp_path / "page.html")]) == 0
+    capsys.readouterr()
+    page = (tmp_path / "page.html").read_text(encoding="utf-8")
+    [tally] = {_html.unescape(re.sub(r"<[^>]+>", "", m)) for m in re.findall(r'<p class="stt">(.*?)</p>', page)}
+    h = home()
+    shown = tally_text(h.tally, h.get("muted", ())).plain
+    assert shown == status == tally == "Rules: 1 met · 1 not met · 1 can't tell yet · 1 gate missed", (shown, status, tally)
+    rows = {r.id: r.standing for r in h.tree}
+    assert rows["e1"].startswith("open · 1 criterion met · 1 criterion not met")       # rb's own words, in the model
+    assert said_standing(rows["e1"]).startswith("open · 1 rule met · 1 rule not met · 1 can't tell yet")
+    assert plain_word("2 criteria met") == "2 rules met" and plain_word("estimate meets criterion") == "estimate meets the rule"
+    drawn = asyncio.run(catalogue(240))
+    assert "1 rule met · 1 rule not met" in drawn["o:e1"].plain and "criteri" not in drawn["o:e1"].plain, drawn["o:e1"].plain
+    assert object_card("e1").bars_label == "Its rules:"
+
+    async def card(subject: str) -> str:
+        from rabbit_brain.tui import ObjectScreen, RBApp
+        app = RBApp(Path.cwd())
+        async with app.run_test(size=(160, 48)) as pilot:
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and _laid(app))
+            app.push_screen(ObjectScreen(Path.cwd(), subject))
+            await until(pilot, lambda: isinstance(app.screen, ObjectScreen) and app.screen.query(".lead"))
+            return _shown(app.screen)
+
+    from rabbit_brain.tui import HomeScreen
+    c1 = object_card("c1")
+    assert c1.who_line.startswith("rule · ") and " · criterion met" in c1.lead, (c1.who_line, c1.lead)
+    shown = asyncio.run(card("c1"))
+    assert " · rule met" in shown and "rule: rule met: estimate" in shown and "; rule met: estimate" in shown, shown
+    assert "criteri" not in shown, shown
+
+
+def test_a_rule_card_says_rb_s_clauses_plainly_and_the_statement_as_written(repo):
+    """On a rule's card the finding's sentence keeps its statement as written, a statement that reads like a rule word
+    ("untested: example") included, and says rb's own clauses after it as rb open does: a bare "criterion untested"
+    clause reads "not tested", as the card's lead does."""
+    from rabbit_brain.tui import said_lead, said_sentence
+
+    assert repo("criterion", "add", "untested: example", "-e", "e1", "--metric", "top5", "--at-least", "0.9", "--id", "c2")[0] == 0
+    c2 = object_card("c2")
+    [sentence] = c2.sentences
+    assert sentence == "untested: example. top5: no reading yet; criterion untested; declared; no evidence recorded yet.", sentence
+    assert said_sentence(sentence, c2.title) == (
+        "untested: example. top5: no reading yet; not tested; declared; no evidence recorded yet.")
+    assert said_lead("criterion met: estimate 0.785 ≥ 0.7; declared before the evidence.") == (
+        "rule met: estimate 0.785 ≥ 0.7; declared before the evidence.")
+    assert said_sentence("other words. criterion untested.", "untested: example") == "other words. criterion untested."

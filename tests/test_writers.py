@@ -318,8 +318,8 @@ def test_an_agent_with_no_model_said_is_told_once_how_to_say_it(rec, capsys, mon
     told = capsys.readouterr().out.split("Since this session last looked:\n")[1].split("\n\n")[0].splitlines()
     assert told[-1] == "  - No model is recorded for your writes yet   (rb context --model <your model id>)"
     rb(capsys, monkeypatch, "context", "--model", "test-model-7b", env=OTHER)
-    assert "--model" not in rb(capsys, monkeypatch, "context", env=OTHER).data["markdown"].split("## Rules")[0]
-    assert "--model" not in rb(capsys, monkeypatch, "context", env={**NO_ID, "RB_MODEL": "test-model-env"}).data["markdown"].split("## Rules")[0]
+    assert "--model" not in rb(capsys, monkeypatch, "context", env=OTHER).data["markdown"].split("## How to record")[0]
+    assert "--model" not in rb(capsys, monkeypatch, "context", env={**NO_ID, "RB_MODEL": "test-model-env"}).data["markdown"].split("## How to record")[0]
 
 
 def test_the_manual_gives_each_way_rb_asks_for_a_model(rec, capsys, monkeypatch):

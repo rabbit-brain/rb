@@ -352,31 +352,16 @@ fn git_out(root: &Path, args: &[&str]) -> Option<String> {
     Some(crate::rbyaml::py_strip(&String::from_utf8_lossy(&r.stdout)).to_string())
 }
 
-/// Where the code lives: the origin remote with any credentials scrubbed, the commit that holds the code, and what
+/// Where the code lives: origin's address where a reader can use it (`readable_code_address`), the commit that holds the code, and what
 /// the working tree changes of it (`changed`). The commit is HEAD, or, where origin lacks HEAD and the commits since
 /// the newest one it holds change only what the bundle carries (the record, the results folders rb reads, what a
 /// clone took out of its branch), that commit: a fork's own record commit is no code. Where origin's branches, as
 /// this clone last saw them, hold neither, `at_origin` is false. `building` is where this export is being made and
 /// where it goes, which are rb's own, as is every page and export the ownership ledger says rb wrote.
 pub fn repo_info(led: &Ledger, building: &[&Path]) -> Option<Dict> {
-    let url = git_out(&led.root, &["remote", "get-url", "origin"])?;
+    let url = readable_code_address(&origin_as_written(led)?)?;
     // a repository with no commit yet names none
     let commit = git_out(&led.root, &["rev-parse", "--verify", "-q", "HEAD"])?;
-    if url.is_empty() {
-        return None;
-    }
-    let mut url = url;
-    if let Some((scheme, rest)) = url.split_once("://") {
-        let (netloc, tail) = match rest.find(|c| c == '/' || c == '?' || c == '#') {
-            Some(i) => (&rest[..i], &rest[i..]),
-            None => (rest, ""),
-        };
-        if netloc.contains('@') {
-            let host = netloc.rsplit_once('@').map(|(_, h)| h).unwrap_or(netloc);
-            let path = tail.split(|c| c == '?' || c == '#').next().unwrap_or("");
-            url = format!("{scheme}://{host}{path}");
-        }
-    }
     let mut d = crate::dict! {"url" => url};
     let carried = Carried::of(led, building);
     if !commit.is_empty() {
@@ -389,6 +374,57 @@ pub fn repo_info(led: &Ledger, building: &[&Path]) -> Option<Dict> {
     d.insert("changed".into(), Value::list_of_str(changed_paths(&led.root, &carried)));
     Some(d)
 }
+
+/// origin's address as the checkout's config writes it (none without one): what an insteadOf rewrites it to for
+/// this machine's own fetches is this machine's, not an address a reader is given.
+fn origin_as_written(led: &Ledger) -> Option<String> {
+    git_out(&led.root, &["config", "--get", "remote.origin.url"]).filter(|u| !u.is_empty())
+}
+
+/// The address a reader can fetch the code from, as rb names it on what it publishes (rb export's bundle, page and
+/// manifest; rb sync sends the same): an https address, with any user:password@ before its host and any query or
+/// fragment after its path taken out. Anything else (a path of this machine, file://, ssh, plain http) names no
+/// address a reader can use, so none is named.
+pub fn readable_code_address(url: &str) -> Option<String> {
+    let url = url.trim();
+    let (scheme, rest) = url.split_once("://")?;
+    if !scheme.eq_ignore_ascii_case("https") {
+        return None;
+    }
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (netloc, tail) = rest.split_at(end);
+    let host = netloc.rsplit_once('@').map_or(netloc, |(_, h)| h);
+    if host.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return None;
+    }
+    // a host name, or [an IPv6 address], then an optional :port of digits: no name at all is no address
+    let (name, port) = match host.strip_prefix('[') {
+        Some(v6) => {
+            let (inside, after) = v6.split_once(']')?;
+            (inside, if after.is_empty() { None } else { Some(after.strip_prefix(':')?) })
+        }
+        None => match host.rsplit_once(':') {
+            Some((n, p)) => (n, Some(p)),
+            None => (host, None),
+        },
+    };
+    let bad_name = name.is_empty() || (!host.starts_with('[') && name.contains(['[', ']', ':']));
+    if bad_name || port.is_some_and(|p| p.is_empty() || !p.chars().all(|c| c.is_ascii_digit())) {
+        return None;
+    }
+    let path = tail.split(['?', '#']).next().unwrap_or("");
+    Some(format!("https://{host}{path}"))
+}
+
+/// Why an export names no code where the checkout has an origin: it is not an address a reader can use (said in
+/// one line, `repo_unnamed`); none where there is no origin, or it is named, or --no-repo leaves it out.
+pub fn code_unnamed(led: &Ledger) -> Option<&'static str> {
+    let url = origin_as_written(led)?;
+    readable_code_address(&url).is_none().then_some(CODE_UNNAMED)
+}
+
+/// What rb export says, once, where origin is not an address a reader can use.
+pub const CODE_UNNAMED: &str = "The bundle names no address for the code: origin is not an https address a reader can fetch. A reader gets the code with rb clone --code <address>.";
 
 /// What a bundle carries of the checkout, or rb wrote there of its own, as paths from the repository's root: the
 /// record's folder and each results folder rb reads, the export being made, each page and export rb wrote, and each
@@ -792,6 +828,7 @@ fn bundle_into(led: &Ledger, tmp: &Path, dest: &Path, clone_to: Option<&str>, no
     if !kept.is_empty() {
         said.insert("sources_at_commit".into(), at_commit_list(&kept));
     }
+    unnamed(led, no_repo, &mut said);
     Ok((said, parts))
 }
 
@@ -809,12 +846,20 @@ fn page_into(led: &Ledger, tmp: &Path, dest: &Path, no_repo: bool) -> Res<(Dict,
     let parts = bundle_parts(tmp);
     within_cap(parts.clone())?;
     crate::sys::go_on()?;
-    let said = crate::dict! {
+    let mut said = crate::dict! {
         "file_count" => man.get("file_count").cloned().unwrap_or(Value::Int(0)), "bytes" => man.get("bytes").cloned().unwrap_or(Value::Int(0)),
         "resources_not_included" => Value::List(Vec::new()), "url" => Value::Null, "sources_included" => Value::List(Vec::new()),
         "sources_missing" => Value::List(Vec::new()), "repo" => repo.map(Value::Dict).unwrap_or(Value::Null)
     };
+    unnamed(led, no_repo, &mut said);
     Ok((said, parts))
+}
+
+/// `repo_unnamed`: the line that says the export names no code, where origin is not an address a reader can use.
+fn unnamed(led: &Ledger, no_repo: bool, said: &mut Dict) {
+    if let Some(line) = (!no_repo).then(|| code_unnamed(led)).flatten() {
+        said.insert("repo_unnamed".into(), Value::Str(line.to_string()));
+    }
 }
 
 fn write_manifest(tmp: &Path, man: &Dict) -> Res<()> {
@@ -1604,6 +1649,34 @@ fn naming_the_script(page: &str, script: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 061: the code is named only at an https address a reader can fetch, with what it carried for this machine
+    /// (credentials, a query, a fragment) taken out; anything else, an https address with no host among them, names none.
+    #[test]
+    fn the_code_is_named_only_at_an_https_address_a_reader_can_fetch() {
+        for (given, named) in [
+            ("https://alice:p@ss@github.com/org/repo.git", Some("https://github.com/org/repo.git")),
+            ("HTTPS://host:8443/r.git?x=1#y", Some("https://host:8443/r.git")),
+            ("https://[2001:db8::1]:443/r.git", Some("https://[2001:db8::1]:443/r.git")),
+            ("https://[2001:db8::1]/r.git", Some("https://[2001:db8::1]/r.git")),
+            ("https://:443/srv/private/repo.git", None),
+            ("https:///srv/private/repo.git", None),
+            ("https://u@:443/r.git", None),
+            ("https://host:/r.git", None),
+            ("https://host:44x/r.git", None),
+            ("https://[2001:db8::1/r.git", None),
+            ("https://[]/r.git", None),
+            ("https://a:b:c/r.git", None),
+            ("/srv/rb/repo.git", None),
+            ("file:///srv/rb/repo.git", None),
+            ("http://host/r.git", None),
+            ("ssh://host/r.git", None),
+            ("git@host:org/r.git", None),
+            ("hg::https://host/r", None),
+        ] {
+            assert_eq!(readable_code_address(given).as_deref(), named, "{given}");
+        }
+    }
 
     /// A folder of the test's own, gone with it.
     struct Dir(PathBuf);

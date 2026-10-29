@@ -1912,12 +1912,12 @@ def test_context_is_the_markdown_briefing_with_its_sections(project, capsys):
     assert md.startswith("# The record: INT8 quality")
     sections = {s.split("\n", 1)[0]: s for s in md.split("\n## ")[1:]}
     exp = "Experiment e1: INT8 vs FP32 (open)"
-    for heading in ("Rules", "Words", "Criteria", "Needs a human", "Can be done now", exp, "Recent activity"):
+    for heading in ("How to record", "Words", "Rules", "Needs judgment", "Can be done now", exp, "Recent activity"):
         assert heading in sections, heading
-    criteria = sections["Criteria"]           # each criterion, with its headline on the line under it
+    criteria = sections["Rules"]           # each criterion, with its headline on the line under it
     assert re.search(r"c1 +INT8 validation loss under 1\.5\n +estimate meets criterion · ", criteria), criteria
     assert re.search(r"c2 +INT8 validation loss under 1\.0\n +criterion not met · ", criteria), criteria
-    assert "rb decide c2" in sections["Needs a human"] and "c1" not in sections["Needs a human"]
+    assert "rb decide c2" in sections["Needs judgment"] and "c1" not in sections["Needs judgment"]
     assert "Can INT8 ship?" in sections["Can be done now"]
     # the heading names no one: what can be done now, whoever does it (JSON keys unchanged)
     main(["status"])

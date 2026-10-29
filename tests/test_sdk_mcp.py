@@ -543,7 +543,7 @@ def test_an_agents_freeze_says_what_it_locks_and_is_recorded_as_the_agents(proje
     out = capsys.readouterr().out
     assert "int8 frozen: spec " in out and 'before the runs · words (as given): "lock it before the runs"' in out and "your words" not in out
     assert "    criterion c1 (primary): change.val_loss ≤ 0.05\n" in out
-    assert "look: check c1 before locking it; freezing locks it as the test. Is it the one you mean?" in out
+    assert 'look: c1 is locked as the test now. Check it is the one you mean: a change to it needs --amend --why "<reason>".' in out
     assert "claude-code" not in out
     frozen = rb.open().experiment("int8").data.frozen
     assert (frozen.by, frozen.why, frozen.words) == ("agent:claude-code", "before the runs", "lock it before the runs")

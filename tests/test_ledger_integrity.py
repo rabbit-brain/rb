@@ -627,10 +627,10 @@ def test_a_setting_s_history_shows_every_check_of_it(human, capsys):
     assert [h["op"] for h in history] == ["spec_set", "spec_verify", "spec_verify"]
     assert main(["show", "e1/lr"]) == 0
     shown = [line.strip().split(" ", 1)[1] for line in capsys.readouterr().out.splitlines() if line.startswith("    20")]
-    assert shown == ["spec_set: setting lr: new, 0.2", "spec_verify: provisional", "spec_verify: verified"]
+    assert shown == ["spec set: setting lr: new, 0.2", "spec check: provisional", "spec check: verified"]
     assert main(["log", "e1/lr"]) == 0
     assert [line.split(" ", 2)[2] for line in capsys.readouterr().out.splitlines()] == [
-        "spec_set experiment e1: setting lr: new, 0.2", "spec_verify experiment e1: provisional", "spec_verify experiment e1: checked as stated"]
+        "spec set experiment e1: setting lr: new, 0.2", "spec check experiment e1: provisional", "spec check experiment e1: checked as stated"]
 
 
 def test_a_verified_line_that_moves_is_shown_and_does_not_block(human, capsys):

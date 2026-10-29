@@ -718,8 +718,10 @@ fn op_set_setting(led: &Ledger, a: &Args) -> Res<Value> {
             why: a.opt_text("why")?.unwrap_or_default(),
         },
     )?;
-    // as the command line says it beside the setting: a line that postdates a past run, a varied factor left the same
-    for w in crate::cmds::record::postdates_notes(led, &experiment, &[(full.clone(), setting.clone())])?.into_iter().chain(crate::cmds::record::varies_same(led, &experiment, Some(&full))?) {
+    // as the command line says it beside the setting: a line that postdates a past run, a cited value that differs, a
+    // varied factor left the same
+    let cited = crate::cmds::record::cited_differs(&experiment, &full, &setting);
+    for w in crate::cmds::record::postdates_notes(led, &experiment, &[(full.clone(), setting.clone())])?.into_iter().chain(cited).chain(crate::cmds::record::varies_same(led, &experiment, Some(&full))?) {
         say(Some(&w));
     }
     Ok(Value::Dict(setting.dump(false)))

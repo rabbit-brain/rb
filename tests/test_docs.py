@@ -242,10 +242,10 @@ def test_rb_status_prints_its_parts_in_the_order_the_manual_gives(workdir, monke
     lines = capsys.readouterr().out.splitlines()
     parts = [("the project, and the last", lambda line: line.startswith("Ordering · ")),
              ("where each question stands", lambda line: line.startswith("Does the order hold? (")),
-             ("the tally of the criteria", lambda line: line.startswith("Criteria: ")),
-             ("**Needs a human**", lambda line: line.startswith("Needs a human (")),
+             ("the tally of the criteria", lambda line: line.startswith("Rules: ")),
+             ("**Needs judgment**", lambda line: line.startswith("Needs judgment (")),
              ("**Can be done now**", lambda line: line.startswith("Can be done now (")),
-             ("each criterion on its axes, with its integrity problems", lambda line: line == "Criteria"),
+             ("each criterion on its axes, with its integrity problems", lambda line: line == "Rules"),
              ("each experiment with its state", lambda line: line == "Experiments"),
              ("the runs, and whether", lambda line: line.startswith("Runs: ")),
              ("the analyses, and which", lambda line: line == "Analyses"),

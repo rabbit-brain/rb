@@ -19,6 +19,7 @@ import pytest
 
 from rabbit_brain.models import Envelope
 from rbtest import as_the_user, command, environment, home, main, state
+from test_export import SERVED, served_at  # noqa: F401 (origin at an https address, served from a bare repository)
 
 HAS_GIT = shutil.which("git") is not None
 pytestmark = pytest.mark.skipif(not HAS_GIT, reason="the record is played in a git repository")
@@ -167,6 +168,34 @@ def test_structure_travels_and_authority_does_not(bundle, capsys, tmp_path_facto
     assert {v.name for v in exp.variants} == {"fp32", "int8"} and exp.varies == ["precision"]
     # no run came along
     assert rec.records("run") == []
+
+
+def test_a_fresh_clone_never_says_it_was_kept_with_rb_since_it_began(bundle, capsys, tmp_path_factory):
+    """WITNESS2: a clone's structure came from its parent, so its page draws no "Kept with rb since it began." while
+    nothing is recorded here, though rb status counts nothing recorded afterwards; the parent's page says it."""
+    rb, src = bundle
+    dest = tmp_path_factory.mktemp("clones") / "mine"
+    assert rb("clone", str(src), str(dest))[0] == 0
+    assert all(v["afterwards"] == 0 for k, v in state(dest).status()["witness"].items() if isinstance(v, dict))
+    out = dest.parent / "clone-page.html"
+    code, _ = _rb_in(dest, "page", "--out", str(out), capsys=capsys)
+    assert code == 0 and 'class="dim sm wit"' not in out.read_text(encoding="utf-8")
+    assert "Kept with rb since" in (src / "page.html").read_text(encoding="utf-8")
+
+
+def test_a_clone_of_questions_alone_says_nothing_of_since_it_began(rbcli, capsys, tmp_path_factory):
+    """WITNESS2: a clone of a record that holds one question and no experiment has nothing that tells it from a record
+    begun here, so its page draws no record line at all."""
+    rb = rbcli
+    assert rb("init", "INT8 ResNet-50", "--id", "int8")[0] == 0
+    assert rb("question", "add", "Does INT8 cost top-1 accuracy on ImageNet?", "--id", "q1")[0] == 0
+    code, env = rb("export", "--with-record")
+    assert code == 0
+    dest = tmp_path_factory.mktemp("clones") / "questions"
+    assert rb("clone", env.data["path"], str(dest))[0] == 0
+    out = dest.parent / "q-page.html"
+    code, _ = _rb_in(dest, "page", "--out", str(out), capsys=capsys)
+    assert code == 0 and 'class="dim sm wit"' not in out.read_text(encoding="utf-8")
 
 
 def test_a_resource_keeps_its_identity_and_leaves_another_machines_paths_behind(bundle, capsys, tmp_path_factory):
@@ -576,7 +605,7 @@ def test_the_clones_line_says_it_for_the_record_alone_and_them_for_its_files_too
     git("commit", "-qm", "the record")
     bare = tmp_path_factory.mktemp("published") / "int8.git"
     subprocess.run(["git", "clone", "-q", "--bare", str(code_dir), str(bare)], check=True, capture_output=True)
-    git("remote", "add", "origin", str(bare))
+    git("remote", "add", "origin", served_at(monkeypatch, bare))
 
     def cloned(name):
         code, env = rb("export", "--with-record", "--out", str(tmp_path_factory.mktemp("b") / "b"))
@@ -629,7 +658,7 @@ def test_rb_export_says_what_a_rerun_does_not_get_of_the_code(workdir, monkeypat
     Path("eval.py").write_text("print('top1')\n", encoding="utf-8")
     assert main(["init", "INT8 ResNet-50 on ImageNet", "--id", "int8-resnet-50", "--no-agents", "--json"]) == 0
     capsys.readouterr()
-    git("remote", "add", "origin", str(tmp_path_factory.mktemp("published") / "first.git"))
+    git("remote", "add", "origin", served_at(monkeypatch, tmp_path_factory.mktemp("published") / "first.git"))
     out = tmp_path_factory.mktemp("exports")
     # no commit yet: no "at" with nothing after it
     first = said("export", "--with-record", "--out", str(out / "first"))
@@ -640,7 +669,7 @@ def test_rb_export_says_what_a_rerun_does_not_get_of_the_code(workdir, monkeypat
     git("commit", "-qm", "code and record")
     bare = tmp_path_factory.mktemp("published") / "int8.git"
     subprocess.run(["git", "clone", "-q", "--bare", str(code_dir), str(bare)], check=True, capture_output=True)
-    git("remote", "add", "origin", str(bare))
+    git("remote", "add", "origin", served_at(monkeypatch, bare))
     git("fetch", "-q", "origin")
     capsys.readouterr()
     clean = said("export", "--with-record", "--out", str(out / "clean"))
@@ -650,7 +679,7 @@ def test_rb_export_says_what_a_rerun_does_not_get_of_the_code(workdir, monkeypat
     head = git("rev-parse", "HEAD")[:10]
     one = said("export", "--with-record", "--out", str(out / "one"))
     assert f"This checkout changes the code at {head}: 1 file not committed: configs/sweep.yaml.\n" in one, one
-    assert "A rerun gets the commit without them; commit them first to share them.\n" in one, one
+    assert "A rerun gets the commit without it; commit it first to share it.\n" in one and "without them" not in one, one
     assert "does not hold commit" not in one, one
     # eleven: the first ten, then how many more
     for i in range(10):
@@ -658,10 +687,16 @@ def test_rb_export_says_what_a_rerun_does_not_get_of_the_code(workdir, monkeypat
     many = said("export", "--with-record", "--out", str(out / "many"))
     named = ", ".join(["configs/sweep.yaml", *[f"tool{i:02}.py" for i in range(9)]])
     assert f"This checkout changes the code at {head}: 11 files not committed: {named} and 1 more.\n" in many, many
+    assert "A rerun gets the commit without them; commit them first to share them.\n" in many, many
     # code committed here and never pushed: origin, as this clone last saw it, lacks the commit
     git("add", "-A")
     git("commit", "-qm", "top5 too")
     head = git("rev-parse", "HEAD")[:10]
     gone = said("export", "--with-record", "--out", str(out / "ahead"))
-    assert f"origin, as this clone last saw it, does not hold commit {head}: a rerun cannot get the code from {bare} until it is pushed there.\n" in gone, gone
+    assert f"origin, as this clone last saw it, does not hold commit {head}: a rerun cannot get the code from {SERVED} until it is pushed there.\n" in gone, gone
     assert "This checkout changes the code" not in gone, gone
+    # origin at a path of this machine: no address is named, and the export says so in one line
+    git("remote", "set-url", "origin", str(bare))
+    local = said("export", "--with-record", "--out", str(out / "local"))
+    assert "Code repository recorded" not in local and str(bare) not in local, local
+    assert local.count("The bundle names no address for the code: origin is not an https address a reader can fetch.") == 1, local

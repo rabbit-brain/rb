@@ -78,7 +78,11 @@ pub fn cmd_export(ns: &Namespace, out: &mut Out) -> R {
                 out.say("A rerun gets no code until it is committed.");
             } else {
                 out.say(format!("This checkout changes the code at {at}: {n} not committed: {}{more}.", paths.join(", ")));
-                out.say("A rerun gets the commit without them; commit them first to share them.");
+                out.say(if changed.len() == 1 {
+                    "A rerun gets the commit without it; commit it first to share it."
+                } else {
+                    "A rerun gets the commit without them; commit them first to share them."
+                });
             }
         }
         // origin, as this clone last saw it, lacks the commit (export.rs's repo.at_origin, written only when false)
@@ -86,6 +90,10 @@ pub fn cmd_export(ns: &Namespace, out: &mut Out) -> R {
             let url = r.get("url").map(pyjson::py_str).unwrap_or_default();
             out.say(format!("origin, as this clone last saw it, does not hold commit {at}: a rerun cannot get the code from {url} until it is pushed there."));
         }
+    }
+    // origin is no address a reader can use (a path of this machine, file://, ssh): the export names none, once
+    if let Some(line) = rv.get("repo_unnamed").filter(|l| l.truthy()) {
+        out.say(pyjson::py_str(line));
     }
     if let Some(Value::List(missing)) = rv.get("sources_missing").filter(|m| m.truthy()) {
         out.say(format!("Cited sources no longer on disk, so not included: {}.", missing.iter().map(pyjson::py_str).collect::<Vec<_>>().join(", ")));
@@ -165,7 +173,7 @@ pub fn cmd_clone(ns: &Namespace, out: &mut Out) -> R {
                 commit.chars().take(12).collect::<String>()
             ));
         }
-        // rb's words first; where git failed, git's own last line after "git said:"
+        // rb's words first; where git failed, git's own message after "git said:"
         Some(c) => {
             let url = c.get("url").map(pyjson::py_str).unwrap_or_default();
             let said = c.get("git_said").map(pyjson::py_str).unwrap_or_default();

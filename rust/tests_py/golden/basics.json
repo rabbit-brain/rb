@@ -417,7 +417,7 @@
     "Not filed under a question",
     "  json mode exp \u00b7 planned",
     "",
-    "Criteria: none yet",
+    "Rules: none yet",
     "",
     "Can be done now (6)",
     "  - 4 \u00d7 planned:",
@@ -487,7 +487,7 @@
     "          if it holds: ship wide now \u00b7 if not: keep base",
     "          note nqtdhpa: a first note \u00b7 1 more: rb show e1",
     "",
-    "Criteria: none yet",
+    "Rules: none yet",
     "",
     "Can be done now (1)",
     "  - nothing in the record tests e1 yet: wider is better",
@@ -561,7 +561,7 @@
     "Not filed under a question",
     "  json mode exp \u00b7 planned",
     "",
-    "Criteria: none yet",
+    "Rules: none yet",
     "",
     "Can be done now (6)",
     "  - 4 \u00d7 planned:",
@@ -621,7 +621,7 @@
     "Not filed under a question",
     "  json mode exp \u00b7 planned",
     "",
-    "Criteria: none yet",
+    "Rules: none yet",
     "",
     "Can be done now (6)",
     "  - 4 \u00d7 planned:",
@@ -1104,8 +1104,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "52046a1b32c0f08bc23e7c11a9f18657da7b97396bc5e2033a4b5f1dedf1065c",
-   "bytes": 197491
+   "sha256": "334260d73132d9f9883ddc41ea93c310977f3fad47a87e23ddc1675e8753a45c",
+   "bytes": 196543
   }
  }
 }

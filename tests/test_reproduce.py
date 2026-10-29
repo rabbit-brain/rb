@@ -288,7 +288,11 @@ def test_only_a_command_rb_watched_reads_as_observed(int8):
     watched = int8.experiment("owner", "e4")
     assert watched["commands"] == [{"run": int8.runs["watched"], "command": int8.watched, "observed": True}]
     how = "rb journal run watched it make these numbers, "
-    assert any(line.startswith(f"#   int8: command (as given): {int8.watched} ({how}") for line in watched["script"].splitlines()), watched["script"]
+    # named as the run's runs.{id}.named names it, after its "run ": another experiment's run reads "int8" too
+    named = int8.document("owner")["runs"][int8.runs["watched"]]["named"]
+    assert named.startswith("run int8, recorded "), named
+    said = named.removeprefix("run ")
+    assert any(line.startswith(f"#   {said}: command (as given): {int8.watched} ({how}") for line in watched["script"].splitlines()), watched["script"]
     own = int8.of_run("owner", "watched")
     assert own["steps"][-1]["label"].startswith(f"command (as given) · {how}") and own["steps"][-1]["runnable"], own["steps"][-1]
     assert f"\n# command (as given) · {how}" in own["script"] and f"\n{int8.watched}\n" in own["script"]

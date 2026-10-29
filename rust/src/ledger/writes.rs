@@ -1951,7 +1951,7 @@ impl Ledger {
                 }
                 let receipt = Value::Dict(receipt);
                 let read_before = dup.is_some() || same_row.is_some();
-                let note = format!("{}{}", if again.is_some() && read_before { format!("recorded again: {}. ", again.unwrap()) } else { String::new() }, a.note);
+                let note = format!("{}{}", if again.is_some() && read_before { format!("recorded again: {}. ", again.unwrap().trim_end().trim_end_matches('.')) } else { String::new() }, a.note).trim_end().to_string();
                 let run: Run = build(crate::dict! {
                     "id" => self.new_id("run", None)?, "uid" => new_uid("run"), "experiment" => exp.id.clone(),
                     "metrics" => Value::Dict(values.clone().into_iter().collect()), "per_run" => Value::Dict(given.clone()),
@@ -2014,7 +2014,8 @@ impl Ledger {
                 notices.push(format!("{place} is also recorded as {} in {}: one row is one run, and it counts in both {} and {}", other.id, other.experiment, other.experiment, exp.id));
             }
         }
-        for line in super::support::told_after_add(&run, a.produced_at.is_some(), &a.numbers_from) {
+        let watched = !a.numbers_from.is_empty() && self.journal_wrote(&a.numbers_from);
+        for line in super::support::told_after_add(&run, a.produced_at.is_some(), &a.numbers_from, watched) {
             crate::plain::tell(line);
         }
         let warning = if notices.is_empty() { None } else { Some(notices.join("; ")) };

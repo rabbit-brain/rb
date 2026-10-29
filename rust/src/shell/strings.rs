@@ -126,6 +126,64 @@ pub fn runs_stand(stand: i64, retracted: i64) -> String {
     format!("{stand} \u{b7} {retracted} retracted {}", if retracted == 1 { "stays on record" } else { "stay on record" })
 }
 
+/// WITNESS (Oct 28): what a run rb did not see happen says where a run it saw shows its receipt's link.
+pub const RECORDED_AFTERWARDS: &str = "recorded afterwards";
+/// An item's type, underneath: rb saw it happen, or recorded it afterwards.
+pub const RECORDED_AS_IT_RAN: &str = "recorded as it ran";
+
+/// The record's one line (WITNESS, Oct 28), in rb's voice, from M's facts (`home.witness`): when rb began keeping it
+/// (its day, "23 Oct 2026") and what was recorded afterwards, by kind, each count with its noun ("9 runs and 1 call"),
+/// naming no source: a run typed in with its past time is recorded afterwards too, and no file says it.
+/// "Kept with rb since it began." where nothing was; nothing before the record's first write.
+pub fn witness_line(began: &str, afterwards: &[(i64, i64, &str, &str)]) -> String {
+    let day = began.split(' ').next().unwrap_or("");
+    // each kind with any recorded afterwards: "1 run", "both runs", "all 9 runs", "2 runs" (of 5)
+    let parts: Vec<String> = afterwards
+        .iter()
+        .filter(|(n, ..)| *n > 0)
+        .map(|(n, total, one, many)| match (*n, *total) {
+            (1, _) => format!("1 {one}"),
+            (2, 2) => format!("both {many}"),
+            (n, t) if n == t => format!("all {n} {many}"),
+            (n, _) => format!("{n} {many}"),
+        })
+        .collect();
+    if day.is_empty() {
+        return String::new();
+    }
+    if parts.is_empty() {
+        return "Kept with rb since it began.".into();
+    }
+    let ymd: Vec<&str> = day.split('-').collect();
+    let month = ymd.get(1).and_then(|m| m.parse::<usize>().ok()).and_then(|m| ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].get(m.wrapping_sub(1)));
+    let day = match (month, ymd.first(), ymd.get(2)) {
+        (Some(m), Some(y), Some(d)) => format!("{} {m} {y}", d.trim_start_matches('0')),
+        _ => day.to_string(),
+    };
+    let n: i64 = afterwards.iter().map(|(n, ..)| *n).sum();
+    let listed = match parts.split_last() {
+        Some((last, [])) => last.clone(),
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        None => String::new(),
+    };
+    let mut listed = listed.chars();
+    let listed = listed.next().map(|c| c.to_uppercase().chain(listed).collect::<String>()).unwrap_or_default();
+    // recorded after it happened, never "after <day>" (support.rs run_witness: made before it was recorded)
+    let (was, it) = if n == 1 { ("was", "it") } else { ("were", "they") };
+    format!("Kept with rb since {day}. {listed} {was} recorded afterwards, not as {it} happened.")
+}
+
+/// A finding's evidence line (WITNESS): how many of the runs its reading rests on were recorded afterwards.
+pub fn rests_afterwards(afterwards: i64, total: i64) -> String {
+    match (afterwards, total) {
+        (0, _) => String::new(),
+        (1, 1) => "its run recorded afterwards".into(),
+        (2, 2) => "both its runs recorded afterwards".into(),
+        (a, t) if a == t => format!("all {t} of its runs recorded afterwards"),
+        (a, t) => format!("{a} of its {t} runs recorded afterwards"),
+    }
+}
+
 /// Resources (SHELL-SPEC section 4.8).
 pub const RESOURCES_LEDE: &str = "What the runs read and made, how each is identified, how to get it again, and what depends on it.";
 pub const HOW_TO_GET_IT_AGAIN: &str = "how to get it again";
@@ -235,6 +293,8 @@ pub const RUN_OF: &str = "run of ";
 pub const A_RUN: &str = "a run";
 /// An analysis named where its title is empty, never by its id.
 pub const AN_ANALYSIS: &str = "an analysis";
+/// Before the run a Raw log row's run replaces, after the sentence that records the run replacing it.
+pub const REPLACING: &str = "replacing ";
 /// How a run's row says when it was made, as its receipt does.
 pub const PRODUCED: &str = "produced ";
 pub const RECORDED: &str = "recorded ";
@@ -440,14 +500,17 @@ pub const RERUN_BY_HAND: &str = "To do it by hand:";
 pub const CODE_UNNAMED: &str = "The runs need the code; this bundle doesn't say where it is.";
 
 /// The prompt a reader copies into their own coding agent, with the record's page, its bundle and the folder rb clone
-/// makes (each as the view gives it: rb's own value, or the placeholder the hub's metas fill). With `experiment` (its
+/// makes (each as the view gives it: rb's own value, or the placeholder the hub's metas fill). `code` says whether the
+/// bundle names the code (its manifest's repo, which rb export and rb sync name only where a reader can use the
+/// address): step 2 then says rb clone gets it, else that the bundle holds the record alone and the code is the
+/// owner's to give. With `experiment` (its
 /// id, its title and its rules' ids) step 4 reruns that experiment alone and step 5 names its rules.
 /// The steps are P's (out/rerun/prompt.md), checked against what rb does: rb clone gets the code into the record's
 /// checkout, or says why not with the --code that gets it; rb context's "Rerun the parent" names each resource and each
 /// experiment's commands, with, where a run ran other code, the command that puts that code here first (named in words,
 /// so the step holds if rb's line changes); rb journal run records a command, not a run, so each run is recorded with
 /// the rb run add line rb reconcile prints for it.
-pub fn rerun_prompt(page: &str, bundle: &str, folder: &str, experiment: Option<(&str, &str, &[String])>) -> String {
+pub fn rerun_prompt(page: &str, bundle: &str, folder: &str, code: bool, experiment: Option<(&str, &str, &[String])>) -> String {
     let run = match experiment {
         Some((id, title, _)) => format!("Run experiment {id}, \u{201c}{}\u{201d}: its commands", typographic(title)),
         None => "Run each experiment's commands".to_string(),
@@ -457,13 +520,23 @@ pub fn rerun_prompt(page: &str, bundle: &str, folder: &str, experiment: Option<(
         Some((_, _, rules)) if !rules.is_empty() => format!("which of its rules ({}) reproduced and which did not, with their numbers", rules.join(", ")),
         _ => "which rules reproduced and which did not, with their numbers".to_string(),
     };
+    let clone = if code {
+        format!(
+            "rb clone {bundle} {folder}. This bundle names the code: rb clone gets it too, at the commit the record names, \
+             and puts the record in it. If it says it could not get the code, tell me what it says and stop: once I give \
+             you an address of the code, rb clone {bundle} <another new folder> --code <that address> gets it."
+        )
+    } else {
+        format!(
+            "rb clone {bundle} {folder}. This bundle holds the record alone: the code is its owner's to give, and the \
+             runs need it. Tell me so and stop: once I give you an address of the code, rb clone {bundle} <another new \
+             folder> --code <that address> gets it at the commit the record names and puts the record in it."
+        )
+    };
     format!(
         "Rerun this research with Rabbit Brain (rb). Its record: {page}\n\n\
          1. Install rb: pip install rabbit-brain\n\
-         2. Clone the record into a new folder: rb clone {bundle} {folder}. It gets the code too, at the commit the record \
-         names, and puts the record in it. If it says it could not get the code, or that the bundle doesn't say where \
-         it is, tell me what it says and stop: once I give you an address of the code, rb clone {bundle} <another new \
-         folder> --code <that address> gets it.\n\
+         2. Clone the record into a new folder: {clone}\n\
          3. In that folder, run rb context and read it before anything else. Its \"Rerun the parent\" part names the code \
          and whether it is here, each resource, such as a model or a dataset, with how to get it, and the first command \
          for each experiment.\n\
@@ -620,6 +693,34 @@ pub fn hint(term: &str) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// WITNESS: the record's one line, in rb's voice: its day and what was recorded afterwards by kind, singular where
+    /// one; "since it began" where nothing was; nothing before a first write. A finding's count says all or both.
+    #[test]
+    fn the_record_line_says_what_was_recorded_afterwards() {
+        let none = [(0, 3, "run", "runs"), (0, 1, "call", "calls")];
+        assert_eq!(witness_line("2026-10-23 22:57 UTC", &none), "Kept with rb since it began.");
+        assert_eq!(witness_line("", &none), "");
+        assert_eq!(
+            witness_line("2026-10-28 22:57 UTC", &[(2, 8, "run", "runs"), (0, 1, "analysis", "analyses"), (1, 4, "call", "calls")]),
+            "Kept with rb since 28 Oct 2026. 2 runs and 1 call were recorded afterwards, not as they happened."
+        );
+        assert_eq!(witness_line("2026-05-07 09:00 UTC", &[(1, 3, "run", "runs")]), "Kept with rb since 7 May 2026. 1 run was recorded afterwards, not as it happened.");
+        assert_eq!(witness_line("2026-05-07 09:00 UTC", &[(1, 1, "run", "runs")]), "Kept with rb since 7 May 2026. 1 run was recorded afterwards, not as it happened.");
+        assert_eq!(
+            witness_line("2026-10-23 22:57 UTC", &[(9, 9, "run", "runs"), (0, 0, "analysis", "analyses"), (2, 5, "call", "calls")]),
+            "Kept with rb since 23 Oct 2026. All 9 runs and 2 calls were recorded afterwards, not as they happened."
+        );
+        assert_eq!(
+            witness_line("2026-10-23 22:57 UTC", &[(2, 2, "run", "runs"), (1, 2, "analysis", "analyses"), (1, 1, "call", "calls")]),
+            "Kept with rb since 23 Oct 2026. Both runs, 1 analysis and 1 call were recorded afterwards, not as they happened."
+        );
+        assert_eq!(rests_afterwards(0, 4), "");
+        assert_eq!(rests_afterwards(1, 1), "its run recorded afterwards");
+        assert_eq!(rests_afterwards(2, 2), "both its runs recorded afterwards");
+        assert_eq!(rests_afterwards(6, 6), "all 6 of its runs recorded afterwards");
+        assert_eq!(rests_afterwards(3, 6), "3 of its 6 runs recorded afterwards");
+    }
 
     /// Plain words pass 3: a question's state names its subject, and a note's rules say their state as a sentence.
     #[test]

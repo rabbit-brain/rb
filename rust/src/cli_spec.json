@@ -4911,7 +4911,7 @@
          "--provider"
         ],
         "dest": "provider",
-        "help": "who provides that model, kept the same way (RB_PROVIDER for one command); rb fills in Claude Code's, Codex's and Gemini CLI's when none is given",
+        "help": "who provides that model, kept the same way (RB_PROVIDER for one command); rb fills in Claude Code's and Codex's when none is given",
         "metavar": "NAME"
        }
       ],
@@ -7018,7 +7018,7 @@
     {
      "dest": "login",
      "metavar": "login",
-     "help": "rabbitbrain.ai, optional: sign this machine in with a short code, approved on any device where you are signed in (hosted service not yet available)"
+     "help": "rabbitbrain.ai, optional: sign this machine in with a short code, approved on any device where you are signed in"
     },
     {
      "dest": "logout",
@@ -7028,7 +7028,7 @@
     {
      "dest": "sync",
      "metavar": "sync",
-     "help": "rabbitbrain.ai, optional: a private copy of this record's page in your account, for your own eyes from anywhere (hosted service not yet available)"
+     "help": "rabbitbrain.ai, optional: a private copy of this record's page in your account, for your own eyes from anywhere"
     },
     {
      "dest": "ui",

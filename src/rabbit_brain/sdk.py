@@ -265,7 +265,7 @@ class State:
         return self._call("relations", criterion=criterion_id)
 
     def status(self, experiment: Optional[str] = None) -> dict:
-        """What `rb status --json` puts in data: the tally, what needs a human, what can be done now, every record."""
+        """What `rb status --json` puts in data: the tally, what needs judgment, what can be done now, every record."""
         return self._call("status", experiment=experiment)
 
     def context(self) -> str:

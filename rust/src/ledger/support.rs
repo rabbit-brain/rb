@@ -223,8 +223,9 @@ pub fn produced_line(r: &Run) -> String {
 }
 
 /// What a run add says beside the run it records: a command kept as given later, a file written after the run, and a
-/// file dated minutes ago with no --produced-at, which may hold an older run.
-pub fn told_after_add(r: &Run, produced_given: bool, numbers_from: &[String]) -> Vec<String> {
+/// file dated minutes ago with no --produced-at, which may hold an older run, unless rb's journal watched the command
+/// that wrote it (`watched`): then the file is that run's, and its time is when it ran.
+pub fn told_after_add(r: &Run, produced_given: bool, numbers_from: &[String], watched: bool) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(g) = run_command(r).filter(|g| !g.made_it()) {
         out.push(format!(
@@ -248,7 +249,7 @@ pub fn told_after_add(r: &Run, produced_given: bool, numbers_from: &[String]) ->
             r.experiment
         ));
     }
-    if !produced_given && !numbers_from.is_empty() && r.receipt.row.is_none() && matches!(r.produced_basis.as_str(), "file" | "git") {
+    if !produced_given && !watched && !numbers_from.is_empty() && r.receipt.row.is_none() && matches!(r.produced_basis.as_str(), "file" | "git") {
         if let (Some(made), Some(now)) = (r.produced_at.as_deref().and_then(crate::pytime::parse_iso), crate::pytime::parse_iso(&r.created_at)) {
             let mins = now.signed_duration_since(made).num_minutes();
             if (0..60).contains(&mins) {
@@ -279,23 +280,130 @@ impl Start {
     pub fn to_value(&self) -> Value {
         crate::obj! {"at" => self.at.clone(), "before" => self.before, "runs" => self.runs, "unknown" => self.unknown}
     }
+}
 
-    /// "Recorded since 2026-10-10, after 117 of its 119 runs were made; what came before it is Retrospective"
-    pub fn words(&self) -> String {
-        let after = match (self.before, self.runs) {
-            (1, 1) => "after its one run was made".to_string(),
-            (2, 2) => "after both its runs were made".to_string(),
-            (b, n) if b == n => format!("after all {n} of its runs were made"),
-            (1, n) => format!("after 1 of its {n} runs was made"),
-            (b, n) => format!("after {b} of its {n} runs were made"),
-        };
-        let unknown = match self.unknown {
-            0 => String::new(),
-            1 => " (when 1 was made is unknown)".to_string(),
-            n => format!(" (when {n} were made is unknown)"),
-        };
-        format!("Recorded since {}, {after}{unknown}; what came before it is Retrospective", day(&self.at))
+/// The record's line (WITNESS), one sentence on every view: when rb began keeping the record, its day as the view gives
+/// days (`day`: "2026-10-10" in rb's text, "10 Oct 2026" on a page), and what was recorded afterwards, by kind, each
+/// count with its noun ("2 runs and 1 call"; "1 run", "both runs", "all 9 runs"), naming no source. "Kept with rb since
+/// it began." where nothing was; nothing before the record's first write (an empty day). `afterwards` holds, by kind,
+/// how many were recorded afterwards, how many stand, and the kind's noun for one and for several.
+pub fn record_line(day: &str, afterwards: &[(i64, i64, &str, &str)]) -> String {
+    if day.is_empty() {
+        return String::new();
     }
+    let parts: Vec<String> = afterwards
+        .iter()
+        .filter(|(n, ..)| *n > 0)
+        .map(|(n, total, one, many)| match (*n, *total) {
+            (1, _) => format!("1 {one}"),
+            (2, 2) => format!("both {many}"),
+            (n, t) if n == t => format!("all {n} {many}"),
+            (n, _) => format!("{n} {many}"),
+        })
+        .collect();
+    let Some((last, rest)) = parts.split_last() else {
+        return "Kept with rb since it began.".into();
+    };
+    let listed = if rest.is_empty() { last.clone() } else { format!("{} and {last}", rest.join(", ")) };
+    let mut chars = listed.chars();
+    let listed: String = chars.next().map(|c| c.to_uppercase().chain(chars).collect()).unwrap_or_default();
+    let n: i64 = afterwards.iter().map(|(n, ..)| *n).sum();
+    let (was, it) = if n == 1 { ("was", "it") } else { ("were", "they") };
+    format!("Kept with rb since {day}. {listed} {was} recorded afterwards, not as {it} happened.")
+}
+
+/// The kinds the record's line counts, in its order, with their nouns: the keys of `witness`.
+pub const RECORD_LINE_KINDS: [(&str, &str); 4] = [("runs", "run"), ("analyses", "analysis"), ("calls", "call"), ("notes", "note")];
+
+/// How rb knows of what a write records: rb saw it happen (`as_it_ran`) or recorded it afterwards, from what the
+/// project's files or someone's account say of it (`afterwards`). The rule, from what the ledger holds:
+/// - a run is as it ran when rb's journal watched its command make its numbers (`watched`), or when it was recorded as
+///   it was made, its output no more than an hour older than its recording (`recorded_as_made`); otherwise it was
+///   recorded afterwards: made before it was recorded (`made_before`), or when it was made is unknown (`made_unknown`);
+/// - an analysis the same way, by its own computing time and command;
+/// - a call is afterwards when it is a past call (`past_call`), made before it was recorded; any other call is as made;
+/// - a note is words written when they are recorded (`written`): rb saw them written; one dated before the record
+///   began came with a clone from its parent (`inherited`);
+/// - any other write declares what it records as it is written (`declared`), but for an experiment rb added or
+///   indexed again from a results folder (`read_from_files`) and what a clone brought from its parent (`inherited`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Witness {
+    pub seen: &'static str,
+    pub basis: &'static str,
+}
+
+impl Witness {
+    pub const fn as_it_ran(basis: &'static str) -> Witness {
+        Witness { seen: "as_it_ran", basis }
+    }
+
+    pub const fn afterwards(basis: &'static str) -> Witness {
+        Witness { seen: "afterwards", basis }
+    }
+
+    pub fn is_afterwards(&self) -> bool {
+        self.seen == "afterwards"
+    }
+
+    pub fn to_value(&self) -> Value {
+        crate::obj! {"seen" => self.seen, "basis" => self.basis}
+    }
+}
+
+/// How rb knows of a run (Witness).
+pub fn run_witness(r: &Run) -> Witness {
+    if run_command(r).map_or(false, |g| g.given == "observed") {
+        return Witness::as_it_ran("watched");
+    }
+    match (made_before_recorded(r), r.produced_basis == "unknown") {
+        (false, _) => Witness::as_it_ran("recorded_as_made"),
+        (true, true) => Witness::afterwards("made_unknown"),
+        (true, false) => Witness::afterwards("made_before"),
+    }
+}
+
+/// How rb knows of an analysis (Witness).
+pub fn analysis_witness(a: &Analysis) -> Witness {
+    if analysis_command(a).map_or(false, |g| g.given == "observed") {
+        return Witness::as_it_ran("watched");
+    }
+    match (analysis_made_before(a), a.produced_basis == "unknown") {
+        (false, _) => Witness::as_it_ran("recorded_as_made"),
+        (true, true) => Witness::afterwards("made_unknown"),
+        (true, false) => Witness::afterwards("made_before"),
+    }
+}
+
+/// How rb knows of a call (Witness): a past call was made before it was recorded.
+pub fn decision_witness(d: &Decision) -> Witness {
+    match d.past {
+        Some(_) => Witness::afterwards("past_call"),
+        None => Witness::as_it_ran("recorded_as_made"),
+    }
+}
+
+/// How rb knows of a note (Witness): words written here are seen as written; a note dated before the record began
+/// (`began`) was not written here, as a clone brings its parent's.
+pub fn note_witness(n: &crate::record::Note, began: &str) -> Witness {
+    match !began.is_empty() && crate::pytime::before(Some(&n.at), Some(began)) {
+        true => Witness::afterwards("inherited"),
+        false => Witness::as_it_ran("written"),
+    }
+}
+
+/// When a watched command ran, in nanoseconds, as journal::wrote_of reads its entry: from its start, less the minute
+/// a look may take and two seconds of clock skew, to two seconds after it ended. None for an entry with no time.
+fn ran_between(e: &Dict) -> Option<(i64, i64)> {
+    const LOOK_NS: i64 = 60_000_000_000;
+    const SKEW_NS: i64 = 2_000_000_000;
+    let end = e.get_str("at").and_then(crate::pytime::parse_iso).map(|d| d.timestamp_millis() * 1_000_000)?;
+    let secs = e.get("secs").and_then(|v| v.as_f64()).filter(|s| s.is_finite() && *s >= 0.0).unwrap_or(0.0);
+    Some((end - (secs * 1e9) as i64 - LOOK_NS - SKEW_NS, end + SKEW_NS))
+}
+
+/// A count of one kind: how many stand, and how many of them were recorded afterwards.
+fn counted(total: usize, afterwards: usize) -> Value {
+    crate::obj! {"total" => total, "afterwards" => afterwards}
 }
 
 /// Whether a run was made before the record began at `began`: its produced time, when known, is more than the margin
@@ -314,6 +422,81 @@ impl Ledger {
         Ok(self.first_write()?.and_then(|w| w.get_str("at").map(str::to_string)).filter(|a| !a.is_empty()))
     }
 
+    /// How rb knows of a log line's write (Witness): a run's, an analysis's or a call's by that record, as it stands;
+    /// the rest by the line itself.
+    pub fn line_witness(&self, line: &Dict) -> Witness {
+        let (op, kind, id) = (line.get_str("op").unwrap_or(""), line.get_str("kind").unwrap_or(""), line.get_str("id").unwrap_or(""));
+        match (op, kind) {
+            ("reconcile" | "reindex" | "reconciled", _) => return Witness::afterwards("read_from_files"),
+            ("clone", _) => return Witness::afterwards("inherited"),
+            ("note", _) => return Witness::as_it_ran("written"),
+            _ => {}
+        }
+        // the write that records it takes the record's witness; a later write on it (a retraction) is rb's own, as made
+        let loaded = match (op, kind) {
+            ("record", "run") => self.load::<Run>(id).ok().map(|r| run_witness(&r)),
+            ("analyze", "analysis") => self.load::<Analysis>(id).ok().map(|a| analysis_witness(&a)),
+            ("decide", "decision") => self.load::<Decision>(id).ok().map(|d| decision_witness(&d)),
+            _ => None,
+        };
+        loaded.unwrap_or(Witness::as_it_ran("declared"))
+    }
+
+    /// The record's line (WITNESS), as facts: when rb began keeping this record (`began`, "" before any write), and of
+    /// the runs, analyses, calls and notes that stand, how many there are and how many were recorded afterwards
+    /// (Witness); of the runs, also how many were made before the record began (`before`) and how many were made at a
+    /// time nobody knows (`unknown`). A call a confirmation stands for is counted once, as the confirmation.
+    pub fn witness(&self) -> Res<Value> {
+        let began = self.began()?.unwrap_or_default();
+        let runs = self.standing_runs()?;
+        let made: Vec<Option<bool>> = runs.iter().map(|r| if began.is_empty() { Some(false) } else { made_before_start(r, &began) }).collect();
+        let mut run_counts = match counted(runs.len(), runs.iter().filter(|r| run_witness(r).is_afterwards()).count()) {
+            Value::Dict(d) => d,
+            _ => Dict::new(),
+        };
+        run_counts.insert("before".into(), Value::from(made.iter().filter(|m| **m == Some(true)).count()));
+        run_counts.insert("unknown".into(), Value::from(made.iter().filter(|m| m.is_none()).count()));
+        let analyses = self.live::<Analysis>()?;
+        let auth = self.authorities()?;
+        let calls: Vec<Decision> = self.live::<Decision>()?.into_iter().filter(|d| auth.get(&d.id).map_or(true, |a| a.confirmed_by.is_none())).collect();
+        let proj = self.project()?;
+        let mut notes: Vec<&crate::record::Note> = proj.notes.iter().collect();
+        let exps = self.live::<Experiment>()?;
+        notes.extend(exps.iter().flat_map(|e| e.notes.iter()));
+        let notes: Vec<_> = notes.into_iter().filter(|n| n.retracted.is_none()).collect();
+        Ok(crate::obj! {
+            "began" => began.clone(),
+            "runs" => Value::Dict(run_counts),
+            "analyses" => counted(analyses.len(), analyses.iter().filter(|a| analysis_witness(a).is_afterwards()).count()),
+            "calls" => counted(calls.len(), calls.iter().filter(|d| decision_witness(d).is_afterwards()).count()),
+            "notes" => counted(notes.len(), notes.iter().filter(|n| note_witness(n, &began).is_afterwards()).count())
+        })
+    }
+
+    /// How many runs a finding's reading rests on and how many of them were recorded afterwards (Witness): its
+    /// counted observations' runs, each once, or, where an analysis gives the reading, the runs that analysis rests on
+    /// through what it read.
+    pub fn finding_witness(&self, f: &Finding) -> Res<Value> {
+        let mut ids: Vec<String> = f.observations.iter().filter(|o| o.counted).map(|o| o.run.clone()).collect();
+        if ids.is_empty() {
+            if let Some(src) = f.comparison.as_ref().map(|r| r.source.clone()).filter(|s| !s.is_empty() && s != "runs") {
+                if self.kind_of(&src)? == Some("analysis") {
+                    let a = self.load::<Analysis>(&src)?;
+                    ids = self.upstream(&a)?.into_iter().filter(|(k, _, _)| k == "run").map(|(_, id, _)| id).collect();
+                }
+            }
+        }
+        let mut seen = HashSet::new();
+        ids.retain(|id| seen.insert(id.clone()));
+        let mut afterwards = 0;
+        for id in &ids {
+            if self.load::<Run>(id).map_or(false, |r| run_witness(&r).is_afterwards()) {
+                afterwards += 1;
+            }
+        }
+        Ok(counted(ids.len(), afterwards))
+    }
+
     /// The record-start line's facts, while any standing run was made before the record began. None otherwise.
     pub fn record_start(&self) -> Res<Option<Start>> {
         let Some(at) = self.began()? else { return Ok(None) };
@@ -324,6 +507,19 @@ impl Ledger {
             return Ok(None);
         }
         Ok(Some(Start { at, before, runs: runs.len(), unknown: made.iter().filter(|m| m.is_none()).count() }))
+    }
+
+    /// The record's line as rb's text says it, under the title of rb status and rb context and in rb ui's head: from
+    /// the witness facts, with the day as rb's text gives days. None while nothing was recorded afterwards.
+    pub fn record_line(&self) -> Res<Option<String>> {
+        let w = self.witness()?;
+        let n = |k: &str, f: &str| w.get(k).and_then(|c| c.get(f)).and_then(Value::as_i64).unwrap_or(0);
+        let kinds: Vec<(i64, i64, &str, &str)> = RECORD_LINE_KINDS.iter().map(|(k, one)| (n(k, "afterwards"), n(k, "total"), *one, *k)).collect();
+        if kinds.iter().all(|(a, ..)| *a == 0) {
+            return Ok(None);
+        }
+        let began = w.get("began").and_then(Value::as_str).unwrap_or("");
+        Ok(Some(record_line(&day(began), &kinds)).filter(|l| !l.is_empty()))
     }
 
     /// The earliest sign rb can vouch for of a file's bytes as they are: the journal's first sighting of them, git's
@@ -375,6 +571,16 @@ impl Ledger {
             }
         }
         Ok(None)
+    }
+
+    /// Whether a command rb's journal watched wrote one of `paths` as it is now: on rb journal run's list of what it
+    /// wrote, and last written while it ran, so a file changed by hand since is not that run's.
+    pub fn journal_wrote(&self, paths: &[String]) -> bool {
+        let mt = |p: &str| std::fs::metadata(self.root.join(p)).ok().map(|md| crate::sys::mtime_ns(&md) as i64);
+        crate::journal::entries(&self.root, None).iter().filter(|e| e.get_str("op") == Some("run")).any(|e| {
+            let Some(window) = ran_between(e) else { return false };
+            crate::journal::wrote_of(e, &mt).iter().any(|w| paths.contains(w) && mt(w).map_or(false, |m| window.0 <= m && m <= window.1))
+        })
     }
 
     /// The log line given for a run's launch (`<file>:<line>`, or `<file>` for the first line that holds it), checked:
@@ -804,16 +1010,30 @@ mod tests {
         assert_eq!(minute("2026-05-07T22:07:47+02:00"), "2026-05-07 20:07 UTC");
     }
 
+    /// The record's line, pinned to the page's sentences (strings.rs the_record_line_says_what_was_recorded_afterwards):
+    /// 1, both, all, runs and calls, with the day as the view gives it.
     #[test]
-    fn the_record_start_line() {
-        let s = |before, runs, unknown| Start { at: "2026-10-10T14:00:00.000+00:00".into(), before, runs, unknown }.words();
-        let r = "; what came before it is Retrospective";
-        assert_eq!(s(117, 119, 0), format!("Recorded since 2026-10-10, after 117 of its 119 runs were made{r}"));
-        assert_eq!(s(4, 4, 0), format!("Recorded since 2026-10-10, after all 4 of its runs were made{r}"));
-        assert_eq!(s(1, 1, 0), format!("Recorded since 2026-10-10, after its one run was made{r}"));
-        assert_eq!(s(2, 2, 0), format!("Recorded since 2026-10-10, after both its runs were made{r}"));
-        assert_eq!(s(3, 3, 0), format!("Recorded since 2026-10-10, after all 3 of its runs were made{r}"));
-        assert_eq!(s(1, 2, 0), format!("Recorded since 2026-10-10, after 1 of its 2 runs was made{r}"));
-        assert_eq!(s(2, 5, 1), format!("Recorded since 2026-10-10, after 2 of its 5 runs were made (when 1 was made is unknown){r}"));
+    fn the_record_line_says_what_was_recorded_afterwards() {
+        let none = [(0, 3, "run", "runs"), (0, 1, "call", "calls")];
+        assert_eq!(record_line("23 Oct 2026", &none), "Kept with rb since it began.");
+        assert_eq!(record_line("", &none), "");
+        assert_eq!(
+            record_line("28 Oct 2026", &[(2, 8, "run", "runs"), (0, 1, "analysis", "analyses"), (1, 4, "call", "calls")]),
+            "Kept with rb since 28 Oct 2026. 2 runs and 1 call were recorded afterwards, not as they happened."
+        );
+        assert_eq!(record_line("7 May 2026", &[(1, 3, "run", "runs")]), "Kept with rb since 7 May 2026. 1 run was recorded afterwards, not as it happened.");
+        assert_eq!(record_line("7 May 2026", &[(1, 1, "run", "runs")]), "Kept with rb since 7 May 2026. 1 run was recorded afterwards, not as it happened.");
+        assert_eq!(
+            record_line("23 Oct 2026", &[(9, 9, "run", "runs"), (0, 0, "analysis", "analyses"), (2, 5, "call", "calls")]),
+            "Kept with rb since 23 Oct 2026. All 9 runs and 2 calls were recorded afterwards, not as they happened."
+        );
+        assert_eq!(
+            record_line("23 Oct 2026", &[(2, 2, "run", "runs"), (1, 2, "analysis", "analyses"), (1, 1, "call", "calls")]),
+            "Kept with rb since 23 Oct 2026. Both runs, 1 analysis and 1 call were recorded afterwards, not as they happened."
+        );
+        assert_eq!(
+            record_line(&day("2026-10-10T14:00:00.000+00:00"), &[(117, 119, "run", "runs")]),
+            "Kept with rb since 2026-10-10. 117 runs were recorded afterwards, not as they happened."
+        );
     }
 }

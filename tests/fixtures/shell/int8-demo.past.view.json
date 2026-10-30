@@ -27,9 +27,9 @@
    "at": "2026-10-19 09:40 UTC"
   },
   "latest": {
-   "head": "2026-10-19 · 09:25 to 09:40 UTC · 4 writes",
+   "head": "2026-10-19, 09:25 to 09:40 UTC · 4 changes",
    "calls_made": 0,
-   "line": "Latest changes: 2026-10-19 · 09:25 to 09:40 UTC · 4 writes · no calls made"
+   "line": "Latest changes: 2026-10-19, 09:25 to 09:40 UTC · 4 changes · no calls made"
   },
   "made": {
    "criteria": 6,
@@ -4442,7 +4442,7 @@
   }
  },
  "history": {
-  "summary": "47 writes in the log",
+  "summary": "47 changes recorded",
   "log": [
    {
     "at": "2026-10-19 09:40 UTC",
@@ -5072,7 +5072,7 @@
     "last": "2026-10-19 09:40 UTC",
     "n": 4,
     "calls": 0,
-    "head": "2026-10-19 · 09:25 to 09:40 UTC · 4 writes · no calls made",
+    "head": "2026-10-19, 09:25 to 09:40 UTC · 4 changes · no calls made",
     "lines": [
      {
       "first": "2026-10-19 09:25 UTC",
@@ -5116,9 +5116,7 @@
       "last": "2026-10-19 09:40 UTC",
       "n": 1,
       "sentence": "Mentioned a past call to park int8, dated 2026-05-07, from notes.md:3, not confirmed",
-      "refs": [
-       "notes.md"
-      ],
+      "refs": [],
       "why": "",
       "note": "",
       "log_index": 46
@@ -5130,7 +5128,7 @@
     "last": "2026-10-19 09:12 UTC",
     "n": 1,
     "calls": 0,
-    "head": "2026-10-19 · 09:12 UTC · 1 write · no calls made",
+    "head": "2026-10-19, 09:12 UTC · 1 change · no calls made",
     "lines": [
      {
       "first": "2026-10-19 09:12 UTC",
@@ -5151,7 +5149,7 @@
     "last": "2026-10-16 07:30 UTC",
     "n": 1,
     "calls": 0,
-    "head": "2026-10-16 · 07:30 UTC · 1 write · no calls made",
+    "head": "2026-10-16, 07:30 UTC · 1 change · no calls made",
     "lines": [
      {
       "first": "2026-10-16 07:30 UTC",
@@ -5159,8 +5157,7 @@
       "n": 1,
       "sentence": "Added a note on e1",
       "refs": [
-       "e1",
-       "n1"
+       "e1"
       ],
       "why": "",
       "note": "",
@@ -5173,7 +5170,7 @@
     "last": "2026-10-15 09:09 UTC",
     "n": 2,
     "calls": 1,
-    "head": "2026-10-15 · 09:05 to 09:09 UTC · 2 writes · 1 call made",
+    "head": "2026-10-15, 09:05 to 09:09 UTC · 2 changes · 1 call made",
     "lines": [
      {
       "first": "2026-10-15 09:05 UTC",
@@ -5207,7 +5204,7 @@
     "last": "2026-10-14 16:40 UTC",
     "n": 1,
     "calls": 0,
-    "head": "2026-10-14 · 16:40 UTC · 1 write · no calls made",
+    "head": "2026-10-14, 16:40 UTC · 1 change · no calls made",
     "lines": [
      {
       "first": "2026-10-14 16:40 UTC",
@@ -5228,7 +5225,7 @@
     "last": "2026-10-14 08:30 UTC",
     "n": 1,
     "calls": 1,
-    "head": "2026-10-14 · 08:30 UTC · 1 write · 1 call made",
+    "head": "2026-10-14, 08:30 UTC · 1 change · 1 call made",
     "lines": [
      {
       "first": "2026-10-14 08:30 UTC",
@@ -5249,7 +5246,7 @@
     "last": "2026-10-13 15:02 UTC",
     "n": 18,
     "calls": 0,
-    "head": "2026-10-13 · 14:10 to 15:02 UTC · 18 writes · no calls made",
+    "head": "2026-10-13, 14:10 to 15:02 UTC · 18 changes · no calls made",
     "lines": [
      {
       "first": "2026-10-13 14:10 UTC",
@@ -5270,7 +5267,8 @@
       "sentence": "Recorded a run on e1: run fp32 and int8 · seed 2 at 2026-10-13 14:12 UTC, replacing run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC",
       "refs": [
        "runs2b",
-       "runs2"
+       "runs2",
+       "e1"
       ],
       "why": "",
       "note": "",
@@ -5305,7 +5303,7 @@
       "first": "2026-10-13 14:24 UTC",
       "last": "2026-10-13 14:24 UTC",
       "n": 1,
-      "sentence": "Specified e2: int8 by calib_images 128, 512, 1024, 2048",
+      "sentence": "Added calib_images to e2, given by each run",
       "refs": [
        "e2"
       ],
@@ -5319,7 +5317,8 @@
       "n": 1,
       "sentence": "Added rule c5 to e2",
       "refs": [
-       "c5"
+       "c5",
+       "e2"
       ],
       "why": "",
       "note": "",
@@ -5370,10 +5369,12 @@
       "sentence": "Recorded 5 runs: run fp32 and int8 · calib images 128, run fp32 and int8 · calib images 512, run fp32 and int8 · calib images 1024, run fp32 and int8 · calib images 2048, run fp32 and int8 · seed 3",
       "refs": [
        "runc128",
+       "e2",
        "runc512",
        "runc1024",
        "runc2048",
-       "runs3"
+       "runs3",
+       "e1"
       ],
       "why": "",
       "note": "",
@@ -5424,7 +5425,7 @@
     "last": "2026-10-12 08:06 UTC",
     "n": 2,
     "calls": 0,
-    "head": "2026-10-12 · 08:02 to 08:06 UTC · 2 writes · no calls made",
+    "head": "2026-10-12, 08:02 to 08:06 UTC · 2 changes · no calls made",
     "lines": [
      {
       "first": "2026-10-12 08:02 UTC",
@@ -5432,7 +5433,8 @@
       "n": 1,
       "sentence": "Recorded a run on e1: run fp32 and int8 · results/runs.db row 7, from row 7 of table runs",
       "refs": [
-       "runsql7"
+       "runsql7",
+       "e1"
       ],
       "why": "",
       "note": "",
@@ -5458,7 +5460,7 @@
     "last": "2026-10-06 10:32 UTC",
     "n": 17,
     "calls": 0,
-    "head": "2026-10-06 · 10:02 to 10:32 UTC · 17 writes · no calls made",
+    "head": "2026-10-06, 10:02 to 10:32 UTC · 17 changes · no calls made",
     "lines": [
      {
       "first": "2026-10-06 10:02 UTC",
@@ -5498,7 +5500,7 @@
       "first": "2026-10-06 10:08 UTC",
       "last": "2026-10-06 10:08 UTC",
       "n": 1,
-      "sentence": "Specified e1: fp32 against int8, paired by seed",
+      "sentence": "Added seed to e1, given by each run",
       "refs": [
        "e1"
       ],
@@ -5513,6 +5515,7 @@
       "sentence": "Added 3 rules to e1: c1, c3, c4",
       "refs": [
        "c1",
+       "e1",
        "c3",
        "c4"
       ],
@@ -5581,6 +5584,7 @@
       "refs": [
        "runs1",
        "ckpt-int8-s1",
+       "e1",
        "runs2"
       ],
       "why": "",

@@ -1847,3 +1847,12 @@ def test_a_rule_card_says_rb_s_clauses_plainly_and_the_statement_as_written(repo
     assert said_lead("criterion met: estimate 0.785 ≥ 0.7; declared before the evidence.") == (
         "rule met: estimate 0.785 ≥ 0.7; declared before the evidence.")
     assert said_sentence("other words. criterion untested.", "untested: example") == "other words. criterion untested."
+
+
+def test_a_question_s_changes_say_a_freeze_as_the_spec_and_rules_locked(repo):
+    """What moved under a question says a freeze in the words every view says a rule with: the spec and rules locked,
+    with its reason, never "criteria"."""
+    assert repo("freeze", "e1", "-m", "before the held-out runs")[0] == 0
+    changed = home().briefs[0].changed
+    assert any(line.endswith(": spec and rules locked · note: before the held-out runs") or line.endswith(": spec and rules locked: before the held-out runs") for line in changed), changed
+    assert not any("criteri" in line for line in changed), changed

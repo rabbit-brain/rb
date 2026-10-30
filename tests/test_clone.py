@@ -171,15 +171,21 @@ def test_structure_travels_and_authority_does_not(bundle, capsys, tmp_path_facto
 
 
 def test_a_fresh_clone_never_says_it_was_kept_with_rb_since_it_began(bundle, capsys, tmp_path_factory):
-    """WITNESS2: a clone's structure came from its parent, so its page draws no "Kept with rb since it began." while
-    nothing is recorded here, though rb status counts nothing recorded afterwards; the parent's page says it."""
+    """WITNESS2, 0.6.2: a clone's structure came from its parent, so while nothing is recorded here (rb status counts
+    nothing recorded afterwards) its page never says "Kept with rb since it began.": it says what came from the parent:
+    from a path, which a page does not name, as the relation rb clone gives each experiment. The parent's page
+    says its own line."""
     rb, src = bundle
     dest = tmp_path_factory.mktemp("clones") / "mine"
     assert rb("clone", str(src), str(dest))[0] == 0
     assert all(v["afterwards"] == 0 for k, v in state(dest).status()["witness"].items() if isinstance(v, dict))
     out = dest.parent / "clone-page.html"
     code, _ = _rb_in(dest, "page", "--out", str(out), capsys=capsys)
-    assert code == 0 and 'class="dim sm wit"' not in out.read_text(encoding="utf-8")
+    page = out.read_text(encoding="utf-8")
+    assert code == 0 and "since it began" not in page
+    n = len(state(dest).status()["experiments"])
+    said = "1 experiment reproduces an experiment" if n == 1 else f"{n} experiments reproduce experiments"
+    assert page.count('class="dim sm wit">Kept with rb since ') == 2 and page.count(f". {said} of another record.</p>") == 2
     assert "Kept with rb since" in (src / "page.html").read_text(encoding="utf-8")
 
 

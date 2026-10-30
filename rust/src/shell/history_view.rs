@@ -546,7 +546,7 @@ mod tests {
     fn every_sitting_and_line_of_the_example_shows() {
         let d = example();
         let page = said(&sittings(&d, &all));
-        assert!(page.starts_with("47 writes in the log"), "{page}");
+        assert!(page.starts_with("47 changes recorded"), "{page}");
         for s in list(&d, "history.sittings") {
             assert!(page.contains(&said(text(s, "head"))), "{}", text(s, "head"));
             for l in list(s, "lines") {
@@ -565,8 +565,8 @@ mod tests {
         let page = said(&sittings(&d, &all));
         let at = |s: &str| page.find(s).unwrap_or_else(|| panic!("{s} not drawn"));
         // the newest sitting first, and inside it the newest line first
-        assert!(at("2026-10-19 · 09:25 to 09:40 UTC") < at("2026-10-19 · 09:12 UTC"));
-        assert!(at("2026-10-19 · 09:12 UTC") < at("2026-10-06 · 10:02 to 10:32 UTC"));
+        assert!(at("2026-10-19, 09:25 to 09:40 UTC") < at("2026-10-19, 09:12 UTC"));
+        assert!(at("2026-10-19, 09:12 UTC") < at("2026-10-06, 10:02 to 10:32 UTC"));
         assert!(at("Mentioned a past call to park int8") < at("Proposed a call to accept c3, not made"));
         assert!(at("Proposed a call to accept c3, not made") < at("Amended e2 after locking it"));
         assert!(at("09:40 Mentioned a past call") < at("09:35 Proposed a call"));
@@ -745,7 +745,7 @@ mod tests {
         let line = latest(&d);
         assert_eq!(
             line,
-            "<p class=\"counts latest\"><a href=\"#history\">Latest changes: 2026-10-19 \u{b7} 09:25 to 09:40 UTC \u{b7} 4 writes \u{b7} no calls made</a></p>"
+            "<p class=\"counts latest\"><a href=\"#history\">Latest changes: 2026-10-19, 09:25 to 09:40 UTC \u{b7} 4 changes \u{b7} no calls made</a></p>"
         );
         // it holds the newest sitting's head (the Overview's history.sittings[0].head)
         assert!(said(&line).contains(&said(text(&list(&d, "history.sittings")[0], "head"))));
@@ -758,7 +758,7 @@ mod tests {
         let d = example();
         let html = recent(&d, &all);
         let page = said(&html);
-        assert!(page.starts_with("Recent calls and changes 2026-10-19 · 09:25 to 09:40 UTC · 4 writes · no calls made"), "{page}");
+        assert!(page.starts_with("Recent calls and changes 2026-10-19, 09:25 to 09:40 UTC · 4 changes · no calls made"), "{page}");
         assert!(page.ends_with("Every change, newest first \u{2192}"), "{page}");
         assert_eq!(html.matches("<li class=\"hev\">").count(), 4);
         assert!(!page.contains("in the log"), "the Overview's lines carry no log count: {page}");
@@ -815,7 +815,7 @@ mod tests {
         let d = one_line("{\"first\": \"2026-10-19 09:35 UTC\", \"n\": 1, \"sentence\": \"Locked e1\"}");
         let html = sittings(&d, &all);
         assert!(!html.contains("hsum") && !said(&html).contains("1 write in the log"), "{html}");
-        assert!(sittings(&example(), &all).contains("<p class=\"dim sm hsum\">47 writes in the log</p>"));
+        assert!(sittings(&example(), &all).contains("<p class=\"dim sm hsum\">47 changes recorded</p>"));
     }
 
     #[test]

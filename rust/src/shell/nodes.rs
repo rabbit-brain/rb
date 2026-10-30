@@ -4582,7 +4582,6 @@ mod tests {
         dig(&mut doc, &["runs", "runs2"]).as_dict_mut().unwrap().insert("witness".into(), crate::obj! {"seen" => "afterwards", "basis" => "made_before"});
         dig(&mut doc, &["findings", "c1"]).as_dict_mut().unwrap().insert("witness".into(), crate::obj! {"total" => 4, "afterwards" => 1});
         let page = all(&doc, Surface::Page);
-        let page = all(&doc, Surface::Page);
         assert!(card(&page, "run-runs1").contains("<dt>type</dt><dd>recorded as it ran</dd>"));
         assert!(card(&page, "run-runs2").contains("<dt>type</dt><dd>recorded afterwards</dd>"));
         assert!(card(&page, "c-c1").contains("<dt>evidence</dt><dd>1 of its 4 runs recorded afterwards</dd>"));

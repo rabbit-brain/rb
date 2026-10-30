@@ -278,6 +278,16 @@ def test_a_command_line_that_names_no_command_or_did_not_parse_uploads_nothing(t
     receiver.release.set()
 
 
+def test_an_agent_s_session_hook_counts_nothing_and_uploads_nothing(trial, receiver):
+    trial.cli("init", "INT8 ResNet-50 on ImageNet", "--no-agents")   # before analytics: it queues nothing
+    trial.telemetry("enable")             # the consent event, never attempted: a delivery is due
+    before = trial.pending()
+    run = trial.raw("journal", "scan", "--hook", "claude-code")
+    assert run.returncode == 0 and run.stdout == "" and run.stderr == ""
+    time.sleep(1)
+    assert receiver.requests == [] and trial.state()["last_attempt"] == 0 and trial.pending() == before
+
+
 @pytest.mark.parametrize("switch, said", [({"DO_NOT_TRACK": "1"}, "DO_NOT_TRACK is set"), ({"CI": "true"}, "CI environment")])
 def test_consent_given_under_a_switch_goes_out_with_the_first_event_after_it(trial, receiver, switch, said):
     enabled = trial.raw("telemetry", "enable", overrides=switch)

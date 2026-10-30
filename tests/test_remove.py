@@ -96,8 +96,8 @@ def test_remove_takes_back_what_is_rb_s_and_leaves_the_rest_as_it_was(repo):
     was before rb: AGENTS.md and .mcp.json byte for byte and with the times they had, no ref under refs/rb/, no rb
     folder in .git."""
     plan = _plan(repo)
-    assert [i["path"] for i in plan["remove"]] == [".rb/", ".claude/skills/rabbit-brain/SKILL.md", "AGENTS.md", ".mcp.json", "rb-page.html", "rb-export/",
-                                                    "refs/rb/ (1 ref)", ".git/rb/"]
+    assert [i["path"] for i in plan["remove"]] == [".rb/", ".claude/skills/rabbit-brain/SKILL.md", "AGENTS.md", ".mcp.json", ".claude/settings.json",
+                                                    "rb-page.html", "rb-export/", "refs/rb/ (1 ref)", ".git/rb/"]
     assert plan["keep"] == [] and plan["others"] == [] and plan["dry_run"]
     assert plan["untouched"].startswith("Not rb's to touch: your research files, worktrees and .git/worktrees, git history, git objects")
     assert plan["residue"] and all(len(o) == 40 for o in plan["residue"])
@@ -334,7 +334,7 @@ def test_rb_s_writes_staged_and_not_committed_are_named_with_the_command_that_un
     plan = _plan(repo)
     staged = [line[3:] for line in repo.git("status", "--porcelain").splitlines()]
     assert sorted(plan["staged"]) == sorted(staged) and plan["tracked_deleted"] == 0 and plan["tracked_changed"] == 0
-    assert plan["unstage"] == "git restore --staged -- .claude/skills/rabbit-brain/SKILL.md .rb rb-export rb-page.html && git add -- AGENTS.md .mcp.json"
+    assert plan["unstage"] == "git restore --staged -- .claude/settings.json .claude/skills/rabbit-brain/SKILL.md .rb rb-export rb-page.html && git add -- AGENTS.md .mcp.json"
     said = f"{len(staged)} staged files hold rb's writes, and rb does not touch git's index: "
     text = repo.run("remove", "--dry-run").stdout
     assert f"{said}after rb remove, run {plan['unstage']}, or your next commit adds them to history." in text and "history keeps them" not in text
@@ -537,7 +537,7 @@ def test_the_last_line_says_which_files_rb_took_its_part_out_of(repo):
     r = repo.run("remove", "--yes")
     assert r.returncode == 0
     last = r.stdout.rstrip("\n").splitlines()[-1]
-    assert last == ("Removed .rb/, .claude/skills/rabbit-brain/SKILL.md, rb-page.html, rb-export/, refs/rb/ (1 ref), .git/rb/. "
+    assert last == ("Removed .rb/, .claude/skills/rabbit-brain/SKILL.md, .claude/settings.json, rb-page.html, rb-export/, refs/rb/ (1 ref), .git/rb/. "
                     "Took rb's part out of AGENTS.md, .mcp.json. Nothing else was changed."), last
     assert (repo.root / "AGENTS.md").read_bytes() == HOUSE
 
@@ -793,7 +793,7 @@ def test_a_file_staged_with_rb_s_part_alone_then_changed_is_unstaged_by_the_one_
     plan = _plan(rec)
     mine = ".mcp.json .rb AGENTS.md" if there else ".mcp.json .rb"
     how = "git rm -r -q -f --cached" if before == "no-commit" else "git restore --staged"
-    assert plan["staged_in_part"] == [] and plan["unstage"] == f"{how} -- .claude/skills/rabbit-brain/SKILL.md {mine}"
+    assert plan["staged_in_part"] == [] and plan["unstage"] == f"{how} -- .claude/settings.json .claude/skills/rabbit-brain/SKILL.md {mine}"
     assert "staged in part" not in rec.run("remove", "--dry-run").stdout
     rec.rb("remove", "--yes")
     subprocess.run(plan["unstage"], shell=True, cwd=rec.root, env=rec.env, check=True)

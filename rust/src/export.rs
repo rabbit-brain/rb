@@ -383,7 +383,8 @@ fn origin_as_written(led: &Ledger) -> Option<String> {
 
 /// The address a reader can fetch the code from, as rb names it on what it publishes (rb export's bundle, page and
 /// manifest; rb sync sends the same): an https address, with any user:password@ before its host and any query or
-/// fragment after its path taken out. Anything else (a path of this machine, file://, ssh, plain http) names no
+/// fragment after its path taken out. An "@" after the authority ends (a password holding "/", "?" or "#") names
+/// none, since rb cannot tell where the credentials end. Anything else (a path of this machine, file://, ssh, plain http) names no
 /// address a reader can use, so none is named.
 pub fn readable_code_address(url: &str) -> Option<String> {
     let url = url.trim();
@@ -393,6 +394,11 @@ pub fn readable_code_address(url: &str) -> Option<String> {
     }
     let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
     let (netloc, tail) = rest.split_at(end);
+    // an "@" past where the authority ends: a password holding "/", "?" or "#" (unencoded), so rb cannot tell where
+    // the credentials end and git may read it otherwise; naming none keeps every part of the password unsaid
+    if tail.contains('@') {
+        return None;
+    }
     let host = netloc.rsplit_once('@').map_or(netloc, |(_, h)| h);
     if host.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return None;
@@ -446,11 +452,11 @@ impl Carried {
         let lines = crate::owned::entries(&led.root);
         let how = |l: &Dict| l.get("how").and_then(Value::as_str).unwrap_or("").to_string();
         let path_of = |l: &Dict| l.get("path").and_then(Value::as_str).map(PathBuf::from);
-        // a page or an export rb wrote; and an instruction file, a section or a server rb put in, while it is as rb left it
+        // a page or an export rb wrote; and an instruction file, a section, a server or a session hook rb put in, while it is as rb left it
         let written = lines.iter().filter(|l| how(l) == "output").filter_map(path_of).chain(
             lines
                 .iter()
-                .filter(|l| ["created", "replaced", "section", "mcp_entry"].contains(&how(l).as_str()))
+                .filter(|l| ["created", "replaced", "section", "mcp_entry", "hook_entry"].contains(&how(l).as_str()))
                 .filter_map(path_of)
                 .filter(|p| crate::owned::as_rb_wrote(&led.root, p)),
         );
@@ -1675,6 +1681,29 @@ mod tests {
             ("hg::https://host/r", None),
         ] {
             assert_eq!(readable_code_address(given).as_deref(), named, "{given}");
+        }
+    }
+
+    /// 062: a password holding "/", "?" or "#" ends the authority there (RFC 3986), so rb cannot tell where the
+    /// credentials end and git may read the address another way: any "@" after that point names no code, so no part
+    /// of the password is printed or written. Percent-encoded, the password is credentials like any other.
+    #[test]
+    fn a_password_holding_a_slash_names_no_code_and_no_part_of_it() {
+        for (given, named) in [
+            ("https://user:pa/ss@host/repo.git", None),
+            ("https://ci:1234/x@host/r", None),
+            ("https://ci:12?34@host/r", None),
+            ("https://ci:12#34@host/r", None),
+            ("https://ci@host/x@y/r", None),
+            ("https://user:pa%2Fss@host/repo.git", Some("https://host/repo.git")),
+            ("https://user:pa%2F%3F%23ss@host:8443/repo.git", Some("https://host:8443/repo.git")),
+            ("https://ci:1234@host/r", Some("https://host/r")),
+        ] {
+            let got = readable_code_address(given);
+            assert_eq!(got.as_deref(), named, "{given}");
+            for part in ["pa", "ss", "1234", "12", "34", "%2F"] {
+                assert!(!got.as_deref().unwrap_or("").contains(part), "{given} -> {got:?} says {part}");
+            }
         }
     }
 

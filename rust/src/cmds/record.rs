@@ -78,6 +78,7 @@ fn init_plan(led: &Ledger, out: &mut Out, consent: Option<crate::skill::Consent>
             ("change", Some("AGENTS.md")) if in_place.is_some() => in_place.as_deref().unwrap_or_default(),
             ("change", Some("AGENTS.md")) => "rb's section added at its end; nothing else in it changes",
             ("change", Some(".mcp.json")) => "rb's MCP server added to its mcpServers; nothing else in it changes",
+            ("change", _) if crate::skill::hook_of(path).is_some() => "rb's session hook added under its hooks; nothing else in it changes",
             ("change", _) => "written again: rb's own file",
             _ => "new",
         };

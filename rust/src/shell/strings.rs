@@ -131,6 +131,54 @@ pub const RECORDED_AFTERWARDS: &str = "recorded afterwards";
 /// An item's type, underneath: rb saw it happen, or recorded it afterwards.
 pub const RECORDED_AS_IT_RAN: &str = "recorded as it ran";
 
+/// A rule word as a tally says it, short and plain: "met", "not met", "can't tell yet", "not tested"; any other ("not
+/// reproduced", "gate missed") as rb gives it. The screens' tallies and rb status's (cmds/reading.rs) read this one.
+pub fn short_rule(word: &str) -> &str {
+    match word {
+        "meets" => "met",
+        "misses" => "not met",
+        "undetermined" => "can't tell yet",
+        "untested" => "not tested",
+        other => other,
+    }
+}
+
+/// A record's first day as its line says it: "2026-10-28" is "28 Oct 2026"; anything else as given.
+fn record_day(day: &str) -> String {
+    let ymd: Vec<&str> = day.split('-').collect();
+    let month = ymd.get(1).and_then(|m| m.parse::<usize>().ok()).and_then(|m| ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].get(m.wrapping_sub(1)));
+    match (month, ymd.first(), ymd.get(2)) {
+        (Some(m), Some(y), Some(d)) => format!("{} {m} {y}", d.trim_start_matches('0')),
+        _ => day.to_string(),
+    }
+}
+
+/// The record's line where nothing was recorded afterwards and yet the record holds work from before it began, so
+/// "since it began" would not be true: a clone of an address ("It began as a clone of another record."), experiments
+/// that reproduce another record's, as rb clone relates each, which a page cannot tell from a relation made by hand
+/// ("1 experiment reproduces an experiment of another record."), or experiments rb reconcile read from results folders
+/// ("1 experiment was read from its results folder."). The first that holds is said.
+pub fn witness_older_line(began: &str, clone: bool, reproduce: usize, folders: usize) -> String {
+    let day = began.split(' ').next().unwrap_or("");
+    let what = if clone {
+        "It began as a clone of another record.".to_string()
+    } else if reproduce == 1 {
+        "1 experiment reproduces an experiment of another record.".to_string()
+    } else if reproduce > 1 {
+        format!("{reproduce} experiments reproduce experiments of another record.")
+    } else if folders == 1 {
+        "1 experiment was read from its results folder.".to_string()
+    } else if folders > 1 {
+        format!("{folders} experiments were read from their results folders.")
+    } else {
+        return String::new();
+    };
+    if day.is_empty() {
+        return String::new();
+    }
+    format!("Kept with rb since {}. {what}", record_day(day))
+}
+
 /// The record's one line (WITNESS, Oct 28), in rb's voice, from M's facts (`home.witness`): when rb began keeping it
 /// (its day, "23 Oct 2026") and what was recorded afterwards, by kind, each count with its noun ("9 runs and 1 call"),
 /// naming no source: a run typed in with its past time is recorded afterwards too, and no file says it.
@@ -154,12 +202,7 @@ pub fn witness_line(began: &str, afterwards: &[(i64, i64, &str, &str)]) -> Strin
     if parts.is_empty() {
         return "Kept with rb since it began.".into();
     }
-    let ymd: Vec<&str> = day.split('-').collect();
-    let month = ymd.get(1).and_then(|m| m.parse::<usize>().ok()).and_then(|m| ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].get(m.wrapping_sub(1)));
-    let day = match (month, ymd.first(), ymd.get(2)) {
-        (Some(m), Some(y), Some(d)) => format!("{} {m} {y}", d.trim_start_matches('0')),
-        _ => day.to_string(),
-    };
+    let day = record_day(day);
     let n: i64 = afterwards.iter().map(|(n, ..)| *n).sum();
     let listed = match parts.split_last() {
         Some((last, [])) => last.clone(),
@@ -701,6 +744,21 @@ mod tests {
         let none = [(0, 3, "run", "runs"), (0, 1, "call", "calls")];
         assert_eq!(witness_line("2026-10-23 22:57 UTC", &none), "Kept with rb since it began.");
         assert_eq!(witness_line("", &none), "");
+        let day = "2026-10-28 09:00 UTC";
+        assert_eq!(witness_older_line(day, true, 1, 2), "Kept with rb since 28 Oct 2026. It began as a clone of another record.");
+        assert_eq!(witness_older_line(day, false, 1, 2), "Kept with rb since 28 Oct 2026. 1 experiment reproduces an experiment of another record.");
+        assert_eq!(witness_older_line(day, false, 2, 0), "Kept with rb since 28 Oct 2026. 2 experiments reproduce experiments of another record.");
+        assert_eq!(witness_older_line(day, false, 0, 1), "Kept with rb since 28 Oct 2026. 1 experiment was read from its results folder.");
+        assert_eq!(witness_older_line(day, false, 0, 3), "Kept with rb since 28 Oct 2026. 3 experiments were read from their results folders.");
+        assert_eq!(witness_older_line(day, false, 0, 0), "");
+        assert_eq!(witness_older_line("", true, 0, 0), "");
+    }
+
+    /// 0.6.2: one table of a tally's short rule words, public, so rb status's tally reads it rather than a copy.
+    #[test]
+    fn a_tally_says_each_rule_word_short() {
+        let said: Vec<&str> = ["meets", "misses", "undetermined", "untested", "not reproduced"].iter().map(|w| short_rule(w)).collect();
+        assert_eq!(said, ["met", "not met", "can't tell yet", "not tested", "not reproduced"]);
         assert_eq!(
             witness_line("2026-10-28 22:57 UTC", &[(2, 8, "run", "runs"), (0, 1, "analysis", "analyses"), (1, 4, "call", "calls")]),
             "Kept with rb since 28 Oct 2026. 2 runs and 1 call were recorded afterwards, not as they happened."

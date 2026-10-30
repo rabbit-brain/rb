@@ -638,6 +638,17 @@ fn run(argv: Vec<String>) -> i32 {
     }
     let command = parts.join(" ");
     ran(&command);
+    // an agent's session hook looking once (rb journal scan --hook <agent>, which rb init installs): it says nothing and
+    // exits 0 whatever happens, starts no check, sync or count, and tells the session nothing, since what it told would
+    // reach no one and would be told to the session as said
+    if command == "journal scan" {
+        if let Some(agent) = ns_str(&ns, "hook") {
+            let _ = guarded(|| crate::journal::hook_look(&agent));
+            // and no analytics delivery after it: main delivers only after a command it ran
+            RAN.with(|r| *r.borrow_mut() = None);
+            return EXIT_OK;
+        }
+    }
     // at most once a day, a background check for a newer rb (layer 3 of updates without the user): never a delay
     if !ns_bool(&ns, "dry_run") {
         let _ = guarded(crate::ledger::updates::start_check);

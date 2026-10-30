@@ -4478,11 +4478,11 @@ def test_the_record_line_sits_under_the_questions_never_above_the_queue(record):
 
 
 def test_no_since_it_began_where_the_record_holds_older_work(record):
-    """WITNESS2: "Kept with rb since it began." only where nothing in the record came before it as far as the facts
-    tell: a clone (its parent's structure), a record of questions alone (which may be one) and a record with an
-    experiment read from a results folder (rb reconcile --apply's work, which rb did not see happen) draw no line while
-    nothing counts as recorded afterwards; with
-    something counted, the line says it as anywhere."""
+    """WITNESS2, 0.6.2: "Kept with rb since it began." only where nothing in the record came before it as far as the
+    facts tell. While nothing counts as recorded afterwards, a clone (its parent's structure) says it began as one, a
+    record with experiments read from results folders (rb reconcile --apply's work, which rb did not see happen) says
+    how many, and a record of questions alone (which may be a clone) draws no line; with something counted, the line
+    says it as anywhere."""
     def line(doc):
         return [said(Html(page_of(record, doc)).text(e)) for e in Html(page_of(record, doc)).of_class("wit")]
     doc = example()
@@ -4493,12 +4493,14 @@ def test_no_since_it_began_where_the_record_holds_older_work(record):
         e["folder"] = ""
     doc["project"]["parent"] = ""
     assert line(doc) == ["Kept with rb since it began."] * 2
+    clone = ["Kept with rb since 28 Oct 2026. It began as a clone of another record."] * 2
     doc["project"]["parent"] = "https://example.org/int8/"
-    assert line(doc) == []
+    assert line(doc) == clone
     doc["project"]["parent"] = ""
-    # a clone from a path: no address on a page, and its experiments reproduce the parent's, as rb clone relates them
+    # a clone from a path: no address on a page, and its experiments reproduce the parent's, as rb clone relates them;
+    # a relation made by hand reads the same, so the line says what the relation says, never that it began as a clone
     doc["experiments"][0]["relations"] = ["reproduces exp_01M62XFCZAKSMW6RGQM8X5W0SR"]
-    assert line(doc) == []
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. 1 experiment reproduces an experiment of another record."] * 2
     doc["experiments"][0]["relations"] = ["reproduces e2"]
     assert line(doc) == ["Kept with rb since it began."] * 2
     # a record of questions alone: nothing tells a clone of them from a record begun here
@@ -4507,15 +4509,24 @@ def test_no_since_it_began_where_the_record_holds_older_work(record):
     assert line(doc) == []
     doc["experiments"] = kept
     doc["experiments"][0]["folder"] = "results/"
-    assert line(doc) == []
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. 1 experiment was read from its results folder."] * 2
+    doc["experiments"][1]["folder"] = "results/calib/"
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. 2 experiments were read from their results folders."] * 2
+    doc["experiments"][0]["relations"] = ["reproduces exp_01M62XFCZAKSMW6RGQM8X5W0SR"]
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. 1 experiment reproduces an experiment of another record."] * 2
+    doc["project"]["parent"] = "https://example.org/int8/"
+    assert line(doc) == clone
+    doc["project"]["parent"] = ""
+    doc["experiments"][0]["relations"] = []
     doc["home"]["witness"]["runs"] = {"total": 3, "afterwards": 3, "before": 3, "unknown": 0}
     assert line(doc) == ["Kept with rb since 28 Oct 2026. All 3 runs were recorded afterwards, not as they happened."] * 2
 
 
 def test_a_record_rb_reconcile_started_never_says_it_was_kept_from_its_start(tmp_path):
-    """WITNESS2: rb reconcile --apply starting a record from a results folder that holds a report (INT8 calibration on
-    ImageNet), with no run recorded, counts nothing afterwards, and its page draws no "Kept with rb since it began.":
-    the folder's work came before the record, and rb did not see it happen."""
+    """WITNESS2, 0.6.2: rb reconcile --apply starting a record from a results folder that holds a report (INT8
+    calibration on ImageNet), with no run recorded, counts nothing afterwards, and its page never says "Kept with rb
+    since it began.": the folder's work came before the record, and rb did not see it happen. It says the experiment
+    was read from its folder."""
     from rbtest import Recorder
     rec = Recorder(tmp_path, "int8")
     rec.start()
@@ -4527,7 +4538,28 @@ def test_a_record_rb_reconcile_started_never_says_it_was_kept_from_its_start(tmp
     assert [e["id"] for e in st["experiments"]] == ["calib"] and not st["runs"]
     assert all(v["afterwards"] == 0 for v in st["witness"].values() if isinstance(v, dict))
     t = Html(_page(rec, tmp_path, "page"))
-    assert _witness_lines(t) == [] and "Kept with rb" not in said(t.text(t.root))
+    assert "since it began" not in said(t.text(t.root))
+    day = st["witness"]["began"][:10]
+    y, m, d = day.split("-")
+    said_day = f"{int(d)} {'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split()[int(m) - 1]} {y}"
+    assert [text for _, text in _witness_lines(t)] == [f"Kept with rb since {said_day}. 1 experiment was read from its results folder."] * 2
+
+
+def test_a_record_begun_here_never_says_it_began_as_a_clone(tmp_path):
+    """0.6.2 (review): a record begun here whose experiment is related by hand to another project's, as rb clone relates
+    a clone's, says what the relation says, never that the record began as a clone."""
+    from rbtest import Recorder
+    rec = Recorder(tmp_path, "int8")
+    rec.start()
+    rec.rb("init", "INT8 ResNet-50", "--no-agents")
+    rec.rb("question", "add", "Does INT8 cost top-1 accuracy on ImageNet?", "--id", "q1")
+    rec.rb("experiment", "add", "INT8 vs FP32 on ImageNet", "--id", "int8", "-q", "q1", "--baseline", "fp32", "--candidate", "int8")
+    rec.rb("experiment", "relate", "int8", "reproduces", "exp_01M62XFCZAKSMW6RGQM8X5W0SR")
+    st = rec.rb("status")
+    assert all(v["afterwards"] == 0 for v in st["witness"].values() if isinstance(v, dict))
+    t = Html(_page(rec, tmp_path, "page"))
+    assert "began as a clone" not in said(t.text(t.root))
+    assert [text.split(". ", 1)[1] for _, text in _witness_lines(t)] == ["1 experiment reproduces an experiment of another record."] * 2
 
 
 def test_a_record_with_no_write_draws_no_record_line(record):

@@ -142,14 +142,65 @@ pub fn is_address(url: &str) -> bool {
 pub fn shareable(url: &str) -> String {
     let Some((front, rest)) = url.split_once("://") else { return url.to_string() };
     // the credentials run to the last @ before the first / after the scheme: a ? or a # in them leaves none behind
-    let rest = match rest.find('/').map_or(rest, |end| &rest[..end]).rfind('@') {
-        Some(at) => &rest[at + 1..],
-        None => rest,
+    let authority = rest.find('/').map_or(rest, |end| &rest[..end]);
+    let host = authority.rfind('@').map_or(authority, |at| &authority[at + 1..]);
+    // a password holding "/" leaves an @ past the first /: what comes before that / is no host[:digits] ("user:pa",
+    // "jo@x.com:tok"), or it is a user and a password ("user:p@ss"), so the credentials run to the last @ before the
+    // first ? or # after the next @, and no part of the password is said
+    let password = authority.find('@').is_some_and(|at| authority[..at].contains(':'));
+    let unsure = (host.contains(':') && !is_host_port(host)) || password;
+    let rest = match rest[authority.len()..].find('@') {
+        Some(next) if unsure => {
+            let first = authority.len() + next;
+            let end = rest[first..].find(['?', '#']).map_or(rest.len(), |e| first + e);
+            &rest[rest[..end].rfind('@').map_or(0, |at| at + 1)..]
+        }
+        _ => &rest[authority.len() - host.len()..],
     };
     let scheme = front.rsplit("::").next().unwrap_or(front);
     let web = scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https");
     let rest = if web { rest.split(['?', '#']).next().unwrap_or("") } else { rest };
     format!("{front}://{rest}")
+}
+
+/// What rb clone says in place of an address it cannot read safely (`said`).
+pub const UNREADABLE: &str = "an address rb cannot read safely";
+
+/// An address as rb clone says and keeps it: `shareable`'s, but where an @ follows the first /, ? or # after the
+/// scheme and what comes before it holds credentials or a `:`, a password may hold one of them and its host cannot be
+/// told apart from it, so no address is said, only `UNREADABLE`: never a wrong host and never a part of a password.
+pub fn said(url: &str) -> String {
+    match url.split_once("://") {
+        Some((_, rest)) => {
+            let authority = rest.find(['/', '?', '#']).map_or(rest, |end| &rest[..end]);
+            if authority.contains(['@', ':']) && rest[authority.len()..].contains('@') {
+                UNREADABLE.to_string()
+            } else {
+                shareable(url)
+            }
+        }
+        None => url.to_string(),
+    }
+}
+
+/// Whether an address's authority reads as a host and an optional :port of digits (`lab.example:8443`, `[::1]:8000`),
+/// as git and curl read it.
+fn is_host_port(authority: &str) -> bool {
+    let (name, port) = match authority.strip_prefix('[') {
+        Some(v6) => match v6.split_once(']') {
+            Some((inside, "")) => (inside, None),
+            Some((inside, after)) => match after.strip_prefix(':') {
+                Some(p) => (inside, Some(p)),
+                None => return false,
+            },
+            None => return false,
+        },
+        None => match authority.rsplit_once(':') {
+            Some((n, p)) => (n, Some(p)),
+            None => (authority, None),
+        },
+    };
+    !name.is_empty() && (authority.starts_with('[') || !name.contains(['[', ']', ':'])) && port.map_or(true, |p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
 }
 
 /// One request; its answer whatever the status, or why there was none.
@@ -421,6 +472,17 @@ mod tests {
             ("https://alice:pa?ss@host/b.zip", "https://host/b.zip"),
             ("https://alice:pa#ss@host/b.zip", "https://host/b.zip"),
             ("https://alice:pa?ss@host", "https://host"),
+            ("https://user:pa/ss@host/repo.git", "https://host/repo.git"),
+            ("https://user:pa/s?s@host/repo.git?x=1", "https://host/repo.git"),
+            ("https://user:pa/ss@host/repo.git?next=a@b", "https://host/repo.git"),
+            ("https://user:pa%2Fss@host/repo.git", "https://host/repo.git"),
+            ("ssh://git:pa/ss@host/r.git", "ssh://host/r.git"),
+            ("https://jo@x.com:tok/en@host/repo.git", "https://host/repo.git"),
+            ("https://user:p@ss/x@host/r", "https://host/r"),
+            // a host and a port of digits, then a path holding @, is the address git reads: kept whole
+            ("https://ci:1234/x@host/r", "https://ci:1234/x@host/r"),
+            ("https://lab.example:8443/u/x@y/b.zip", "https://lab.example:8443/u/x@y/b.zip"),
+            ("http://[::1]:8000/u/x@y", "http://[::1]:8000/u/x@y"),
             ("hg::https://alice:pw@host/repo", "hg::https://host/repo"),
             ("gcrypt::https://alice:pw@github.com/org/repo.git", "gcrypt::https://github.com/org/repo.git"),
             ("hg::https://alice:pw@host/repo?x=1#f", "hg::https://host/repo"),
@@ -436,6 +498,31 @@ mod tests {
             ("exports/a://b?x", "exports/a://b?x"),
         ] {
             assert_eq!(shareable(given), kept, "{given}");
+        }
+    }
+
+    /// rb clone says no address where an @ follows the first /, ? or # after credentials or a `:` (the orchestrator's rule,
+    /// Oct 30 17:00 +08), and says every other one as `shareable` does.
+    #[test]
+    fn an_address_rb_cannot_read_safely_is_not_said() {
+        for given in [
+            "https://ci:1234/x@host/r",
+            "https://user:pa/ss@host/u/x@y/r",
+            "https://host:/u/x@y",
+            "https://user:pa/ss@host/repo.git",
+            "https://user:pw@host/repo.git?next=a@b",
+            "https://alice@lab.example/u/x@y/b.zip",
+            "https://jo@x.com:tok/en@host/repo.git",
+            "ssh://git:pa/ss@host/r.git",
+            "http://[::1]:8000/u/x@y",
+            "https://user:pw@host?sig=a@b",
+            "https://alice:pa?ss@host/b.zip",
+        ] {
+            assert_eq!(said(given), UNREADABLE, "{given}");
+        }
+        // with neither before the first /, git reads the host there: said as shareable says it
+        for given in ["https://tok/en@host/r", "https://user:pw@host/r.git?sig=s3cret", "https://lab.example/u/x@y/b.zip", "git@github.com:lab/proj.git", "/home/me/bundle"] {
+            assert_eq!(said(given), shareable(given), "{given}");
         }
     }
 

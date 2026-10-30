@@ -269,7 +269,8 @@ impl Plan {
         let skill_dir = skill.parent().map(Path::to_path_buf);
         let cursor = crate::skill::cursor_path(Some(root));
         // each one a link takes elsewhere is said with the file it lands in
-        for p in [&skill, &cursor, &root.join("AGENTS.md"), &root.join(".mcp.json")] {
+        let hooks = [crate::skill::Hook::Claude, crate::skill::Hook::Codex, crate::skill::Hook::Cursor].map(|h| crate::skill::hook_path(h, root));
+        for p in [&skill, &cursor, &root.join("AGENTS.md"), &root.join(".mcp.json")].into_iter().chain(hooks.iter()) {
             if let Some(l) = crate::skill::through_link(p, root) {
                 self.links.push((shown(p), crate::skill::link_note(p, root), crate::sys::slashed(&l.real)));
             }
@@ -291,6 +292,9 @@ impl Plan {
         self.own_file(&cursor, crate::skill::cursor_text(&text).as_bytes(), lines, "rb's rule for Cursor", Vec::new(), shown);
         self.agents_md(root, lines, shown);
         self.mcp_json(root, lines, shown);
+        for h in [crate::skill::Hook::Claude, crate::skill::Hook::Codex, crate::skill::Hook::Cursor] {
+            self.hook(h, root, lines, shown);
+        }
     }
 
     fn own_file(&mut self, path: &Path, rb_text: &[u8], lines: &[Dict], what: &str, mut more: Vec<Act>, shown: &dyn Fn(&Path) -> String) {
@@ -417,6 +421,134 @@ impl Plan {
                 path: name,
                 why: "its \"rabbit-brain\" server is not as rb writes it: delete it from mcpServers yourself if you want it gone".into(),
             }),
+        }
+    }
+
+    /// rb's session hook in an agent's project file, as the MCP server is: the file back as it was while it is as rb left
+    /// it (a file rb made goes), else rb's handlers alone cut out by their own bytes when they are as rb writes them,
+    /// with the lists and the `hooks` rb made for them once nothing else is in them. Every other hook stays.
+    fn hook(&mut self, h: crate::skill::Hook, root: &Path, lines: &[Dict], shown: &dyn Fn(&Path) -> String) {
+        let path = crate::skill::hook_path(h, root);
+        let Some(now) = std::fs::read(&path).ok().and_then(|b| String::from_utf8(b).ok()) else { return };
+        let Ok(cfg) = crate::pyjson::loads(&now) else { return };
+        let items = crate::skill::hook_items(h);
+        // rb's handler under each event, in whichever form an rb wrote it: today's, or an earlier rb's
+        let form_in = |e: &str| cfg.get("hooks").and_then(|x| x.get(e)).and_then(Value::as_list).and_then(|l| crate::skill::hook_form_in(h, l));
+        let in_it = |(e, _): &(String, Value)| form_in(e).is_some();
+        let line = crate::owned::last_for(lines, &path, &["hook_entry", "created"]);
+        let name = shown(&path);
+        let Some(l) = line else {
+            if items.iter().any(in_it) {
+                self.keep.push(Kept { path: name, why: "rb's session hook (rb journal scan): rb did not add it here, so it stays; delete it from hooks yourself if you want it gone".into() });
+            }
+            return;
+        };
+        let created = line_str(&l, "how") == Some("created");
+        let names = |k: &str| l.get(k).and_then(Value::as_list).map(|v| v.iter().filter_map(Value::as_str).map(str::to_string).collect::<Vec<String>>());
+        // the file as it was before this write still holds handlers of rb's from an earlier one: they are cut, not put back
+        let inherits = names("own").map_or(false, |own| names("added").map_or(false, |all| all.iter().any(|e| !own.contains(e))));
+        // a handler of rb's from before rb wrote here (`replaced`, `cut`), kept by an earlier write: this write's `before`
+        // no longer holds it, so the file does not go back to that alone
+        let before_cfg = line_str(&l, "before").and_then(|b| crate::pyjson::loads(b).ok());
+        let in_before = |e: &str, x: &Value| {
+            before_cfg.as_ref().and_then(|c| c.get("hooks")).and_then(|c| c.get(e)).and_then(Value::as_list).map_or(false, |l| l.contains(x))
+        };
+        let carried = l.get("replaced").and_then(Value::as_dict).map_or(false, |d| d.iter().any(|(e, x)| !in_before(e, x)))
+            || l.get("cut").and_then(Value::as_dict).map_or(false, |d| {
+                d.iter().any(|(e, xs)| xs.as_list().map_or(false, |xs| xs.iter().any(|x| !in_before(e, x))))
+            });
+        let file_made = created || l.get("file_made") == Some(&Value::Bool(true));
+        if line_str(&l, "sha256_after") == Some(sha(now.as_bytes()).as_str()) && !inherits && !carried {
+            if created {
+                let mut acts = vec![made_at(&path)];
+                acts.extend(made_dirs(Some(&l)));
+                self.remove.push(Item { path: name, why: format!("made by rb, and as rb wrote it{}", link_stays(&path)), acts });
+                return;
+            }
+            if let Some(back) = line_str(&l, "before").filter(|b| line_str(&l, "sha256_before") == Some(sha(b.as_bytes()).as_str())) {
+                let at = l.get("mtime_before").and_then(Value::as_i64);
+                self.remove.push(Item {
+                    path: name,
+                    why: "rb's session hook, as rb added it: the file goes back to what it was, byte for byte".into(),
+                    acts: vec![Act::Write(path, back.to_string(), at)],
+                });
+                return;
+            }
+        }
+        // what rb made for its handlers goes with them once nothing else is in it: all of it, in a file rb made
+        let made: Vec<String> = if created {
+            std::iter::once("hooks".to_string()).chain(items.iter().map(|(e, _)| e.clone())).collect()
+        } else {
+            l.get("made_keys").and_then(Value::as_list).map(|v| v.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default()
+        };
+        // only the handlers rb added here: one that was in a list before rb (a teammate's commit of rb's) stays; one whose
+        // place rb's took when rb brought it up to date (`replaced`) goes back as it was
+        let added = names("added");
+        let replaced = l.get("replaced").and_then(Value::as_dict).cloned().unwrap_or_default();
+        let cut_before = l.get("cut").and_then(Value::as_dict).cloned().unwrap_or_default();
+        let (mut back, mut present, mut again, mut put_again) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        let at_of = |key: &str, e: &str, k: usize| -> Option<usize> {
+            let v = l.get(key).and_then(Value::as_dict).and_then(|d| d.get(e)).cloned();
+            let v = if key == "cut_at" { v.and_then(|x| x.as_list().and_then(|xs| xs.get(k).cloned())) } else { v };
+            v.and_then(|x| x.as_i64()).and_then(|j| usize::try_from(j).ok())
+        };
+        for (e, _) in items.iter().filter(|x| created || added.as_ref().map_or(true, |a| a.contains(&x.0))) {
+            // every form of rb's there goes, so no earlier rb's handler is left running beside nothing
+            let forms = cfg.get("hooks").and_then(|x| x.get(e)).and_then(Value::as_list).map(|l| crate::skill::hook_forms_in(h, l)).unwrap_or_default();
+            // none of rb's left to put it in place of: the one rb's took the place of comes back where it was
+            if let (true, Some(was)) = (forms.is_empty(), replaced.get(e.as_str())) {
+                put_again.push((e.clone(), was.clone(), at_of("replaced_at", e, 0)));
+            }
+            for (k, form) in forms.into_iter().enumerate() {
+                match replaced.get(e.as_str()).filter(|_| k == 0) {
+                    Some(was) => back.push((e.clone(), form, was.clone())),
+                    None => present.push((e.clone(), form)),
+                }
+            }
+        }
+        // the ones rb took out beside its own (`cut`), and the one rb's took the place of where none of rb's is left,
+        // come back, each at its place in the list (`cut_at`, `replaced_at`; a line with none puts it last), unless it
+        // is there and stays there: one rb takes out above as a form of rb's (put back by the user under an event rb
+        // added to) comes back at its place too
+        let cuts: Vec<(String, Value, Option<usize>)> = cut_before
+            .iter()
+            .flat_map(|(e, items)| {
+                let items = items.as_list().map(|l| l.to_vec()).unwrap_or_default();
+                items.into_iter().enumerate().map(|(k, x)| (e.clone(), x, at_of("cut_at", e, k))).collect::<Vec<_>>()
+            })
+            .collect();
+        for (e, item, at) in put_again.into_iter().chain(cuts) {
+            let list = cfg.get("hooks").and_then(|x| x.get(&e)).and_then(Value::as_list).map(|l| l.to_vec()).unwrap_or_default();
+            let goes = present.iter().any(|(pe, x)| *pe == e && *x == item) || back.iter().any(|(be, x, _)| *be == e && *x == item);
+            if (!list.contains(&item) || goes) && !again.iter().any(|(ae, x, _)| *ae == e && *x == item) {
+                again.push((e, item, at));
+            }
+        }
+        again.sort_by_key(|(e, _, at)| (e.clone(), at.unwrap_or(usize::MAX)));
+        if present.is_empty() && back.is_empty() && again.is_empty() {
+            return;
+        }
+        let cut = crate::splice::items_put(&now, "hooks", &back).and_then(|put| crate::splice::items_cut(&put, "hooks", &present, &made));
+        match cut.and_then(|c| crate::splice::items_add_at(&c, "hooks", &again).ok().map(|a| a.unwrap_or(c))) {
+            Some(cut) => {
+                let empty = crate::pyjson::loads(&cut).map_or(false, |v| crate::skill::hook_file_empty(h, &v));
+                let acts = if file_made && empty {
+                    let mut acts = vec![made_at(&path)];
+                    acts.extend(made_dirs(Some(&l)));
+                    acts
+                } else {
+                    vec![Act::Write(path, cut, None)]
+                };
+                let why = if back.is_empty() && again.is_empty() {
+                    "rb's session hook (rb journal scan), as rb writes it; every other hook and the rest of the file stay"
+                } else if present.is_empty() && back.is_empty() {
+                    "the earlier form of rb's session hook that rb took out goes back where it was; every other hook and the rest of the file stay"
+                } else {
+                    "rb's session hook (rb journal scan), as rb writes it, with the earlier one it took the place of put back; every other hook and the rest of the file stay"
+                };
+                self.remove.push(Item { path: name, why: why.into(), acts });
+            }
+            None => self.keep.push(Kept { path: name, why: "rb's session hook is not in it as rb writes it: delete it from hooks yourself if you want it gone".into() }),
         }
     }
 
@@ -577,7 +709,7 @@ impl Plan {
             if in_commit && head.is_none() {
                 return false;
             }
-            let mine = crate::owned::all_for(lines, p, &["created", "replaced", "section", "mcp_entry"]);
+            let mine = crate::owned::all_for(lines, p, &["created", "replaced", "section", "mcp_entry", "hook_entry"]);
             for _ in 0..=mine.len() {
                 if head.as_deref() == Some(at.as_str()) {
                     return true;

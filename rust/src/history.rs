@@ -2138,4 +2138,144 @@ mod tests {
             assert_eq!(h.sittings[0].lines[0].sentence, said);
         }
     }
+
+    /// The contract examples' log as rb writes it (tests/fixtures/shell/int8-demo.*.view.json): each write's time from the
+    /// example's own history.log, its runs' labels and times, its experiments' titles and its calls from the example's
+    /// records, and what rb's log line holds beyond what the example shows (an op, a detail, who wrote it) from this
+    /// table. History told from it is what the examples must hold, so they cannot drift from what rb writes. One row
+    /// stands for each write the example's log lists: an amendment that adds a rule is its criterion's row, where rb also
+    /// writes the experiment's, since the example's log counts it once. Facts are made here, not read from a ledger by
+    /// Facts::of and named_apart, which the tests over a real record above cover.
+    fn example_history(v: &Value) -> History {
+        let (ana, helper) = ("human:ana", "agent:helper");
+        let amend = |change: &str, why: &str| crate::obj! {"change" => change, "why" => why};
+        let table: Vec<(&str, &str, &str, &str, Value)> = vec![
+            (ana, "init", "project", "int8-resnet50", crate::obj! {"title" => "INT8 ResNet-50 on ImageNet"}),
+            (ana, "add", "question", "q1", crate::obj! {"parent" => Value::Null}),
+            (ana, "add", "experiment", "e1", crate::obj! {"questions" => crate::list!["q1"]}),
+            (ana, "spec_set", "experiment", "e1", crate::obj! {"setting" => "seed", "change" => "setting seed: new, unknown (per-run)"}),
+            (ana, "add", "criterion", "c1", crate::obj! {"experiment" => "e1"}),
+            (ana, "add", "criterion", "c3", crate::obj! {"experiment" => "e1"}),
+            (ana, "add", "criterion", "c4", crate::obj! {"experiment" => "e1"}),
+            (ana, "file", "criterion", "c1", crate::obj! {"question" => "q1"}),
+            (ana, "file", "criterion", "c3", crate::obj! {"question" => "q1"}),
+            (ana, "file", "criterion", "c4", crate::obj! {"question" => "q1"}),
+            (ana, "add", "resource", "imagenet-val", crate::obj! {}),
+            (ana, "add", "resource", "imagenet-calib-512", crate::obj! {}),
+            (ana, "add", "resource", "resnet50-fp32", crate::obj! {}),
+            (ana, "freeze", "experiment", "e1", crate::obj! {}),
+            (ana, "gate", "experiment", "e1", crate::obj! {"confirms" => "design", "design" => "94f795b74f5c"}),
+            (ana, "record", "run", "runs1", crate::obj! {"experiment" => "e1"}),
+            (ana, "record", "run", "runs2", crate::obj! {"experiment" => "e1"}),
+            (ana, "record", "run", "runsql7", crate::obj! {"experiment" => "e1"}),
+            (ana, "add", "criterion", "c6", crate::obj! {"experiment" => "e1", "amendment" => amend("new criterion c6: onnx_top1", "")}),
+            (ana, "retract", "run", "runs2", crate::obj! {"why" => "evaluated on the train split"}),
+            (ana, "record", "run", "runs2b", crate::obj! {"experiment" => "e1", "replaces" => "runs2"}),
+            (ana, "add", "question", "q1a", crate::obj! {"parent" => "q1"}),
+            (ana, "add", "experiment", "e2", crate::obj! {"questions" => crate::list![]}),
+            (ana, "spec_set", "experiment", "e2", crate::obj! {"setting" => "calib_images", "change" => "setting calib_images: new, unknown (per-run)"}),
+            (ana, "add", "criterion", "c5", crate::obj! {"experiment" => "e2"}),
+            (ana, "gate", "experiment", "e2", crate::obj! {"if_holds" => "ship int8 calibrated on 512 images", "if_not" => "keep fp32 for serving"}),
+            (ana, "file", "experiment", "e2", crate::obj! {"question" => "q1a"}),
+            (ana, "file", "criterion", "c5", crate::obj! {"question" => "q1a"}),
+            (ana, "freeze", "experiment", "e2", crate::obj! {}),
+            (ana, "record", "run", "runc128", crate::obj! {"experiment" => "e2"}),
+            (ana, "record", "run", "runc512", crate::obj! {"experiment" => "e2"}),
+            (ana, "record", "run", "runc1024", crate::obj! {"experiment" => "e2"}),
+            (ana, "record", "run", "runc2048", crate::obj! {"experiment" => "e2"}),
+            (ana, "record", "run", "runs3", crate::obj! {"experiment" => "e1"}),
+            (ana, "analyze", "analysis", "a1", crate::obj! {"experiment" => "e1"}),
+            (ana, "add", "criterion", "c2", crate::obj! {"experiment" => "e1", "amendment" => amend("new criterion c2: fp32.top1", "")}),
+            (ana, "file", "criterion", "c2", crate::obj! {"question" => "q1"}),
+            (ana, "decide", "decision", "dec1", crate::obj! {"subject" => "c1"}),
+            (helper, "decide", "decision", "dec5", crate::obj! {"subject" => "c4"}),
+            (ana, "decide", "decision", "dec6", crate::obj! {"subject" => "c4", "confirms" => "dec5"}),
+            (ana, "file", "criterion", "c4", crate::obj! {"question" => "q1", "when_met" => "int8 serves within the accuracy budget", "why" => "c1 and c4 hold on three seeds"}),
+            (ana, "note", "experiment", "e1", crate::obj! {"note" => "n1"}),
+            (ana, "amend", "experiment", "e1", crate::obj! {"amendment" => amend("hypothesis", "")}),
+            (ana, "amend", "experiment", "e2", crate::obj! {"amendment" => amend("unit run -> calib_images", "the cells are the unit")}),
+            (helper, "file", "criterion", "c5", crate::obj! {"question" => "q1a", "when_met" => "512 images are enough", "why" => "only the 128-image cell misses"}),
+            (helper, "decide", "decision", "dec7", crate::obj! {"subject" => "c3"}),
+            (helper, "decide", "decision", "dec4", crate::obj! {"subject" => "int8"}),
+        ];
+        let log = v.get("history").unwrap().get("log").unwrap().as_list().unwrap();
+        assert_eq!(log.len(), table.len(), "the table holds one line for each write of the example's log");
+        let at = |i: usize| {
+            let row = log.iter().find(|r| r.get("log_index") == Some(&Value::Int(i as i64))).unwrap_or_else(|| panic!("no log_index {i}"));
+            let m = row.get_str("at").unwrap().strip_suffix(" UTC").unwrap().replace(' ', "T");
+            format!("{m}:00.000+00:00")
+        };
+        let rows: Vec<Dict> = table.into_iter().enumerate()
+            .map(|(i, (actor, op, kind, id, detail))| crate::dict! {"at" => at(i), "actor" => actor, "via" => "cli", "op" => op, "kind" => kind, "id" => id, "detail" => detail})
+            .collect();
+        let mut f = Facts { project: v.get("project").unwrap().get_str("title").unwrap().to_string(), ..Default::default() };
+        for e in v.get("experiments").unwrap().as_list().unwrap() {
+            f.titles.insert(e.get_str("id").unwrap().to_string(), e.get_str("title").unwrap().to_string());
+        }
+        // each run as names_of says it: "run <its label>", told apart from a run whose words read the same by when
+        let runs = v.get("runs").unwrap().as_dict().unwrap();
+        let mut said: IndexMap<String, String> = IndexMap::new();
+        let mut times: IndexMap<String, String> = IndexMap::new();
+        for row in rows.iter().filter(|r| r.get_str("op") == Some("record")) {
+            let id = row.get_str("id").unwrap();
+            let r = &runs[id];
+            said.insert(id.to_string(), format!("run {}", r.get_str("label").unwrap()));
+            times.insert(id.to_string(), r.get_str("at").unwrap().replace(" UTC", ":00+00:00").replace(' ', "T"));
+            let made: Vec<String> = r.get("made").and_then(Value::as_list).unwrap().iter().map(crate::pyjson::py_str).collect();
+            let row = if id == "runsql7" { "row 7 of table runs".to_string() } else { String::new() };
+            f.runs.insert(id.to_string(), RunFacts { experiment: r.get_str("experiment_id").unwrap().to_string(), made, row });
+        }
+        f.names = twins_told_apart(&said, &times);
+        for (id, r) in runs {
+            assert_eq!(f.names.get(id).map(String::as_str), r.get_str("named"), "runs.{id}.named is what twins_told_apart says of its label");
+        }
+        f.bases = said.iter().filter(|(id, w)| f.names.get(*id) != Some(*w)).map(|(id, w)| (id.clone(), w.clone())).collect();
+        for c in ["c1", "c2", "c3", "c4", "c6"] {
+            f.experiment_of.insert(c.into(), "e1".into());
+        }
+        f.experiment_of.insert("c5".into(), "e2".into());
+        // the calls: c1 made, a proposal on c4 the user confirmed, a proposal on c3, and a past call a session mentioned
+        let call = |subject: &str, action: &str, why: &str, standing: Standing| Call { subject: subject.into(), action: action.into(), why: why.into(), standing };
+        f.calls.insert("dec1".into(), call("c1", "accept", "holds on all three seeds", Standing::Made));
+        f.calls.insert("dec5".into(), call("c4", "accept", "per-class drop stays under 2 points", Standing::Proposed));
+        f.calls.insert("dec6".into(), call("c4", "accept", "per-class drop stays under 2 points", Standing::Confirmed));
+        let pending = v.get("pending").unwrap().get("rows").unwrap().as_list().unwrap();
+        assert!(pending.iter().any(|p| p.get_str("id") == Some("dec7")) && pending.iter().any(|p| p.get_str("id") == Some("dec4")));
+        f.calls.insert("dec7".into(), call("c3", "accept", "one seed is enough for the export check\\u200b", Standing::Proposed));
+        f.calls.insert("dec4".into(), call("int8", "park", "", Standing::PastMentioned("2026-05-07".into(), "notes.md:3".into())));
+        let mut h = told(&rows, &f);
+        // a line links only what the document holds, as the shell's model keeps them (model.rs held_ids)
+        let mut held: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for k in ["questions", "experiments"] {
+            held.extend(v.get(k).unwrap().as_list().unwrap().iter().filter_map(|x| x.get_str("id")).map(str::to_string));
+        }
+        for k in ["findings", "runs", "resources", "analyses"] {
+            held.extend(v.get(k).unwrap().as_dict().unwrap().keys().cloned());
+        }
+        h.retain_refs(|r| held.contains(r));
+        h
+    }
+
+    #[test]
+    fn the_contract_examples_say_history_as_history_tells_it() {
+        // the orchestrator's contract test (Oct 29 15:40 +08 item 2): every example's summary, sittings and Latest
+        // changes are what this file tells of the examples' log, word for word
+        let live = crate::pyjson::loads(include_str!("../../tests/fixtures/shell/int8-demo.live.view.json")).unwrap();
+        let h = example_history(&live);
+        let want = crate::obj! {"history" => h.to_value(), "latest" => h.latest().map_or(Value::Null, |l| l.to_value())};
+        if let Ok(out) = std::env::var("RB_EXAMPLE_HISTORY_OUT") {
+            std::fs::write(out, crate::pyjson::dumps(&want)).unwrap();
+        }
+        for (name, text) in [
+            ("live", include_str!("../../tests/fixtures/shell/int8-demo.live.view.json")),
+            ("owner", include_str!("../../tests/fixtures/shell/int8-demo.owner.view.json")),
+            ("away", include_str!("../../tests/fixtures/shell/int8-demo.away.view.json")),
+            ("past", include_str!("../../tests/fixtures/shell/int8-demo.past.view.json")),
+        ] {
+            let v = crate::pyjson::loads(text).unwrap();
+            let held = crate::obj! {"history" => crate::obj! {"summary" => v.get("history").unwrap().get("summary").unwrap().clone(), "sittings" => v.get("history").unwrap().get("sittings").unwrap().clone()}, "latest" => v.get("home").unwrap().get("latest").unwrap().clone()};
+            let (got, want) = (crate::pyjson::dumps(&held), crate::pyjson::dumps(&want));
+            assert!(got == want, "int8-demo.{name}.view.json's History is not what history.rs tells of its log:\n held: {got}\n told: {want}");
+        }
+    }
 }

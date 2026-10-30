@@ -401,7 +401,7 @@
     "Started the record in @BASE@/work/.rb, titled \"work\", the folder's name. Commit .rb/ with the code.",
     "",
     "For the agents here:",
-    "  Cursor (.cursor/): .cursor/rules/rabbit-brain.mdc",
+    "  Cursor (.cursor/): .cursor/rules/rabbit-brain.mdc; rb's session hook in a new .cursor/hooks.json (sessionStart and stop run rb journal scan, which looks at the repository and says nothing)",
     "",
     "The repository at d7961b9: 2 results folders.",
     "",
@@ -992,7 +992,7 @@
     "",
     "Observed and unplaced (1):",
     "  results/warmup/metrics.json was there when rb first looked here, in results/warmup/, which warmup reads, so rb cannot tell it from the work before the record and proposes no run of it: rb run add warmup --from results/warmup/metrics.json records it, if it is one",
-    "  rb put the code in git at refs/rb/snapshots/ae3dc46cedd3b0d63b9fcfc5c65d4215ca43de6c, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/ae3dc46cedd3b0d63b9fcfc5c65d4215ca43de6c removes it.",
+    "  rb put the code in git at refs/rb/snapshots/e117c62c5450a09a126daadd3181e2e08c891a2f, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/e117c62c5450a09a126daadd3181e2e08c891a2f removes it.",
     ""
    ],
    "err": [
@@ -1110,7 +1110,7 @@
     "first line",
     "it failed here",
     "exit 3. The command, its exit code and what it wrote are in the journal.",
-    "  rb put the code in git at refs/rb/snapshots/0284ebd5e682d3a5f6fb351c9f4133dac1940b53, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/0284ebd5e682d3a5f6fb351c9f4133dac1940b53 removes it.",
+    "  rb put the code in git at refs/rb/snapshots/831ef02d9b10ae17a81cab8584a66360f3eeaa94, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/831ef02d9b10ae17a81cab8584a66360f3eeaa94 removes it.",
     "",
     "Next: rb reconcile",
     ""
@@ -1193,7 +1193,7 @@
     "    ],",
     "    \"code\": {",
     "     \"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\",",
-    "     \"tree\": \"0284ebd5e682d3a5f6fb351c9f4133dac1940b53\"",
+    "     \"tree\": \"831ef02d9b10ae17a81cab8584a66360f3eeaa94\"",
     "    }",
     "   },",
     "   {",
@@ -1207,7 +1207,7 @@
     "    \"wrote_checked\": true,",
     "    \"code\": {",
     "     \"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\",",
-    "     \"tree\": \"0284ebd5e682d3a5f6fb351c9f4133dac1940b53\"",
+    "     \"tree\": \"831ef02d9b10ae17a81cab8584a66360f3eeaa94\"",
     "    }",
     "   }",
     "  ],",
@@ -1272,14 +1272,14 @@
     "",
     "Results in the repository, not in the record (1):",
     "  python3 -c 'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")': top1=0.76",
-    "    rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\"'\"'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")'\"'\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree ae3dc46cedd3b0d63b9fcfc5c65d4215ca43de6c",
+    "    rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\"'\"'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")'\"'\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree e117c62c5450a09a126daadd3181e2e08c891a2f",
     "",
     "Observed and unplaced (1):",
     "  results/warmup/metrics.json was there when rb first looked here, in results/warmup/, which warmup reads, so rb cannot tell it from the work before the record and proposes no run of it: rb run add warmup --from results/warmup/metrics.json records it, if it is one",
     "",
     "rb reconcile --apply keeps this in the record: 1 run to record.",
     "",
-    "Next: rb reconcile --apply  \u00b7  rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\"'\"'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")'\"'\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree ae3dc46cedd3b0d63b9fcfc5c65d4215ca43de6c",
+    "Next: rb reconcile --apply  \u00b7  rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\"'\"'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")'\"'\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree e117c62c5450a09a126daadd3181e2e08c891a2f",
     ""
    ],
    "err": [
@@ -1313,14 +1313,14 @@
     "",
     "Results in the repository, not in the record (1):",
     "  python3 -c 'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")': top1=0.76",
-    "    rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\"'\"'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")'\"'\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree ae3dc46cedd3b0d63b9fcfc5c65d4215ca43de6c",
+    "    rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\"'\"'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")'\"'\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree e117c62c5450a09a126daadd3181e2e08c891a2f",
     "",
     "Observed and unplaced (1):",
     "  results/warmup/metrics.json was there when rb first looked here, in results/warmup/, which warmup reads, so rb cannot tell it from the work before the record and proposes no run of it: rb run add warmup --from results/warmup/metrics.json records it, if it is one",
     "",
     "rb reconcile --apply keeps this in the record: 1 to re-index, 1 run to record.",
     "",
-    "Next: rb reconcile --apply  \u00b7  rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\"'\"'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")'\"'\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree ae3dc46cedd3b0d63b9fcfc5c65d4215ca43de6c",
+    "Next: rb reconcile --apply  \u00b7  rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\"'\"'print(\"{\\\"metrics\\\": {\\\"top1\\\": 0.76, \\\"loss\\\": 1.5}}\")'\"'\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree e117c62c5450a09a126daadd3181e2e08c891a2f",
     ""
    ],
    "err": [
@@ -1646,7 +1646,7 @@
     "   }",
     "  },",
     "  \"recorded\": [",
-    "   \"runqtdhpa: rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\\\"'\\\"'print(\\\"{\\\\\\\"metrics\\\\\\\": {\\\\\\\"top1\\\\\\\": 0.76, \\\\\\\"loss\\\\\\\": 1.5}}\\\")'\\\"'\\\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree ae3dc46cedd3b0d63b9fcfc5c65d4215ca43de6c\"",
+    "   \"runqtdhpa: rb run add warmup loss=1.5 top1=0.76 --command 'python3 -c '\\\"'\\\"'print(\\\"{\\\\\\\"metrics\\\\\\\": {\\\\\\\"top1\\\\\\\": 0.76, \\\\\\\"loss\\\\\\\": 1.5}}\\\")'\\\"'\\\"'' --produced-at 2026-10-01T12:00:00.000+00:00 --commit d7961b9462929707adc86be88c7ac9db104738c7 --tree e117c62c5450a09a126daadd3181e2e08c891a2f\"",
     "  ],",
     "  \"not_recorded\": [],",
     "  \"found\": [],",
@@ -1673,7 +1673,7 @@
     "   \"metrics/\"",
     "  ],",
     "  \"warnings\": [",
-    "   \"rb put the code in git at refs/rb/snapshots/7ed1f797c3b9131f3eb3c5f054c4162e8daba2d8, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/7ed1f797c3b9131f3eb3c5f054c4162e8daba2d8 removes it.\"",
+    "   \"rb put the code in git at refs/rb/snapshots/47cda7a49b7ac9fb0c27f165bb00291f7b3803fd, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/47cda7a49b7ac9fb0c27f165bb00291f7b3803fd removes it.\"",
     "  ]",
     " },",
     " \"errors\": [],",
@@ -1818,6 +1818,26 @@
   }
  ],
  "files": {
+  ".cursor/hooks.json": [
+   "{",
+   "  \"version\": 1,",
+   "  \"hooks\": {",
+   "    \"sessionStart\": [",
+   "      {",
+   "        \"command\": \"rb journal scan --hook cursor; exit 0\",",
+   "        \"timeout\": 10",
+   "      }",
+   "    ],",
+   "    \"stop\": [",
+   "      {",
+   "        \"command\": \"rb journal scan --hook cursor; exit 0\",",
+   "        \"timeout\": 10",
+   "      }",
+   "    ]",
+   "  }",
+   "}",
+   ""
+  ],
   ".cursor/rules/house.mdc": [
    "Be careful.",
    ""
@@ -1908,21 +1928,21 @@
    "sha256": "a932af1300912e58c79f915390b8e901055b662651eaae198bb260b341e6bac5",
    "bytes": 150
   },
-  ".rb/cache/objects/1d/1d6ba4f3ed4ced02b58885a1f8ca021e54b79105992fec2c765fd67ce07ec0a9.json.gz": {
-   "sha256": "61112b74aed5776657c78b3d1eca62a70e7187e1be36014ba025a41fd6d4ca7a",
-   "bytes": 1288
-  },
-  ".rb/cache/objects/2a/2a26cd5eac0ca91df8938ffd9416921477158856f9328f1c690a0c86f1127f90.json.gz": {
-   "sha256": "02b9f6d1df4d5e2f4bddde8b6bb4c9d909e206934eb2ff8a5dca8230c9cd6e2e",
-   "bytes": 1238
-  },
   ".rb/cache/objects/3d/3d454dfd07793d6bac57a2df9f14fe5835a687cfad7363cc90b596879da1a39e.json.gz": {
    "sha256": "feb938d0926137990eddba9e18d5243e66125f4fb3d85b0bd06c0dee4bed411e",
    "bytes": 250
   },
+  ".rb/cache/objects/53/5371fdfd8d37e035593a4e398631a5631091208bc5bcc063269a6f1097d14070.json.gz": {
+   "sha256": "5fa33f4747bdfee063db54428b2bd639d8e21d2b82ed607da6e542f830e9104e",
+   "bytes": 1238
+  },
   ".rb/cache/objects/a5/a586acb2a032aa95bcbc48078d4dddb1555773715a0e826beec028fffe975f36.json.gz": {
    "sha256": "0f4d310d15dba3e15e7a755fcbd21ac9df2cd41109c0ddf1fb409d4c23f1d7b9",
    "bytes": 1978
+  },
+  ".rb/cache/objects/ad/ad965344f24153007ea1dc520c27d0a97175cb34fe997580a8ceebf6580eb111.json.gz": {
+   "sha256": "21d315a5faca6e2492911e45dff4001e7d0e803f45a23636120ec54085e38dcc",
+   "bytes": 1288
   },
   ".rb/cache/objects/b7/b715c3b4aba97c7b5a71dc54ef1378f2756368268eda08601007538dffb02072.json.gz": {
    "sha256": "06972562945834e10b5f3e6432aabc24a6070f66a827b111b269394bba7f190a",
@@ -2094,9 +2114,9 @@
    "    commit: d7961b9462929707adc86be88c7ac9db104738c7",
    "    branch: main",
    "    dirty: true",
-   "    diff_sha256: efe8b7ec6f8359cc16ad095736f81ac4048e15e79aebf2747116611e905cca03",
-   "    untracked: 2",
-   "    tree: ae3dc46cedd3b0d63b9fcfc5c65d4215ca43de6c",
+   "    diff_sha256: 75dd4449407f08d7b7486cac0a4b929ac980514249b9f18c71930a22d0917453",
+   "    untracked: 3",
+   "    tree: e117c62c5450a09a126daadd3181e2e08c891a2f",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -2142,12 +2162,12 @@
    "    commit: d7961b9462929707adc86be88c7ac9db104738c7",
    "    branch: main",
    "    dirty: true",
-   "    diff_sha256: 2d9b263a4e138aba58769631c9f104814b467cd0cff4621f440604ddf4d0e9b7",
-   "    untracked: 3",
-   "    tree: 7ed1f797c3b9131f3eb3c5f054c4162e8daba2d8",
+   "    diff_sha256: a9fdcef6734d7712fda6363e477576f576f3d23e1026b22118b79150ffc1b8e9",
+   "    untracked: 4",
+   "    tree: 47cda7a49b7ac9fb0c27f165bb00291f7b3803fd",
    "  produced:",
    "    commit: d7961b9462929707adc86be88c7ac9db104738c7",
-   "    tree: ae3dc46cedd3b0d63b9fcfc5c65d4215ca43de6c",
+   "    tree: e117c62c5450a09a126daadd3181e2e08c891a2f",
    "    from: flag",
    "  environment:",
    "    python: 3.12.1",
@@ -2172,10 +2192,10 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c1\", \"sha256\": \"3d454dfd07793d6bac57a2df9f14fe5835a687cfad7363cc90b596879da1a39e\", \"path\": \".rb/experiments/warmup/criteria/c1.yaml\", \"detail\": {\"rule\": \"top1 \u2265 0.7\", \"experiment\": \"warmup\", \"role\": \"primary\", \"changed_parts\": {\"warmup\": {\"role:c1\": \"primary\", \"rule:c1\": \"top1 \u2265 0.7\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reindex\", \"kind\": \"experiment\", \"id\": \"warmup\", \"sha256\": \"a586acb2a032aa95bcbc48078d4dddb1555773715a0e826beec028fffe975f36\", \"path\": \".rb/experiments/warmup/experiment.yaml\", \"detail\": {\"folder\": \"results/warmup/\", \"files\": 5, \"quotes\": 5, \"checks\": 1, \"changed_parts\": {\"warmup\": {}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reconciled\", \"kind\": \"project\", \"id\": \"work\", \"detail\": {\"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\", \"added\": [], \"updated\": {\"warmup\": [\"files: 1 new (seed2/metrics.json)\"]}, \"results\": 0, \"next\": 0, \"guides\": [], \"checks\": {\"passed\": 0, \"failed\": 0, \"not_run\": 1}, \"audits_failed\": 1, \"manifests\": 1, \"changed_sources\": 1, \"line\": \"1 re-indexed (warmup) \u00b7 checks: 1 not run under rb's watch \u00b7 1 audit file saying failed \u00b7 1 manifest, 1 source changed since frozen\", \"uncited_seen\": {\"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\", \"count\": 0, \"cut\": false, \"files\": []}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"2a26cd5eac0ca91df8938ffd9416921477158856f9328f1c690a0c86f1127f90\", \"path\": \".rb/experiments/warmup/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"warmup\", \"metrics\": {\"top1\": 0.75, \"top5\": 0.92}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"5371fdfd8d37e035593a4e398631a5631091208bc5bcc063269a6f1097d14070\", \"path\": \".rb/experiments/warmup/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"warmup\", \"metrics\": {\"top1\": 0.75, \"top5\": 0.92}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reindex\", \"kind\": \"experiment\", \"id\": \"warmup\", \"sha256\": \"b715c3b4aba97c7b5a71dc54ef1378f2756368268eda08601007538dffb02072\", \"path\": \".rb/experiments/warmup/experiment.yaml\", \"detail\": {\"folder\": \"results/warmup/\", \"files\": 5, \"quotes\": 5, \"checks\": 1, \"changed_parts\": {\"warmup\": {}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reconciled\", \"kind\": \"project\", \"id\": \"work\", \"detail\": {\"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\", \"added\": [], \"updated\": {\"warmup\": [\"files: 1 changed (README.md)\", \"result changed\"]}, \"results\": 1, \"next\": 0, \"guides\": [], \"checks\": {\"passed\": 1, \"failed\": 0, \"not_run\": 0}, \"audits_failed\": 1, \"manifests\": 1, \"changed_sources\": 1, \"line\": \"1 re-indexed (warmup) \u00b7 1 result quoted \u00b7 checks: 1 passed \u00b7 1 audit file saying failed \u00b7 1 manifest, 1 source changed since frozen\", \"uncited_seen\": {\"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\", \"count\": 0, \"cut\": false, \"files\": []}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"1d6ba4f3ed4ced02b58885a1f8ca021e54b79105992fec2c765fd67ce07ec0a9\", \"path\": \".rb/experiments/warmup/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"warmup\", \"metrics\": {\"loss\": 1.5, \"top1\": 0.76}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"ad965344f24153007ea1dc520c27d0a97175cb34fe997580a8ceebf6580eb111\", \"path\": \".rb/experiments/warmup/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"warmup\", \"metrics\": {\"loss\": 1.5, \"top1\": 0.76}, \"per_run\": {}, \"again\": false}}",
    ""
   ],
   ".rb/project.yaml": [
@@ -2201,8 +2221,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "2f3bf3d031218f90039b6a9ee57d33f61311b6f542b959b494e919a171593ffc",
-   "bytes": 199407
+   "sha256": "592e6c36c357c10049bcaf64270ba35dfac2fa4dda2c32a158ffe9f91d758366",
+   "bytes": 199623
   },
   "results/other/report.md": [
    "# Other",

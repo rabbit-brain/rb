@@ -3604,6 +3604,24 @@ pub fn look(led: &Ledger) {
     }
 }
 
+/// The look an agent's session hook makes (`rb journal scan --hook <agent>`, which rb init installs): one scan, kept as
+/// that agent's (never the user's, whatever this shell says), where a record is. It waits on no one: while another rb
+/// holds the record's lock, that rb is reading or writing it, and this look is left to the next one. It never fails:
+/// what it finds is observation, and a hook that cannot look leaves things as they were.
+pub fn hook_look(agent: &str) {
+    let named = !agent.is_empty() && agent.len() <= 40 && agent.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+    let Some(root) = crate::ledger::find_root(None).filter(|_| named) else { return };
+    let lock = root.join(DIR).join(".lock");
+    if let Ok(f) = std::fs::OpenOptions::new().read(true).write(true).open(&lock) {
+        if f.try_lock().is_err() {
+            return;
+        }
+    }
+    if let Ok(led) = Ledger::open_with(None, None, Some(agent)) {
+        let _ = scan(&led);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{is_git_command, same_word, shell_words, value_in_command};

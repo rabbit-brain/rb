@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2 (2026-10-30)
+
+rb looks at the repository as each agent session starts and as each turn ends, and no address rb says carries any part of a password.
+
+- **A session hook.** With rb's instructions for each agent it sets up, `rb init` installs a session hook in the agent's project file: `SessionStart` and `Stop` in `.claude/settings.json` for Claude Code and in `.codex/hooks.json` for Codex, and `sessionStart` and `stop` in `.cursor/hooks.json` for Cursor. The hook runs `rb journal scan --hook <agent>` with a 10-second limit, so rb looks at the repository as a session starts and as each turn ends, whether the agent reads rb's instructions or not. It says nothing, tells the session nothing, records nothing and starts no analytics delivery. The look is kept in the journal as the agent's. Codex runs a project's hooks once it is trusted, in `/hooks`. `rb skill add` installs the hook for one agent later.
+- **A hook file that was there changes only once you agree**, as `AGENTS.md` and `.mcp.json` do. rb's handler goes beside the hooks there, and every byte that was there is kept. `rb init --dry-run` shows what rb would add. Where a file holds an earlier rb's handler, rb puts today's in its place, so one is left. A handler that runs `rb journal scan` in a form no rb wrote is yours: rb leaves it as it is, adds nothing beside it, and says so in one line. `rb remove` takes rb's handler in any form rb wrote, and puts back the handlers it replaced or cut, each where it stood in the list.
+- **The record line says where the record began.** Where nothing was recorded afterwards, it says "Kept with rb since it began." Where the record holds work from before it began, it says which: a record that began as a clone of another record, experiments that reproduce another record's, and experiments `rb reconcile` read from their results folders. A relation to another record's experiment never reads as a clone.
+- **No part of a password.** Where an address holds a password with a `/` in it, or a user name with an `@`, rb leaves the whole password out wherever it says or writes the address: in `rb clone`, in git's message as rb says it, and in a clone's parent on the page and in an export. An origin whose password holds a `/` names no code in `rb export` and `rb sync`. Where an `@` follows an address's first `/` after credentials or a `:`, rb cannot tell the host from a password, so `rb clone` says "an address rb cannot read safely" in its place: in what it prints, in the clone's `parent` and in git's message.
+- **Words.** A question's changes say a freeze as "spec and rules locked", in `rb ui` and `rb open`.
+- **Windows** (still a preview, [#2](https://github.com/rabbit-brain/rb/issues/2)): Claude Code runs the session hook in Git Bash. Without Git Bash it runs the hook in PowerShell, which does not read it: the hook fails, the session goes on, and rb does not look. Cursor's hook and Codex's on Windows look for rb on the PATH alone. Where rb is not there, Cursor's exits 0, and Codex's fails while Codex goes on.
+
 ## 0.6.1 (2026-10-30)
 
 rabbitbrain.ai opens for everyone, every view says one wording, and the record says what rb saw happen and what it recorded afterwards.

@@ -487,10 +487,11 @@ impl History {
 
 /// The history of the repository at `root`, or None when it holds no work yet.
 pub fn history(root: &Path) -> Option<History> {
-    // what rb init and rb skill add write is no work: the record, the skill, the MCP entry, the instruction files; nor
-    // is a new repository's scaffold, its README, license and ignore files, as a hosting service's first commit holds
+    // what rb init and rb skill add write is no work: the record, the skill, the MCP entry, the instruction files, the
+    // agents' hook files; nor is a new repository's scaffold, its README, license and ignore files, as a hosting
+    // service's first commit holds
     let mut spec = vec!["rev-list".to_string(), "--count".into(), "HEAD".into(), "--".into(), ".".into()];
-    spec.extend([DIR, ".claude/skills/rabbit-brain", ".cursor/rules/rabbit-brain.mdc", ".mcp.json", "AGENTS.md"].iter().map(|p| format!(":(exclude){p}")));
+    spec.extend([DIR, ".claude/skills/rabbit-brain", ".cursor/rules/rabbit-brain.mdc", ".mcp.json", "AGENTS.md", ".claude/settings.json", ".codex/hooks.json", ".cursor/hooks.json"].iter().map(|p| format!(":(exclude){p}")));
     spec.extend(["README*", "LICENSE*", "LICENCE*", "COPYING*", ".gitignore", ".gitattributes"].iter().map(|p| format!(":(exclude,glob){p}")));
     let spec: Vec<&str> = spec.iter().map(String::as_str).collect();
     let commits = crate::sources::git(root, &spec)

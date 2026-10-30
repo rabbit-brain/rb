@@ -69,7 +69,7 @@ pub fn consent(yes: bool, json: bool) -> Consent {
 #[derive(Debug, Clone)]
 pub struct Install {
     pub path: PathBuf,
-    /// created, section, mcp_entry or replaced
+    /// created, section, mcp_entry, hook_entry or replaced
     pub how: &'static str,
     pub content: String,
     pub insert: Option<crate::splice::Insert>,
@@ -77,16 +77,18 @@ pub struct Install {
     /// what the ledger line keeps besides: rb's section and the bytes it took the place of, and what rb's own earlier
     /// write here kept of what was there before rb
     pub carry: crate::value::Dict,
+    /// a session hook's earlier form of rb's handler brought up to date in place
+    pub upgrades: bool,
 }
 
 impl Install {
     fn new(path: PathBuf, how: &'static str, content: String) -> Install {
-        Install { path, how, content, insert: None, old: None, carry: crate::value::Dict::new() }
+        Install { path, how, content, insert: None, old: None, carry: crate::value::Dict::new(), upgrades: false }
     }
 
     /// Whether it changes a file someone else made: what rb asks before.
     pub fn edits(&self) -> bool {
-        self.insert.is_some() || self.old.is_some()
+        self.insert.is_some() || self.old.is_some() || self.how == "hook_entry"
     }
 
     /// The lines of the section between rb's markers that this edit takes the place of, as the file reads now.
@@ -98,6 +100,14 @@ impl Install {
 
     /// What it adds to the file that is there, as the question shows it.
     pub fn shown(&self) -> String {
+        if let Some(h) = hook_of(&self.path).filter(|_| self.how == "hook_entry") {
+            // rb's handler under each event it goes to, beside what each holds already
+            let mut part = crate::value::Dict::new();
+            for (e, item) in hook_items(h) {
+                part.insert(e, Value::List(vec![item]));
+            }
+            return pyjson::dumps_with(&Value::Dict(part), &Dumps::indent(2)).unwrap_or_default();
+        }
         let added = self.insert.as_ref().map(|i| i.added.as_str()).unwrap_or("");
         added.trim_start_matches(',').trim_start_matches(['\r', '\n']).trim_end_matches(['\r', '\n']).replace("\r\n", "\n")
     }
@@ -385,6 +395,328 @@ fn mcp_install(root: &Path) -> Result<Option<Install>, String> {
     }
 }
 
+/// An agent rb puts a session hook in for: its project file, the events that start a session and end a turn, and the
+/// handler rb adds to each.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Hook {
+    Claude,
+    Codex,
+    Cursor,
+}
+
+/// What every hook runs, after `rb journal scan --hook`: the agent's name, which the look is kept under.
+fn hook_name(h: Hook) -> &'static str {
+    match h {
+        Hook::Claude => "claude-code",
+        Hook::Codex => "codex",
+        Hook::Cursor => "cursor",
+    }
+}
+
+/// How long an agent lets rb's hook run, in seconds: a look takes a fraction of a second at the walk's cap.
+pub const HOOK_TIMEOUT: i64 = 10;
+
+/// The command a hook runs in a POSIX shell (Claude Code's sh, or Git Bash on Windows; Codex on macOS and Linux): rb on
+/// the PATH, else where uv tool and pipx put it (~/.local/bin), else the project's own .venv, and exit 0 whichever is
+/// there or none is. rb with --hook says nothing and exits 0 itself; the shell's fallbacks cover an rb not found.
+pub fn hook_sh(h: Hook) -> String {
+    let name = hook_name(h);
+    let venv = match h {
+        Hook::Claude => "\"$CLAUDE_PROJECT_DIR/.venv/bin/rb\"".to_string(),
+        _ => "\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.venv/bin/rb\"".to_string(),
+    };
+    let quiet = ">/dev/null 2>&1";
+    format!("rb journal scan --hook {name} {quiet} || \"$HOME/.local/bin/rb\" journal scan --hook {name} {quiet} || {venv} journal scan --hook {name} {quiet} || true")
+}
+
+/// The command Codex runs on Windows (commandWindows), in a shell its documentation does not name: one word list, the
+/// same in PowerShell, cmd and a plain exec, with nothing to quote. Where rb is not found the hook fails, and Codex goes on.
+pub fn hook_plain(h: Hook) -> String {
+    format!("rb journal scan --hook {}", hook_name(h))
+}
+
+/// The command Cursor runs, through PowerShell on Windows and a POSIX shell elsewhere: the plain command, then `exit 0`,
+/// which both read the same way, so the hook exits 0 where rb is not found too.
+pub fn hook_either(h: Hook) -> String {
+    format!("{}; exit 0", hook_plain(h))
+}
+
+/// The hook's project file.
+pub fn hook_path(h: Hook, root: &Path) -> PathBuf {
+    match h {
+        Hook::Claude => root.join(".claude").join("settings.json"),
+        Hook::Codex => root.join(".codex").join("hooks.json"),
+        Hook::Cursor => root.join(".cursor").join("hooks.json"),
+    }
+}
+
+/// Which hook a file rb writes is: by its folder, since two of them are named hooks.json.
+pub fn hook_of(path: &Path) -> Option<Hook> {
+    let dir = path.parent().and_then(|d| d.file_name()).and_then(|n| n.to_str());
+    match (dir, path.file_name().and_then(|n| n.to_str())) {
+        (Some(".claude"), Some("settings.json")) => Some(Hook::Claude),
+        (Some(".codex"), Some("hooks.json")) => Some(Hook::Codex),
+        (Some(".cursor"), Some("hooks.json")) => Some(Hook::Cursor),
+        _ => None,
+    }
+}
+
+/// The events rb's hook runs on, in the agent's own names: a session's start, and each turn's end.
+pub fn hook_events(h: Hook) -> [&'static str; 2] {
+    match h {
+        Hook::Cursor => ["sessionStart", "stop"],
+        _ => ["SessionStart", "Stop"],
+    }
+}
+
+/// rb's part of the file under `hooks`: each event with the one item rb adds to it (a matcher group holding rb's
+/// handler for Claude Code and Codex, the handler itself for Cursor).
+pub fn hook_items(h: Hook) -> Vec<(String, Value)> {
+    let item = match h {
+        Hook::Claude => crate::obj! {"hooks" => crate::list![crate::obj! {"type" => "command", "command" => hook_sh(h), "timeout" => HOOK_TIMEOUT}]},
+        Hook::Codex => crate::obj! {"hooks" => crate::list![crate::obj! {
+            "type" => "command", "command" => hook_sh(h), "commandWindows" => hook_plain(h), "timeout" => HOOK_TIMEOUT
+        }]},
+        Hook::Cursor => crate::obj! {"command" => hook_either(h), "timeout" => HOOK_TIMEOUT},
+    };
+    hook_events(h).iter().map(|e| (e.to_string(), item.clone())).collect()
+}
+
+/// The file rb makes where there is none: rb's part alone (with Cursor's format version).
+fn hook_file(h: Hook) -> Value {
+    let mut hooks = crate::value::Dict::new();
+    for (e, item) in hook_items(h) {
+        hooks.insert(e, Value::List(vec![item]));
+    }
+    match h {
+        Hook::Cursor => crate::obj! {"version" => 1i64, "hooks" => Value::Dict(hooks)},
+        _ => crate::obj! {"hooks" => Value::Dict(hooks)},
+    }
+}
+
+/// What a file holds once rb's part is taken out of a file rb made: nothing of anyone's.
+pub fn hook_file_empty(h: Hook, v: &Value) -> bool {
+    let empty = |x: Option<&Value>| x.map_or(true, |x| x.as_dict().map_or(false, |d| d.is_empty()));
+    match v.as_dict() {
+        Some(d) if h == Hook::Cursor => d.iter().all(|(k, x)| (k == "version" && *x == Value::Int(1)) || (k == "hooks" && empty(Some(x)))),
+        Some(d) => d.iter().all(|(k, x)| k == "hooks" && empty(Some(x))),
+        None => false,
+    }
+}
+
+/// Every handler rb has written for the agent's hook, today's first: one an earlier rb wrote is rb's to bring up to
+/// date. Only a whole item counts, so a handler with anything changed in it (its timeout, a matcher) is not one of them.
+pub fn hook_forms(h: Hook) -> Vec<Value> {
+    let name = hook_name(h);
+    let today = hook_items(h).remove(0).1;
+    // the first form: each try quiet on stderr alone, and Cursor's command with no `exit 0` after it
+    let venv = match h {
+        Hook::Claude => "\"$CLAUDE_PROJECT_DIR/.venv/bin/rb\"".to_string(),
+        _ => "\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.venv/bin/rb\"".to_string(),
+    };
+    let first_sh = format!("rb journal scan --hook {name} 2>/dev/null || \"$HOME/.local/bin/rb\" journal scan --hook {name} 2>/dev/null || {venv} journal scan --hook {name} 2>/dev/null || true");
+    let first = match h {
+        Hook::Claude => crate::obj! {"hooks" => crate::list![crate::obj! {"type" => "command", "command" => first_sh, "timeout" => HOOK_TIMEOUT}]},
+        Hook::Codex => crate::obj! {"hooks" => crate::list![crate::obj! {
+            "type" => "command", "command" => first_sh, "commandWindows" => hook_plain(h), "timeout" => HOOK_TIMEOUT
+        }]},
+        Hook::Cursor => crate::obj! {"command" => hook_plain(h), "timeout" => HOOK_TIMEOUT},
+    };
+    vec![today, first]
+}
+
+/// Whether a handler runs rb's look (`journal scan --hook` anywhere in it): one of rb's forms, or one edited by hand.
+fn runs_rb_look(v: &Value) -> bool {
+    match v {
+        Value::Str(s) => s.contains("journal scan --hook"),
+        Value::List(l) => l.iter().any(runs_rb_look),
+        Value::Dict(d) => d.values().any(runs_rb_look),
+        _ => false,
+    }
+}
+
+/// The handler of rb's in an event's list that rb takes out or brings up to date: the first that is a form rb has
+/// written, today's first.
+pub fn hook_form_in(h: Hook, list: &[Value]) -> Option<Value> {
+    hook_forms_in(h, list).into_iter().next()
+}
+
+/// Every form rb has written that an event's list holds, each once, today's first.
+pub fn hook_forms_in(h: Hook, list: &[Value]) -> Vec<Value> {
+    hook_forms(h).into_iter().filter(|f| list.contains(f)).collect()
+}
+
+/// The events whose handler runs rb's look and is no form rb has written: edited by hand, so rb leaves it and adds
+/// nothing beside it.
+pub fn hook_hand_edited(h: Hook, root: &Path) -> Vec<String> {
+    let Some(old) = crate::dry::read(&hook_path(h, root)).ok().and_then(|b| String::from_utf8(b).ok()).and_then(|t| pyjson::loads(&t).ok()) else {
+        return Vec::new();
+    };
+    let forms = hook_forms(h);
+    hook_events(h)
+        .iter()
+        .filter(|e| {
+            let list = old.get("hooks").and_then(|x| x.get(e)).and_then(Value::as_list).map(|l| l.to_vec()).unwrap_or_default();
+            list.iter().any(|x| runs_rb_look(x) && !forms.contains(x)) && !list.iter().any(|x| forms.contains(x))
+        })
+        .map(|e| e.to_string())
+        .collect()
+}
+
+/// What rb would write for the agent's session hook: a new file holding rb's hook, or, in the file that is there, rb's
+/// handler under each event (its own list, the list or `hooks` made where it is not there), an earlier form of rb's
+/// handler brought up to date in place, never changing a hook or a key rb did not write or reformatting the file.
+///
+/// Which handler is rb's: where the ledger has a line for the file, a form rb has written (`hook_forms`) under an event
+/// that line says rb added it to; with no line (a record cloned, a ledger lost), any form rb has written. A handler
+/// that runs rb's look and is no such form was edited by hand, or is rb's in a file rb did not write here: rb leaves it
+/// and adds nothing beside it. The ledger line keeps the file as it was, which of `hooks` and its events rb made, which
+/// events hold a handler of rb's (`added`), which this write put there (`own`), and the handler of rb's that was there
+/// before rb wrote here and that rb's took the place of (`replaced`), so rb remove takes out exactly rb's part and puts
+/// that one back. Ok(None): it is there already, or only edited by hand.
+fn hook_install(h: Hook, root: &Path) -> Result<Option<Install>, String> {
+    let path = hook_path(h, root);
+    if !crate::dry::exists(&path) {
+        return Ok(Some(Install::new(path, "created", pyjson::dumps_with(&hook_file(h), &Dumps::indent(2)).unwrap_or_default() + "\n")));
+    }
+    let Some(text) = crate::dry::read(&path).ok().and_then(|b| String::from_utf8(b).ok()) else { return Err("is not JSON rb can read".into()) };
+    let old = pyjson::loads(&text).map_err(|_| "is not JSON rb can read".to_string())?;
+    let items = hook_items(h);
+    let forms = hook_forms(h);
+    let had = old.get("hooks");
+    let list_of = |e: &str| had.and_then(|x| x.get(e)).and_then(Value::as_list).map(|l| l.to_vec()).unwrap_or_default();
+    // what rb's earlier write here owned: the events whose handler it said was rb's, the keys it made, the file it
+    // made, and the handlers of rb's from before rb wrote here that its own took the place of
+    let prior = crate::owned::last_for(&crate::owned::entries(root), &path, &["hook_entry", "created"]);
+    let names = |l: &crate::value::Dict, k: &str| -> Option<Vec<String>> {
+        l.get(k).and_then(Value::as_list).map(|v| v.iter().filter_map(Value::as_str).map(str::to_string).collect())
+    };
+    let all: Vec<String> = items.iter().map(|(e, _)| e.clone()).collect();
+    let dict = |l: &crate::value::Dict, k: &str| l.get(k).and_then(Value::as_dict).cloned().unwrap_or_default();
+    let none = crate::value::Dict::new;
+    let (prior_ours, prior_made, file_made, prior_replaced, prior_cut, prior_at) = match &prior {
+        Some(l) if l.get("how").and_then(Value::as_str) == Some("created") => {
+            (Some(all.clone()), [vec!["hooks".to_string()], all.clone()].concat(), true, none(), none(), [none(), none()])
+        }
+        Some(l) => (
+            Some(names(l, "added").unwrap_or_else(|| all.clone())),
+            names(l, "made_keys").unwrap_or_default(),
+            l.get("file_made") == Some(&Value::Bool(true)),
+            dict(l, "replaced"),
+            dict(l, "cut"),
+            [dict(l, "replaced_at"), dict(l, "cut_at")],
+        ),
+        None => (None, Vec::new(), false, none(), none(), [none(), none()]),
+    };
+    let (mut adds, mut swaps, mut cuts) = (Vec::new(), Vec::new(), Vec::new());
+    // `replaced`: the handler of rb's from before rb wrote here that rb's took the place of; `cut`: the ones beside it
+    // that rb took out; `replaced_at` and `cut_at` the place of each in its list as rb found it. rb remove puts them
+    // back, each where it was. What an earlier write here kept of them stays kept.
+    let [mut replaced_at, mut cut_at] = prior_at;
+    let (mut ours, mut own, mut replaced, mut cut) = (Vec::new(), Vec::new(), prior_replaced, prior_cut);
+    let place = |list: &[Value], x: &Value| list.iter().position(|y| y == x).map_or(Value::Null, |j| Value::Int(j as i64));
+    for (e, today) in &items {
+        let list = list_of(e);
+        let rb_here = prior_ours.as_ref().map_or(true, |p| p.contains(e));
+        // rb's handlers in this event, each once, today's first
+        let mine: Vec<Value> = if rb_here { forms.iter().filter(|f| list.contains(f)).cloned().collect() } else { Vec::new() };
+        if let Some(first) = mine.first().cloned() {
+            if first != *today {
+                swaps.push((e.clone(), first.clone(), today.clone()));
+                if prior_ours.is_none() {
+                    replaced.insert(e.clone(), first.clone());
+                    replaced_at.insert(e.clone(), place(&list, &first));
+                    own.push(Value::str(e));
+                }
+            }
+            // a second form of rb's beside the first (an rb that added its own beside an earlier one) goes
+            for extra in mine.iter().skip(1) {
+                cuts.push((e.clone(), extra.clone()));
+            }
+            if prior_ours.is_none() && mine.len() > 1 {
+                cut.insert(e.clone(), Value::List(mine[1..].to_vec()));
+                cut_at.insert(e.clone(), Value::List(mine[1..].iter().map(|x| place(&list, x)).collect()));
+            }
+            // today's form there with no line of rb's for the file is not rb's write here, and stays as it is
+            if prior_ours.is_some() || first != *today {
+                ours.push(Value::str(e));
+            }
+        } else if !list.iter().any(runs_rb_look) {
+            adds.push((e.clone(), today.clone()));
+            own.push(Value::str(e));
+            ours.push(Value::str(e));
+        }
+    }
+    if adds.is_empty() && swaps.is_empty() && cuts.is_empty() {
+        return Ok(None);
+    }
+    let mut after = crate::splice::items_put(&text, "hooks", &swaps).ok_or("cannot take rb's part without being written another way")?;
+    if !cuts.is_empty() {
+        after = crate::splice::items_cut(&after, "hooks", &cuts, &[]).ok_or("cannot take rb's part without being written another way")?;
+    }
+    if let Some(added) = crate::splice::items_add(&after, "hooks", &adds)? {
+        after = added;
+    }
+    let mut made: Vec<Value> = Vec::new();
+    if had.is_none() {
+        made.push(Value::str("hooks"));
+    }
+    for (e, _) in &adds {
+        if had.and_then(|x| x.get(e)).is_none() {
+            made.push(Value::str(e));
+        }
+    }
+    for k in prior_made {
+        if !made.iter().any(|m| m.as_str() == Some(k.as_str())) {
+            made.push(Value::Str(k));
+        }
+    }
+    let swapped = !swaps.is_empty() || !cuts.is_empty();
+    let mut i = Install::new(path, "hook_entry", after);
+    i.carry.insert("before".into(), Value::Str(text));
+    i.carry.insert("made_keys".into(), Value::List(made));
+    // `added`: every event whose handler of rb's is rb's after this write; `own`: the ones this write put there
+    i.carry.insert("added".into(), Value::List(ours));
+    i.carry.insert("own".into(), Value::List(own));
+    if !replaced.is_empty() {
+        i.carry.insert("replaced".into(), Value::Dict(replaced));
+    }
+    if !cut.is_empty() {
+        i.carry.insert("cut".into(), Value::Dict(cut));
+    }
+    if !replaced_at.is_empty() {
+        i.carry.insert("replaced_at".into(), Value::Dict(replaced_at));
+    }
+    if !cut_at.is_empty() {
+        i.carry.insert("cut_at".into(), Value::Dict(cut_at));
+    }
+    if file_made {
+        i.carry.insert("file_made".into(), Value::Bool(true));
+    }
+    i.upgrades = swapped;
+    Ok(Some(i))
+}
+
+/// What rb says of a handler that runs rb's look in a form no rb it knows wrote: the events it is under, and that rb
+/// leaves it and adds nothing beside it.
+fn hand_said(h: Hook, root: &Path) -> String {
+    let events = hook_hand_edited(h, root);
+    let name = named(&hook_path(h, root), root);
+    let which = match &events[..] {
+        [one] => format!("the {one} handler that runs rb journal scan was"),
+        _ => format!("the {} handlers that run rb journal scan were", events.join(" and ")),
+    };
+    let it = if events.len() == 1 { "it" } else { "them" };
+    format!("{name}: {which} edited by hand or written by a newer rb, so rb leaves {it} as {} and adds nothing beside {it}", if it == "it" { "it is" } else { "they are" })
+}
+
+/// What the hook does, as rb's text says it after the file's name.
+fn hook_said(h: Hook) -> String {
+    let [start, stop] = hook_events(h);
+    let trust = if h == Hook::Codex { "; Codex runs it once it is trusted in /hooks" } else { "" };
+    format!("{start} and {stop} run rb journal scan, which looks at the repository and says nothing{trust}")
+}
+
 /// The coding agents that work in this repository, each with the files that gave it away. An agent's session gives
 /// its agent away too, and is never among the signs: rb's words never say who ran rb.
 pub fn detect_agents(root: &Path) -> indexmap::IndexMap<String, Vec<String>> {
@@ -448,6 +780,12 @@ fn left_words(rel: &str) -> String {
 /// The command that writes rb's file at `path` for one agent, as `rb skill add` does: with the yes up front, but in an
 /// agent session.
 fn add_command(path: &Path) -> String {
+    match hook_of(path) {
+        Some(Hook::Claude) => return format!("rb skill add --claude --project{}", yes_flag()),
+        Some(Hook::Codex) => return format!("rb skill add --agents-md{}", yes_flag()),
+        Some(Hook::Cursor) => return format!("rb skill add --cursor{}", yes_flag()),
+        None => {}
+    }
     match path.file_name().and_then(|n| n.to_str()) {
         Some("AGENTS.md") => format!("rb skill add --agents-md{}", yes_flag()),
         Some(".mcp.json") => "claude mcp add --scope project rabbit-brain -- rb mcp".to_string(),
@@ -487,6 +825,19 @@ fn left_as_it_is(i: &Install, root: &Path) -> (String, Value) {
                 i.content.clone(),
             )
         }
+        "hook_entry" if i.upgrades => {
+            let command = add_command(&i.path);
+            let said = if session_runtime().is_some() {
+                format!("{name} holds an earlier form of rb's session hook, and in an agent session rb changes no file that is there, so rb left it as it is. In the user's own terminal, {command} brings it up to date in place and changes nothing else in it.")
+            } else {
+                format!("{name} holds an earlier form of rb's session hook, and rb changes a file that is there only once agreed, so rb left it as it is. {command} brings it up to date in place and changes nothing else in it.")
+            };
+            (said, command, i.shown())
+        }
+        "hook_entry" => {
+            let command = add_command(&i.path);
+            (format!("{left} {command} adds rb's session hook to it, under \"hooks\", and changes nothing else in it."), command, i.shown())
+        }
         _ => {
             let member = format!("\"rabbit-brain\": {}", pyjson::dumps(&mcp_server()));
             (
@@ -509,7 +860,7 @@ pub fn question(edits: &[&Install], root: &Path) -> Vec<String> {
     let joined = there.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(" and ");
     let mut lines = Vec::new();
     if !there.is_empty() {
-        lines.push(if edits.iter().any(|i| i.old.is_some() || i.replaces().is_some()) {
+        lines.push(if edits.iter().any(|i| i.old.is_some() || i.replaces().is_some() || i.upgrades) {
             format!("{joined} {are} here before rb. rb would change {it} as below, and nothing else:")
         } else {
             format!("{joined} {are} here before rb. rb would add this to {it}, and change nothing else in {it}:")
@@ -535,6 +886,8 @@ pub fn question(edits: &[&Install], root: &Path) -> Vec<String> {
                 lines.push(format!("{name}: in place of what it holds, {}; rb keeps what it holds now, for rb remove to put back.", holds(&i.path)));
                 continue;
             }
+            "hook_entry" if i.upgrades => lines.push(format!("{name}, under \"hooks\", in place of the earlier form of rb's session hook in it:")),
+            "hook_entry" => lines.push(format!("{name}, under \"hooks\":")),
             _ => lines.push(format!("{name}, in mcpServers:")),
         }
         lines.extend(i.shown().lines().map(str::to_string));
@@ -546,6 +899,9 @@ pub fn question(edits: &[&Install], root: &Path) -> Vec<String> {
 
 /// What a file rb writes for an agent holds, as the question says it.
 fn holds(path: &Path) -> &'static str {
+    if hook_of(path).is_some() {
+        return "rb's session hook (it runs `rb journal scan` as a session starts and as each turn ends)";
+    }
     match path.file_name().and_then(|n| n.to_str()) {
         Some(".mcp.json") => "rb's MCP server (\"rabbit-brain\" in mcpServers, which runs `rb mcp`)",
         Some("AGENTS.md") => "rb's section, between its markers",
@@ -557,10 +913,14 @@ fn holds(path: &Path) -> &'static str {
 /// The question's last line, which names each file: "Add rb's server to .mcp.json and rb's section to AGENTS.md? [y/N] ".
 pub fn prompt(edits: &[&Install], root: &Path) -> String {
     let name = |i: &Install| named(&i.path, root);
-    let adds: Vec<String> = edits.iter().filter(|i| i.old.is_none() && i.edits()).map(|i| format!("rb's {} to {}", if i.how == "mcp_entry" { "server" } else { "section" }, name(i))).collect();
+    let adds: Vec<String> = edits.iter().filter(|i| i.old.is_none() && i.edits() && !i.upgrades).map(|i| format!("rb's {} to {}", match i.how { "mcp_entry" => "server", "hook_entry" => "session hook", _ => "section" }, name(i))).collect();
     let puts: Vec<String> = edits.iter().filter(|i| i.old.is_some()).map(|i| format!("rb's text in place of {}", name(i))).collect();
     let makes: Vec<String> = edits.iter().filter(|i| !i.edits()).map(|i| name(i)).collect();
+    let ups: Vec<String> = edits.iter().filter(|i| i.upgrades).map(|i| format!("rb's session hook in {}", name(i))).collect();
     let mut parts = Vec::new();
+    if !ups.is_empty() {
+        parts.push(format!("bring {} up to date", ups.join(" and ")));
+    }
     if !adds.is_empty() {
         parts.push(format!("add {}", adds.join(" and ")));
     }
@@ -614,6 +974,12 @@ pub fn setup_agents(root: &Path, consent: Consent, ask: &mut dyn FnMut(&[&Instal
     let claude = found.get("claude").map(|_| (own_file(claude_path(true, Some(root)), text.clone(), root), mcp_install(root)));
     let agents = (found.contains_key("agents_md") || found.contains_key("codex")).then(|| agents_install(&text, Some(root)));
     let rule = found.get("cursor").map(|_| own_file(cursor_path(Some(root)), cursor_text(&text), root));
+    // each agent's session hook, in its project file
+    let hooks: Vec<(Hook, Result<Option<Install>, String>)> = [("claude", Hook::Claude), ("codex", Hook::Codex), ("cursor", Hook::Cursor)]
+        .into_iter()
+        .filter(|(a, _)| found.contains_key(*a))
+        .map(|(_, h)| (h, hook_install(h, root)))
+        .collect();
     // the one question, for every file that is there and would change, and every new one a link takes outside
     let mut edits: Vec<&Install> = Vec::new();
     if let Some((skill, mcp)) = &claude {
@@ -636,6 +1002,13 @@ pub fn setup_agents(root: &Path, consent: Consent, ask: &mut dyn FnMut(&[&Instal
     if let Some(Ok(Own::Make(i))) = &rule {
         if i.needs_yes(root) {
             edits.push(i);
+        }
+    }
+    for (_, hook) in &hooks {
+        if let Ok(Some(i)) = hook {
+            if i.needs_yes(root) {
+                edits.push(i);
+            }
         }
     }
     let agreed = !edits.is_empty()
@@ -677,6 +1050,39 @@ pub fn setup_agents(root: &Path, consent: Consent, ask: &mut dyn FnMut(&[&Instal
             }
         }
     };
+    // a session hook: made, added beside the hooks there, there already, or left as it is
+    let hook_line = |done: &mut SetUp, h: Hook| -> String {
+        let name = named(&hook_path(h, root), root);
+        match hooks.iter().find(|(x, _)| *x == h).map(|(_, r)| r) {
+            Some(Ok(Some(i))) if !i.needs_yes(root) || agreed => match put(i, root) {
+                Ok(path) => {
+                    done.written.push(crate::sys::slashed(path));
+                    let hand = hook_hand_edited(h, root);
+                    let hand = if hand.is_empty() { String::new() } else { format!("; {}", hand_said(h, root)) };
+                    if i.upgrades {
+                        format!("rb's session hook in {name} brought up to date in place ({}){hand}", hook_said(h))
+                    } else if i.edits() {
+                        format!("rb's session hook added to {name} ({}){hand}", hook_said(h))
+                    } else {
+                        format!("rb's session hook in a new {name} ({})", hook_said(h))
+                    }
+                }
+                Err(e) => format!("{name}: nothing written. {}", e.message),
+            },
+            Some(Ok(Some(i))) => {
+                let (said, value) = left_as_it_is(i, root);
+                done.left.push(value);
+                said
+            }
+            Some(Ok(None)) if !hook_hand_edited(h, root).is_empty() => hand_said(h, root),
+            Some(Ok(None)) => {
+                done.present.push(crate::sys::slashed(hook_path(h, root)));
+                format!("rb's session hook was already in {name}")
+            }
+            Some(Err(why)) => format!("{name} {why}, so it is left as it is"),
+            None => String::new(),
+        }
+    };
     if let (Some(signs), Some((skill, mcp))) = (found.get("claude"), &claude) {
         let who = with_signs("Claude Code", signs);
         if let Some(skill_said) = own(&mut done, skill, "Claude Code", signs, "the skill in ") {
@@ -697,7 +1103,8 @@ pub fn setup_agents(root: &Path, consent: Consent, ask: &mut dyn FnMut(&[&Instal
                 Ok(None) => format!("rb's MCP server was already in {mcp_name}"),
                 Err(why) => format!("{mcp_name} {why}, so it is left as it is"),
             };
-            done.said.push(format!("{who}: {}; {mcp_said}", skill_said.trim_end_matches('.')));
+            let hook_said = hook_line(&mut done, Hook::Claude);
+            done.said.push(format!("{who}: {}; {}; {hook_said}", skill_said.trim_end_matches('.'), mcp_said.trim_end_matches('.')));
         }
     }
     if let Some(planned) = agents {
@@ -722,9 +1129,14 @@ pub fn setup_agents(root: &Path, consent: Consent, ask: &mut dyn FnMut(&[&Instal
             Err(e) => done.said.push(left(who, &signs, &e)),
         }
     }
+    if let Some(signs) = found.get("codex") {
+        let said = hook_line(&mut done, Hook::Codex);
+        done.said.push(format!("{}: {said}", with_signs("Codex", signs)));
+    }
     if let (Some(signs), Some(rule)) = (found.get("cursor"), &rule) {
         if let Some(said) = own(&mut done, rule, "Cursor", signs, "") {
-            done.said.push(format!("{}: {said}", with_signs("Cursor", signs)));
+            let hook_said = hook_line(&mut done, Hook::Cursor);
+            done.said.push(format!("{}: {}; {hook_said}", with_signs("Cursor", signs), said.trim_end_matches('.')));
         }
     }
     if found.is_empty() {
@@ -818,6 +1230,24 @@ pub fn cmd_skill(ns: &Namespace, out: &mut Out) -> Res<i32> {
         match agents_install(&text, None)? {
             None => lines.push("AGENTS.md holds rb's section already, as rb writes it.".into()),
             Some(i) => want(i),
+        }
+    }
+    // each agent's session hook goes in with its instructions: Claude Code's with the project's skill, Cursor's with its
+    // rule, and Codex's with AGENTS.md where Codex works here
+    let codex = am && detect_agents(&here).contains_key("codex");
+    for (h, on) in [(Hook::Claude, c && crate::cmds::flag(ns, "project")), (Hook::Codex, codex), (Hook::Cursor, cur)] {
+        if !on {
+            continue;
+        }
+        let name = named(&hook_path(h, &here), &here);
+        match hook_install(h, &here) {
+            Ok(Some(i)) => want(i),
+            Ok(None) if !hook_hand_edited(h, &here).is_empty() => lines.push(format!("{}.", hand_said(h, &here))),
+            Ok(None) => {
+                lines.push(format!("{name} holds rb's session hook already."));
+                present.push(crate::sys::slashed(hook_path(h, &here)));
+            }
+            Err(why) => lines.push(format!("{name} {why}, so rb left it as it is.")),
         }
     }
     let mut left: Vec<Value> = Vec::new();

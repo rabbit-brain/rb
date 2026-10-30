@@ -1881,14 +1881,7 @@ const NEEDS_JUDGMENT_MD: &str = "## Needs judgment";
 /// other ("1 not reproduced", "1 gate missed") as rb gives it, in plain words (shell/views.rs short_rule, then
 /// strings.rs plain_word).
 fn tally_word(key: &str, n: &str) -> String {
-    let short = match key {
-        "meets" => "met",
-        "misses" => "not met",
-        "undetermined" => "can't tell yet",
-        "untested" => "not tested",
-        other => other,
-    };
-    crate::shell::strings::plain_word(&format!("{n} {short}"))
+    crate::shell::strings::plain_word(&format!("{n} {}", crate::shell::strings::short_rule(key)))
 }
 
 pub const CONTEXT_RULES: &[&str] = &[

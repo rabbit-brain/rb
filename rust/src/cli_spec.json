@@ -5071,6 +5071,15 @@
              "const": true,
              "default": false,
              "help": "print one JSON object (the envelope) instead of text"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--hook"
+             ],
+             "dest": "hook",
+             "help": "run from that agent's session hook (rb init installs it): say nothing, exit 0, and keep the look as that agent's",
+             "metavar": "<agent>"
             }
            ],
            "groups": [
@@ -5082,7 +5091,8 @@
              "title": "options",
              "actions": [
               0,
-              1
+              1,
+              2
              ]
             }
            ],

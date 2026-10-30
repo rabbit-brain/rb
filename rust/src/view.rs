@@ -2015,7 +2015,7 @@ pub fn retraction_words(r: &Retraction) -> String {
     format!("retracted{by}{why}")
 }
 
-/// What moved, semantically: runs recorded and superseded, criteria locked, specs amended. Newest first, dated.
+/// What moved, semantically: runs recorded and superseded, specs and rules locked, specs amended. Newest first, dated.
 pub fn changed(led: &Ledger, exps: &[Experiment], limit: usize) -> Res<Vec<String>> {
     let titles: IndexMap<String, String> = exps.iter().map(|e| (e.id.clone(), if e.title.is_empty() { e.id.clone() } else { e.title.clone() })).collect();
     let by = crate::actor::by_writer;
@@ -2031,7 +2031,7 @@ pub fn changed(led: &Ledger, exps: &[Experiment], limit: usize) -> Res<Vec<Strin
     for exp in exps {
         let title = &titles[&exp.id];
         if let Some(fz) = &exp.frozen {
-            let locked = format!("{title}: criteria locked{}{}", by(&fz.by), reason_part(&fz.why, &fz.by, ": "));
+            let locked = format!("{title}: spec and rules locked{}{}", by(&fz.by), reason_part(&fz.why, &fz.by, ": "));
             events.push((fz.at.clone(), with_words(&locked, &fz.words, &fz.by)));
         }
         for a in &exp.amendments {

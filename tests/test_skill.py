@@ -124,7 +124,8 @@ def test_add_agents_md_is_a_marked_section_that_updates_in_place(rb):
 def test_add_can_write_every_target_in_one_call(rb):
     code, env = rb("skill", "add", "--claude", "--cursor", "--agents-md")
     assert code == 0
-    assert len(env.data["written"]) == 3
+    # the skill (in the home folder), Cursor's rule and its session hook, and AGENTS.md
+    assert len(env.data["written"]) == 4 and env.data["written"][-1].endswith(".cursor/hooks.json")
 
 
 def test_init_puts_rb_where_the_agents_found_here_look_and_keeps_what_is_there(rb, monkeypatch):
@@ -251,7 +252,8 @@ def test_init_off_a_terminal_changes_no_file_that_was_here_and_says_what_to_add(
     said = " ".join(env.data["agents"]["said"])
     assert "AGENTS.md was here before rb, so rb left it as it is. rb skill add --agents-md --yes adds rb's section at its end" in said
     assert '.mcp.json was here before rb, so rb left it as it is. To add rb\'s MCP server, put "rabbit-brain": {"command": "rb", "args": ["mcp"]} in its mcpServers' in said
-    assert [line["how"] for line in _ledger(team.cwd)] == ["dir", "created", "dir"]       # rb's folder in git, the skill, the journal
+    # rb's folder in git, the skill, the session hook's new settings file, the journal
+    assert [line["how"] for line in _ledger(team.cwd)] == ["dir", "created", "created", "dir"]
 
 
 def test_yes_adds_to_the_files_that_were_here_byte_for_byte(team):
@@ -390,7 +392,8 @@ def test_skill_add_puts_rb_s_own_in_place_of_one_rb_did_not_write_only_once_agre
     skill = customised.cwd / ".claude/skills/rabbit-brain/SKILL.md"
     was = skill.stat().st_mtime_ns
     code, env = customised("skill", "add", "--claude", "--project")
-    assert code == 0 and skill.read_bytes() == OURS_SKILL and env.data["written"] == []
+    # the session hook's settings file is new, so it is made; the skill rb did not write is left as it is
+    assert code == 0 and skill.read_bytes() == OURS_SKILL and [Path(w).name for w in env.data["written"]] == ["settings.json"]
     assert env.data["left"][0]["command"] == "rb skill add --claude --project --yes"
     code, _ = customised("init", "INT8 ResNet-50")
     code, env = customised("skill", "add", "--claude", "--project", "--yes")
@@ -413,7 +416,8 @@ def test_an_agent_session_s_yes_changes_no_file_that_was_here(customised, monkey
     monkeypatch.delenv("RB_ACTOR", raising=False)
     for argv in (("--agents-md",), ("--agents-md", "--yes"), ("--claude", "--project", "--yes")):
         code, env = customised("skill", "add", *argv)
-        assert code == 0 and env.data["written"] == [], argv
+        # a session hook's file that is not there yet is made (it was not here); nothing that was here changes
+        assert code == 0 and all(Path(w).name in ("settings.json", "hooks.json") for w in env.data["written"]), argv
         assert (customised.cwd / "AGENTS.md").read_bytes() == HOUSE and (customised.cwd / ".claude/skills/rabbit-brain/SKILL.md").read_bytes() == OURS_SKILL
         commands = [x["command"] for x in env.data["left"]]
         assert commands and not any("--yes" in c for c in commands), commands
@@ -447,7 +451,7 @@ def test_a_link_out_of_the_repository_takes_no_write_without_the_yes(linked, cap
     note = f"(through a link, at {linked.skill.as_posix()}, outside this repository)"
     code, env = linked("skill", "add", "--claude", "--project")
     assert code == 0 and env.data["written"] == [] and not linked.skill.exists()
-    assert [x["command"] for x in env.data["left"]] == ["rb skill add --claude --project --yes"]
+    assert [x["command"] for x in env.data["left"]] == ["rb skill add --claude --project --yes"] * 2      # the skill and the session hook
     main(["skill", "add", "--claude", "--project"])
     assert f"rb wrote nothing to .claude/skills/rabbit-brain/SKILL.md {note}, since rb writes outside this repository only once agreed." in capsys.readouterr().out
     code, env = linked("init", "INT8 ResNet-50")
@@ -487,5 +491,6 @@ def test_init_asks_before_a_write_a_link_takes_out_of_the_repository(linked, ans
     name = f".claude/skills/rabbit-brain/SKILL.md (through a link, at {linked.skill.as_posix()}, outside this repository)"
     question = text[text.index("For the agents here:"):text.index("[y/N] ")]
     assert f"rb would write outside this repository, where a link takes it:\n\n{name}: a new file, with rb's own text (what `rb skill` prints).\n" in question
-    assert question.splitlines()[-1] == f"Write {name}? "
+    settings = f".claude/settings.json (through a link, at {(linked.outside / 'settings.json').resolve().as_posix()}, outside this repository)"
+    assert question.splitlines()[-1] == f"Write {name} and {settings}? "
     assert linked.skill.is_file() is (answer == "y")

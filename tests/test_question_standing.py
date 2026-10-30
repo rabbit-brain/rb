@@ -86,7 +86,7 @@ def test_the_brief_says_where_each_question_stands_in_sentences(rb):
     assert eb.scope == "datasets = 2 · shards = 8"
     assert eb.table is not None and eb.counted == 2
     # What changed is dated, names no writer, and quotes reasons rather than rewording them.
-    assert any("criteria locked: before the counted runs" in line for line in b.changed)
+    assert any("spec and rules locked: before the counted runs" in line for line in b.changed)
     # A question is not listed as open inside its own section. rb status lists an open question an agent can act on
     # (one with nothing filed under it yet); its own section gives the command, not "q2 is open".
     assert not any("q1 is open" in line for line in b.still_open)

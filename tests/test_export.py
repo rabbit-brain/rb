@@ -828,7 +828,8 @@ SCALE_RAW, SCALE_GZIP = 2_400_000, 185_000  # bytes: the scale record's page (SH
 # Raised to 2.45 MB on the orchestrator's call of Oct 25, 21:55 +08 (design pass 1: your view and reader's view, and
 # citations): rb open's / measured 2,402,838 to 2,407,121 bytes on MP-1025-1905's trial.
 OPEN_RAW = 2_450_000                       # bytes: rb open's / on the scale record
-OPEN_TIMES_STATUS = 3                      # rb open's / on the scale record, against rb status --json there
+OPEN_TIMES_STATUS = 3.5                    # rb open's / on the scale record, against rb status --json there: about 2.5 on
+                                           # a quiet box, 3.04 once under load (MP-1030-03); twice as slow reads about 5
 
 
 @pytest.fixture(scope="module")
@@ -1197,8 +1198,8 @@ def test_the_small_fixtures_pages_are_small(page_repo, monkeypatch, tmp_path):
 
 def test_size_budget(request, tmp_path):
     """The shell's pages stay within their budgets: the scale record's (141 runs, 60 criteria, about 700 writes) under
-    2.2 MB raw for now and 170 KB gzip; rb open's / there under 2.2 MB for now, sent as it is though gzip is asked for, within 3 times
-    what rb status --json takes on the same record."""
+    2.2 MB raw for now and 170 KB gzip; rb open's / there under 2.2 MB for now, sent as it is though gzip is asked for, within 3.5 times
+    what rb status --json takes on the same record (the median of 5 rounds)."""
     needs("M0", "R1")
     scale = request.getfixturevalue("scale_record")
     page = _exported(scale.root, scale.env, tmp_path)
@@ -1226,7 +1227,7 @@ def test_size_budget(request, tmp_path):
             ask = urllib.request.Request(m.group(1) + "/", headers={"Accept-Encoding": "gzip, deflate"})
             with opener.open(ask, timeout=120) as resp:
                 got["encoding"], got["body"] = resp.headers.get("Content-Encoding"), resp.read()
-        times = _median_ratio(home, status)
+        times = _median_ratio(home, status, n=5)
         assert got["encoding"] is None and len(got["body"]) < OPEN_RAW, (got["encoding"], len(got["body"]))
         assert times <= OPEN_TIMES_STATUS, times
     finally:
@@ -1292,6 +1293,8 @@ def test_the_manifest_names_what_the_working_tree_changes_of_its_commit(repo, ca
     Path("configs/sweep.yaml").write_text("lr: 0.1\n", encoding="utf-8")
     Path("eval.py").write_text("print(1)\n", encoding="utf-8")
     Path(".gitignore").write_text("scratch/\n", encoding="utf-8")
+    Path(".claude").mkdir()
+    Path(".claude/settings.json").write_text('{\n  "permissions": {"allow": ["Bash(python eval.py)"]}\n}\n', encoding="utf-8")
     _git("add", "-A")
     _git("commit", "-qm", "code")
     out = tmp_path_factory.mktemp("exports")
@@ -1299,6 +1302,10 @@ def test_the_manifest_names_what_the_working_tree_changes_of_its_commit(repo, ca
     assert code == 0 and env.data["repo"]["changed"] == []
     # what rb writes in the checkout is its own, never the code's: its skill and server, a page, an export, one being built
     assert repo("skill", "add", "--agents-md", "--yes")[0] == 0 and Path("AGENTS.md").is_file()
+    # the session hook rb adds to a settings file that was there (hook_entry): the file is rb's while it is as rb left it
+    assert repo("skill", "add", "--claude", "--project", "--yes")[0] == 0 and "rb" in Path(".claude/settings.json").read_text(encoding="utf-8")
+    assert '"permissions"' in Path(".claude/settings.json").read_text(encoding="utf-8")
+    assert "hook_entry" in Path(".git/rb/owned.jsonl").read_text(encoding="utf-8")
     assert repo("page")[0] == 0 and repo("export", "--with-record")[0] == 0 and repo("export", "--zip", "--out", "rb-page.zip")[0] == 0
     for _ in range(2):
         code, env = repo("export", "--with-record", "--out", "bundles/b1")

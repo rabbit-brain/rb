@@ -503,24 +503,31 @@ fn controls(surface: Surface) -> String {
 
 /// The record's one line (WITNESS), as the Overview and About draw it: when rb began keeping the record and how much of it
 /// was recorded afterwards, not as it happened, quiet, from M's facts (`home.witness`); nothing where the document gives
-/// none. "Kept with rb since it began." only where the facts show the record holds nothing that came before it: never on
-/// a clone (its structure came from its parent: a parent's address, or an experiment that reproduces one elsewhere, by
-/// its uid or address, as rb clone relates each) or a record with an experiment read from a results folder (work the
-/// folder held, which rb did not see happen), where the counts cannot tell; nor on a record with no experiment, where
-/// nothing tells a clone of questions alone from a record begun here.
+/// none. "Kept with rb since it began." only where the facts show the record holds nothing that came before it. Where
+/// the counts cannot tell, it says what came from elsewhere: a clone of a parent's address says it began as one; a
+/// record whose experiments reproduce one elsewhere, by its uid or address (as rb clone relates each, a clone from a path
+/// included, and as anyone may relate one by hand), says how many do; one with experiments read from results folders
+/// (work the folders held, which rb did not see happen) says how many were. A record with no experiment and nothing
+/// counted draws none, since nothing tells a clone of questions alone from a record begun here.
 fn witness(doc: &Value) -> String {
     let n = |k: &str| count(doc, &format!("home.witness.{k}.afterwards")).unwrap_or(0);
     let t = |k: &str| count(doc, &format!("home.witness.{k}.total")).unwrap_or(0);
     let kinds = [("runs", "run"), ("analyses", "analysis"), ("calls", "call"), ("notes", "note")];
     let elsewhere = |r: &Value| r.as_str().and_then(|r| r.strip_prefix("reproduces ")).map_or(false, |to| to.starts_with("exp_") || to.contains('/'));
     let exps = list(doc, "experiments");
-    let older = !text(doc, "project.parent").is_empty()
-        || exps.is_empty()
-        || exps.iter().any(|e| !text(e, "folder").is_empty() || list(e, "relations").iter().any(elsewhere));
-    if older && kinds.iter().all(|(k, _)| n(k) == 0) {
-        return String::new();
-    }
-    let line = w::witness_line(text(doc, "home.witness.began"), &kinds.map(|(k, one)| (n(k), t(k), one, k)));
+    let clone = !text(doc, "project.parent").is_empty();
+    let reproduce = exps.iter().filter(|e| list(e, "relations").iter().any(elsewhere)).count();
+    let folders = exps.iter().filter(|e| !text(e, "folder").is_empty()).count();
+    let began = text(doc, "home.witness.began");
+    let line = if kinds.iter().any(|(k, _)| n(k) > 0) {
+        w::witness_line(began, &kinds.map(|(k, one)| (n(k), t(k), one, k)))
+    } else if clone || reproduce > 0 || folders > 0 {
+        w::witness_older_line(began, clone, reproduce, folders)
+    } else if exps.is_empty() {
+        String::new()
+    } else {
+        w::witness_line(began, &kinds.map(|(k, one)| (n(k), t(k), one, k)))
+    };
     if line.is_empty() { line } else { format!("<p class=\"dim sm wit\">{}</p>", esc(&line)) }
 }
 
@@ -773,18 +780,6 @@ fn tag_of(key: &str) -> String {
     format!(" {}", term_as(hint, &format!("<span class=\"tag\">{}</span>", esc(label))))
 }
 
-/// A rule word as a tally says it, short and plain: "met", "not met", "can't tell yet", "not tested"; any other ("not
-/// reproduced", "gate missed") as rb gives it.
-fn short_rule(word: &str) -> &str {
-    match word {
-        "meets" => "met",
-        "misses" => "not met",
-        "undetermined" => "can't tell yet",
-        "untested" => "not tested",
-        other => other,
-    }
-}
-
 /// rb's tally of rule words (home.tally's [word, n] pairs) as the screens say it (plain words pass 3): "Rules: 4 met ·
 /// 1 not reproduced · 4 can't tell yet", each word short and plain in its colour, what the counts count leading them.
 fn rule_tally(pairs: &[Value], muted: &[String]) -> String {
@@ -795,7 +790,7 @@ fn rule_tally(pairs: &[Value], muted: &[String]) -> String {
             let rule = pair.first()?.as_str()?;
             let n = super::whole(pair.get(1)?)?;
             let full = format!("{n} {}", crate::assess::rule_label(rule, n));
-            let said = said_plain(&format!("{n} {}", short_rule(rule)));
+            let said = said_plain(&format!("{n} {}", w::short_rule(rule)));
             Some(match crate::surface::part_class(&full, muted).as_str() {
                 "dim" => format!("<span>{said}</span>"),
                 cls => format!("<span class=\"sw {cls}\">{said}</span>"),
@@ -3578,7 +3573,7 @@ impl<'a> Page<'a> {
             .iter()
             .filter(|(_, n)| *n > 0)
             .map(|(word, n)| {
-                let said = said_plain(&format!("{n} {}", short_rule(word)));
+                let said = said_plain(&format!("{n} {}", w::short_rule(word)));
                 let full = format!("{n} {}", crate::assess::rule_label(word, *n));
                 let to = format!("{qid}:rd:{}", reading_key(&full));
                 let cls = crate::surface::part_class(&full, &muted);
@@ -3880,7 +3875,7 @@ impl<'a> Page<'a> {
                 .map(|(word, n)| {
                     let full = format!("{n} {}", crate::assess::rule_label(word, *n));
                     let cls = crate::surface::part_class(&full, &muted);
-                    let said = said_plain(&format!("{n} {}", short_rule(word)));
+                    let said = said_plain(&format!("{n} {}", w::short_rule(word)));
                     if cls == "dim" { format!("<span>{said}</span>") } else { format!("<span class=\"sw {cls}\">{said}</span>") }
                 })
                 .collect();

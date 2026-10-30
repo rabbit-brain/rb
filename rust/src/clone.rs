@@ -51,7 +51,7 @@ fn fetch(url: &str) -> Res<(Scratch, PathBuf)> {
     let hold = temp_dir()?;
     let dest = hold.0.join("bundle.zip");
     // said without what the address carried for the download alone (credentials, a signed query)
-    let shown = crate::http::shareable(url);
+    let shown = crate::http::said(url);
     match crate::http::download(url, &dest, crate::zipfile::MAX_BUNDLE, QUIET, WHOLE) {
         Ok(()) => Ok((hold, dest)),
         Err(None) => Err(too_big(&shown)),
@@ -72,7 +72,7 @@ fn bundle_record(given: &str) -> Res<(PathBuf, Value, Option<Scratch>)> {
     let fetched = if given.starts_with("http://") || given.starts_with("https://") { Some(fetch(given)?) } else { None };
     let mut src = fetched.as_ref().map_or_else(|| PathBuf::from(given), |(_, zip)| zip.clone());
     // an address is said without what it carried for the download alone
-    let source = &crate::http::shareable(given);
+    let source = &crate::http::said(given);
     if !src.exists() {
         // a path that is not there is said as that: nothing is wrong with a bundle rb never saw
         return Err(RBError::msg_fix(
@@ -234,10 +234,30 @@ fn git_message(stderr: &str) -> String {
 /// `C:/code/int8.git`, which git reads too).
 fn said_address(a: &str) -> String {
     if a.contains("://") {
-        crate::http::shareable(a)
+        crate::http::said(a)
     } else {
         crate::sys::typed(a)
     }
+}
+
+/// git's message with the address it quotes said as rb says it, so what the address carried for the download alone
+/// (a password, a token) is never printed or written.
+fn without_address(message: &str, address: &str) -> String {
+    if address.is_empty() {
+        return message.to_string();
+    }
+    let said = said_address(address);
+    let message = message.replace(address, &said);
+    // git takes the credentials out of an address it quotes itself, up to the first @ before the first /, and keeps
+    // the rest (a signed query, a user's own @): each form git or curl may quote is said as rb says the address too
+    let Some((front, rest)) = address.split_once("://") else { return message };
+    let git = rest.find('/').map_or(rest, |end| &rest[..end]);
+    let curl = rest.find(['/', '?', '#']).map_or(rest, |end| &rest[..end]);
+    let mut forms: Vec<String> = [git.find('@'), curl.rfind('@')].into_iter().flatten().map(|at| format!("{front}://{}", &rest[at + 1..])).collect();
+    // the longest first, so a shorter form inside a longer one never leaves the rest of it behind
+    forms.sort_by_key(|f| std::cmp::Reverse(f.len()));
+    forms.dedup();
+    forms.iter().fold(message, |m, form| m.replace(form.as_str(), &said))
 }
 
 /// A reason get_code gave, as rb's words and as git's own message, apart: (why, git_said).
@@ -370,7 +390,7 @@ fn get_code(dest: &Path, address: &str, commit: Option<&str>, given: &[String], 
         if o.status.success() {
             return Ok(String::from_utf8_lossy(&o.stdout).trim().to_string());
         }
-        Err(format!("{GIT_SAID}{}", git_message(&String::from_utf8_lossy(&o.stderr))))
+        Err(format!("{GIT_SAID}{}", without_address(&git_message(&String::from_utf8_lossy(&o.stderr)), address)))
     };
     let d = dest.to_string_lossy().to_string();
     let done = (|| {
@@ -483,7 +503,7 @@ fn read_parent(source: &str) -> Res<Parent> {
             "E_STATE_NEWER",
             format!(
                 "{} holds a record with a part only a newer rb reads ({}); a clone would leave it behind, so this rb clones nothing until it is upgraded.",
-                crate::http::shareable(source),
+                crate::http::said(source),
                 first.get("why").map(py_str).unwrap_or_default()
             ),
             "Upgrade: `pip install --upgrade rabbit-brain`, then clone the bundle again.",
@@ -554,7 +574,7 @@ pub fn clone(source: &str, dest: Option<&Path>, code: Option<&str>) -> Res<Dict>
         ));
     }
     // where it came from, without what the address carried for the download alone (credentials, a signed query)
-    let url = crate::http::shareable(source);
+    let url = crate::http::said(source);
     // the code the runs need, where the bundle names it or the caller gives it: the record lands in a checkout of it
     let named = man.get("repo").filter(|r| r.truthy());
     let address = code.map(str::to_string).or_else(|| named.and_then(|r| r.get("url")).map(py_str)).filter(|a| !a.trim().is_empty());
@@ -790,6 +810,28 @@ mod tests {
     fn an_address_is_kept_as_a_reader_can_use_it() {
         assert_eq!(said_address("https://ana:secret@example.org/ana/int8.git?token=1"), "https://example.org/ana/int8.git");
         assert_eq!(said_address("git@github.com:ana/int8.git"), "git@github.com:ana/int8.git");
+        // an @ past the first / after credentials or a `:`: no address is said, in rb's words and in git's alike
+        assert_eq!(said_address("https://ana:pa/ss@example.org/ana/int8.git"), crate::http::UNREADABLE);
+        let raw = "https://ana:pa/ss@example.org/ana/int8.git";
+        let told = without_address(&format!("repository '{raw}' not found."), raw);
+        assert_eq!(told, "repository 'an address rb cannot read safely' not found.");
+        // git's own form of the address, its credentials taken out by git, is said as rb says it too
+        let signed = "https://ana:secret@example.org/ana/int8.git?sig=s3cret";
+        let told = without_address("unable to access 'https://example.org/ana/int8.git?sig=s3cret/': 403", signed);
+        assert_eq!(told, "unable to access 'https://example.org/ana/int8.git/': 403");
+        let odd = "https://ana:secret@example.org/ana/int8.git?next=a@b";
+        let told = without_address("unable to access 'https://example.org/ana/int8.git?next=a@b/'", odd);
+        assert_eq!(told, "unable to access 'an address rb cannot read safely/'");
+        // git takes out only what comes before the first @: a user's own @ leaves the password in git's form
+        let user_at = "https://jo@x.com:tok@example.org/r";
+        let told = without_address("unable to access 'https://x.com:tok@example.org/r/': bad URL", user_at);
+        assert_eq!(told, "unable to access 'https://example.org/r/': bad URL");
+        // a ? before an @: no address, in rb's words and in git's
+        let query = "https://ana:pw@example.org?sig=a@b";
+        assert_eq!(said_address(query), crate::http::UNREADABLE);
+        let told = without_address("unable to access 'https://example.org?sig=a@b/'", query);
+        assert_eq!(told, "unable to access 'an address rb cannot read safely/'");
+        assert!(!told.contains("pa/ss") && !told.contains("ana:"));
         let local = if cfg!(windows) { "C:\\Users\\ana\\int8.git" } else { "/home/ana/int8.git" };
         assert_eq!(said_address(local), if cfg!(windows) { "C:/Users/ana/int8.git" } else { "/home/ana/int8.git" });
     }

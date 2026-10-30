@@ -1411,11 +1411,10 @@ def test_a_check_of_a_setting_is_said_as_what_rb_found(int8_demo, tmp_path):
 
 
 def test_home_within_budget(scale_record, monkeypatch):
-    """The bridge's home op (what rb ui reads on every change) and rb open's /state.json stay within 20% of phase 0's
-    figures for this system (tests/shell_baselines.py, for_this_machine) on the scale record, in size and in time, time
+    """The bridge's home op (what rb ui reads on every change) and rb open's /state.json stay within phase 0's
+    figures (20% in size, 25% in time) for this system (tests/shell_baselines.py, for_this_machine) on the scale record, in size and in time, time
     read against rb status --json on the same record and machine so a faster or slower machine holds the same ratio. The three are read in turn, round
     by round, so other work on the machine weighs on each alike; the median of the rounds' ratios is held."""
-    import statistics
     import shell_baselines
     root, then = Path(getattr(scale_record, "root", scale_record)).resolve(), shell_baselines.for_this_machine()
     as_the_user(monkeypatch)
@@ -1435,14 +1434,39 @@ def test_home_within_budget(scale_record, monkeypatch):
             rounds.append({"home": timed(lambda: shell_baselines.home_op(root)), "status": timed(lambda: shell_baselines.status_json(root)), "state_json": timed(state)})
     finally:
         server.close()
-    rounds = rounds[1:]
+    for k, ok, said in over_budget(rounds[1:], then):
+        assert ok, (k, said)
+
+
+# Time holds 1.25 times phase 0's ratio, size 1.2 times its bytes: a ratio read on a loaded machine went just past 1.2 times
+# once (MP-1030-0029: 1.070 against a cap of 1.068, six jobs on the box), while a real slowdown moves it far more.
+TIME_MARGIN, SIZE_MARGIN = 1.25, 1.2
+
+
+def over_budget(rounds: list, then: dict) -> list:
+    """For home and state_json, whether a round's size and the median of its time ratios against rb status hold their
+    budget, with what was read against what it may be."""
+    import statistics
+    out = []
     for k in ("home", "state_json"):
         size = rounds[0][k][1]
-        assert size <= 1.2 * then[k]["bytes_median"], (k, size, then[k]["bytes_median"])
+        out.append((k, size <= SIZE_MARGIN * then[k]["bytes_median"], (size, then[k]["bytes_median"])))
         ratio = statistics.median(r[k][0] / r["status"][0] for r in rounds)
-        was = then[k]["seconds_median"] / then["status"]["seconds_median"]
-        cap = 1.2 * was
-        assert ratio <= cap, (k, round(ratio, 3), round(cap, 3))
+        cap = TIME_MARGIN * then[k]["seconds_median"] / then["status"]["seconds_median"]
+        out.append((k, ratio <= cap, (round(ratio, 3), round(cap, 3))))
+    return out
+
+
+def test_home_budget_takes_a_loaded_machine_and_fails_a_real_slowdown():
+    """The budget's margin takes the ratio a loaded machine once read for home (1.070 against a cap of 1.068 at 1.2 times
+    phase 0's), and still fails home or state_json read half as fast again, or a size a fifth past phase 0's."""
+    then = {k: {"bytes_median": 1000, "seconds_median": s} for k, s in (("home", 0.89), ("state_json", 0.5), ("status", 1.0))}
+    def rounds(home: float, state: float = 0.5, size: int = 1000) -> list:
+        return [{"home": (home, size), "state_json": (state, size), "status": (1.0, 0)}] * 5
+    def holds(rs) -> bool:
+        return all(ok for _, ok, _ in over_budget(rs, then))
+    assert holds(rounds(1.070)) and holds(rounds(0.89 * 1.24))
+    assert not holds(rounds(0.89 * 1.5)) and not holds(rounds(0.89, state=0.75)) and not holds(rounds(0.89, size=1201))
 
 
 def test_rb_open_s_document_carries_its_places_on_the_shell(tmp_path, monkeypatch):

@@ -591,7 +591,9 @@ def test_init_dry_run_writes_nothing_and_lists_exactly_what_init_then_writes(tmp
     unlisted = [p for p in made if not any(p == q or (q.endswith("/") and p.startswith(q)) for q in plan)]
     unmade = [q for q in plan if not any(p == q or (q.endswith("/") and p.startswith(q)) for p in made)]
     assert unlisted == [] and unmade == [], (unlisted, unmade)
-    expected = {"AGENTS.md", ".mcp.json", ".claude/skills/rabbit-brain/SKILL.md", ".git/rb/owned.jsonl"} if argv else {".claude/skills/rabbit-brain/SKILL.md", ".git/rb/owned.jsonl"}
+    # Claude Code's session hook goes in a new .claude/settings.json either way: it was not there
+    expected = {"AGENTS.md", ".mcp.json", ".claude/skills/rabbit-brain/SKILL.md", ".claude/settings.json", ".git/rb/owned.jsonl"} if argv else {
+        ".claude/skills/rabbit-brain/SKILL.md", ".claude/settings.json", ".git/rb/owned.jsonl"}
     # the journal is the look rb init makes as the record begins, in git's folder, on rb's list of what it writes there
     assert {p for p in plan if not p.startswith(".rb/")} == (expected if signs else set()) | {".git/rb/journal/", ".git/rb/owned.jsonl"}
 

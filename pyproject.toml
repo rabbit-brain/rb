@@ -6,7 +6,7 @@ build-backend = "maturin"
 
 [project]
 name = "rabbit-brain"
-version = "0.6.1"
+version = "0.6.2"
 description = "Track the state of ML research you run with coding agents: questions, criteria, runs and decisions as plain YAML next to your code."
 readme = "README.md"
 license = "Apache-2.0"

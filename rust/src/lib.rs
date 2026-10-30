@@ -56,7 +56,7 @@ pub mod telemetry;
 pub mod usage;
 pub mod cmds;
 
-pub const VERSION: &str = "0.6.1";
+pub const VERSION: &str = "0.6.2";
 
 /// The version rb says it is: VERSION, or RB_TEST_VERSION when the tests pin it (as RB_TEST_NOW pins the clock and
 /// RB_TEST_SEED the ids), so what they expect outlives a release.

@@ -3159,10 +3159,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 17,",
-   " \"bytes\": 104546,",
+   " \"bytes\": 104772,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"fb749ab8bbc7859edf16364e2cb755f03cc42328b5d02d51508949b8e5176abf\",",
+   "  \"page.html\": \"466f0c57a13e4c92ba249c5d0c4c3fab7b0e12bafac5788545937ec84108ae43\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/criteria/c1.yaml\": \"347ab9bf0bee9c195eddc6be07c03ce47f697434aaa8a10837686fa77be310d5\",",
@@ -3193,8 +3193,8 @@
    ""
   ],
   "forked/page.html": {
-   "sha256": "fb749ab8bbc7859edf16364e2cb755f03cc42328b5d02d51508949b8e5176abf",
-   "bytes": 94056
+   "sha256": "466f0c57a13e4c92ba249c5d0c4c3fab7b0e12bafac5788545937ec84108ae43",
+   "bytes": 94282
   },
   "forked/record/.rb/.gitattributes": [
    "* -text",

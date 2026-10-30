@@ -573,11 +573,11 @@ def test_init_says_when_gitignore_keeps_what_it_installs_out_of_git(rb):
     code, env = rb("init", "INT8 ResNet-50 on ImageNet")
     assert code == 0 and env.data["paste"] == PASTE
     agents = env.data["agents"]
-    assert agents["ignored"] == [".claude/skills/rabbit-brain/SKILL.md"] and agents["later"] == []
+    assert agents["ignored"] == [".claude/skills/rabbit-brain/SKILL.md", ".claude/settings.json"] and agents["later"] == []
     assert (".gitignore keeps .claude/skills/rabbit-brain/SKILL.md out of git, so it does not travel with the repository: "
             "a clone, and the agents working in it, will not have it.") in agents["said"]
     code, env = rb("skill", "add", "--claude", "--project")
-    assert env.data["ignored"] == [".claude/skills/rabbit-brain/SKILL.md"]
+    assert env.data["ignored"] == [".claude/skills/rabbit-brain/SKILL.md", ".claude/settings.json"]
     Path(".gitignore").write_text("", encoding="utf-8")
     code, env = rb("skill", "add", "--claude", "--project")
     assert env.data["ignored"] == []

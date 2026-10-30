@@ -420,6 +420,8 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser) -> None:
     j.set_defaults(func="cmd_journal")
     jsub = j.add_subparsers(dest="sub_command", required=False, metavar="<scan|run>")
     s = jsub.add_parser("scan", parents=rc, help="look at the watched places once and journal what changed")
+    s.add_argument("--hook", metavar="<agent>",
+                   help="run from that agent's session hook (rb init installs it): say nothing, exit 0, and keep the look as that agent's")
     s.set_defaults(func="cmd_journal_scan")
     s = jsub.add_parser("run", parents=rc, help="run a command and journal what it did: rb journal run -- python eval.py ...")
     s.add_argument("cmd", nargs=argparse.REMAINDER, help="the command, after --")

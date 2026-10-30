@@ -10,7 +10,7 @@
   "home": {
     "counts": {"questions": 2, "experiments": 2, "criteria": 6, "runs": 9, "retracted": 1, "analyses": 1, "resources": 4, "calls": 4, "writes": 47},
     "last_write": {"at": "2026-10-19 09:40 UTC"},
-    "latest": {"head": "2026-10-19 · 09:25 to 09:40 UTC · 4 writes", "calls_made": 0, "line": "Latest changes: 2026-10-19 · 09:25 to 09:40 UTC · 4 writes · no calls made"},
+    "latest": {"head": "2026-10-19, 09:25 to 09:40 UTC · 4 changes", "calls_made": 0, "line": "Latest changes: 2026-10-19, 09:25 to 09:40 UTC · 4 changes · no calls made"},
     "made": {"criteria": 6, "after_evidence": 2, "runs": 8, "with_command": 1, "line": "2 of 6 rules were written after their results came in · 1 of 8 runs records its command (as given)"},
     "witness": {"began": "2026-10-06 10:02 UTC", "runs": {"total": 8, "afterwards": 1, "before": 1, "unknown": 0}, "analyses": {"total": 1, "afterwards": 0}, "calls": {"total": 4, "afterwards": 1}, "notes": {"total": 2, "afterwards": 0}},
     "began": "Kept with rb since 2026-10-06. 1 run and 1 call were recorded afterwards, not as they happened.",
@@ -1677,7 +1677,7 @@
     }
   },
   "history": {
-    "summary": "47 writes in the log",
+    "summary": "47 changes recorded",
     "log": [
       {"at": "2026-10-19 09:40 UTC", "op": "decide", "sentence": "mentioned a past call on int8, from notes.md:3", "refs": ["notes.md"], "log_index": 46, "witness": {"seen": "afterwards", "basis": "past_call"}},
       {"at": "2026-10-19 09:35 UTC", "op": "decide", "sentence": "proposed a call: accept c3, not made", "refs": ["c3"], "log_index": 45, "witness": {"seen": "as_it_ran", "basis": "recorded_as_made"}},
@@ -1733,7 +1733,7 @@
         "last": "2026-10-19 09:40 UTC",
         "n": 4,
         "calls": 0,
-        "head": "2026-10-19 · 09:25 to 09:40 UTC · 4 writes · no calls made",
+        "head": "2026-10-19, 09:25 to 09:40 UTC · 4 changes · no calls made",
         "lines": [
           {
             "first": "2026-10-19 09:25 UTC",
@@ -1765,7 +1765,7 @@
             "note": "one seed is enough for the export check\\u200b",
             "log_index": 45
           },
-          {"first": "2026-10-19 09:40 UTC", "last": "2026-10-19 09:40 UTC", "n": 1, "sentence": "Mentioned a past call to park int8, dated 2026-05-07, from notes.md:3, not confirmed", "refs": ["notes.md"], "why": "", "note": "", "log_index": 46}
+          {"first": "2026-10-19 09:40 UTC", "last": "2026-10-19 09:40 UTC", "n": 1, "sentence": "Mentioned a past call to park int8, dated 2026-05-07, from notes.md:3, not confirmed", "refs": [], "why": "", "note": "", "log_index": 46}
         ]
       },
       {
@@ -1773,7 +1773,7 @@
         "last": "2026-10-19 09:12 UTC",
         "n": 1,
         "calls": 0,
-        "head": "2026-10-19 · 09:12 UTC · 1 write · no calls made",
+        "head": "2026-10-19, 09:12 UTC · 1 change · no calls made",
         "lines": [{"first": "2026-10-19 09:12 UTC", "last": "2026-10-19 09:12 UTC", "n": 1, "sentence": "Amended e1 after locking it: hypothesis", "refs": ["e1"], "why": "", "note": "", "log_index": 42}]
       },
       {
@@ -1781,15 +1781,15 @@
         "last": "2026-10-16 07:30 UTC",
         "n": 1,
         "calls": 0,
-        "head": "2026-10-16 · 07:30 UTC · 1 write · no calls made",
-        "lines": [{"first": "2026-10-16 07:30 UTC", "last": "2026-10-16 07:30 UTC", "n": 1, "sentence": "Added a note on e1", "refs": ["e1", "n1"], "why": "", "note": "", "log_index": 41}]
+        "head": "2026-10-16, 07:30 UTC · 1 change · no calls made",
+        "lines": [{"first": "2026-10-16 07:30 UTC", "last": "2026-10-16 07:30 UTC", "n": 1, "sentence": "Added a note on e1", "refs": ["e1"], "why": "", "note": "", "log_index": 41}]
       },
       {
         "first": "2026-10-15 09:05 UTC",
         "last": "2026-10-15 09:09 UTC",
         "n": 2,
         "calls": 1,
-        "head": "2026-10-15 · 09:05 to 09:09 UTC · 2 writes · 1 call made",
+        "head": "2026-10-15, 09:05 to 09:09 UTC · 2 changes · 1 call made",
         "lines": [
           {
             "first": "2026-10-15 09:05 UTC",
@@ -1818,7 +1818,7 @@
         "last": "2026-10-14 16:40 UTC",
         "n": 1,
         "calls": 0,
-        "head": "2026-10-14 · 16:40 UTC · 1 write · no calls made",
+        "head": "2026-10-14, 16:40 UTC · 1 change · no calls made",
         "lines": [
           {
             "first": "2026-10-14 16:40 UTC",
@@ -1837,7 +1837,7 @@
         "last": "2026-10-14 08:30 UTC",
         "n": 1,
         "calls": 1,
-        "head": "2026-10-14 · 08:30 UTC · 1 write · 1 call made",
+        "head": "2026-10-14, 08:30 UTC · 1 change · 1 call made",
         "lines": [{"first": "2026-10-14 08:30 UTC", "last": "2026-10-14 08:30 UTC", "n": 1, "sentence": "Made a call: accepted c1", "refs": ["c1"], "why": "holds on all three seeds", "note": "", "log_index": 37}]
       },
       {
@@ -1845,10 +1845,10 @@
         "last": "2026-10-13 15:02 UTC",
         "n": 18,
         "calls": 0,
-        "head": "2026-10-13 · 14:10 to 15:02 UTC · 18 writes · no calls made",
+        "head": "2026-10-13, 14:10 to 15:02 UTC · 18 changes · no calls made",
         "lines": [
           {"first": "2026-10-13 14:10 UTC", "last": "2026-10-13 14:10 UTC", "n": 1, "sentence": "Retracted run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC", "refs": ["runs2"], "why": "evaluated on the train split", "note": "", "log_index": 19},
-          {"first": "2026-10-13 14:12 UTC", "last": "2026-10-13 14:12 UTC", "n": 1, "sentence": "Recorded a run on e1: run fp32 and int8 · seed 2 at 2026-10-13 14:12 UTC, replacing run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC", "refs": ["runs2b", "runs2"], "why": "", "note": "", "log_index": 20},
+          {"first": "2026-10-13 14:12 UTC", "last": "2026-10-13 14:12 UTC", "n": 1, "sentence": "Recorded a run on e1: run fp32 and int8 · seed 2 at 2026-10-13 14:12 UTC, replacing run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC", "refs": ["runs2b", "runs2", "e1"], "why": "", "note": "", "log_index": 20},
           {"first": "2026-10-13 14:16 UTC", "last": "2026-10-13 14:16 UTC", "n": 1, "sentence": "Added question q1a under q1", "refs": ["q1a", "q1"], "why": "", "note": "", "log_index": 21},
           {
             "first": "2026-10-13 14:20 UTC",
@@ -1860,8 +1860,8 @@
             "note": "",
             "log_index": 22
           },
-          {"first": "2026-10-13 14:24 UTC", "last": "2026-10-13 14:24 UTC", "n": 1, "sentence": "Specified e2: int8 by calib_images 128, 512, 1024, 2048", "refs": ["e2"], "why": "", "note": "", "log_index": 23},
-          {"first": "2026-10-13 14:28 UTC", "last": "2026-10-13 14:28 UTC", "n": 1, "sentence": "Added rule c5 to e2", "refs": ["c5"], "why": "", "note": "", "log_index": 24},
+          {"first": "2026-10-13 14:24 UTC", "last": "2026-10-13 14:24 UTC", "n": 1, "sentence": "Added calib_images to e2, given by each run", "refs": ["e2"], "why": "", "note": "", "log_index": 23},
+          {"first": "2026-10-13 14:28 UTC", "last": "2026-10-13 14:28 UTC", "n": 1, "sentence": "Added rule c5 to e2", "refs": ["c5", "e2"], "why": "", "note": "", "log_index": 24},
           {"first": "2026-10-13 14:31 UTC", "last": "2026-10-13 14:31 UTC", "n": 1, "sentence": "Set the gate of e2", "refs": ["e2"], "why": "", "note": "", "log_index": 25},
           {"first": "2026-10-13 14:34 UTC", "last": "2026-10-13 14:36 UTC", "n": 2, "sentence": "Filed e2 and c5 under q1a", "refs": ["e2", "q1a", "c5"], "why": "", "note": "", "log_index": 26},
           {"first": "2026-10-13 14:40 UTC", "last": "2026-10-13 14:40 UTC", "n": 1, "sentence": "Locked e2", "refs": ["e2"], "why": "", "note": "", "log_index": 28},
@@ -1870,7 +1870,7 @@
             "last": "2026-10-13 14:51 UTC",
             "n": 5,
             "sentence": "Recorded 5 runs: run fp32 and int8 · calib images 128, run fp32 and int8 · calib images 512, run fp32 and int8 · calib images 1024, run fp32 and int8 · calib images 2048, run fp32 and int8 · seed 3",
-            "refs": ["runc128", "runc512", "runc1024", "runc2048", "runs3"],
+            "refs": ["runc128", "e2", "runc512", "runc1024", "runc2048", "runs3", "e1"],
             "why": "",
             "note": "",
             "log_index": 29
@@ -1885,9 +1885,9 @@
         "last": "2026-10-12 08:06 UTC",
         "n": 2,
         "calls": 0,
-        "head": "2026-10-12 · 08:02 to 08:06 UTC · 2 writes · no calls made",
+        "head": "2026-10-12, 08:02 to 08:06 UTC · 2 changes · no calls made",
         "lines": [
-          {"first": "2026-10-12 08:02 UTC", "last": "2026-10-12 08:02 UTC", "n": 1, "sentence": "Recorded a run on e1: run fp32 and int8 · results/runs.db row 7, from row 7 of table runs", "refs": ["runsql7"], "why": "", "note": "", "log_index": 17},
+          {"first": "2026-10-12 08:02 UTC", "last": "2026-10-12 08:02 UTC", "n": 1, "sentence": "Recorded a run on e1: run fp32 and int8 · results/runs.db row 7, from row 7 of table runs", "refs": ["runsql7", "e1"], "why": "", "note": "", "log_index": 17},
           {"first": "2026-10-12 08:06 UTC", "last": "2026-10-12 08:06 UTC", "n": 1, "sentence": "Amended e1 after locking it: added rule c6", "refs": ["e1", "c6"], "why": "", "note": "", "log_index": 18}
         ]
       },
@@ -1896,13 +1896,13 @@
         "last": "2026-10-06 10:32 UTC",
         "n": 17,
         "calls": 0,
-        "head": "2026-10-06 · 10:02 to 10:32 UTC · 17 writes · no calls made",
+        "head": "2026-10-06, 10:02 to 10:32 UTC · 17 changes · no calls made",
         "lines": [
           {"first": "2026-10-06 10:02 UTC", "last": "2026-10-06 10:02 UTC", "n": 1, "sentence": "Started the record: INT8 ResNet-50 on ImageNet", "refs": [], "why": "", "note": "", "log_index": 0},
           {"first": "2026-10-06 10:04 UTC", "last": "2026-10-06 10:04 UTC", "n": 1, "sentence": "Added question q1", "refs": ["q1"], "why": "", "note": "", "log_index": 1},
           {"first": "2026-10-06 10:06 UTC", "last": "2026-10-06 10:06 UTC", "n": 1, "sentence": "Added an experiment: int8 against fp32 (e1)", "refs": ["e1"], "why": "", "note": "", "log_index": 2},
-          {"first": "2026-10-06 10:08 UTC", "last": "2026-10-06 10:08 UTC", "n": 1, "sentence": "Specified e1: fp32 against int8, paired by seed", "refs": ["e1"], "why": "", "note": "", "log_index": 3},
-          {"first": "2026-10-06 10:10 UTC", "last": "2026-10-06 10:12 UTC", "n": 3, "sentence": "Added 3 rules to e1: c1, c3, c4", "refs": ["c1", "c3", "c4"], "why": "", "note": "", "log_index": 4},
+          {"first": "2026-10-06 10:08 UTC", "last": "2026-10-06 10:08 UTC", "n": 1, "sentence": "Added seed to e1, given by each run", "refs": ["e1"], "why": "", "note": "", "log_index": 3},
+          {"first": "2026-10-06 10:10 UTC", "last": "2026-10-06 10:12 UTC", "n": 3, "sentence": "Added 3 rules to e1: c1, c3, c4", "refs": ["c1", "e1", "c3", "c4"], "why": "", "note": "", "log_index": 4},
           {"first": "2026-10-06 10:14 UTC", "last": "2026-10-06 10:16 UTC", "n": 3, "sentence": "Filed c1, c3 and c4 under q1", "refs": ["c1", "q1", "c3", "c4"], "why": "", "note": "", "log_index": 7},
           {
             "first": "2026-10-06 10:17 UTC",
@@ -1916,7 +1916,7 @@
           },
           {"first": "2026-10-06 10:20 UTC", "last": "2026-10-06 10:20 UTC", "n": 1, "sentence": "Locked e1", "refs": ["e1"], "why": "", "note": "", "log_index": 13},
           {"first": "2026-10-06 10:24 UTC", "last": "2026-10-06 10:24 UTC", "n": 1, "sentence": "Confirmed the design of e1", "refs": ["e1"], "why": "", "note": "", "log_index": 14},
-          {"first": "2026-10-06 10:28 UTC", "last": "2026-10-06 10:32 UTC", "n": 2, "sentence": "Recorded 2 runs: run fp32 and int8 · seed 1, run fp32 and int8 · seed 2 at 2026-10-06 10:32 UTC", "refs": ["runs1", "ckpt-int8-s1", "runs2"], "why": "", "note": "", "log_index": 15}
+          {"first": "2026-10-06 10:28 UTC", "last": "2026-10-06 10:32 UTC", "n": 2, "sentence": "Recorded 2 runs: run fp32 and int8 · seed 1, run fp32 and int8 · seed 2 at 2026-10-06 10:32 UTC", "refs": ["runs1", "ckpt-int8-s1", "e1", "runs2"], "why": "", "note": "", "log_index": 15}
         ]
       }
     ]

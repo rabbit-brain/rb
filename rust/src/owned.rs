@@ -2,7 +2,7 @@
 //! a section or an entry it added to a file that was there, a page or an export, a ref that keeps code, a folder of
 //! its own), in `<git common dir>/rb/owned.jsonl`, outside git `.rb/cache/owned.jsonl`. It lives outside the record,
 //! so no format-1 file changes. rb remove reads it to take back exactly what rb made, and `--out` to know rb's files.
-//! A line: {at, path, scope (repo or home), how (created, replaced, section, mcp_entry, output, ref or dir), sha256_after,
+//! A line: {at, path, scope (repo or home), how (created, replaced, section, mcp_entry, hook_entry, output, ref or dir), sha256_after,
 //! sha256_before (where rb changed a file that was there), command}, and what a kind of write needs besides. A path in
 //! the checkout the ledger sits in is kept from the ledger's own folder (`../../AGENTS.md`), so the lines still name
 //! the checkout's files once its folder moves; any other path is kept whole.

@@ -213,6 +213,9 @@ const BRANCH: &str = "rerun";
 /// What marks a reason as git's own message, where get_code failed in git: rb clone says it after "git said:".
 const GIT_SAID: char = '\u{1}';
 
+/// Why the code is not got where git failed on an address rb cannot read safely: rb's own words, with no git message.
+const UNREADABLE_WHY: &str = "git failed on it; its message is left out, since git, curl and ssh name the host they tried, and in this address rb cannot tell the host from a password or a token";
+
 /// What git said when it failed, in one line: the paragraph that holds its error (git's advice after a blank line
 /// left out, as is its `fatal: `), each line ending in a stop. Its last line alone can be a fragment of that advice
 /// ("and the repository exists.").
@@ -247,7 +250,7 @@ fn without_address(message: &str, address: &str) -> String {
         return message.to_string();
     }
     let said = said_address(address);
-    let message = message.replace(address, &said);
+    let message = replace_whole(message, address, &said);
     // git takes the credentials out of an address it quotes itself, up to the first @ before the first /, and keeps
     // the rest (a signed query, a user's own @): each form git or curl may quote is said as rb says the address too
     let Some((front, rest)) = address.split_once("://") else { return message };
@@ -257,7 +260,257 @@ fn without_address(message: &str, address: &str) -> String {
     // the longest first, so a shorter form inside a longer one never leaves the rest of it behind
     forms.sort_by_key(|f| std::cmp::Reverse(f.len()));
     forms.dedup();
-    forms.iter().fold(message, |m, form| m.replace(form.as_str(), &said))
+    let message = forms.iter().fold(message, |m, form| replace_whole(&m, form, &said));
+    // what is left of the address or a form that says more than rb says (a token with a /, a signed query), ended or
+    // not, is said as rb says it all the same: no part of a password or a token is said, even inside a longer address
+    let mut all: Vec<&str> = std::iter::once(address).chain(forms.iter().map(String::as_str)).filter(|f| *f != said).collect();
+    all.sort_by_key(|f| std::cmp::Reverse(f.len()));
+    let message = all.iter().fold(message, |m, f| m.replace(f, &said));
+    // the credentials go wherever they still start a host, in the whole form and in each form git leaves after an @
+    // of theirs: git:// and ssh name the host with no scheme before it
+    let shared = crate::http::shareable(address);
+    let kept = shareable_rest(&shared, front);
+    let cut = std::iter::once(0).chain(rest.match_indices('@').map(|(i, _)| i + 1)).find(|&k| rest[k..].starts_with(kept)).unwrap_or(0);
+    let secret = &rest[..cut];
+    let mut secrets: Vec<&str> = std::iter::once(secret).chain(secret.match_indices('@').map(|(i, _)| &secret[i + 1..])).filter(|x| x.len() > 1).collect();
+    secrets.sort_by_key(|x| std::cmp::Reverse(x.len()));
+    let message = secrets.iter().fold(message, |m, x| cut_before_host(&m, x));
+    // where rb says no address, git's message names no host either: the host git, curl or ssh may have read out of it
+    // ("Could not resolve host: tok") can be part of a token
+    if said != crate::http::UNREADABLE {
+        return message;
+    }
+    // each as read, and as curl and ssh may print it: its escapes decoded, a lone % escaped, an IPv6 host without its
+    // brackets, and in any case; a name with letters beyond ASCII curl prints as punycode, so then any such name goes
+    let mut hosts: Vec<String> = Vec::new();
+    for read in read_hosts(rest) {
+        let decoded = percent_decoded(read);
+        let bare = decoded.strip_prefix('[').and_then(|v6| v6.strip_suffix(']')).map(str::to_string);
+        hosts.extend([read.to_string(), lone_percent_escaped(read), lone_percent_escaped(&decoded), decoded].into_iter().chain(bare));
+    }
+    hosts.retain(|h| !h.is_empty());
+    hosts.sort_by_key(|h| std::cmp::Reverse(h.len()));
+    hosts.dedup();
+    let punycode = hosts.iter().any(|h| !h.is_ascii());
+    let message = message
+        .split(crate::http::UNREADABLE)
+        .map(|piece| {
+            let piece = hosts.iter().fold(piece.to_string(), |m, h| replace_token(&m, h, crate::http::UNREADABLE));
+            if punycode {
+                replace_punycode(&piece, crate::http::UNREADABLE)
+            } else {
+                piece
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(crate::http::UNREADABLE);
+    // and whatever stands where git, curl or ssh name the host they tried is said as the phrase, whatever form of the
+    // address they turned it into (curl maps letters beyond ASCII to ASCII ones, and writes escapes back its own way)
+    let mut message = replace_host_slots(&message, crate::http::UNREADABLE);
+    // a user's part before the host, said as rb says it too, leaves the phrase twice around its @: said once
+    let twice = format!("{0}@{0}", crate::http::UNREADABLE);
+    while message.contains(&twice) {
+        message = message.replace(&twice, crate::http::UNREADABLE);
+    }
+    message
+}
+
+/// Where git, curl and ssh name the host they tried: "Could not resolve host: X", "Failed to connect to X port 443",
+/// "unable to look up X (port 9418)", "ssh: Could not resolve hostname X: ...", "connect to host X port 22",
+/// "Connection to X closed", "Connection closed by X".
+const HOST_SLOTS: [&str; 7] = ["resolve host: ", "resolve hostname ", "connect to host ", "connect to ", "look up ", "connection to ", "connection closed by "];
+
+/// `text` with the name in each of `HOST_SLOTS` (up to a space, a quote or a bracket, without a stop, comma, colon or
+/// semicolon that ends it) replaced by `to`, where it is not `to` already.
+fn replace_host_slots(text: &str, to: &str) -> String {
+    let lower = text.to_ascii_lowercase();
+    let mut cuts: Vec<(usize, usize)> = Vec::new();
+    for slot in HOST_SLOTS {
+        for (at, _) in lower.match_indices(slot) {
+            let start = at + slot.len();
+            let longer = slot == "connect to " && lower[start..].starts_with("host ");
+            if longer || text[start..].starts_with(to) || cuts.iter().any(|&(s, e)| start >= s && start < e) {
+                continue;
+            }
+            let end = text[start..].find(|c: char| c.is_whitespace() || matches!(c, '\'' | '"' | '`' | '(' | ')')).map_or(text.len(), |e| start + e);
+            let name = text[start..end].trim_end_matches(['.', ',', ':', ';']);
+            // curl's own "Couldn't connect to server" names none
+            if !name.is_empty() && !(slot == "connect to " && name == "server") {
+                cuts.push((start, start + name.len()));
+            }
+        }
+    }
+    cuts.sort();
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    for (s, e) in cuts {
+        if s < last {
+            continue;
+        }
+        out.push_str(&text[last..s]);
+        out.push_str(to);
+        last = e;
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
+/// Each `%` not followed by two hex digits written `%25`, as curl writes it back.
+fn lone_percent_escaped(text: &str) -> String {
+    let b = text.as_bytes();
+    let mut out = String::with_capacity(text.len());
+    for (i, c) in text.char_indices() {
+        let escape = c == '%' && b.get(i + 1).map_or(false, u8::is_ascii_hexdigit) && b.get(i + 2).map_or(false, u8::is_ascii_hexdigit);
+        out.push_str(if c == '%' && !escape { "%25" } else { &text[i..i + c.len_utf8()] });
+    }
+    out
+}
+
+/// `%XX` escapes decoded, as curl decodes them in a host before it names it.
+fn percent_decoded(text: &str) -> String {
+    let b = text.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hex = |c: u8| (c as char).to_digit(16);
+        match (b[i], b.get(i + 1).copied().and_then(hex), b.get(i + 2).copied().and_then(hex)) {
+            (b'%', Some(hi), Some(lo)) => {
+                out.push((hi * 16 + lo) as u8);
+                i += 3;
+            }
+            (c, _, _) => {
+                out.push(c);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// `text` with every name that holds a punycode label (`xn--...`) replaced by `to`.
+fn replace_punycode(text: &str, to: &str) -> String {
+    let name = |c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.';
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    let mut at = 0;
+    while at < text.len() {
+        let c = text[at..].chars().next().unwrap_or(' ');
+        if !name(c) {
+            at += c.len_utf8();
+            continue;
+        }
+        let end = text[at..].find(|c: char| !name(c)).map_or(text.len(), |e| at + e);
+        let run = text[at..end].trim_end_matches('.');
+        if run.split('.').any(|label| label.len() > 4 && label[..4].eq_ignore_ascii_case("xn--")) {
+            out.push_str(&text[last..at]);
+            out.push_str(to);
+            last = at + run.len();
+        }
+        at = end;
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
+/// The hosts git, curl and ssh may read out of an address's part after `://` (an extra `/` there skipped, as curl
+/// skips it), and the user's part they may print before one: in the authority up to the first `/`, `?` or `#` (curl)
+/// and up to the first `/` (git, ssh), every run that starts at its start or after an @ and ends at an @ or its end
+/// (`u:p@tok`, `u:p`, `tok`), each with what follows a `:` and without it (git names `user:pass` as a host and its
+/// port).
+fn read_hosts(rest: &str) -> Vec<&str> {
+    fn upto<'a>(r: &'a str, stops: &[char]) -> &'a str {
+        r.find(stops).map_or(r, |e| &r[..e])
+    }
+    fn no_port(h: &str) -> &str {
+        match h.strip_prefix('[') {
+            Some(v6) => v6.split_once(']').map_or(h, |(inside, _)| &h[..inside.len() + 2]),
+            None => h.split(':').next().unwrap_or(h),
+        }
+    }
+    let rest = rest.trim_start_matches('/');
+    let mut read = Vec::new();
+    for authority in [upto(rest, &['/', '?', '#']), upto(rest, &['/'])] {
+        let ats: Vec<usize> = authority.match_indices('@').map(|(i, _)| i).collect();
+        let starts = std::iter::once(0).chain(ats.iter().map(|i| i + 1));
+        for start in starts {
+            for end in ats.iter().copied().filter(|&e| e >= start).chain(std::iter::once(authority.len())) {
+                read.push(&authority[start..end]);
+            }
+        }
+    }
+    read.into_iter().flat_map(|h| [h, no_port(h)]).collect()
+}
+
+/// `text` with `token` replaced by `to` wherever it stands as a whole name, in any ASCII case (ssh says a host in
+/// lower case): not inside a longer name (a letter, a digit, `-`, `_`, or a `.` before more of a name, on either side).
+fn replace_token(text: &str, token: &str, to: &str) -> String {
+    let name = |c: char| c.is_alphanumeric() || c == '-' || c == '_';
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    let (lower, wanted) = (text.to_ascii_lowercase(), token.to_ascii_lowercase());
+    for (at, _) in lower.match_indices(&wanted) {
+        if at < last {
+            continue;
+        }
+        let end = at + token.len();
+        let before = text[..at].chars().next_back();
+        let mut after = text[end..].chars();
+        let next = after.next();
+        let inside_before = before.map_or(false, |c| name(c) || (c == '.' && text[..at - 1].chars().next_back().map_or(false, name)));
+        let inside_after = next.map_or(false, |c| name(c) || (c == '.' && after.next().map_or(false, name)));
+        if !inside_before && !inside_after {
+            out.push_str(&text[last..at]);
+            out.push_str(to);
+            last = end;
+        }
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
+/// What `shareable` kept after the scheme of an address written `front://...`.
+fn shareable_rest<'a>(kept: &'a str, front: &str) -> &'a str {
+    kept.strip_prefix(front).and_then(|k| k.strip_prefix("://")).unwrap_or(kept)
+}
+
+/// `text` without `secret` wherever it starts a host: at the start, or after a space, a quote, a `/` or a `(`.
+fn cut_before_host(text: &str, secret: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    for (at, _) in text.match_indices(secret) {
+        if at < last {
+            continue;
+        }
+        if text[..at].chars().next_back().map_or(true, |c| matches!(c, '/' | '\'' | '"' | '`' | '(') || c.is_whitespace()) {
+            out.push_str(&text[last..at]);
+            last = at + secret.len();
+        }
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
+/// `text` with `from` replaced by `to` only where `from` ends the address it is in: at a quote, a space, a / or the
+/// end of the text. A longer address that starts with the same text is kept whole, never rewritten in part.
+fn replace_whole(text: &str, from: &str, to: &str) -> String {
+    if from.is_empty() {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    for (at, _) in text.match_indices(from) {
+        if at < last {
+            continue;
+        }
+        let end = at + from.len();
+        if text[end..].chars().next().map_or(true, |c| c == '/' || c == '\'' || c == '"' || c == '`' || c.is_whitespace()) {
+            out.push_str(&text[last..at]);
+            out.push_str(to);
+            last = end;
+        }
+    }
+    out.push_str(&text[last..]);
+    out
 }
 
 /// A reason get_code gave, as rb's words and as git's own message, apart: (why, git_said).
@@ -389,6 +642,11 @@ fn get_code(dest: &Path, address: &str, commit: Option<&str>, given: &[String], 
         let o = std::process::Command::new("git").args(args).stdin(std::process::Stdio::null()).output().map_err(|_| "git not found".to_string())?;
         if o.status.success() {
             return Ok(String::from_utf8_lossy(&o.stdout).trim().to_string());
+        }
+        // where rb says no address, rb says why in its own words and leaves git's message out: git, curl and ssh
+        // name the host they tried, which can be part of a password or a token there
+        if said_address(address) == crate::http::UNREADABLE {
+            return Err(UNREADABLE_WHY.to_string());
         }
         Err(format!("{GIT_SAID}{}", without_address(&git_message(&String::from_utf8_lossy(&o.stderr)), address)))
     };
@@ -832,7 +1090,96 @@ mod tests {
         let told = without_address("unable to access 'https://example.org?sig=a@b/'", query);
         assert_eq!(told, "unable to access 'an address rb cannot read safely/'");
         assert!(!told.contains("pa/ss") && !told.contains("ana:"));
+        // an address is said in place only where it ends (a quote, a space, a / or the end): a longer address that
+        // starts with the same text is kept whole, never rewritten in part
+        let short = "https://ana:secret@example.org/ana/int8";
+        let told = without_address("unable to access 'https://example.org/ana/int8-v2.git/': 404, see https://example.org/ana/int8", short);
+        assert_eq!(told, "unable to access 'https://example.org/ana/int8-v2.git/': 404, see https://example.org/ana/int8");
+        let told = without_address("repository 'https://ana:secret@example.org/ana/int8' not found; tried https://ana:secret@example.org/ana/int8 and https://ana:secret@example.org/ana/int8.git", short);
+        assert_eq!(told, "repository 'https://example.org/ana/int8' not found; tried https://example.org/ana/int8 and https://example.org/ana/int8.git");
+        // so with a password holding a /, and in git's own form of a user's own @
+        let told = without_address("unable to access 'https://ana:pa/ss@example.org/ana/int8.git'", "https://ana:pa/ss@example.org/ana/int8");
+        assert_eq!(told, "unable to access 'an address rb cannot read safely.git'");
+        let told = without_address("could not read https://ana:pa/ss@example.org/r?token=SECRET.", "https://ana:pa/ss@example.org/r?token=SECRET");
+        assert_eq!(told, "could not read an address rb cannot read safely.");
+        // a bare @ hides nothing, so nothing is cut for it
+        assert_eq!(without_address("see @foo and (@bar)", "https://@host/r"), "see @foo and (@bar)");
+        let told = without_address("bad URL https://x.com:tok@example.org/r2", user_at);
+        assert_eq!(told, "bad URL https://example.org/r2");
+        // a token with a / or a signed query says no more in an address that does not end there
+        assert_eq!(without_address("could not read https://tok/en@host/r.", "https://tok/en@host/r"), "could not read an address rb cannot read safely.");
+        assert_eq!(without_address("tried https://tok/en@host/r.git and failed.", "https://tok/en@host/r"), "tried an address rb cannot read safely.git and failed.");
+        // and where rb says no address, git's message names no host either: curl's host can be part of a token
+        let told = without_address(&git_message("fatal: unable to access 'https://tok/en@host/r/': Could not resolve host: tok\n"), "https://tok/en@host/r");
+        assert_eq!(told, "unable to access 'an address rb cannot read safely/': Could not resolve host: an address rb cannot read safely.");
+        let told = without_address("Failed to connect to tok port 443 after 3 ms: tok.en, toked and stok stay", "https://tok/en@host/r");
+        assert_eq!(told, "Failed to connect to an address rb cannot read safely port 443 after 3 ms: tok.en, toked and stok stay");
+        // as git 2 says it for https://lab.example?next=a@b
+        let told = without_address(&git_message("fatal: unable to access 'https://b/': Could not resolve host: lab.example\n"), "https://lab.example?next=a@b");
+        assert_eq!(told, "unable to access 'an address rb cannot read safely/': Could not resolve host: an address rb cannot read safely.");
+        // git names user:pass as a host and its port for git://; curl decodes escapes, prints a name beyond ASCII as
+        // punycode and an IPv6 host without brackets; ssh says a host in lower case
+        let told = without_address(&git_message("fatal: unable to look up deploy:s3cr (port 9418) (Name or service not known)\n"), "git://deploy:s3cr/et@127.0.0.1:9/r");
+        assert_eq!(told, "unable to look up an address rb cannot read safely (port 9418) (Name or service not known).");
+        assert_eq!(without_address("Could not resolve host: s3cret", "https://s3cr%65t/x@host/r"), "Could not resolve host: an address rb cannot read safely");
+        assert_eq!(without_address("Could not resolve host: xn--tkn-cma7d", "https://tökén/x@host/r"), "Could not resolve host: an address rb cannot read safely");
+        assert_eq!(without_address("Failed to connect to ::1 port 9 after 0 ms", "https://[::1]:9/r?x=a@b"), "Failed to connect to an address rb cannot read safely port 9 after 0 ms");
+        assert_eq!(without_address("ssh: Could not resolve hostname tok: Name or service not known", "ssh://git@TOK/en@host/r"), "ssh: Could not resolve hostname an address rb cannot read safely: Name or service not known");
+        // git:// and ssh print the user's part before the host; curl writes a lone % back as %25 and skips an extra /
+        let told = without_address("unable to look up u:p@tok (port 9418) (Name or service not known).", "git://u:p@tok/en@host/r");
+        assert_eq!(told, "unable to look up an address rb cannot read safely (port 9418) (Name or service not known).");
+        let told = without_address("unable to look up u:p@127.0.0.1:9 (port 9418).", "git://u:p@127.0.0.1:9/x@h/r");
+        assert_eq!(told, "unable to look up an address rb cannot read safely (port 9418).");
+        let told = without_address("deploy:s3cr@tok: Permission denied (publickey).", "ssh://deploy:s3cr@tok/x?y=a@b");
+        assert_eq!(told, "an address rb cannot read safely: Permission denied (publickey).");
+        assert_eq!(without_address("Could not resolve host: to%25k.", "https://to%k/x@host/r"), "Could not resolve host: an address rb cannot read safely.");
+        assert_eq!(without_address("Could not resolve host: %25.", "https://%/x@host/r"), "Could not resolve host: an address rb cannot read safely.");
+        assert_eq!(without_address("Could not resolve host: tok.", "https:///tok/en@host/r"), "Could not resolve host: an address rb cannot read safely.");
+        assert_eq!(without_address("Could not resolve host: secrethost.", "https:///user:pass@secrethost/r"), "Could not resolve host: an address rb cannot read safely.");
+        // curl maps letters beyond ASCII to ASCII ones, and writes a lone % back beside an escape it decodes: whatever
+        // stands where it names the host is said as the phrase
+        assert_eq!(without_address("Could not resolve host: token.", "https://ｔｏｋｅｎ/x@h/r"), "Could not resolve host: an address rb cannot read safely.");
+        assert_eq!(without_address("Could not resolve host: tok.en.", "https://tok。en/x@h/r"), "Could not resolve host: an address rb cannot read safely.");
+        assert_eq!(without_address("Could not resolve host: to%25kA.", "https://to%k%41/x@h/r"), "Could not resolve host: an address rb cannot read safely.");
+        assert_eq!(without_address("Failed to connect to seCret port 443: Connection refused", "https://x@h/y?a=b@c"), "Failed to connect to an address rb cannot read safely port 443: Connection refused");
+        assert_eq!(without_address("ssh: Could not resolve hostname s3cr: Name or service not known", "ssh://x/y@z/r"), "ssh: Could not resolve hostname an address rb cannot read safely: Name or service not known");
+        assert_eq!(without_address("Connection closed by s3cr port 22", "ssh://x/y@z/r"), "Connection closed by an address rb cannot read safely port 22");
+        assert_eq!(without_address("ssh: connect to host s3cr port 22: Connection refused", "ssh://x/y@z/r"), "ssh: connect to host an address rb cannot read safely port 22: Connection refused");
+        assert_eq!(without_address("Failed to connect to s3cr port 9: Couldn't connect to server.", "https://x/y@z/r"), "Failed to connect to an address rb cannot read safely port 9: Couldn't connect to server.");
+        // an address rb says keeps git's host
+        assert_eq!(without_address("Could not resolve host: example.org", "https://ana:secret@example.org/r"), "Could not resolve host: example.org");
+        assert_eq!(without_address("could not fetch https://host/r.git?token=SECRET.", "https://host/r.git?token=SECRET"), "could not fetch https://host/r.git.");
+        assert_eq!(without_address("could not fetch https://ana:pw@host/r.git?token=SECRET.", "https://ana:pw@host/r.git?token=SECRET"), "could not fetch https://host/r.git.");
+        // git:// and ssh name the host with no scheme before it
+        assert_eq!(without_address("unable to look up u:s3cr3t@127.0.0.1:9 (port 9418)", "git://u:s3cr3t@127.0.0.1:9/r"), "unable to look up 127.0.0.1:9 (port 9418)");
+        assert_eq!(without_address("git:pa/ss@host: Permission denied", "ssh://git:pa/ss@host/r.git"), "host: Permission denied");
         let local = if cfg!(windows) { "C:\\Users\\ana\\int8.git" } else { "/home/ana/int8.git" };
         assert_eq!(said_address(local), if cfg!(windows) { "C:/Users/ana/int8.git" } else { "/home/ana/int8.git" });
+    }
+
+    #[test]
+    fn where_rb_says_no_address_it_says_why_in_its_own_words_and_no_git_message() {
+        // every address rb cannot read safely that the reviews of git's message probed takes that path
+        let unreadable = [
+            "git://deploy:s3cr/et@127.0.0.1:9/r", "https://s3cr%65t/x@host/r", "https://t%6Fk/en@host/r", "https://AB%43d/x@host/r",
+            "https://tökén/x@host/r", "https://[::1]:9/r?x=a@b", "https://tok/en@host/r", "https://lab.example?next=a@b", "https://tok?en@host/r",
+            "git://u:p@tok/en@host/r", "git://deploy:s3cr@tok/en@host/r", "git://u:p@127.0.0.1:9/x@h/r", "ssh://u:p@TOK/en@host/r",
+            "ssh://deploy:s3cr@tok/x?y=a@b", "https://to%k/x@host/r", "https://to%zzk/x@host/r", "https://tok%/x@host/r", "https://%/x@host/r",
+            "https:///tok/en@host/r", "https:///user:pass@secrethost/r", "https:///x@host/r?y=a@b", "https://tok。en/x@h/r",
+            "https://ｔｏｋｅｎ/x@h/r", "https://to\u{ad}ken/x@h/r", "https://to%k%41/x@h/r", "https://to%41%k/x@h/r", "git://tok:12345/x@h/r",
+        ];
+        for a in unreadable {
+            assert_eq!(said_address(a), crate::http::UNREADABLE, "{a}");
+        }
+        // and git, failing on one (nothing listens on port 9 here), is not quoted: no host, no port, no git words
+        let dest = std::env::temp_dir().join(format!("rb-clone-unreadable-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dest);
+        let why = get_code(&dest, "git://u:p@127.0.0.1:9/x@h/r", None, &[], &[], &[]).unwrap_err();
+        assert_eq!(why, UNREADABLE_WHY);
+        assert_eq!(said_apart(&why), (UNREADABLE_WHY.to_string(), String::new()));
+        assert!(!dest.exists());
+        // an address rb says still gets git's own message, after "git said:"
+        let why = get_code(&dest, "git://127.0.0.1:9/r", None, &[], &[], &[]).unwrap_err();
+        assert!(why.starts_with(GIT_SAID) && why.contains("127.0.0.1"), "{why}");
     }
 }

@@ -16,12 +16,69 @@ pub struct Reply {
 
 /// What stops a request before any answer.
 pub enum Failure {
-    /// no answer came: why, in the system's words ("Connection refused", "timed out")
-    Unreachable(String),
+    /// no answer came: why, in the system's words ("Connection refused", "timed out"), and whether the connection went
+    Unreachable(Why),
     /// not a web address at all: no http:// or https:// in front, or no host after it
     NotAnAddress,
     /// the address is one, and what was to be sent with it cannot be (a header value no request carries)
     Unsendable,
+}
+
+/// Why no answer came: the words said for it, and whether a connection was refused, reset, aborted, closed before its
+/// answer or timed out (`went`), as against an address that cannot answer at all (a host no resolver knows, a
+/// certificate this machine does not accept). `went` is read from the kind of error the HTTP and TLS libraries give,
+/// never from their words, so a new wording of theirs changes nothing.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Why {
+    pub words: String,
+    pub went: bool,
+}
+
+impl Why {
+    fn went(words: impl Into<String>) -> Why {
+        Why { words: words.into(), went: true }
+    }
+    fn stays(words: impl Into<String>) -> Why {
+        Why { words: words.into(), went: false }
+    }
+}
+
+impl std::ops::Deref for Why {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.words
+    }
+}
+
+impl std::fmt::Display for Why {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.words)
+    }
+}
+
+impl PartialEq<str> for Why {
+    fn eq(&self, other: &str) -> bool {
+        self.words == other
+    }
+}
+
+impl PartialEq<&str> for Why {
+    fn eq(&self, other: &&str) -> bool {
+        self.words == *other
+    }
+}
+
+/// The kinds of error that say a connection was there and went, or did not come in time.
+fn went_kind(kind: std::io::ErrorKind) -> bool {
+    use std::io::ErrorKind::*;
+    matches!(kind, ConnectionRefused | ConnectionReset | ConnectionAborted | BrokenPipe | TimedOut | UnexpectedEof)
+}
+
+/// Why an I/O step stopped, with whether its connection went.
+fn io_why(e: &std::io::Error) -> Why {
+    // WSAESHUTDOWN, a send on a socket the other side shut, is a broken pipe that std may not give a kind of its own
+    let shut = cfg!(windows) && e.raw_os_error() == Some(10058);
+    Why { words: io_text(e), went: went_kind(e.kind()) || shut }
 }
 
 /// A system error by its code, in the system's words: "Connection refused".
@@ -55,32 +112,34 @@ fn scheme_host(url: &str) -> Option<(String, String)> {
 }
 
 /// Why reading an answer's body stopped: ureq's own reason (a timeout) when it is ureq's, else the system's words.
-fn read_text(e: &std::io::Error, host: &str) -> String {
+fn read_text(e: &std::io::Error, host: &str) -> Why {
     match e.get_ref().and_then(|inner| inner.downcast_ref::<ureq::Error>()) {
         Some(inner) => reason_of(inner, host),
-        None => io_text(e),
+        None => io_why(e),
     }
 }
 
-fn reason_of(e: &ureq::Error, host: &str) -> String {
+fn reason_of(e: &ureq::Error, host: &str) -> Why {
     match e {
         // the resolver's failure, as std words it: say what the resolver itself says
-        ureq::Error::Io(io) if io.raw_os_error().is_none() && io.to_string().starts_with("failed to lookup address information") => gai_text(host),
-        ureq::Error::Io(io) => io_text(io),
-        ureq::Error::Timeout(_) => "timed out".into(),
-        ureq::Error::HostNotFound => gai_text(host),
-        ureq::Error::ConnectionFailed => errno_text(crate::sys::CONNECTION_REFUSED),
-        ureq::Error::Tls(t) => t.to_string(),
-        ureq::Error::Rustls(e) => certificate_words(&e.to_string()),
+        ureq::Error::Io(io) if io.raw_os_error().is_none() && io.to_string().starts_with("failed to lookup address information") => Why::stays(gai_text(host)),
+        // a connection closed before its answer comes as UnexpectedEof, over http ("Peer disconnected") and https
+        // (TLS's words for a close with no close_notify) alike
+        ureq::Error::Io(io) => io_why(io),
+        ureq::Error::Timeout(_) => Why::went("timed out"),
+        ureq::Error::HostNotFound => Why::stays(gai_text(host)),
+        ureq::Error::ConnectionFailed => Why::went(errno_text(crate::sys::CONNECTION_REFUSED)),
+        ureq::Error::Tls(t) => Why::stays(t.to_string()),
+        ureq::Error::Rustls(e) => Why::stays(certificate_words(&e.to_string())),
         // a proxy that refused the tunnel: "Tunnel connection failed: 403 Forbidden"
-        ureq::Error::ConnectProxyFailed(why) => match why.strip_prefix("proxy server responded ").and_then(|r| r.split('/').next()).and_then(|c| c.parse::<u16>().ok()) {
+        ureq::Error::ConnectProxyFailed(why) => Why::stays(match why.strip_prefix("proxy server responded ").and_then(|r| r.split('/').next()).and_then(|c| c.parse::<u16>().ok()) {
             Some(code) => {
                 let reason = ureq::http::StatusCode::from_u16(code).ok().and_then(|c| c.canonical_reason()).unwrap_or("");
                 format!("Tunnel connection failed: {code} {reason}").trim_end().to_string()
             }
             None => why.clone(),
-        },
-        other => other.to_string(),
+        }),
+        other => Why::stays(other.to_string()),
     }
 }
 
@@ -167,13 +226,14 @@ pub fn shareable(url: &str) -> String {
 pub const UNREADABLE: &str = "an address rb cannot read safely";
 
 /// An address as rb clone says and keeps it: `shareable`'s, but where an @ follows the first /, ? or # after the
-/// scheme and what comes before it holds credentials or a `:`, a password may hold one of them and its host cannot be
-/// told apart from it, so no address is said, only `UNREADABLE`: never a wrong host and never a part of a password.
+/// scheme, a password or a token may hold one of them and its host cannot be told apart from it, so no address is
+/// said, only `UNREADABLE`: never a wrong host and never a part of a password or a token. A plain address with an @ in
+/// its path or its query is unsaid too: the accepted cost.
 pub fn said(url: &str) -> String {
     match url.split_once("://") {
         Some((_, rest)) => {
             let authority = rest.find(['/', '?', '#']).map_or(rest, |end| &rest[..end]);
-            if authority.contains(['@', ':']) && rest[authority.len()..].contains('@') {
+            if rest[authority.len()..].contains('@') {
                 UNREADABLE.to_string()
             } else {
                 shareable(url)
@@ -249,7 +309,7 @@ fn read_answer(url: &str, host: &str, quiet: Duration, whole: Duration, limit: u
     let resp = agent(Some(quiet), Some(whole)).get(url).call().map_err(|e| Failure::Unreachable(reason_of(&e, host)))?;
     let status = resp.status();
     if !status.is_success() {
-        return Err(Failure::Unreachable(status.canonical_reason().unwrap_or("").to_string()));
+        return Err(Failure::Unreachable(Why::stays(status.canonical_reason().unwrap_or(""))));
     }
     if resp.body().content_length().map_or(false, |n| n > limit) {
         let _ = got.send(Got::TooBig);
@@ -290,16 +350,16 @@ pub fn download(url: &str, dest: &std::path::Path, limit: u64, quiet: Duration, 
         };
         let _ = tx.send(last);
     });
-    let failed = |e: std::io::Error| Some(Failure::Unreachable(io_text(&e)));
+    let failed = |e: std::io::Error| Some(Failure::Unreachable(io_why(&e)));
     let mut file: Option<std::fs::File> = None;
     let mut total: u64 = 0;
     let mut heard: Option<std::time::Instant> = None;
     loop {
         if crate::sys::interrupted() {
-            return Err(Some(Failure::Unreachable("interrupted".into())));
+            return Err(Some(Failure::Unreachable(Why::stays("interrupted"))));
         }
         if asked.elapsed() >= whole {
-            return Err(Some(Failure::Unreachable("timed out".into())));
+            return Err(Some(Failure::Unreachable(Why::went("timed out"))));
         }
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(Got::Started) => {
@@ -320,13 +380,13 @@ pub fn download(url: &str, dest: &std::path::Path, limit: u64, quiet: Duration, 
             Ok(Got::TooBig) => return Err(None),
             Ok(Got::Failed(failure)) => return Err(Some(failure)),
             Err(RecvTimeoutError::Timeout) if heard.map_or(false, |t| t.elapsed() >= quiet) => {
-                return Err(Some(Failure::Unreachable("timed out".into())));
+                return Err(Some(Failure::Unreachable(Why::went("timed out"))));
             }
             Err(RecvTimeoutError::Timeout) => {}
             // the thread always says how it ended, so one that ended without a word met a fault of rb's own: said as one
             Err(RecvTimeoutError::Disconnected) => match reader.join() {
                 Err(fault) => std::panic::resume_unwind(fault),
-                Ok(()) => return Err(Some(Failure::Unreachable("the download stopped".into()))),
+                Ok(()) => return Err(Some(Failure::Unreachable(Why::stays("the download stopped")))),
             },
         }
     }
@@ -501,8 +561,8 @@ mod tests {
         }
     }
 
-    /// rb clone says no address where an @ follows the first /, ? or # after credentials or a `:` (the orchestrator's rule,
-    /// Oct 30 17:00 +08), and says every other one as `shareable` does.
+    /// rb clone says no address where an @ follows the first /, ? or # at all (the orchestrator, Oct 31 00:05 +08, for
+    /// the /; MP-1031-03 for a ? or #, where shareable names a wrong host), and says every other one as `shareable` does.
     #[test]
     fn an_address_rb_cannot_read_safely_is_not_said() {
         for given in [
@@ -517,13 +577,54 @@ mod tests {
             "http://[::1]:8000/u/x@y",
             "https://user:pw@host?sig=a@b",
             "https://alice:pa?ss@host/b.zip",
+            // a token with a / never reaches a record's parent, and a plain @ in a path is unsaid with it
+            "https://tok/en@host/r",
+            "https://lab.example/u/x@y/b.zip",
+            "https://lab.example/b.zip?next=a@b",
+            // shareable reads the host after that @ ("https://b"); git and curl read lab.example
+            "https://lab.example?next=a@b",
+            "http://tok?en@127.0.0.1:9/r",
         ] {
             assert_eq!(said(given), UNREADABLE, "{given}");
         }
-        // with neither before the first /, git reads the host there: said as shareable says it
-        for given in ["https://tok/en@host/r", "https://user:pw@host/r.git?sig=s3cret", "https://lab.example/u/x@y/b.zip", "git@github.com:lab/proj.git", "/home/me/bundle"] {
+        // no @ past the first /, ? or #: said as shareable says it
+        for given in ["https://user:pw@host/r.git?sig=s3cret", "https://lab.example/u/b.zip", "https://lab.example?next=ab", "git@github.com:lab/proj.git", "/home/me/bundle"] {
             assert_eq!(said(given), shareable(given), "{given}");
         }
+    }
+
+    /// A connection that was there and went (refused, closed before its answer, reset, a broken pipe, timed out) is
+    /// told by the kind of error, whatever words the system or the libraries give it; a host no resolver knows, a
+    /// network that cannot be reached and a status phrase are not.
+    #[test]
+    fn a_connection_that_went_is_told_by_its_kind_and_an_address_that_cannot_answer_is_not() {
+        let closes = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = closes.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            if let Ok((mut s, _)) = closes.accept() {
+                let mut buf = [0u8; 4096];
+                let _ = std::io::Read::read(&mut s, &mut buf);
+            }
+        });
+        let got = request("POST", &format!("http://127.0.0.1:{port}/api/hub/device/token"), &[], Some(b"{}".to_vec()), Duration::from_secs(5));
+        assert!(matches!(&got, Err(Failure::Unreachable(why)) if why.went), "closed before its answer");
+        let refused = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = refused.local_addr().unwrap().port();
+        drop(refused);
+        let got = request("GET", &format!("http://127.0.0.1:{port}/"), &[], None, Duration::from_secs(5));
+        assert!(matches!(&got, Err(Failure::Unreachable(why)) if why.went), "refused");
+        let got = request("GET", "http://hub.invalid/", &[], None, Duration::from_secs(5));
+        assert!(matches!(&got, Err(Failure::Unreachable(why)) if !why.went), "a host no resolver knows");
+        #[cfg(unix)]
+        let (went, stays) = ([libc::ECONNREFUSED, libc::ECONNRESET, libc::ECONNABORTED, libc::EPIPE, libc::ETIMEDOUT], libc::ENETUNREACH);
+        #[cfg(windows)]
+        let (went, stays) = ([10061, 10054, 10053, 10058, 10060], 10051); // WSAECONNREFUSED, WSAECONNRESET, WSAECONNABORTED, WSAESHUTDOWN, WSAETIMEDOUT; WSAENETUNREACH
+        for code in went {
+            assert!(io_why(&std::io::Error::from_raw_os_error(code)).went, "{code}");
+        }
+        assert!(!io_why(&std::io::Error::from_raw_os_error(stays)).went);
+        assert!(io_why(&std::io::Error::from(std::io::ErrorKind::UnexpectedEof)).went);
+        assert!(io_why(&std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "peer closed connection without sending TLS close_notify")).went);
     }
 
     /// An answer from the hub that goes quiet partway through is given up within the call's time, like one that never

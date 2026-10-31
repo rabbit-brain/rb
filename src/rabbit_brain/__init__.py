@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-__version__ = "0.6.2"
+__version__ = "0.6.3"
 if os.environ.get("RB_TEST_VERSION"):      # the tests pin the version, as RB_TEST_NOW pins the clock, so what they expect outlives a release
     __version__ = os.environ["RB_TEST_VERSION"]
 

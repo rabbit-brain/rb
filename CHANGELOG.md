@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.3 (2026-10-31)
+
+`rb login` waits through a dropped connection, and `rb clone` says no part of a password in git's message.
+
+- **`rb login` through a dropped connection.** While `rb login` waits for you to approve the code in the browser, a check whose connection is refused, reset or dropped, or times out, is asked again, as a busy hub's is: three in a row at most. The fourth ends it as before: the hub could not be reached, and nothing is stored. A hub that cannot be reached at the first request is still said at once.
+- **No part of a password in `rb clone`.** Wherever an `@` follows an address's first `/`, `?` or `#`, rb cannot tell the host from a password or a token, so `rb clone` says "an address rb cannot read safely" in its place. For such an address it says why in its own words and leaves git's message out, since git, curl and ssh name the host they tried. For any other address written with `://`, git's message as `rb clone` says it leaves out the user and password before the host, for `git://` and `ssh://` too: 0.6.2 said them there whole, in what it printed and in `--json`. Neither ever reached the record in `.rb/`.
+
 ## 0.6.2 (2026-10-30)
 
 rb looks at the repository as each agent session starts and as each turn ends, and no address rb says carries any part of a password.

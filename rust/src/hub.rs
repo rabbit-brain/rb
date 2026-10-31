@@ -237,19 +237,25 @@ impl Answer {
 /// A JSON request to the hub's sign-in endpoints: (status, the answer). An error status comes back with its JSON, or
 /// {"error": <its reason>} when it sent none.
 fn post(url: &str, body: &Value) -> Res<(u16, Answer)> {
+    post_once(url, body)?.map_err(|reason| unreachable(url, &reason))
+}
+
+/// The same, with a request that got no answer kept apart: Ok(Err(why)), in the system's words, with whether its
+/// connection went.
+fn post_once(url: &str, body: &Value) -> Res<Result<(u16, Answer), http::Why>> {
     let headers = [("content-type", "application/json".to_string())];
     match http::request("POST", url, &headers, Some(pyjson::dumps(body).into_bytes()), Duration::from_secs(30)) {
         Ok(Reply { status, reason, body }) => {
             if (200..300).contains(&status) {
-                return Ok((status, Answer::of(url, &body)?));
+                return Ok(Ok((status, Answer::of(url, &body)?)));
             }
             let said = match pyjson::loads(&String::from_utf8_lossy(&body)) {
                 Ok(v @ Value::Dict(_)) => v,
                 _ => crate::obj! {"error" => reason},
             };
-            Ok((status, Answer { url: url.to_string(), body: said }))
+            Ok(Ok((status, Answer { url: url.to_string(), body: said })))
         }
-        Err(Failure::Unreachable(reason)) => Err(unreachable(url, &reason)),
+        Err(Failure::Unreachable(reason)) => Ok(Err(reason)),
         Err(Failure::NotAnAddress) => Err(not_an_address(url)),
         Err(Failure::Unsendable) => Err(unsendable()),
     }
@@ -263,9 +269,20 @@ fn approval(hub: &str, device_code: &Value, mut interval: u64, lasts: u64) -> Re
     while Instant::now() < deadline {
         std::thread::sleep(Duration::from_secs(interval));
         stderr_write(".");
-        let (status, ans) = post(&format!("{hub}/api/hub/device/token"), &crate::obj! {"device_code" => device_code.clone()})?;
-        // a gateway or a hub that is down for a moment (502, 503, 504) is asked again, three times in a row at most:
-        // the code may be approved already, and the next answer gives the token
+        let url = format!("{hub}/api/hub/device/token");
+        // a gateway or a hub that is down for a moment (502, 503, 504), or a connection that drops or times out, is
+        // asked again, three times in a row at most: the code may be approved already, and the next answer gives the
+        // token. The fourth in a row ends it as it came.
+        let (status, ans) = match post_once(&url, &crate::obj! {"device_code" => device_code.clone()})? {
+            // the connection was refused, reset, aborted or closed before its answer, or the wait timed out, as the
+            // kind of error says (never its words); a host no resolver knows or a certificate not accepted ends it
+            Err(why) if why.went && unavailable < 3 => {
+                unavailable += 1;
+                continue;
+            }
+            Err(reason) => return Err(unreachable(&url, &reason)),
+            Ok(answered) => answered,
+        };
         if matches!(status, 502..=504) && unavailable < 3 {
             unavailable += 1;
             continue;

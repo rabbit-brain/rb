@@ -12,6 +12,7 @@ import shutil
 import tempfile
 import signal
 import subprocess
+import sys
 import threading
 import time
 import zipfile
@@ -34,10 +35,17 @@ class _Hub(BaseHTTPRequestHandler):
     held = None              # (arrived, release): an upload that has come is held, unanswered, until it is released
     asked = None             # (arrived, release): the same for a whoami, which an upload asks before it builds the bundle
     unavailable = 0          # how many polls for the token to come are answered 503
+    dropped = 0              # how many polls for the token to come are read and then closed with no answer
     refuse = 0               # how many uploads to come are answered 503, as a hub out of service answers
     puts: list = []          # when each upload came, and whether it was taken
 
+    def _drain(self):
+        """Read the request's body before answering: on Windows, closing a socket with bytes unread resets it, and the
+        client sees the connection aborted instead of the answer."""
+        return self.rfile.read(int(self.headers.get("content-length") or "0"))
+
     def do_GET(self):
+        self._drain()
         if self.path == "/api/hub/whoami":
             if _Hub.asked:
                 arrived, release = _Hub.asked
@@ -51,11 +59,16 @@ class _Hub(BaseHTTPRequestHandler):
         self._json(404, {"error": "no"})
 
     def do_POST(self):
+        self._drain()
         origin = f"http://127.0.0.1:{self.server.server_address[1]}"
         if self.path == "/api/hub/device/code":
             return self._json(200, {"device_code": "dev_stub", "user_code": "ABCD-EFGH",
                                     "verification_uri": f"{origin}/link", "expires_in": 600, "interval": 0})
         if self.path == "/api/hub/device/token":
+            if _Hub.dropped > 0:                       # the connection drops before the answer comes
+                _Hub.dropped -= 1
+                self.close_connection = True
+                return
             if _Hub.unavailable > 0:                   # a hub down for a moment, as a gateway answers for it
                 _Hub.unavailable -= 1
                 return self._json(503, {"error": "Service Unavailable"})
@@ -66,11 +79,12 @@ class _Hub(BaseHTTPRequestHandler):
         self._json(404, {"error": "no"})
 
     def do_DELETE(self):
+        self._drain()
         _Hub.revoked = self.headers.get("authorization")
         self._json(200, {"ok": True})
 
     def do_PUT(self):
-        body = self.rfile.read(int(self.headers.get("content-length", "0")))
+        body = self._drain()
         if _Hub.refuse > 0:
             _Hub.refuse -= 1
             _Hub.puts.append((time.monotonic(), False))
@@ -139,6 +153,7 @@ def hub(workdir, monkeypatch, tmp_path_factory, capsys):
     _Hub.asked = None
     _Hub.refuse = 0
     _Hub.unavailable = 0
+    _Hub.dropped = 0
     _Hub.puts = []
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), _Hub)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -999,3 +1014,51 @@ def test_login_asks_again_when_the_hub_is_down_for_a_moment(hub, monkeypatch, tm
     _Hub.unavailable, _Hub.polls = 4, 0
     code, env = hub("login", "--hub", os.environ["RB_HUB_URL"])
     assert code == 2 and env.errors[0].code == "E_HUB_REFUSED" and "Service Unavailable" in env.errors[0].message
+
+
+def test_login_asks_again_when_the_connection_drops_while_it_waits(hub, monkeypatch, tmp_path):
+    """A poll whose connection drops before the hub answers is asked again, as a 503 is: the code may be approved
+    already. Two drops, then the token: signed in."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    _Hub.dropped = 2
+    code, env = hub("login")
+    assert code == 0 and env.data["handle"] == "t" and _Hub.dropped == 0 and _Hub.polls == 2, env.errors
+    creds = json.loads((tmp_path / "cfg" / "credentials.json").read_text(encoding="utf-8"))
+    assert "rb_deviceflowtoken" in json.dumps(creds)
+
+
+def test_login_ends_after_four_dropped_polls_in_a_row_and_keeps_nothing(hub, monkeypatch, tmp_path):
+    """Four polls in a row whose connection drops end rb login as an unreachable hub, with no credential written."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    _Hub.dropped = 4
+    code, env = hub("login")
+    assert code == 2 and env.errors[0].code == "E_HUB_UNREACHABLE", env.errors
+    assert _Hub.dropped == 0 and _Hub.polls == 0
+    assert not (tmp_path / "cfg" / "credentials.json").exists()
+
+
+@pytest.mark.skipif(sys.platform != "linux" or shutil.which("openssl") is None,
+                    reason="a certificate this machine trusts for the test, through SSL_CERT_FILE, is played on Linux")
+def test_login_asks_again_when_an_https_connection_drops_while_it_waits(hub, monkeypatch, tmp_path):
+    """The same over https, where the connection that drops before the answer is said in TLS's words."""
+    import ssl
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(tmp_path / "key"),
+                    "-out", str(tmp_path / "cert"), "-days", "1", "-subj", "/CN=localhost",
+                    "-addext", "subjectAltName=DNS:localhost", "-addext", "basicConstraints=critical,CA:FALSE"],
+                   check=True, capture_output=True)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), _Hub)
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(tmp_path / "cert", tmp_path / "key")
+    httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setenv("SSL_CERT_FILE", str(tmp_path / "cert"))
+        monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+        monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+        monkeypatch.setenv("RB_HUB_URL", f"https://localhost:{httpd.server_address[1]}")
+        _Hub.dropped = 2
+        code, env = hub("login")
+        assert code == 0 and env.data["handle"] == "t" and _Hub.dropped == 0 and _Hub.polls == 2, env.errors
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

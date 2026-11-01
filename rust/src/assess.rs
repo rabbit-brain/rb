@@ -406,7 +406,7 @@ pub fn close(a: f64, b: f64) -> f64 {
     1e-12 * 1f64.max(a.abs()).max(b.abs())
 }
 
-fn threshold(c: &Criterion, value: f64) -> (bool, f64) {
+pub(crate) fn threshold(c: &Criterion, value: f64) -> (bool, f64) {
     let target = c.target.unwrap_or(0.0);
     let margin = if c.comparator == "equals" {
         c.tolerance.unwrap_or(0.0) - (value - target).abs()

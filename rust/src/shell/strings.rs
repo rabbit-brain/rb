@@ -256,10 +256,11 @@ pub fn made_criteria(late: i64, criteria: i64) -> (String, &'static str) {
 
 /// Its second part, up to "command (as given)": "no run records its " or "2 of 8 runs record their ".
 pub fn made_commands(given: i64, runs: i64) -> String {
-    if given == 0 {
-        "no run records its ".to_string()
-    } else {
-        format!("{given} of {runs} runs record their ")
+    match (given, runs) {
+        (0, _) => "no run records its ".to_string(),
+        (1, 1) => "the run records its ".to_string(),
+        (1, _) => format!("1 of {runs} runs records its "),
+        _ => format!("{given} of {runs} runs record their "),
     }
 }
 /// The Overview's fallback for "Latest changes" until History's sittings exist (SHELL-SPEC section 15, `last_write`).
@@ -736,6 +737,15 @@ pub fn hint(term: &str) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A count of runs that record their command agrees with its number: one run records its command.
+    #[test]
+    fn made_commands_says_one_run_in_the_singular() {
+        assert_eq!(made_commands(0, 3), "no run records its ");
+        assert_eq!(made_commands(1, 1), "the run records its ");
+        assert_eq!(made_commands(1, 8), "1 of 8 runs records its ");
+        assert_eq!(made_commands(2, 8), "2 of 8 runs record their ");
+    }
 
     /// WITNESS: the record's one line, in rb's voice: its day and what was recorded afterwards by kind, singular where
     /// one; "since it began" where nothing was; nothing before a first write. A finding's count says all or both.

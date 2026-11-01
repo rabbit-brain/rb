@@ -32,7 +32,8 @@ pub fn cmd_init(ns: &Namespace, out: &mut Out) -> R {
         out.say(crate::skill::PASTE_LINE);
         out.next = vec!["rb context --model <your model id>".into()];
     } else {
-        out.say("Then paste this line into your agent's chat:");
+        // with no agent files asked for, the line is for whoever works with an agent, never a step left undone
+        out.say(if flag(ns, "no_agents") { "If you work with a coding agent, paste this line into its chat:" } else { "Then paste this line into your agent's chat:" });
         out.say(format!("  {}", crate::skill::PASTE_LINE));
     }
     out.data.insert("paste".into(), Value::str(crate::skill::PASTE_LINE));
@@ -534,6 +535,11 @@ pub fn cmd_spec_set(ns: &Namespace, out: &mut Out) -> R {
         if setting.design_factor == Some(true) { out.say("  Fixed design factor: comparisons across its cells are descriptive, with no sampling interval across cells."); }
     } else {
         out.say(format!("{experiment}/{name} = {} · {status}{where_}", show(&setting.value)));
+    }
+    // the value a cited source used, said back as it was given
+    if let Some(c) = &setting.cited {
+        let from = c.source.as_ref().map(|s| format!(" ({})", s.label())).unwrap_or_default();
+        out.say(format!("  cited: {}{from}", show(&c.value)));
     }
     let row_failed = row.as_ref().map_or(false, |r| !r.get("ok").map_or(false, |v| v.truthy()));
     if row_failed {
@@ -1094,6 +1100,155 @@ pub struct FromFile {
     pub per_run: Dict,
     pub produced_at: Option<String>,
     pub row: Option<ledger::FromRow>,
+    /// the row of a CSV or TSV table its numbers were read from: its path, the line it starts on, the columns it was
+    /// picked by with the row's own values, and the column each value came from
+    pub table_row: Option<Dict>,
+}
+
+/// One row of a CSV or TSV table as a run, as a database row is read: `--where` picks exactly one row, its numbers are
+/// the columns that name a metric the project declares (`--select` narrows them), and `@<column>` gives a per-run
+/// value or the time the run was made from the row.
+fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Dict, select: &[String], per_run: Dict, produced_at: Option<String>) -> Res<FromFile> {
+    let bytes = std::fs::read(file).map_err(|e| RBError::could_not_read(&e, shown))?;
+    let table = crate::csvtable::parse(&String::from_utf8_lossy(&bytes), shown);
+    let all_columns = table.columns.join(", ");
+    // a column named twice cannot say which of its cells a value is
+    if let Some(twice) = table.columns.iter().enumerate().find(|(i, c)| !c.is_empty() && table.columns[..*i].contains(c)).map(|(_, c)| c) {
+        return Err(RBError::msg_fix(
+            "E_OBJECT_INVALID",
+            format!("{shown} names column {twice} twice, so rb cannot tell which of its cells a value is."),
+            "Give each column its own name in the table's first line.",
+        ));
+    }
+    if table.rows.is_empty() {
+        return Err(RBError::msg("E_OBJECT_INVALID", format!("{shown} holds no rows under its first line ({all_columns}), so it gives no run.")));
+    }
+    if where_.is_empty() {
+        return Err(RBError::msg_fix(
+            "E_OBJECT_INVALID",
+            format!("{shown} is a table of {}, and rb reads one row of it as a run: its columns are {all_columns}.", if table.rows.len() == 1 { "1 row".to_string() } else { format!("{} rows", table.rows.len()) }),
+            format!("Name the row: rb run add <experiment> --from {} --where <column>=<value>", crate::cli::shlex_quote(shown)),
+        ));
+    }
+    for k in where_.keys() {
+        if !table.columns.contains(k) {
+            return Err(RBError::msg("E_OBJECT_INVALID", format!("--where {k}: {shown} has no column {k}; its columns are {all_columns}.")));
+        }
+    }
+    let picked = || where_.iter().map(|(k, v)| format!("{k}={}", show(v))).collect::<Vec<_>>().join(", ");
+    let hits: Vec<&crate::csvtable::CsvRow> =
+        table.rows.iter().filter(|r| where_.iter().all(|(k, v)| r.column(k).map_or(false, |(_, cell)| crate::csvtable::matches(cell, v)))).collect();
+    let row = match hits.as_slice() {
+        [one] => *one,
+        [] => return Err(RBError::msg_fix("E_OBJECT_INVALID", format!("No row of {shown} has {}.", picked()), "Name a row the table holds: --where <column>=<value>, repeated or comma-separated.")),
+        many => {
+            let first = many[0].cells.iter().map(|(c, v)| format!("{c}={v}")).collect::<Vec<_>>().join(", ");
+            return Err(RBError::msg_fix(
+                "E_OBJECT_INVALID",
+                format!("{} rows of {shown} have {}; the first is line {}: {first}. Nothing written.", many.len(), picked(), many[0].line),
+                "Add a --where column that tells them apart, so exactly one row has them all.",
+            ));
+        }
+    };
+    let shown_row = format!("{shown}, line {}", row.line);
+    let names = crate::journal::names(led)?;
+    let declared = |c: &str| crate::journal::canon_of(c, &names).is_some();
+    let mut chosen: Vec<&(String, String)> = Vec::new();
+    if select.is_empty() {
+        chosen.extend(row.cells.iter().filter(|(c, _)| declared(c)));
+        if chosen.is_empty() {
+            return Err(RBError::msg_fix(
+                "E_OBJECT_INVALID",
+                format!("No column of {shown} names a metric the project declares; its columns are {all_columns}."),
+                "Declare the metric a column holds: rb metric add <name>, with --alias <column> when the column calls it otherwise.",
+            ));
+        }
+    }
+    for wanted in comma_list(select) {
+        let Some(cell) = row.column(&wanted) else {
+            return Err(RBError::msg("E_OBJECT_INVALID", format!("--select {wanted}: {shown} has no column {wanted}; its columns are {all_columns}.")));
+        };
+        if !declared(&cell.0) {
+            return Err(RBError::msg_fix(
+                "E_OBJECT_INVALID",
+                format!("--select {wanted}: {} names no metric the project declares.", cell.0),
+                format!("Declare it first: rb metric add {}, or add it as an --alias of the metric it holds.", crate::cli::shlex_quote(&cell.0)),
+            ));
+        }
+        if !chosen.contains(&cell) {
+            chosen.push(cell);
+        }
+    }
+    let mut metrics = Dict::new();
+    let mut skipped = Vec::new();
+    let mut columns = Dict::new();
+    for (column, cell) in chosen {
+        match crate::csvtable::number(cell) {
+            Some(x) => {
+                metrics.insert(column.clone(), Value::Float(x));
+                columns.insert(column.clone(), Value::Str(column.clone()));
+            }
+            None => skipped.push(format!("{column} ({})", if cell.is_empty() { "empty".to_string() } else { pyjson::repr_str(cell) })),
+        }
+    }
+    if metrics.is_empty() {
+        return Err(RBError::msg_fix(
+            "E_OBJECT_INVALID",
+            format!("{shown_row} holds no number in its metric columns: {}.", skipped.join(", ")),
+            "Name a row that holds them, or --select the columns that do.",
+        ));
+    }
+    let cell_of = |flag: &str, name: &str| -> Res<&(String, String)> {
+        row.column(name).ok_or_else(|| RBError::msg("E_OBJECT_INVALID", format!("{flag}: {shown} has no column {name}; its columns are {all_columns}.")))
+    };
+    let mut resolved = Dict::new();
+    let mut per_run_columns = Dict::new();
+    for (k, v) in per_run {
+        let Some(name) = v.as_str().and_then(|t| t.strip_prefix('@')).map(|n| n.to_string()) else {
+            resolved.insert(k, v);
+            continue;
+        };
+        let flag = format!("--set {k}=@{name}");
+        let (column, cell) = cell_of(&flag, &name)?;
+        if cell.trim().is_empty() {
+            return Err(RBError::msg("E_OBJECT_INVALID", format!("{flag}: {shown_row} holds nothing in {column}, which is no per-run value.")));
+        }
+        resolved.insert(k.clone(), crate::csvtable::value(cell));
+        per_run_columns.insert(k, Value::Str(column.clone()));
+    }
+    let mut produced_column = Value::Null;
+    let produced_at = match produced_at.as_deref().and_then(|t| t.strip_prefix('@')) {
+        Some(name) => {
+            let flag = format!("--produced-at @{name}");
+            let (column, cell) = cell_of(&flag, name)?;
+            if ledger::norm_time(cell).is_none() {
+                return Err(RBError::msg_fix(
+                    "E_OBJECT_INVALID",
+                    format!("{flag}: {shown_row} holds {} in {column}, which is not an ISO date or time.", pyjson::repr_str(cell)),
+                    "Give the time as it is known (--produced-at <ISO date or time>), or --produced-at unknown.",
+                ));
+            }
+            produced_column = Value::Str(column.clone());
+            Some(cell.clone())
+        }
+        None => produced_at,
+    };
+    let key: Dict = where_.keys().filter_map(|k| row.column(k).map(|(c, v)| (c.clone(), crate::csvtable::value(v)))).collect();
+    // the row is told by its own cells but the numbers it gives: whichever columns --where named, the same row is one
+    // run, and a row whose numbers were changed since is still that run
+    let identity: Vec<String> = row.cells.iter().filter(|(c, _)| !columns.contains_key(c)).map(|(c, v)| format!("{c}={v}")).collect();
+    let table_row = crate::dict! {
+        "store" => "csv", "path" => crate::cmds::root_relative(shown, &led.root), "line" => row.line as i64, "where" => Value::Dict(key),
+        "columns" => Value::Dict(columns), "per_run" => Value::Dict(per_run_columns), "produced_at" => produced_column,
+        "row_sha256" => crate::rbyaml::sha256_hex(identity.join("\n").as_bytes())
+    };
+    Ok(FromFile { metrics, skipped, shown: shown_row, per_run: resolved, produced_at, row: None, table_row: Some(table_row) })
+}
+
+/// What a run read from a row of a CSV or TSV table says of it: `row of results.csv, line 4 (mode=int8, bits=8)`.
+pub fn table_row_words(r: &Dict) -> String {
+    let key = r.get("where").and_then(Value::as_dict).map(|w| w.iter().map(|(k, v)| format!("{k}={}", show(v))).collect::<Vec<_>>().join(", ")).unwrap_or_default();
+    format!("row of {}, line {} ({key})", r.get("path").map(pyjson::py_str).unwrap_or_default(), r.get("line").map(pyjson::py_str).unwrap_or_default())
 }
 
 /// The parts of `text` between the commas outside a JSON-quoted text ("lr=0.1,bs=32").
@@ -1180,6 +1335,19 @@ pub fn read_from(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
     let table = table.filter(|t| !t.is_empty());
     // a file that is not there or cannot be read is said so, never taken for a file that is not a database
     let database = crate::sqlite::header(&file).map_err(|e| RBError::could_not_read(&e, &shown))?;
+    if !database && crate::csvtable::is_table(path) {
+        if table.is_some() {
+            return Err(RBError::msg_fix(
+                "E_OBJECT_INVALID",
+                format!("--table names a table of a SQLite database, and {shown} is a CSV table: --where picks its row."),
+                format!("rb run add <experiment> --from {} --where <column>=<value>", crate::cli::shlex_quote(&shown)),
+            ));
+        }
+        if !keys.is_empty() {
+            return Err(RBError::msg("E_OBJECT_INVALID", format!("--keys picks the numbers of a JSON, YAML or TOML file; {shown} is a CSV table, whose metric columns --select picks.")));
+        }
+        return read_table_row(led, &file, &shown, where_, select, per_run, produced_at);
+    }
     if !database {
         if table.is_some() || !where_.is_empty() || !select.is_empty() {
             return Err(RBError::msg_fix(
@@ -1197,7 +1365,7 @@ pub fn read_from(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
                 return Err(RBError::msg("E_OBJECT_INVALID", format!("--keys {} matches no number in {shown}.", patterns.join(", "))));
             }
         }
-        return Ok(FromFile { metrics: nums, skipped, shown, per_run, produced_at, row: None });
+        return Ok(FromFile { metrics: nums, skipped, shown, per_run, produced_at, row: None, table_row: None });
     }
     if !keys.is_empty() {
         return Err(RBError::msg(
@@ -1327,7 +1495,7 @@ pub fn read_from(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
         identity: row.identity(),
         stamp,
     };
-    Ok(FromFile { metrics, skipped, shown: shown_row, per_run: resolved, produced_at, row: Some(from) })
+    Ok(FromFile { metrics, skipped, shown: shown_row, per_run: resolved, produced_at, row: Some(from), table_row: None })
 }
 
 /// A column of the one row of another table linked to the run's row (`@configs.seed`, `@configs[config_id].seed`): the
@@ -1424,6 +1592,7 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
     let mut basis = "typed".to_string();
     let mut produced_at = s(ns, "produced_at");
     let mut row = None;
+    let mut table_row = None;
     let keys = list(ns, "keys");
     let (table, select) = (s(ns, "table"), list(ns, "select"));
     let where_ = parse_pairs(&where_items(&list(ns, "where"))?, "--where", false)?;
@@ -1432,7 +1601,7 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
         return Err(RBError::msg("E_OBJECT_INVALID", "--keys chooses which numbers --from takes; give --from <file>."));
     }
     if (table.is_some() || !where_.is_empty() || !select.is_empty()) && from_file.is_none() {
-        return Err(RBError::msg("E_OBJECT_INVALID", "--table, --where and --select name a row of the SQLite database --from reads; give --from <database>."));
+        return Err(RBError::msg("E_OBJECT_INVALID", "--table, --where and --select name a row of the SQLite database or CSV table --from reads; give --from <database or table>."));
     }
     if let Some(ff) = &from_file {
         let got = read_from(&led, ff, &keys, table.as_deref(), &where_, &select, per_run, produced_at)?;
@@ -1444,7 +1613,7 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
         for (k, v) in got.metrics {
             metrics.insert(k, v);
         }
-        (per_run, produced_at, row) = (got.per_run, got.produced_at, got.row);
+        (per_run, produced_at, row, table_row) = (got.per_run, got.produced_at, got.row, got.table_row);
         files.push(root_relative(ff, &led.root));
         numbers_from.push(root_relative(ff, &led.root));
         basis = if pairs.is_empty() { "file".into() } else { "typed".into() };
@@ -1484,12 +1653,14 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
             tree: s(ns, "tree"),
             numbers_from,
             row,
+            table_row,
         },
     )?;
     let run = result.record;
     if result.duplicate_of.is_some() {
         let by_output = !run.files.is_empty();
-        let same_row = run.receipt.row.as_ref().map(|r| format!("the same row of {}", r.path));
+        let same_row = run.receipt.row.as_ref().map(|r| format!("the same row of {}", r.path))
+            .or_else(|| run.receipt.extra.get("table_row").and_then(|t| t.get("path")).map(|p| format!("the same row of {}", pyjson::py_str(p))));
         let why_same = match &same_row {
             Some(w) => w.as_str(),
             None if by_output => "the same output files",
@@ -1533,6 +1704,9 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
     if let Some(r) = &run.receipt.row {
         out.say(format!("  {}", row_words(r)));
     }
+    if let Some(r) = run.receipt.extra.get("table_row").and_then(Value::as_dict) {
+        out.say(format!("  {}", table_row_words(r)));
+    }
     if !run.inputs.is_empty() || !run.outputs.is_empty() {
         let mut parts: Vec<String> = run.inputs.iter().map(|u| format!("read {}{}", u.resource, if u.role.is_empty() { String::new() } else { format!(" ({})", u.role) })).collect();
         parts.extend(run.outputs.iter().map(|u| format!("made {}{}", u.resource, if u.role.is_empty() { String::new() } else { format!(" ({})", u.role) })));
@@ -1555,6 +1729,11 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
         } else {
             out.say(format!("  {} mentions none of the spec's settings, so nothing was compared: the run's config is unchecked.", cfg.path));
         }
+        // the run's own record says whether its code had uncommitted changes: said as the file's, beside the receipt's
+        if let Some(d) = crate::repo::config_dirty_line(&led.root, &cfg.path, cfg.sha256.as_deref()) {
+            out.say(format!("  {d}."));
+            out.data.insert("config_dirty".into(), Value::Str(d));
+        }
     }
     match &run.receipt.attached {
         None => out.say("  Not in a git repository: the receipt has no commit."),
@@ -1562,6 +1741,16 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
         Some(git) => {
             if git.get("commit").map_or(true, |v| v.is_null()) {
                 out.say("  The repository has no commit yet; the receipt records the uncommitted tree's hash.");
+            } else if !git.get("dirty").map_or(false, |v| v.truthy()) {
+                // rb's own files (what rb init or rb skill add installed, unchanged since) are no code a run ran
+                let top = crate::sources::git_top(&led.here).unwrap_or_else(|| led.root.clone());
+                let own = crate::sources::rb_written(&led.root, &top);
+                if !own.is_empty() {
+                    out.say(format!(
+                        "  Only rb's own files are uncommitted ({}): they are not the run's code, so the receipt reads the tree as clean.",
+                        crate::assess::first_three(&own, ", ")
+                    ));
+                }
             } else if git.get("dirty").map_or(false, |v| v.truthy()) {
                 out.say(format!("  The tree had uncommitted changes when recorded (hash {}).", trunc(&get_s(git, "diff_sha256"), 12)));
                 let watched = crate::ledger::support::run_command(&run).map_or(false, |g| g.given == "observed");
@@ -1583,6 +1772,9 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
                 Some(p) => format!("{} ({}{column})", trunc(p, 19).replace('T', " "), run.produced_basis),
                 None if run.receipt.row.is_some() && s(ns, "produced_at").is_none() => {
                     "when is unknown; a database's times are not its row's. --produced-at @<column> reads a time the row holds.".into()
+                }
+                None if run.basis == "typed" && run.files.is_empty() => {
+                    format!("when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add {} <the same numbers> --produced-at <when> --replaces {} --why \"<when they were made>\"", run.experiment, run.id)
                 }
                 None => "when is unknown".into(),
             }
@@ -2007,6 +2199,10 @@ pub fn cmd_retract(ns: &Namespace, out: &mut Out) -> R {
     if !scope.is_empty() {
         out.say(format!("{sid} ({kind}) superseded for {}{by}{}.", scope.join(", "), crate::view::reason_part(&why, &who, ": ")));
         out.say("Those measurements no longer count; the rest of this run still does, and both facts stay on the record.");
+    } else if kind == "varied setting" {
+        // a name --varies declared with no setting of its own: taken back from what the experiment varies
+        let (exp, name) = sid.split_once('/').unwrap_or((sid.as_str(), ""));
+        out.say(format!("{name} is taken back from what {exp} varies{by}{}. The log keeps it.", crate::view::reason_with_words(&why, &led.words, &who, ": ")));
     } else {
         out.say(format!("{sid} ({kind}) retracted{by}{}. It stays on record and in the log, and no longer counts.", crate::view::reason_with_words(&why, &led.words, &who, ": ")));
     }
@@ -2259,7 +2455,12 @@ fn call_lines(led: &Ledger, d: &Decision, a: &ledger::Authority, kind: Option<&s
         let against = (d.action == "accept" && matches!(rule.as_deref(), Some("misses") | Some("undetermined"))) || (d.action == "reject" && rule.as_deref() == Some("meets"));
         if against {
             let recorded = if a.is_call() { "It is recorded as made" } else { "It is recorded as it was given" };
-            lines.push(format!("  This goes against the rule ({}). {recorded}; rb status shows both.", led.basis_rule(&d.subject, &b)));
+            // an undetermined rule has nothing to go against: the call is made while rb cannot judge it
+            if rule.as_deref() == Some("undetermined") {
+                lines.push(format!("  rb cannot judge this rule yet ({}), so the call accepts it unjudged. {recorded}; rb status shows both.", led.basis_rule(&d.subject, &b)));
+            } else {
+                lines.push(format!("  This goes against the rule ({}). {recorded}; rb status shows both.", led.basis_rule(&d.subject, &b)));
+            }
         }
     }
     if a.is_call() {

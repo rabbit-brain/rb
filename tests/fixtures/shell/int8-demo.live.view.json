@@ -390,7 +390,8 @@
       "reading_short": "int8 against the fp32 baseline: -0.0029 [-0.0046, -0.0012] top1",
       "verdict": "Met: int8 is 0.0029 below fp32 (-0.0046 to -0.0012). A real loss, but 0.0071 past the -0.01 the rule asks for.",
       "tags": [],
-      "reads_baseline": false
+      "reads_baseline": false,
+      "pooled": ""
     },
     "c2": {
       "criterion_id": "c2",
@@ -470,7 +471,8 @@
       "reading_short": "fp32 baseline: observed 0.7597 top1 · cited 0.7613 top1",
       "verdict": "Not reproduced: fp32 is 0.7597 (0.7591 to 0.7603). One arm measured on its own. It is 0.0016 from the cited 0.7613, outside its ± 0.001.",
       "tags": ["retrospective"],
-      "reads_baseline": true
+      "reads_baseline": true,
+      "pooled": ""
     },
     "c3": {
       "criterion_id": "c3",
@@ -528,7 +530,8 @@
       "reading_short": "int8 against the fp32 baseline: -0.0003 onnx_top1",
       "verdict": "Met on its estimate: int8 is 0.00030 below fp32. There is no interval yet. It is 0.0097 past the -0.01 the rule asks for.",
       "tags": ["uncertainty_remains"],
-      "reads_baseline": false
+      "reads_baseline": false,
+      "pooled": ""
     },
     "c4": {
       "criterion_id": "c4",
@@ -592,7 +595,8 @@
       "reading_short": "int8: 0.994 share",
       "verdict": "Met on its estimate: int8 is 0.994 share. One arm measured on its own. It is 0.0040 share past the 0.99 share the rule asks for.",
       "tags": [],
-      "reads_baseline": false
+      "reads_baseline": false,
+      "pooled": ""
     },
     "c5": {
       "criterion_id": "c5",
@@ -690,7 +694,8 @@
       "reading_short": "no reading yet",
       "verdict": "Not met: 1 of 4 units, in 4 design cells, is below -0.01 (calib_images=128).",
       "tags": [],
-      "reads_baseline": false
+      "reads_baseline": false,
+      "pooled": ""
     },
     "c6": {
       "criterion_id": "c6",
@@ -757,7 +762,8 @@
       "reading_short": "int8 against the fp32 baseline: 0.64 latency ratio",
       "verdict": "Not met: the ratio of int8 to fp32 is 0.64. There is no interval yet. It is 0.04 over the 0.6 the rule allows.",
       "tags": ["retrospective", "uncertainty_remains"],
-      "reads_baseline": false
+      "reads_baseline": false,
+      "pooled": ""
     }
   },
   "experiments": [

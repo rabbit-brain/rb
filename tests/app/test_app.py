@@ -123,21 +123,59 @@ def _failed(said: dict) -> list:
     return err.split(" checks failed: ", 1)[1].split("; ") if " checks failed: " in err else [err]
 
 
-@pytest.fixture(scope="module")
-def walked() -> dict:
+_WALKED: dict = {}      # this process's walk at each try: what it said, or how it ended without one (a skip, a timeout)
+
+
+def _walk_passed(said: dict) -> bool:
+    return said.get("exit") == 0 and bool(said.get("ok"))
+
+
+@pytest.fixture
+def walked(request) -> dict:
     """One walk of the fixture by every check, shared by the tests below: a failing check fails each test that names
-    it, and a walk that fails as a whole fails them all."""
+    it, and a walk that fails as a whole fails them all. A walk that passed is read by every later test run; one that
+    failed only by this test run's tests at the same try, so a rerun (--reruns) and a later run walk again."""
     # the suite's workers each ask: the first walks, under the browser lock, and the rest read what it found, for the
     # same script, fixture and harness
     key = hashlib.sha256(b"".join(p.read_bytes() for p in (SCRIPT, GUIDE_CSS, FIXTURE, APP / "app.mjs", APP / "cdp.mjs"))).hexdigest()[:16]
-    cache = Path(tempfile.gettempdir()) / f"rb-app-walk-{key}.json"
+    # rb-app-walk2: the walk with the test run and try that made it (rb-app-walk, the walk alone, is an older checkout's)
+    cache = Path(tempfile.gettempdir()) / f"rb-app-walk2-{key}.json"
+    run = os.environ.get("PYTEST_XDIST_TESTRUNUID") or f"pid{os.getpid()}"
+    attempt = getattr(request.node, "execution_count", 1)
+
+    def kept():
+        try:
+            got = json.loads(cache.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        said = got.get("said") if isinstance(got, dict) else None
+        if not isinstance(said, dict):
+            return None
+        if _walk_passed(said) or (got.get("run") == run and got.get("attempt", 0) >= attempt):
+            return said
+        return None
+
+    said = kept()
+    if said is not None:
+        return said
+    if attempt in _WALKED:
+        if isinstance(_WALKED[attempt], tuple):
+            how, why = _WALKED[attempt]
+            (pytest.skip if how == "skip" else pytest.fail)(why)
+        return _WALKED[attempt]
     with _one_browser_at_a_time():
-        if cache.is_file():
-            return json.loads(cache.read_text(encoding="utf-8"))
-        said = harness(FIXTURE.as_uri(), timeout=1200, lock=False)
+        said = kept()
+        if said is not None:
+            return said
+        try:
+            said = harness(FIXTURE.as_uri(), timeout=1200, lock=False)
+        except (pytest.skip.Exception, pytest.fail.Exception) as e:     # the next test at this try says the same
+            _WALKED[attempt] = ("skip" if isinstance(e, pytest.skip.Exception) else "fail", str(e.msg))
+            raise
+        _WALKED[attempt] = said
         if said.get("exit") in (0, 1):
             tmp = cache.with_suffix(f".{os.getpid()}.tmp")
-            tmp.write_text(json.dumps(said), encoding="utf-8")
+            tmp.write_text(json.dumps({"said": said, "run": run, "attempt": attempt}), encoding="utf-8")
             os.replace(tmp, cache)
     return said
 

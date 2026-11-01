@@ -3491,7 +3491,7 @@
               "--from"
              ],
              "dest": "from_file",
-             "help": "a JSON/YAML/TOML object of metric names to numbers (nested keys join with dots), or a SQLite database with --table",
+             "help": "a JSON/YAML/TOML object of metric names to numbers (nested keys join with dots), a CSV or TSV table with --where, or a SQLite database with --table",
              "metavar": "FILE"
             },
             {
@@ -3516,7 +3516,7 @@
               "--where"
              ],
              "dest": "where",
-             "help": "with --table: the row's columns and their values, e.g. precision=int8,seed=1; exactly one row must have them all",
+             "help": "with --table, or a CSV or TSV table: the row's columns and their values, e.g. precision=int8,seed=1; exactly one row must have them all",
              "metavar": "COLUMN=VALUE"
             },
             {
@@ -3525,7 +3525,7 @@
               "--select"
              ],
              "dest": "select",
-             "help": "with --table: only these of the row's columns that name a declared metric (default: all of them)",
+             "help": "with --table, or a CSV or TSV table: only these of the row's columns that name a declared metric (default: all of them)",
              "metavar": "COLUMN"
             },
             {

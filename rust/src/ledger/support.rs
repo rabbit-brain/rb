@@ -29,6 +29,26 @@ fn outside(at: &str, p: &str) -> Option<&'static str> {
     }
 }
 
+/// Whether line `no` (from 1) of `lines` holds `cmd`, or starts a value that holds it, as YAML folds a long value onto
+/// the lines below it, each indented further than the line the value starts on.
+pub fn line_holds(lines: &[&str], no: usize, cmd: &str) -> bool {
+    if no < 1 || no > lines.len() {
+        return false;
+    }
+    let indent = |l: &str| l.len() - l.trim_start_matches([' ', '\t']).len();
+    let first = lines[no - 1].trim_end_matches('\r');
+    let mut joined = first.to_string();
+    for next in lines.iter().skip(no).take(40) {
+        let next = next.trim_end_matches('\r');
+        if next.trim().is_empty() || indent(next) <= indent(first) {
+            break;
+        }
+        joined.push(' ');
+        joined.push_str(next.trim());
+    }
+    sources::holds_quote(first, cmd) || sources::holds_quote(&joined, cmd)
+}
+
 /// Whether a file is documentation: a command written there is a recipe, not a record that it ran.
 pub fn is_document(path: &str) -> bool {
     let name = path.rsplit(['/', '\\']).next().unwrap_or(path).to_lowercase();
@@ -116,10 +136,17 @@ pub fn command_given(command: Option<&str>, made_before: bool, seen: Option<&Val
             Some("log") => {
                 let (path, line) = (s.get_str("path").unwrap_or(""), s.get("line").map(pyjson::py_str).unwrap_or_default());
                 let written = s.get_str("written").unwrap_or("");
+                // a first commit says when the file was committed, which can come after the run wrote it: it shows the
+                // file was written by then, never that it was written after the run
+                let committed = s.get_str("written_by") == Some("git");
                 match produced_at {
                     _ if is_document(path) => why_not = format!("; {path} is documentation, which gives a recipe, not a launch"),
                     Some(p) if !written.is_empty() => match outside(written, p) {
                         None => return Some(Given { text, given: "logged", how: format!("{path}:{line} records this launch") }),
+                        // committed within a week of the run: as a run's own folder is, hours or days later
+                        Some("after the run") if committed && !after_by(written, p, LAUNCH_SECS) => {
+                            return Some(Given { text, given: "logged", how: format!("{path}:{line} records this launch (first committed {})", day(written)) })
+                        }
                         Some(side) => why_not = format!("; {path} was written {}, {side}", day(written)),
                     },
                     _ => why_not = format!("; {path}:{line} cannot show it was written by then"),
@@ -135,9 +162,35 @@ pub fn command_given(command: Option<&str>, made_before: bool, seen: Option<&Val
     Some(Given { text, given: "later", how: format!("{when}, and neither rb's journal nor a log line written then shows this command made it{why_not}") })
 }
 
+/// How rb reads when a run was produced (`produced_basis`): as the record keeps it, but for numbers typed in with no
+/// file, no row and no time given, which could have been made at any time, so rb reads their time as unknown, unless
+/// its journal watched the command print them. An earlier rb kept such runs as made when they were recorded
+/// (`recorded`); they read the same way, and nothing in .rb/ is rewritten.
+pub fn run_basis(r: &Run) -> &str {
+    if typed_untimed(r) { "unknown" } else { r.produced_basis.as_str() }
+}
+
+/// When a run was produced, as rb reads it: None while that is unknown (run_basis).
+pub fn run_produced(r: &Run) -> Option<&str> {
+    r.produced_at.as_deref().filter(|p| !p.is_empty() && run_basis(r) != "unknown")
+}
+
+/// Numbers typed in that an earlier rb kept as made when recorded: no file, no row, no time given, and no run of the
+/// command rb's journal watched print them; as rb run add reads them now (the SDK's numbers come from the code that
+/// produced them).
+fn typed_untimed(r: &Run) -> bool {
+    r.basis == "typed"
+        && r.via != "sdk"
+        && r.produced_basis == "recorded"
+        && r.files.is_empty()
+        && r.receipt.row.is_none()
+        && !r.receipt.extra.contains_key("table_row")
+        && r.receipt.extra.get("command_seen").and_then(|s| s.get_str("by")) != Some("journal")
+}
+
 /// How rb knows a run's command made its numbers. None with no command.
 pub fn run_command(r: &Run) -> Option<Given> {
-    command_given(r.receipt.command.as_deref(), made_before_recorded(r), r.receipt.extra.get("command_seen"), r.produced_at.as_deref().filter(|_| r.produced_basis != "unknown"))
+    command_given(r.receipt.command.as_deref(), made_before_recorded(r), r.receipt.extra.get("command_seen"), run_produced(r))
 }
 
 /// How rb knows an analysis's command computed its numbers. None with no command.
@@ -150,12 +203,20 @@ pub fn analysis_command(a: &Analysis) -> Option<Given> {
 /// derived (an export, a copy, a transcript), not the run's own output. None for a run read from a database row (the
 /// store itself), one whose produced time is unknown or rests on the file itself, and one with numbers typed in.
 pub fn written_after(r: &Run) -> Option<String> {
-    if r.receipt.row.is_some() || r.produced_basis == "unknown" {
+    // a commit says when the file was committed, which can come hours after the run wrote it: never that it was written
+    // after the run
+    if r.receipt.row.is_some() || r.receipt.extra.contains_key("table_row") || run_basis(r) == "unknown" || existed_by(r) == Some("git") {
         return None;
     }
-    let produced = r.produced_at.as_deref().filter(|p| !p.is_empty())?;
+    let produced = run_produced(r)?;
     let written = r.receipt.produced.get("existed").and_then(|e| e.get_str("at")).filter(|w| !w.is_empty())?;
     after_by(written, produced, MARGIN_SECS).then(|| written.to_string())
+}
+
+/// What the earliest sign of a run's file rests on: `journal` (rb saw it land), `git` (its first commit) or `file` (its
+/// own time).
+pub fn existed_by(r: &Run) -> Option<&str> {
+    r.receipt.produced.get("existed").and_then(|e| e.get_str("by"))
 }
 
 /// What a run's file says when it was written after the run.
@@ -166,7 +227,7 @@ pub fn written_after_words(at: &str) -> String {
 /// When the file a run's numbers were read from was written, as rb knows it: its earliest sign when recorded. None for a
 /// row read from the database itself and for numbers typed in.
 pub fn file_written(r: &Run) -> Option<String> {
-    if r.receipt.row.is_some() {
+    if r.receipt.row.is_some() || r.receipt.extra.contains_key("table_row") {
         return None;
     }
     r.receipt.produced.get("existed").and_then(|e| e.get_str("at")).filter(|w| !w.is_empty()).map(str::to_string)
@@ -175,7 +236,7 @@ pub fn file_written(r: &Run) -> Option<String> {
 /// When the file a run's numbers were read from was written, for a run whose own time is unknown: rb cannot show the
 /// file existed when the run was made. None otherwise.
 pub fn written_when_unknown(r: &Run) -> Option<String> {
-    file_written(r).filter(|_| r.produced_basis == "unknown")
+    file_written(r).filter(|_| run_basis(r) == "unknown")
 }
 
 /// What rb show and the card say of a run's file that rb cannot read as the run's own output, in full.
@@ -183,7 +244,12 @@ pub fn file_sentence(r: &Run) -> Option<String> {
     if let Some(at) = written_after(r) {
         return Some(format!("{}: the file its numbers were read from is not the run's own output", written_after_words(&at)));
     }
-    written_when_unknown(r).map(|at| format!("file written {}; when the run was made is unknown, so rb cannot show the file is its own output", day(&at)))
+    written_when_unknown(r).map(|at| format!("{} {}; when the run was made is unknown, so rb cannot show the file is its own output", file_dated(r), day(&at)))
+}
+
+/// How a run's file is dated: by its first commit, or when it was written.
+fn file_dated(r: &Run) -> &'static str {
+    if existed_by(r) == Some("git") { "file first committed" } else { "file written" }
 }
 
 /// The same, short, for a line that lists runs.
@@ -191,7 +257,7 @@ pub fn file_words(r: &Run) -> Option<String> {
     if let Some(at) = written_after(r) {
         return Some(written_after_words(&at));
     }
-    written_when_unknown(r).map(|at| format!("file written {}; when the run was made is unknown", day(&at)))
+    written_when_unknown(r).map(|at| format!("{} {}; when the run was made is unknown", file_dated(r), day(&at)))
 }
 
 /// A time as rb's text gives one, to the minute: 2026-05-07 20:07 UTC.
@@ -207,7 +273,7 @@ pub fn minute(at: &str) -> String {
 pub fn produced_line(r: &Run) -> String {
     let recorded = minute(if r.receipt.at.is_empty() { &r.created_at } else { &r.receipt.at });
     let column = r.receipt.row.as_ref().and_then(|w| w.produced_at.as_ref()).map(|c| format!(", column {c}")).unwrap_or_default();
-    let how = match r.produced_basis.as_str() {
+    let how = match run_basis(r) {
         "reported" => "as reported",
         "journal" => "when rb's journal first saw its file",
         "git" => "git's first commit of its file",
@@ -215,7 +281,7 @@ pub fn produced_line(r: &Run) -> String {
         _ => "",
     };
     match r.produced_at.as_deref().filter(|p| !p.is_empty()) {
-        _ if r.produced_basis == "unknown" => format!("produced: when is unknown · recorded {recorded}"),
+        _ if run_basis(r) == "unknown" => format!("produced: when is unknown · recorded {recorded}"),
         Some(_) if r.produced_basis == "recorded" => format!("produced and recorded {recorded}"),
         Some(p) => format!("produced {} ({how}{column}) · recorded {recorded}", minute(p)),
         None => format!("produced: when is unknown · recorded {recorded}"),
@@ -225,8 +291,10 @@ pub fn produced_line(r: &Run) -> String {
 /// What a run add says beside the run it records: a command kept as given later, a file written after the run, and a
 /// file dated minutes ago with no --produced-at, which may hold an older run, unless rb's journal watched the command
 /// that wrote it (`watched`): then the file is that run's, and its time is when it ran.
-pub fn told_after_add(r: &Run, produced_given: bool, numbers_from: &[String], watched: bool) -> Vec<String> {
+pub fn told_after_add(r: &Run, produced_given: bool, numbers_from: &[String], watched: bool, root: &std::path::Path) -> Vec<String> {
     let mut out = Vec::new();
+    // a database where the repository keeps one; none is suggested where there is none
+    let store = crate::repo::stores(root).first().map(|db| format!(" Where its numbers came from {db}, read the row itself: rb run add {} --from {db} --table <table> --where <column>=<value>.", r.experiment)).unwrap_or_default();
     if let Some(g) = run_command(r).filter(|g| !g.made_it()) {
         out.push(format!(
             "--command is kept as given and reads as a command given later, not observed: {}. A command from a README, a paper or a script is a recipe: put it in a note with its file and line. A log line written when it ran that records the launch is cited with --command-source <file>:<line>.",
@@ -236,20 +304,18 @@ pub fn told_after_add(r: &Run, produced_given: bool, numbers_from: &[String], wa
     let file = numbers_from.first().cloned().or_else(|| r.files.first().map(|f| f.path.clone())).unwrap_or_default();
     if let Some(at) = written_after(r) {
         out.push(format!(
-            "{file} was written {}, after the run (produced {}): it is not the run's own output, and rb reads it as a file written after the run. Where its numbers came from a database, read the row itself: rb run add {} --from <database> --table <table> --where <column>=<value>.",
+            "{file} was written {}, after the run (produced {}): it is not the run's own output, and rb reads it as a file written after the run.{store}",
             day(&at),
-            day(r.produced_at.as_deref().unwrap_or("")),
-            r.experiment
+            day(r.produced_at.as_deref().unwrap_or(""))
         ));
     }
     if let Some(at) = written_when_unknown(r).filter(|_| !numbers_from.is_empty()) {
         out.push(format!(
-            "{file} was written {}, and when the run was made is unknown, so rb cannot show it is the run's own output. Say when it ran with --produced-at <time>, or read the store its numbers came from: rb run add {} --from <database> --table <table> --where <column>=<value>.",
-            day(&at),
-            r.experiment
+            "{file} {}, and when the run was made is unknown, so rb cannot show it is the run's own output. Say when it ran with --produced-at <time>.{store}",
+            if existed_by(r) == Some("git") { format!("was first committed {}", day(&at)) } else { format!("was written {}", day(&at)) }
         ));
     }
-    if !produced_given && !watched && !numbers_from.is_empty() && r.receipt.row.is_none() && matches!(r.produced_basis.as_str(), "file" | "git") {
+    if !produced_given && !watched && !numbers_from.is_empty() && r.receipt.row.is_none() && matches!(run_basis(r), "file" | "git") {
         if let (Some(made), Some(now)) = (r.produced_at.as_deref().and_then(crate::pytime::parse_iso), crate::pytime::parse_iso(&r.created_at)) {
             let mins = now.signed_duration_since(made).num_minutes();
             if (0..60).contains(&mins) {
@@ -355,7 +421,7 @@ pub fn run_witness(r: &Run) -> Witness {
     if run_command(r).map_or(false, |g| g.given == "observed") {
         return Witness::as_it_ran("watched");
     }
-    match (made_before_recorded(r), r.produced_basis == "unknown") {
+    match (made_before_recorded(r), run_basis(r) == "unknown") {
         (false, _) => Witness::as_it_ran("recorded_as_made"),
         (true, true) => Witness::afterwards("made_unknown"),
         (true, false) => Witness::afterwards("made_before"),
@@ -409,7 +475,7 @@ fn counted(total: usize, afterwards: usize) -> Value {
 /// Whether a run was made before the record began at `began`: its produced time, when known, is more than the margin
 /// earlier. None while when it was made is unknown.
 pub fn made_before_start(r: &Run, began: &str) -> Option<bool> {
-    if r.produced_basis == "unknown" {
+    if run_basis(r) == "unknown" {
         return None;
     }
     let made = r.produced_at.as_deref().filter(|p| !p.is_empty()).unwrap_or(&r.created_at);
@@ -525,16 +591,21 @@ impl Ledger {
     /// The earliest sign rb can vouch for of a file's bytes as they are: the journal's first sighting of them, git's
     /// first commit of them or the file's own last write. None for a file rb cannot read.
     pub fn earliest_sign(&self, path: &str) -> Option<String> {
+        self.earliest_sign_by(path).map(|(at, _)| at)
+    }
+
+    /// The same, with what it rests on: `journal`, `git` (its first commit) or `file` (its own time).
+    pub fn earliest_sign_by(&self, path: &str) -> Option<(String, &'static str)> {
         let full = sources::full_path(&self.root, path);
         let sha = sha256_bytes(&std::fs::read(&full).ok()?);
-        let mut signs: Vec<String> = Vec::new();
+        let mut signs: Vec<(String, &'static str)> = Vec::new();
         if let Some(Value::Dict(hit)) = crate::journal::load_state(&self.root).get("files").and_then(|f| f.get(path)).cloned() {
             if hit.get_str("sha") == Some(sha.as_str()) {
-                signs.extend(hit.get_str("at").and_then(crate::pytime::norm_time));
+                signs.extend(hit.get_str("at").and_then(crate::pytime::norm_time).map(|t| (t, "journal")));
             }
         }
-        signs.extend(sources::first_committed(&self.root, path));
-        signs.extend(crate::pytime::file_time(&full));
+        signs.extend(sources::first_committed(&self.root, path).map(|t| (t, "git")));
+        signs.extend(crate::pytime::file_time(&full).map(|t| (t, "file")));
         signs.into_iter().min()
     }
 
@@ -618,7 +689,7 @@ impl Ledger {
         let bytes = std::fs::read(&full).map_err(|e| RBError::msg("E_SOURCE_UNRESOLVED", format!("{path} could not be read: {}", crate::sys::os_words(&e))))?;
         let text = String::from_utf8_lossy(&bytes).into_owned();
         let lines: Vec<&str> = text.split('\n').collect();
-        let holds = |no: usize| no >= 1 && no <= lines.len() && sources::holds_quote(lines[no - 1], cmd);
+        let holds = |no: usize| line_holds(&lines, no, cmd);
         let found = match line {
             Some(no) if holds(no as usize) => no,
             given => match (given, (1..=lines.len()).find(|no| holds(*no))) {
@@ -635,9 +706,11 @@ impl Ledger {
                 }
             },
         };
+        let sign = self.earliest_sign_by(&path);
         Ok(crate::obj! {
             "by" => "log", "path" => path.clone(), "line" => found, "sha256" => sha256_bytes(&bytes),
-            "written" => self.earliest_sign(&path).map(Value::Str).unwrap_or(Value::Null)
+            "written" => sign.as_ref().map(|(t, _)| Value::Str(t.clone())).unwrap_or(Value::Null),
+            "written_by" => sign.map(|(_, by)| Value::str(by)).unwrap_or(Value::Null)
         })
     }
 }
@@ -697,7 +770,7 @@ impl Ledger {
         if let Some(first) = later.first().cloned() {
             let n = later.len();
             // rb says a record was made before it was recorded only where it knows when it was made
-            let unknown = runs.iter().filter(|r| later.contains(&r.id) && r.produced_basis == "unknown").count()
+            let unknown = runs.iter().filter(|r| later.contains(&r.id) && run_basis(r) == "unknown").count()
                 + analyses.iter().filter(|a| later.contains(&a.id) && a.produced_basis == "unknown").count();
             let when = match (unknown, n) {
                 (0, 1) => "it was made before it was recorded".to_string(),
@@ -739,7 +812,10 @@ impl Ledger {
                     plural(n, "it", "they"),
                     crate::assess::first_few(&ids, 6, ", ")
                 ),
-                &format!("read the store the numbers came from: rb run add {} --from <database> --table <table> --where <column>=<value> --replaces {} --why \"read from the store itself\"", first.experiment, first.id),
+                &match crate::repo::stores(&self.root).first() {
+                    Some(db) => format!("read the store the numbers came from: rb run add {} --from {db} --table <table> --where <column>=<value> --replaces {} --why \"read from the store itself\"", first.experiment, first.id),
+                    None => format!("rb show {}   (where the run's own output is kept, record the run from it: rb run add {} --from <its file> --replaces {} --why \"...\")", first.id, first.experiment, first.id),
+                },
                 vec![("records", Value::list_of_str(ids.clone()))],
             );
         }
@@ -759,7 +835,10 @@ impl Ledger {
                     plural(n, "it was", "they were"),
                     crate::assess::first_few(&ids, 6, ", ")
                 ),
-                &format!("read the store the numbers came from: rb run add {} --from <database> --table <table> --where <column>=<value> --replaces {} --why \"read from the store itself\"", first.experiment, first.id),
+                &match crate::repo::stores(&self.root).first() {
+                    Some(db) => format!("read the store the numbers came from: rb run add {} --from {db} --table <table> --where <column>=<value> --replaces {} --why \"read from the store itself\"", first.experiment, first.id),
+                    None => format!("say when the run was made: rb run add {} --from <its file> --produced-at <when> --replaces {} --why \"...\"", first.experiment, first.id),
+                },
                 vec![("records", Value::list_of_str(ids.clone()))],
             );
         }
@@ -994,6 +1073,42 @@ mod tests {
         assert_eq!(readme.given, "later");
         assert!(["README.md", "docs/run.rst", "notes/Setup.MD", "README"].iter().all(|p| is_document(p)));
         assert!(!["logs/train.log", "out/stdout.txt", "slurm-123.out"].iter().any(|p| is_document(p)));
+    }
+
+    /// Numbers typed with no time are of a time nobody knows, whichever rb wrote them: an earlier rb kept them as made
+    /// when recorded, and they read as unknown now. A time given, a file, a row, or rb's journal watching the command
+    /// print them is a sign of its own, and keeps its reading.
+    #[test]
+    fn typed_numbers_with_no_time_read_as_unknown_whichever_rb_wrote_them() {
+        let text = include_str!("../../../tests/fixtures/shared-files-record/.rb/experiments/e1/runs/runnnqi.yaml");
+        let Value::Dict(mut d) = crate::rbyaml::loads(text, "runnnqi.yaml").unwrap() else { panic!() };
+        d.shift_remove("rb");
+        d.shift_remove("kind");
+        let run = |d: &Dict| crate::ledger::build::<Run>(d.clone()).unwrap();
+        let old = run(&d);
+        assert_eq!((old.basis.as_str(), old.produced_basis.as_str()), ("typed", "recorded"));
+        assert_eq!((run_basis(&old), run_produced(&old)), ("unknown", None));
+        assert!(made_before_recorded(&old) && made_before_start(&old, "2026-01-01T00:00:00Z").is_none());
+        assert_eq!(produced_line(&old), "produced: when is unknown · recorded 2026-10-01 14:07 UTC");
+        // a time given is the run's own
+        let mut given = d.clone();
+        given.insert("produced_basis".into(), Value::Str("reported".into()));
+        given.insert("produced_at".into(), Value::Str(T.into()));
+        assert_eq!((run_basis(&run(&given)), run_produced(&run(&given))), ("reported", Some(T)));
+        // rb's journal watched the command print them
+        let mut watched = d.clone();
+        let Some(Value::Dict(rc)) = watched.get_mut("receipt") else { panic!() };
+        rc.insert("command_seen".into(), crate::obj! {"by" => "journal", "at" => "2026-10-01T14:07:00.000+00:00"});
+        assert_eq!(run_basis(&run(&watched)), "recorded");
+        // a log line given for the launch is not rb seeing it happen
+        let mut logged = d.clone();
+        let Some(Value::Dict(rc)) = logged.get_mut("receipt") else { panic!() };
+        rc.insert("command_seen".into(), crate::obj! {"by" => "log", "path" => "logs/eval.log", "line" => 3});
+        assert_eq!(run_basis(&run(&logged)), "unknown");
+        // numbers the SDK recorded come from the code that produced them, as rb run add reads them
+        let mut sdk = d.clone();
+        sdk.insert("via".into(), Value::Str("sdk".into()));
+        assert_eq!(run_basis(&run(&sdk)), "recorded");
     }
 
     /// rb says a run was made before it was recorded only where it knows when it was made.

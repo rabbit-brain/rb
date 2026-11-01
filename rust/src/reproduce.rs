@@ -776,10 +776,20 @@ impl<'a> Recipes<'a> {
             row
         };
         let as_ready = |d: Dict| Ready::plain(d.get_str("what").unwrap_or(""), d.get_str("state").unwrap_or(""), d.get_str("detail").unwrap_or("").to_string());
+        // a run's own config that says the code had uncommitted changes when it ran: its commit is not all the code
+        let dirty = runs.iter().filter(|r| r.receipt.config.as_ref().and_then(|c| crate::repo::config_dirty_line(&self.led.root, &c.path, c.sha256.as_deref())).is_some()).count();
+        let dirty_why = said(
+            dirty,
+            "the run's config says the code had uncommitted changes when it ran",
+            "the runs' configs say the code had uncommitted changes when they ran",
+            "both runs' configs say the code had uncommitted changes when they ran",
+            "has a config that says the code had uncommitted changes when it ran",
+            "have configs that say the code had uncommitted changes when they ran",
+        );
         if code.is_empty() {
-            rows.push(Ready::plain("code", "unknown", code_why.clone()));
+            rows.push(partly(Ready::plain("code", "unknown", code_why.clone()), dirty, &dirty_why));
         } else {
-            rows.push(partly(as_ready(self.code_row(&code)), unnamed, &code_why));
+            rows.push(partly(partly(as_ready(self.code_row(&code)), unnamed, &code_why), dirty, &dirty_why));
         }
         if let Some(last) = envs.last() {
             let keys: Vec<&str> = ["python", "torch", "numpy", "jax", "tensorflow", "cuda"].into_iter().filter(|k| last.contains_key(*k)).collect();
@@ -1736,7 +1746,11 @@ mod tests {
             std::fs::write(p, text).unwrap();
         }
 
-        fn run(&mut self, name: &'static str, exp: &str, a: NewRun) -> String {
+        fn run(&mut self, name: &'static str, exp: &str, mut a: NewRun) -> String {
+            // numbers typed for a run made as it is recorded say when: typed with no time, they are of a time nobody knows
+            if a.files.is_empty() && a.row.is_none() && a.produced_at.is_none() {
+                a.produced_at = Some(crate::pytime::now());
+            }
             let id = self.led.add_run(exp, a).unwrap().record.id;
             self.ids.insert(name, id.clone());
             id

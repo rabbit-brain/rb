@@ -7,7 +7,7 @@
     "Project 't' started: @BASE@/work/.rb",
     "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
     "",
-    "Then paste this line into your agent's chat:",
+    "If you work with a coding agent, paste this line into its chat:",
     "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
     ""
    ],
@@ -50,6 +50,7 @@
    "exit": 0,
    "out": [
     "run5kjajj on e1: top1=0.7",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers> --produced-at <when> --replaces run5kjajj --why \"<when they were made>\"",
     "  rb put the code in git at refs/rb/snapshots/3d0073043f4eee3c981b7641066bbc495939d195, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/3d0073043f4eee3c981b7641066bbc495939d195 removes it.",
     "",
     "Next: rb criterion add \"<what it should show>\" -e e1 -q <question> --metric top1 --at-most <x>   (write the criterion before the next run)",
@@ -64,6 +65,7 @@
    "exit": 0,
    "out": [
     "run5kjajj on e2: top1=0.6",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e2 <the same numbers> --produced-at <when> --replaces run5kjajj --why \"<when they were made>\"",
     "",
     "Next: rb criterion add \"<what it should show>\" -e e2 -q <question> --metric top1 --at-most <x>   (write the criterion before the next run)",
     ""
@@ -77,6 +79,7 @@
    "exit": 0,
    "out": [
     "t",
+    "Kept with rb since 2026-10-01. 1 run was recorded afterwards, not as it happened.",
     "",
     "Not filed under a question",
     "  x \u00b7 planned",
@@ -98,7 +101,7 @@
     "Experiments",
     "  e1      x \u00b7 planned \u00b7 no variants \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
     "  e2      y \u00b7 open \u00b7 no variants \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 1",
-    "          to run again: code ok \u00b7 environment ok",
+    "          to run again: code unknown \u00b7 environment unknown",
     "",
     "Runs: 1 recorded on 1 experiment \u00b7 1 changed outside rb (run5kjajj): rb doctor",
     "",
@@ -141,9 +144,9 @@
     "   \"began\": \"2026-10-01T12:00:00.000+00:00\",",
     "   \"runs\": {",
     "    \"total\": 1,",
-    "    \"afterwards\": 0,",
+    "    \"afterwards\": 1,",
     "    \"before\": 0,",
-    "    \"unknown\": 0",
+    "    \"unknown\": 1",
     "   },",
     "   \"analyses\": {",
     "    \"total\": 0,",
@@ -257,13 +260,13 @@
     "    \"rerun\": [",
     "     {",
     "      \"what\": \"code\",",
-    "      \"state\": \"ok\",",
-    "      \"detail\": \"commit 74c6b22c42\"",
+    "      \"state\": \"unknown\",",
+    "      \"detail\": \"the run was made before it was recorded, and names no commit\"",
     "     },",
     "     {",
     "      \"what\": \"environment\",",
-    "      \"state\": \"ok\",",
-    "      \"detail\": \"python 3.12.1 \\u00b7 torch 2.4.1 \\u00b7 numpy 2.0.2\"",
+    "      \"state\": \"unknown\",",
+    "      \"detail\": \"the run was made before it was recorded, in an environment rb did not see\"",
     "     }",
     "    ]",
     "   }",
@@ -281,7 +284,7 @@
     "    \"synthetic\": false,",
     "    \"recorded\": \"2026-10-01T12:00:02.000+00:00\",",
     "    \"produced_at\": null,",
-    "    \"produced_basis\": \"recorded\",",
+    "    \"produced_basis\": \"unknown\",",
     "    \"repeats\": null,",
     "    \"by\": \"human:t\",",
     "    \"session\": null,",
@@ -289,12 +292,12 @@
     "    \"outputs\": [],",
     "    \"superseded_for\": [],",
     "    \"command\": null,",
-    "    \"made_before_recorded\": false,",
+    "    \"made_before_recorded\": true,",
     "    \"file_written_after\": null,",
     "    \"file_written\": null,",
     "    \"witness\": {",
-    "     \"seen\": \"as_it_ran\",",
-    "     \"basis\": \"recorded_as_made\"",
+    "     \"seen\": \"afterwards\",",
+    "     \"basis\": \"made_unknown\"",
     "    }",
     "   }",
     "  ],",
@@ -312,7 +315,7 @@
     "   \"experiments\": {},",
     "   \"project_checks\": [],",
     "   \"last_reconcile\": null,",
-    "   \"commit\": \"4dc5c1e6007300bb22470518a0ada711d55e754e\",",
+    "   \"commit\": \"38229113d588e7d986d6c399f54eb2533eff3f1b\",",
     "   \"branch\": \"main\"",
     "  },",
     "  \"open\": [",
@@ -433,6 +436,7 @@
    "exit": 0,
    "out": [
     "t",
+    "Kept with rb since 2026-10-01. Both runs were recorded afterwards, not as they happened.",
     "",
     "Not filed under a question",
     "  x \u00b7 open",
@@ -448,9 +452,9 @@
     "",
     "Experiments",
     "  e1      x \u00b7 open \u00b7 no variants \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 1",
-    "          to run again: code ok \u00b7 environment ok",
+    "          to run again: code unknown \u00b7 environment unknown",
     "  e2      y \u00b7 open \u00b7 no variants \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 1",
-    "          to run again: code ok \u00b7 environment ok",
+    "          to run again: code unknown \u00b7 environment unknown",
     "",
     "Runs: 2 recorded on 2 experiments \u00b7 every receipt is what rb wrote",
     ""
@@ -481,13 +485,13 @@
    "sha256": "88f5c817c5a3e55846dcade576a23c591f2014394ce321df32a1d62e8d2e7e4b",
    "bytes": 145
   },
+  ".rb/cache/objects/8a/8aa2ab6bebfa6a47ec6f9a4ba410e6708651834806f8bdb4a8a99850e16d3489.json.gz": {
+   "sha256": "f73a9ea1900263e5c833da0beef3a2ce475585c1005ab44f517226a6c0d10589",
+   "bytes": 924
+  },
   ".rb/cache/objects/f3/f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6.json.gz": {
    "sha256": "b49dd5346ef687f6a501f3c6c503e1efd5ace2a96eedf9f77d561c59e91c0f41",
    "bytes": 144
-  },
-  ".rb/cache/objects/fe/fe9a97f7bcf2d16db1279d3e7e29d51180d073fc18c6d7a6e42efdba5161a6e0.json.gz": {
-   "sha256": "1d11c8bd8f05461f8bc33bb83d201a95e0ee5e84dcf9023c265c6ab0f3bc25ea",
-   "bytes": 925
   },
   ".rb/experiments/e1/experiment.yaml": [
    "rb: 1",
@@ -508,7 +512,7 @@
    "experiment: e1",
    "metrics:",
    "  top1: 0.7",
-   "produced_basis: recorded",
+   "produced_basis: unknown",
    "basis: typed",
    "spec_sha256: 6dd5a3ffc3c58d0a30cd71ba456079ab248e637d50f81842a65a98ff42588f05",
    "spec_frozen: false",
@@ -561,7 +565,7 @@
    "experiment: e2",
    "metrics:",
    "  top1: 0.6",
-   "produced_basis: recorded",
+   "produced_basis: unknown",
    "basis: typed",
    "spec_sha256: 6dd5a3ffc3c58d0a30cd71ba456079ab248e637d50f81842a65a98ff42588f05",
    "spec_frozen: false",
@@ -599,9 +603,9 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"t\", \"sha256\": \"f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"t\", \"head\": \"\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"53a56a6e0e253fc5556c38ed9b02e72189c45469305498398044953f8da7cc3a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"variants\": [], \"like\": null, \"questions\": [], \"changed_parts\": {\"e1\": {}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e2\", \"sha256\": \"6371aef5aede8dd927992e9d34a13ac0c2e953e02584193370d85be6378fbfec\", \"path\": \".rb/experiments/e2/experiment.yaml\", \"detail\": {\"variants\": [], \"like\": null, \"questions\": [], \"changed_parts\": {\"e2\": {}}}}",
-   "{\"at\": \"2026-10-01T12:00:01.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run5kjajj\", \"worktree\": {\"path\": \"@BASE@/work/wt/a\"}, \"sha256\": \"fbaddc15282ee96ea6fec3b6f567f27691f5be87a78bae5b84acb7fbda427138\", \"path\": \".rb/experiments/e1/runs/run5kjajj.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"top1\": 0.7}, \"per_run\": {}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:02.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run5kjajj\", \"worktree\": {\"path\": \"@BASE@/work/wt/b\"}, \"sha256\": \"2ee18922b89789e67959fa8603b6ccf859971f795c5e47d682d802c7044d1ff7\", \"path\": \".rb/experiments/e2/runs/run5kjajj.yaml\", \"detail\": {\"experiment\": \"e2\", \"metrics\": {\"top1\": 0.6}, \"per_run\": {}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reid\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"fe9a97f7bcf2d16db1279d3e7e29d51180d073fc18c6d7a6e42efdba5161a6e0\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"was\": \"run5kjajj\", \"moved_from\": \".rb/experiments/e1/runs/run5kjajj.yaml\"}}",
+   "{\"at\": \"2026-10-01T12:00:01.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run5kjajj\", \"worktree\": {\"path\": \"@BASE@/work/wt/a\"}, \"sha256\": \"04a274097d79e8a781bcb8c92f11edeae8183698ea4821bb15c02fd25db3bed4\", \"path\": \".rb/experiments/e1/runs/run5kjajj.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"top1\": 0.7}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:02.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run5kjajj\", \"worktree\": {\"path\": \"@BASE@/work/wt/b\"}, \"sha256\": \"f3549941971e1120d329c9d3d1fd630ac8bb33aeecfac7ac7d85e58963f39bc0\", \"path\": \".rb/experiments/e2/runs/run5kjajj.yaml\", \"detail\": {\"experiment\": \"e2\", \"metrics\": {\"top1\": 0.6}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reid\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"8aa2ab6bebfa6a47ec6f9a4ba410e6708651834806f8bdb4a8a99850e16d3489\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"was\": \"run5kjajj\", \"moved_from\": \".rb/experiments/e1/runs/run5kjajj.yaml\"}}",
    ""
   ],
   ".rb/project.yaml": [
@@ -627,9 +631,9 @@
    "journal/",
    ""
   ],
-  "wt/a/.rb/cache/objects/fb/fbaddc15282ee96ea6fec3b6f567f27691f5be87a78bae5b84acb7fbda427138.json.gz": {
-   "sha256": "84124dccb2efa9e451551dbe30ac6766d53a58f274f6a07dc987ca2515eb6c3d",
-   "bytes": 925
+  "wt/a/.rb/cache/objects/04/04a274097d79e8a781bcb8c92f11edeae8183698ea4821bb15c02fd25db3bed4.json.gz": {
+   "sha256": "78616c4723d9186a0a1e8d76856407526ef104a197f9a70ed547583d9378b8d3",
+   "bytes": 924
   },
   "wt/a/.rb/experiments/e1/experiment.yaml": [
    "rb: 1",
@@ -650,7 +654,7 @@
    "experiment: e1",
    "metrics:",
    "  top1: 0.7",
-   "produced_basis: recorded",
+   "produced_basis: unknown",
    "basis: typed",
    "spec_sha256: 6dd5a3ffc3c58d0a30cd71ba456079ab248e637d50f81842a65a98ff42588f05",
    "spec_frozen: false",
@@ -699,7 +703,7 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"t\", \"sha256\": \"f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"t\", \"head\": \"\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"53a56a6e0e253fc5556c38ed9b02e72189c45469305498398044953f8da7cc3a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"variants\": [], \"like\": null, \"questions\": [], \"changed_parts\": {\"e1\": {}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e2\", \"sha256\": \"6371aef5aede8dd927992e9d34a13ac0c2e953e02584193370d85be6378fbfec\", \"path\": \".rb/experiments/e2/experiment.yaml\", \"detail\": {\"variants\": [], \"like\": null, \"questions\": [], \"changed_parts\": {\"e2\": {}}}}",
-   "{\"at\": \"2026-10-01T12:00:01.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run5kjajj\", \"worktree\": {\"path\": \"@BASE@/work/wt/a\"}, \"sha256\": \"fbaddc15282ee96ea6fec3b6f567f27691f5be87a78bae5b84acb7fbda427138\", \"path\": \".rb/experiments/e1/runs/run5kjajj.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"top1\": 0.7}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:01.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run5kjajj\", \"worktree\": {\"path\": \"@BASE@/work/wt/a\"}, \"sha256\": \"04a274097d79e8a781bcb8c92f11edeae8183698ea4821bb15c02fd25db3bed4\", \"path\": \".rb/experiments/e1/runs/run5kjajj.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"top1\": 0.7}, \"per_run\": {}, \"again\": false}}",
    ""
   ],
   "wt/a/.rb/project.yaml": [
@@ -725,9 +729,9 @@
    "journal/",
    ""
   ],
-  "wt/b/.rb/cache/objects/2e/2ee18922b89789e67959fa8603b6ccf859971f795c5e47d682d802c7044d1ff7.json.gz": {
-   "sha256": "93dfea4a7d97c9a293324fb196a5a8f94fc6c71124406517e64fe9af962b2989",
-   "bytes": 925
+  "wt/b/.rb/cache/objects/f3/f3549941971e1120d329c9d3d1fd630ac8bb33aeecfac7ac7d85e58963f39bc0.json.gz": {
+   "sha256": "a2deef9f943f703cfda169e1c297d515cf1fc5833e23bd6932fcff1bd40eb81e",
+   "bytes": 924
   },
   "wt/b/.rb/experiments/e1/experiment.yaml": [
    "rb: 1",
@@ -759,7 +763,7 @@
    "experiment: e2",
    "metrics:",
    "  top1: 0.6",
-   "produced_basis: recorded",
+   "produced_basis: unknown",
    "basis: typed",
    "spec_sha256: 6dd5a3ffc3c58d0a30cd71ba456079ab248e637d50f81842a65a98ff42588f05",
    "spec_frozen: false",
@@ -797,7 +801,7 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"init\", \"kind\": \"project\", \"id\": \"t\", \"sha256\": \"f358d7c68b67d03c8e980272714f14ed15ca36c3ff028d41f6cd9353c74971c6\", \"path\": \".rb/project.yaml\", \"detail\": {\"title\": \"t\", \"head\": \"\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"53a56a6e0e253fc5556c38ed9b02e72189c45469305498398044953f8da7cc3a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"variants\": [], \"like\": null, \"questions\": [], \"changed_parts\": {\"e1\": {}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e2\", \"sha256\": \"6371aef5aede8dd927992e9d34a13ac0c2e953e02584193370d85be6378fbfec\", \"path\": \".rb/experiments/e2/experiment.yaml\", \"detail\": {\"variants\": [], \"like\": null, \"questions\": [], \"changed_parts\": {\"e2\": {}}}}",
-   "{\"at\": \"2026-10-01T12:00:02.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run5kjajj\", \"worktree\": {\"path\": \"@BASE@/work/wt/b\"}, \"sha256\": \"2ee18922b89789e67959fa8603b6ccf859971f795c5e47d682d802c7044d1ff7\", \"path\": \".rb/experiments/e2/runs/run5kjajj.yaml\", \"detail\": {\"experiment\": \"e2\", \"metrics\": {\"top1\": 0.6}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:02.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run5kjajj\", \"worktree\": {\"path\": \"@BASE@/work/wt/b\"}, \"sha256\": \"f3549941971e1120d329c9d3d1fd630ac8bb33aeecfac7ac7d85e58963f39bc0\", \"path\": \".rb/experiments/e2/runs/run5kjajj.yaml\", \"detail\": {\"experiment\": \"e2\", \"metrics\": {\"top1\": 0.6}, \"per_run\": {}, \"again\": false}}",
    ""
   ],
   "wt/b/.rb/project.yaml": [

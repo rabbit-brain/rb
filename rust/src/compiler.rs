@@ -116,8 +116,10 @@ fn walk_files(dir: &Path, out: &mut Vec<PathBuf>, common: Option<&Path>) {
     }
 }
 
-/// The files the caller pointed at, and the paths that fall outside the project.
-fn files(root: &Path, given: &[String]) -> (Vec<PathBuf>, Vec<String>) {
+/// The files the caller pointed at (the first MAX_SOURCES), the paths that fall outside the project, and how many
+/// files inside it there are in all.
+fn files(root: &Path, given: &[String]) -> (Vec<PathBuf>, Vec<String>, usize) {
+    let mut total = 0usize;
     let mut inside: Vec<PathBuf> = Vec::new();
     let mut outside: Vec<String> = Vec::new();
     let home = if cfg!(windows) { crate::sys::slashed(&crate::sys::home()) } else { std::env::var("HOME").unwrap_or_default() };
@@ -152,13 +154,13 @@ fn files(root: &Path, given: &[String]) -> (Vec<PathBuf>, Vec<String>) {
                 outside.push(crate::sys::slashed(&f));
                 continue;
             }
-            inside.push(f);
-            if inside.len() >= MAX_SOURCES {
-                return (inside, outside);
+            total += 1;
+            if inside.len() < MAX_SOURCES {
+                inside.push(f);
             }
         }
     }
-    (inside, outside)
+    (inside, outside, total)
 }
 
 /// A SQLite database's tables, read and never written: each with its columns, its row count, and the columns that
@@ -219,6 +221,19 @@ fn source_entry(root: &Path, f: &Path, names: &IndexMap<String, String>) -> Dict
             let cols = columns(f);
             if !cols.is_empty() {
                 entry.insert("columns".into(), Value::list_of_str(cols));
+            }
+            // a CSV or TSV table is read by its rows, as a database's is: its row count, and the columns that name a
+            // metric the project declares, each with how many of its rows hold a number there
+            if crate::csvtable::is_table(&rel) && std::fs::metadata(f).map_or(false, |m| m.len() <= 64 * 1024 * 1024) {
+                if let Some(text) = text_of(f) {
+                    let t = crate::csvtable::parse(&text, &rel);
+                    entry.insert("rows".into(), Value::Int(t.rows.len() as i64));
+                    let metrics: Dict = t.columns.iter().filter_map(|c| crate::journal::canon_of(c, names).map(|m| (c.clone(), Value::Str(m)))).collect();
+                    let numeric: Vec<String> =
+                        t.columns.iter().filter(|c| !t.rows.is_empty() && t.rows.iter().all(|r| r.column(c).map_or(true, |(_, v)| v.is_empty() || crate::csvtable::number(v).is_some()))).cloned().collect();
+                    entry.insert("number_columns".into(), Value::list_of_str(numeric));
+                    entry.insert("metrics".into(), Value::Dict(metrics));
+                }
             }
         }
         _ => {}
@@ -529,9 +544,11 @@ pub fn cmd_compile(paths: &[String], out: &mut Out) -> Res<i32> {
     };
     let mut sources: Vec<Dict> = Vec::new();
     let mut outside: Vec<String> = Vec::new();
+    let mut total = 0usize;
     if !paths.is_empty() {
-        let (fs, out_) = files(&root, paths);
+        let (fs, out_, all) = files(&root, paths);
         outside = out_;
+        total = all;
         let names = match &led {
             Some(l) => crate::journal::names(l)?,
             None => IndexMap::new(),
@@ -551,7 +568,11 @@ pub fn cmd_compile(paths: &[String], out: &mut Out) -> Res<i32> {
     };
     let gs = |d: &Dict, k: &str| d.get(k).map(py_str).unwrap_or_default();
     if !sources.is_empty() {
-        out.say(format!("Sources ({}):", sources.len()));
+        out.say(if total > sources.len() {
+            format!("Sources (the first {} of {total}, by path):", sources.len())
+        } else {
+            format!("Sources ({}):", sources.len())
+        });
         for s in &sources {
             let mut line = format!("  {}  ·  {}", gs(s, "path"), gs(s, "kind"));
             if let Some(h) = s.get("heading").filter(|h| h.truthy()) {
@@ -564,8 +585,14 @@ pub fn cmd_compile(paths: &[String], out: &mut Out) -> Res<i32> {
                 };
                 line += &format!("  ·  {n} {} ({}{})", crate::assess::plural("number", n), nums.iter().take(4).cloned().collect::<Vec<_>>().join(", "), if n > 4 { ", ..." } else { "" });
             }
+            if let Some(n) = s.get("rows").and_then(|n| n.as_i64()) {
+                line += &format!("  ·  {n} {}", crate::assess::plural("row", n));
+            }
             if let Some(Value::List(cols)) = s.get("columns").filter(|c| c.truthy()) {
                 line += &format!("  ·  columns {}", cols.iter().take(6).map(py_str).collect::<Vec<_>>().join(", "));
+            }
+            if let Some(Value::List(nums)) = s.get("number_columns").filter(|c| c.truthy()) {
+                line += &format!("  ·  numbers in {}", nums.iter().take(6).map(py_str).collect::<Vec<_>>().join(", ") + if nums.len() > 6 { ", ..." } else { "" });
             }
             let tables: Vec<Value> = match s.get("tables") {
                 Some(Value::List(l)) => l.clone(),
@@ -590,6 +617,11 @@ pub fn cmd_compile(paths: &[String], out: &mut Out) -> Res<i32> {
                     said += &format!(" · metric columns {}", named.join(", "));
                 }
                 out.say(said);
+            }
+            if let Some(Value::Dict(m)) = s.get("metrics").filter(|m| m.truthy() && s.get("kind").and_then(|k| k.as_str()) == Some("table")) {
+                let named: Vec<String> = m.iter().map(|(c, metric)| if py_str(metric) == *c { c.clone() } else { format!("{c} ({})", py_str(metric)) }).collect();
+                out.say(format!("      metric columns {}", named.join(", ")));
+                out.say(format!("      a row is a run: rb run add <experiment> --from {} --where <column>=<value>", crate::cli::shlex_quote(&gs(s, "path"))));
             }
             if tables.iter().any(|t| t.get("metrics").map_or(false, |m| m.truthy())) {
                 out.say(format!("      a row is a run: rb run add <experiment> --from {} --table <table> --where <column>=<value>", crate::cli::shlex_quote(&gs(s, "path"))));
@@ -637,8 +669,18 @@ pub fn cmd_compile(paths: &[String], out: &mut Out) -> Res<i32> {
                 }
             }
         }
+        if total > sources.len() {
+            out.say(format!(
+                "  and {} more files not listed: rb compile reads {MAX_SOURCES} at a time; name a narrower folder or the files themselves (rb compile <path...>) to read the rest.",
+                total - sources.len()
+            ));
+        }
     } else if !paths.is_empty() {
         out.say("Nothing readable at the paths given.");
+    }
+    if total > sources.len() {
+        out.data.insert("sources_total".into(), Value::Int(total as i64));
+        out.data.insert("sources_cut".into(), Value::Bool(true));
     }
     for o in &outside {
         out.say(format!("  outside the project, so sources cannot cite it: {o} (copy it into the repository first)"));

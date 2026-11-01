@@ -292,7 +292,7 @@ def test_the_preview_says_everything_apply_would_keep_before_anything_is_written
     assert read["warmup_transfer"]["audits"] == [{"path": "results/warmup_transfer/independent_audit.json", "passed": True, "says": "passed: true"}]
     assert main(["reconcile"]) == 0
     text = capsys.readouterr().out
-    assert "all 4 source hashes match" in text and "folder clean" in text and "2 data files kept local (ignored by git)" in text
+    assert "all 4 source hashes match" in text and "folder unchanged since the last commit" in text and "2 data files kept local (ignored by git)" in text
     assert state().records("experiment", live=True) == []
 
 

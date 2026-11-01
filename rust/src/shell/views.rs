@@ -885,6 +885,11 @@ fn plain_reading(f: &Value) -> String {
     } else {
         places(unit, &[Some(e), lo, hi].into_iter().flatten().collect::<Vec<_>>())
     };
+    // never fewer decimals than the cited number was written with, so the reading never rounds onto or past it
+    let p = match target {
+        Some(t) => p.max(cited_digits(f, t).split_once('.').map_or(0, |(_, d)| d.len())),
+        None => p,
+    };
     // a level with nothing to tell it from keeps rb's own digits (a share of 0.994 against a rule of 0.99)
     let bare = level && lo.is_none() && target.is_none();
     let shown = |x: f64| if bare && x == e && !text(f, "reading.estimate_text").is_empty() { text(f, "reading.estimate_text").to_string() } else { dec(x, p, false) };
@@ -937,6 +942,13 @@ fn plain_reading(f: &Value) -> String {
     if let Some(t) = target {
         let digits = cited_digits(f, t);
         out.push_str(&format!("; the cited number is {}", if unit == "%" { format!("{digits}%") } else if unit.is_empty() { digits } else { format!("{digits} {unit}") }));
+    }
+    // a reading that pools a per-run setting's values leads with rb's headline words for it, as rb show says them
+    let pooled = text(f, "pooled");
+    if !pooled.is_empty() {
+        let mut c = pooled.chars();
+        let first: String = c.next().map(|x| x.to_uppercase().collect()).unwrap_or_default();
+        return format!("{first}{}: {out}.", c.as_str());
     }
     // a sentence led by a variant's own name keeps it as written ("int8 is ..."); rb's words are capitalised
     if !subject.is_empty() {

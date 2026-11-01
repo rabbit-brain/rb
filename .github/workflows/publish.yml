@@ -1,10 +1,10 @@
 name: publish
 
 # A tag v<version> builds the wheels (the rb binary for Linux, macOS and Windows, beside the Python package with the SDK
-# and the terminal UI) and the sdist, checks that the tag matches the package version, runs the tests against a built
-# wheel on Linux and on Windows, checks that rb carries its analytics destination, checks the committed files and every
-# built file against the release denylist, publishes to PyPI through trusted publishing (no token anywhere), and
-# attaches the same files to the tag's GitHub release.
+# and the terminal UI) and the sdist, checks that the tag matches the package version, installs the built wheel on Linux
+# and on Windows and runs a short set of tests that drive it end to end, checks that rb carries its analytics
+# destination, checks the committed files and every built file against the release denylist, publishes to PyPI through
+# trusted publishing (no token anywhere), and attaches the same files to the tag's GitHub release.
 # PyPI side, once: project settings > Publishing > add GitHub publisher owner=rabbit-brain repository=rb
 # workflow=publish.yml environment=pypi. See RELEASING.md.
 
@@ -15,6 +15,20 @@ on:
 permissions:
   contents: read
 
+# The full suites run in tests.yml (every push to main and every pull request) and on our own machines, before the tag:
+# this workflow does not wait for them. The release checks prove less: the wheels GitHub built install and run. These
+# files drive the installed rb end to end, each in a few seconds: the command line and its errors, rb tour's whole
+# project, the SDK and rb mcp, the environment fingerprint, the skill and the agents' session hooks, a bundle exported
+# and cloned, rb remove, rb journal run's subprocess, the SQLite reader, and the page rb page writes (its one test that
+# drives Chrome is left out). Each check, and the scan, stops after 20 minutes, so a job that hangs stops the release
+# then.
+env:
+  WHEEL_TESTS: >-
+    tests/test_cli.py tests/test_failures.py tests/test_tour.py tests/test_sdk_mcp.py tests/test_env.py
+    tests/test_skill.py tests/test_session_hooks.py tests/test_clone.py tests/test_remove.py tests/test_journal.py
+    tests/test_sqlite.py tests/test_page.py
+    --deselect tests/test_page.py::test_views_keep_the_overview_small_and_deep_links_open_only_the_needed_evidence
+
 jobs:
   packages:
     uses: ./.github/workflows/build-wheels.yml
@@ -22,6 +36,7 @@ jobs:
   check:
     needs: packages
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
@@ -47,9 +62,9 @@ jobs:
           python -m pip install twine pytest pytest-xdist pytest-rerunfailures pyyaml
           python -m twine check dist/*
           python -m pip install dist/rabbit_brain-*manylinux*x86_64.whl
-          python -m pytest -q -n auto --reruns 2
           rb version
           rabbit-brain version
+          python -m pytest -q -n auto --reruns 2 $WHEEL_TESTS
       - name: The release carries an analytics destination
         run: |
           # enabling in a scratch settings directory reads the destination built into rb; enable and disable never send
@@ -74,6 +89,7 @@ jobs:
   check-windows:
     needs: packages
     runs-on: windows-latest
+    timeout-minutes: 20
     env:
       PYTHONUTF8: "1"
     steps:
@@ -92,9 +108,9 @@ jobs:
         run: |
           python -m pip install pytest pytest-xdist pytest-rerunfailures pyyaml
           python -m pip install dist/rabbit_brain-*win_amd64.whl
-          python -m pytest -q -n auto --reruns 2
           rb version
           rabbit-brain version
+          python -m pytest -q -n auto --reruns 2 $WHEEL_TESTS
 
   # The denylist reaches this job alone, and in it only the last step. The job installs nothing: GitHub's checkout and
   # artifact download, then the runner's own Python, isolated (-I -S), runs the check's tests and the check over the
@@ -104,6 +120,7 @@ jobs:
     if: ${{ !cancelled() }}
     needs: packages
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:

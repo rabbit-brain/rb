@@ -91,3 +91,23 @@ def test_a_push_is_checked_over_its_whole_history_and_its_text_reaches_the_check
     for name, job_name, job in jobs():                                   # no expression is written into a script
         for step in job.get("steps", []):
             assert "${{" not in step.get("run", ""), (name, job_name, step.get("name"))
+
+
+def test_the_release_checks_name_tests_that_exist_and_every_release_job_stops_after_20_minutes():
+    import ast
+    release = workflows()["publish.yml"]
+    words = release["env"]["WHEEL_TESTS"].split()
+    root = WORKFLOWS.parents[1]
+    paths = [w for w in words if not w.startswith("--") and "::" not in w]
+    deselected = [words[i + 1] for i, w in enumerate(words) if w == "--deselect"]
+    deselected += [w.split("=", 1)[1] for w in words if w.startswith("--deselect=")]   # pytest reads both spellings
+    assert paths and all((root / p).is_file() for p in paths), [p for p in paths if not (root / p).is_file()]
+    for node_id in deselected:
+        path, name = node_id.split("::")
+        assert path in paths, node_id          # a --deselect of a file the set does not run deselects nothing
+        tree = ast.parse((root / path).read_text(encoding="utf-8"))
+        tests = [f for f in tree.body if isinstance(f, ast.FunctionDef) and f.name == name]
+        assert len(tests) == 1, node_id          # renamed or gone, the --deselect would stop matching silently
+        assert not any("parametrize" in ast.dump(d) for d in tests[0].decorator_list), node_id
+    for job in ("check", "check-windows", "scan"):
+        assert release["jobs"][job].get("timeout-minutes") == "20", job

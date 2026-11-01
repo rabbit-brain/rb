@@ -51,9 +51,12 @@ fn module_re() -> &'static Regex {
     static R: OnceLock<Regex> = OnceLock::new();
     re(&R, r"(?:python3?\s+(?:-\S+\s+)*-m\s+|\bfrom\s+|\bimport\s+)([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)")
 }
-fn pypath_re() -> &'static FRegex {
-    static R: OnceLock<FRegex> = OnceLock::new();
-    R.get_or_init(|| FRegex::new(r"(?<![\w/.-])((?:[\w.-]+/)*[\w.-]+\.py)\b").unwrap())
+/// A path to a Python file, where no path character comes before it. Matched by the linear engine, with the character
+/// before it consumed rather than looked behind at: a backtracking engine takes time that grows with the cube of a long
+/// run of path characters, and a report's table of numbers is one.
+fn pypath_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    re(&R, r"(?:^|[^\w/.-])((?:[\w.-]+/)*[\w.-]+\.py)\b")
 }
 fn hex64(s: &str) -> bool {
     static R: OnceLock<Regex> = OnceLock::new();
@@ -278,9 +281,9 @@ pub fn read_doc(root: &Path, rel: &str) -> Option<Doc> {
                 doc.code_refs.push((cand, b.start + newlines_before(&b.text, m.get(0).unwrap().start())));
             }
         }
-        for m in pypath_re().captures_iter(&b.text).flatten() {
+        for m in pypath_re().captures_iter(&b.text) {
             let g = m.get(1).unwrap().as_str().to_string();
-            let line = b.start + newlines_before(&b.text, m.get(0).unwrap().start());
+            let line = b.start + newlines_before(&b.text, m.get(1).unwrap().start());
             for cand in [Some(g.clone()), inside(root, &base.join(&g))] {
                 if let Some(c) = cand.filter(|c| !c.is_empty()) {
                     if root.join(&c).is_file() {
@@ -422,31 +425,225 @@ fn other_checkout(d: &Path, common: Option<&Path>) -> bool {
     common.map_or(false, |c| crate::ledger::is_worktree_top(d, c))
 }
 
-/// Every folder that holds an experiment's results.
+/// The names a folder of results goes by: below the top, a folder with one of these names is where results land, as
+/// the usual folders at the top are.
+pub const RESULT_WORDS: &[&str] = &[
+    "out", "outs", "output", "outputs", "result", "results", "eval", "evals", "evaluation", "evaluations", "eval-out", "eval_out", "metrics",
+    "report", "reports", "artifact", "artifacts", "benchmark", "benchmarks", "multirun",
+];
+/// How far down from the repository's top rb looks for a folder named for results: `a/b/c/results/` is as deep as it goes.
+pub const MAX_ROOT_DEPTH: usize = 4;
+/// Folders of code, tests and configs, and a website's static files: rb looks for results in none of them.
+pub const CODE_DIRS: &[&str] = &["src", "lib", "test", "tests", "config", "configs", "conf", "scripts", "_static", "static", "public"];
+/// How many folders one search for results folders opens at most.
+pub const MAX_DIRS_LOOKED: usize = 5000;
+/// A folder with more subfolders than this (a dataset's class folders) is not searched below.
+pub const MAX_CHILD_DIRS: usize = 300;
+/// How far below a folder where results land rb looks for the folders that hold them.
+pub const RESULTS_DEPTH: usize = 4;
+/// The files whose being in a folder rb does not read is worth a word: what results are usually written as.
+const RESULTISH: &[&str] = &[".json", ".jsonl", ".csv", ".tsv"];
+
+/// A folder that holds results-like files and that rb does not read, and why.
+#[derive(Debug, Clone)]
+pub struct NotRead {
+    /// from the repository's top, with a slash
+    pub folder: String,
+    /// its own .json, .jsonl, .csv and .tsv files
+    pub files: usize,
+    /// its subfolders, where that is why rb looks no further down
+    pub folders: usize,
+    pub why: &'static str,
+}
+
+/// Where a repository keeps its results, as one search finds them.
+#[derive(Debug, Clone, Default)]
+pub struct Discovery {
+    /// the folders where results land, from the top, each with a slash: the usual ones at the top that are there, then
+    /// each folder below named for results, by path
+    pub roots: Vec<String>,
+    /// the folders the search passed that hold results-like files and that rb does not read
+    pub not_read: Vec<NotRead>,
+    /// the search stopped at MAX_DIRS_LOOKED folders
+    pub cut: bool,
+}
+
+thread_local! {
+    /// The search for results folders, by repository, while one command line runs: every read asks it, and the
+    /// answer cannot change until a command rb watches runs.
+    static FOUND_ROOTS: std::cell::RefCell<std::collections::HashMap<PathBuf, Discovery>> = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Forget the search for results folders: a new command line, or a command rb watched, looks again.
+pub fn forget_roots() {
+    FOUND_ROOTS.with(|f| f.borrow_mut().clear());
+}
+
+/// Whether `d` is a repository of its own (a submodule, a nested clone, the folder rb tour makes): its files are not
+/// this repository's.
+fn own_repository(d: &Path) -> bool {
+    d.join(".git").exists()
+}
+
+/// Whether `d` is code or an environment, never a folder of results: a Python package, a virtualenv, a conda
+/// environment.
+fn code_or_env(d: &Path) -> bool {
+    d.join("__init__.py").is_file() || d.join("pyvenv.cfg").is_file() || d.join("conda-meta").is_dir()
+}
+
+/// A folder the search for results goes into: a real folder (no link), named with no dot, in no dependency folder, no
+/// repository or worktree of its own, and no code or environment.
+fn searchable(c: &Path, common: Option<&Path>) -> bool {
+    let n = name_of(c).to_lowercase();
+    let is_link = std::fs::symlink_metadata(c).map(|m| m.file_type().is_symlink()).unwrap_or(true);
+    !is_link
+        && c.is_dir()
+        && !n.starts_with('.')
+        && !SKIP.contains(&n.as_str())
+        && !crate::journal::DEPENDENCY_DIRS.contains(&n.as_str())
+        && n != "rb-tour"
+        && !own_repository(c)
+        && !other_checkout(c, common)
+        && !code_or_env(c)
+}
+
+/// Whether a folder holds a results file or a report somewhere in it, looking at most a few levels down.
+fn holds_results_below(d: &Path, depth: usize) -> bool {
+    if holds_results(d) {
+        return true;
+    }
+    if depth == 0 {
+        return false;
+    }
+    sorted_children(d).iter().any(|c| searchable(c, None) && holds_results_below(c, depth - 1))
+}
+
+/// Where the repository at `root` keeps its results: the usual folders at the top (read whether or not git ignores
+/// them), and every folder named for results (RESULT_WORDS) down to MAX_ROOT_DEPTH levels that holds a results file or
+/// a report. The search never goes into a dot-folder, a dependency folder or a virtualenv, a build folder at the top,
+/// a folder of code, tests or configs, a repository or worktree of its own, or a folder git ignores (a folder named
+/// for results is read even so, as results/ is).
+pub fn discover(root: &Path) -> Discovery {
+    let key = root.to_path_buf();
+    if let Some(d) = FOUND_ROOTS.with(|f| f.borrow().get(&key).cloned()) {
+        return d;
+    }
+    let d = discover_now(root);
+    FOUND_ROOTS.with(|f| f.borrow_mut().insert(key, d.clone()));
+    d
+}
+
+/// The usual results folders a repository's top holds, each by its own spelling (`listed`, the top's entries): on a
+/// file system that ignores case, a Results/ answers to results/ too, and is found as itself, never named twice.
+fn usual_roots<'a>(listed: &HashSet<String>, is_dir: &dyn Fn(&str) -> bool) -> Vec<&'a str> {
+    RESULT_ROOTS.iter().copied().filter(|n| listed.contains(*n) && is_dir(n)).collect()
+}
+
+fn discover_now(root: &Path) -> Discovery {
+    let common = crate::ledger::common_dir_of(root);
+    let ignored: HashSet<String> = zsplit(git(root, &["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"]))
+        .into_iter()
+        .filter_map(|p| p.strip_suffix('/').map(str::to_string))
+        .collect();
+    let mut out = Discovery::default();
+    let listed: HashSet<String> = std::fs::read_dir(root).map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().into_owned()).collect()).unwrap_or_default();
+    for name in usual_roots(&listed, &|n: &str| root.join(n).is_dir()) {
+        if !other_checkout(&root.join(name), common.as_deref()) {
+            out.roots.push(format!("{name}/"));
+        }
+    }
+    let mut found: Vec<String> = Vec::new();
+    let mut looked = 0usize;
+    // (folder, how deep, whether git ignores it or a folder above it)
+    let mut queue: std::collections::VecDeque<(PathBuf, usize, bool)> = std::collections::VecDeque::new();
+    queue.push_back((root.to_path_buf(), 0, false));
+    while let Some((d, depth, under_ignored)) = queue.pop_front() {
+        let children: Vec<PathBuf> = sorted_children(&d).into_iter().filter(|c| searchable(c, common.as_deref())).collect();
+        if depth > 0 && children.len() > MAX_CHILD_DIRS {
+            // a dataset's class folders, a cache: no results folder hides among hundreds of siblings
+            if !under_ignored {
+                out.not_read.push(NotRead { folder: format!("{}/", rel_posix(&d, root)), files: 0, folders: children.len(), why: "it holds too many folders to look in" });
+            }
+            continue;
+        }
+        for c in children {
+            let name = name_of(&c);
+            let n = name.to_lowercase();
+            let level = depth + 1;
+            if (level == 1 && (crate::journal::BUILD_DIRS.contains(&n.as_str()) || RESULT_ROOTS.contains(&name.as_str()))) || CODE_DIRS.contains(&n.as_str()) {
+                continue;
+            }
+            looked += 1;
+            if looked > MAX_DIRS_LOOKED {
+                out.cut = true;
+                break;
+            }
+            let rel = rel_posix(&c, root);
+            if RESULT_WORDS.contains(&n.as_str()) {
+                if holds_results_below(&c, RESULTS_DEPTH) {
+                    found.push(format!("{rel}/"));
+                }
+                continue;
+            }
+            // a folder git ignores is searched for folders named for results, which are read even so, and nothing
+            // in it is named as unread: what git ignores is a cache, a dataset or an environment as often as not
+            let ignored = under_ignored || ignored.contains(&rel);
+            if !ignored {
+                let own = sorted_children(&c)
+                    .iter()
+                    .filter(|f| f.is_file() && RESULTISH.contains(&suffix(&name_of(f).to_lowercase()).as_str()) && !crate::journal::tool_file(&name_of(f)))
+                    .count();
+                if own > 0 {
+                    out.not_read.push(NotRead { folder: format!("{rel}/"), files: own, folders: 0, why: "its name does not say it holds results" });
+                }
+            }
+            if level < MAX_ROOT_DEPTH {
+                queue.push_back((c, level, ignored));
+            }
+        }
+        if out.cut {
+            break;
+        }
+    }
+    found.sort();
+    out.roots.extend(found);
+    out
+}
+
+/// The folders where results land in the repository at `root`, from its top, each with a slash.
+pub fn result_roots_of(root: &Path) -> Vec<String> {
+    discover(root).roots
+}
+
+/// Every folder that holds an experiment's results: below each folder where results land, the first folder down each
+/// path (to RESULTS_DEPTH levels) that holds a report or a results file; a folder found by its name (not one of the
+/// usual folders at the top) that holds them itself is one.
 pub fn result_folders(root: &Path) -> Vec<String> {
+    fn down(d: &Path, depth: usize, root: &Path, common: Option<&Path>, out: &mut Vec<String>) {
+        for c in sorted_children(d) {
+            if !searchable(&c, common) {
+                continue;
+            }
+            if holds_results(&c) {
+                out.push(format!("{}/", rel_posix(&c, root)));
+            } else if depth > 1 {
+                down(&c, depth - 1, root, common, out);
+            }
+        }
+    }
     let mut out = Vec::new();
     let common = crate::ledger::common_dir_of(root);
-    for name in RESULT_ROOTS {
+    for name in result_roots_of(root) {
+        let name = name.trim_end_matches('/');
         let base = root.join(name);
         if !base.is_dir() || other_checkout(&base, common.as_deref()) {
             continue;
         }
-        for d in sorted_children(&base) {
-            let dn = name_of(&d);
-            if !d.is_dir() || dn.starts_with('.') || SKIP.contains(&dn.as_str()) || other_checkout(&d, common.as_deref()) {
-                continue;
-            }
-            if holds_results(&d) {
-                out.push(format!("{}/", rel_posix(&d, root)));
-                continue;
-            }
-            for dd in sorted_children(&d) {
-                let ddn = name_of(&dd);
-                if dd.is_dir() && !ddn.starts_with('.') && !SKIP.contains(&ddn.as_str()) && !other_checkout(&dd, common.as_deref()) && holds_results(&dd) {
-                    out.push(format!("{}/", rel_posix(&dd, root)));
-                }
-            }
+        if !RESULT_ROOTS.contains(&name) && holds_results(&base) {
+            out.push(format!("{name}/"));
+            continue;
         }
+        down(&base, RESULTS_DEPTH, root, common.as_deref(), &mut out);
     }
     out
 }
@@ -1711,7 +1908,7 @@ pub fn facts(read: &Dict) -> Vec<String> {
                 let said = crate::assess::k_of_n(tracked as usize, of as usize, "report or results file", "report and results files");
                 format!("{said} {} tracked · ", if tracked <= 1 { "is" } else { "are" })
             };
-            out.push(format!("git: {}folder clean", if of != 0 { tracked_said() } else { String::new() }));
+            out.push(format!("git: {}folder unchanged since the last commit", if of != 0 { tracked_said() } else { String::new() }));
         } else {
             let un = g.get("untracked").and_then(|v| v.as_list()).map(|l| l.len()).unwrap_or(0);
             let mo = g.get("modified").and_then(|v| v.as_list()).map(|l| l.len()).unwrap_or(0);
@@ -1780,4 +1977,485 @@ pub fn brief(read: &Dict) -> String {
         parts.push("changed since indexed".into());
     }
     parts.join(" · ")
+}
+
+// ---------------------------------------------------------------- what a run folder's own record says of its run
+
+/// The names a run's own record of itself goes by, in a folder of one run: the config a run writes beside its results.
+pub const RUN_CONFIG_NAMES: &[&str] = &[
+    "config.yaml", "config.yml", "config.json", "config.toml", ".hydra/config.yaml", "hparams.yaml", "params.yaml", "params.json", "args.json",
+    "args.yaml", "run.json", "run.yaml", "meta.json", "metadata.json",
+];
+const COMMAND_KEYS: &[&str] = &["command", "cmd", "argv", "cli", "command_line"];
+const COMMIT_KEYS: &[&str] = &["commit", "git_commit", "git_sha", "git.commit", "git.sha", "code.commit", "git.hash", "git_hash"];
+const DIRTY_KEYS: &[&str] = &["dirty", "git_dirty", "git.dirty", "code.dirty", "uncommitted"];
+const STARTED_KEYS: &[&str] = &["started", "started_at", "start_time", "start", "timestamp"];
+const FINISHED_KEYS: &[&str] = &["finished", "finished_at", "end_time", "ended", "ended_at", "completed_at"];
+
+/// One fact a run's own record states, with the line of its file it is on.
+#[derive(Debug, Clone)]
+pub struct Said<T> {
+    pub value: T,
+    pub key: String,
+    pub line: usize,
+}
+
+/// What a run's own config says of the run: its command, the commit, whether the code had uncommitted changes, when
+/// it started and finished, and its other settings. rb reads these as the file's words, never as what rb saw.
+#[derive(Debug, Clone, Default)]
+pub struct RunSays {
+    /// from the repository's top
+    pub path: String,
+    pub command: Option<Said<String>>,
+    /// the command is a list of words (an argv), shown joined
+    pub command_list: bool,
+    pub commit: Option<Said<String>>,
+    pub dirty: Option<Said<bool>>,
+    pub started: Option<Said<String>>,
+    pub finished: Option<Said<String>>,
+    /// every other value, flattened to dotted keys
+    pub settings: Dict,
+}
+
+impl RunSays {
+    /// When the run's output existed, as the folder says it: when it finished, else when it started.
+    pub fn produced_at(&self) -> Option<&Said<String>> {
+        self.finished.as_ref().or(self.started.as_ref())
+    }
+
+    /// The facts in the file's own words, with their lines: `command (line 1) · commit 9ba0f86 (line 2) · dirty: true
+    /// (line 3)`.
+    pub fn said(&self) -> Vec<String> {
+        let mut parts = Vec::new();
+        if let Some(c) = &self.command {
+            parts.push(format!("{}: {} (line {})", c.key, crate::pyjson::repr_str(&c.value), c.line));
+        }
+        if let Some(c) = &self.commit {
+            let dirty = if self.dirty.as_ref().map_or(false, |d| d.key == c.key && d.value) { "-dirty" } else { "" };
+            parts.push(format!("{}: {}{dirty} (line {})", c.key, c.value.chars().take(12).collect::<String>(), c.line));
+        }
+        // a commit git describe --dirty wrote says its own value once, never "commit: true" beside it
+        if let Some(d) = self.dirty.as_ref().filter(|d| self.commit.as_ref().map_or(true, |c| c.key != d.key)) {
+            parts.push(format!("{}: {} (line {})", d.key, d.value, d.line));
+        }
+        if let Some(s) = &self.started {
+            parts.push(format!("{}: {} (line {})", s.key, s.value, s.line));
+        }
+        parts
+    }
+
+    /// Where the file says the code had uncommitted changes when the run ran, in rb's words, naming the file and line.
+    pub fn dirty_line(&self) -> Option<String> {
+        let d = self.dirty.as_ref().filter(|d| d.value)?;
+        // a commit `git describe --dirty` wrote says it with its own value, never "commit: true"
+        let value = match self.commit.as_ref().filter(|c| c.key == d.key) {
+            Some(c) => format!("{}-dirty", c.value),
+            None => "true".to_string(),
+        };
+        Some(format!("{}:{} says {}: {value}: the code had uncommitted changes when it ran", self.path, d.line, d.key))
+    }
+
+    pub fn to_value(&self) -> Value {
+        let said = |s: &Option<Said<String>>| match s {
+            Some(s) => crate::obj! {"value" => s.value.clone(), "key" => s.key.clone(), "line" => s.line as i64},
+            None => Value::Null,
+        };
+        crate::obj! {
+            "path" => self.path.clone(), "command" => said(&self.command), "commit" => said(&self.commit),
+            "dirty" => match &self.dirty { Some(d) => crate::obj! {"value" => d.value, "key" => d.key.clone(), "line" => d.line as i64}, None => Value::Null },
+            "started" => said(&self.started), "finished" => said(&self.finished)
+        }
+    }
+}
+
+/// The line of a structured file a dotted key is on: YAML by its own reader, other files by the first line that
+/// names the key's last part as a key.
+fn key_line(text: &str, kind: &str, key: &str) -> usize {
+    if kind == "yaml" {
+        if let Some(n) = sources::yaml_line_of(text, key) {
+            return n;
+        }
+    }
+    let last = key.rsplit('.').next().unwrap_or(key);
+    let pat = format!(r#"^\s*["']?{}["']?\s*[:=]"#, regex::escape(last));
+    let r = Regex::new(&pat).unwrap();
+    text.split('\n').position(|l| r.is_match(l)).map_or(1, |i| i + 1)
+}
+
+/// A value's text as a run's record gives it: a list of words (an argv) joined with spaces.
+fn said_text(v: &Value) -> Option<String> {
+    match v {
+        Value::Str(s) if !s.trim().is_empty() => Some(s.trim().to_string()),
+        Value::List(l) if !l.is_empty() && l.iter().all(|x| matches!(x, Value::Str(_))) => Some(l.iter().map(pyjson::py_str).collect::<Vec<_>>().join(" ")),
+        Value::Int(_) | Value::Float(_) => Some(pyjson::py_str(v)),
+        _ => None,
+    }
+}
+
+/// What the run config at `rel` (from `root`) says of its run, or None when it cannot be read or says none of the
+/// run's command, commit or uncommitted changes.
+pub fn run_says(root: &Path, rel: &str) -> Option<RunSays> {
+    let p = root.join(rel);
+    let kind = sources::structured_kind(rel)?;
+    if file_size(&p) > MAX_DOC_BYTES {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&std::fs::read(&p).ok()?).into_owned();
+    let doc = sources::parse_structured(&text, kind, rel).ok()?;
+    let doc = sources::unwrap_wandb(doc);
+    if !doc.is_dict() {
+        return None;
+    }
+    let flat = sources::flatten(&doc, "");
+    let mut says = RunSays { path: rel.to_string(), ..Default::default() };
+    let mut taken: HashSet<String> = HashSet::new();
+    let find = |keys: &[&str], taken: &mut HashSet<String>| -> Option<(String, Value)> {
+        // the first key the file gives, as it gives it
+        for k in keys {
+            if let Some(v) = doc.get(k).filter(|v| !v.is_dict()).cloned().or_else(|| flat.get(*k).cloned()) {
+                taken.insert(k.to_string());
+                return Some((k.to_string(), v));
+            }
+        }
+        None
+    };
+    if let Some((k, v)) = find(COMMAND_KEYS, &mut taken) {
+        // a command as one text; an argv list is shown joined, and never offered as the command a log line holds,
+        // since joining it loses its quoting
+        if let Some(t) = said_text(&v) {
+            says.command_list = matches!(v, Value::List(_));
+            says.command = Some(Said { line: key_line(&text, kind, &k), key: k, value: t });
+        }
+    }
+    if let Some((k, v)) = find(COMMIT_KEYS, &mut taken) {
+        // `git describe --dirty` writes the commit with -dirty after it
+        let t = said_text(&v).unwrap_or_default();
+        let (hash, described_dirty) = match t.strip_suffix("-dirty") {
+            Some(h) => (h.to_string(), true),
+            None => (t.clone(), false),
+        };
+        if hash.len() >= 7 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
+            let line = key_line(&text, kind, &k);
+            if described_dirty && says.dirty.is_none() {
+                says.dirty = Some(Said { line, key: k.clone(), value: true });
+            }
+            says.commit = Some(Said { line, key: k, value: hash.to_lowercase() });
+        } else {
+            // not a commit rb can name (a branch, a tag): one of the run's settings
+            taken.remove(&k);
+        }
+    }
+    if let Some((k, v)) = find(DIRTY_KEYS, &mut taken) {
+        let b = match &v {
+            Value::Bool(b) => Some(*b),
+            Value::Int(i) if *i == 0 || *i == 1 => Some(*i == 1),
+            Value::Str(t) => match t.trim().to_lowercase().as_str() {
+                "true" | "yes" | "1" => Some(true),
+                "false" | "no" | "0" => Some(false),
+                _ => None,
+            },
+            _ => None,
+        };
+        match b {
+            Some(b) => says.dirty = Some(Said { line: key_line(&text, kind, &k), key: k, value: b }),
+            None => {
+                taken.remove(&k);
+            }
+        }
+    }
+    for (keys, slot) in [(STARTED_KEYS, 0), (FINISHED_KEYS, 1)] {
+        if let Some((k, v)) = find(keys, &mut taken) {
+            if let Some(t) = said_text(&v).and_then(|t| crate::pytime::norm_time(&t).map(|_| t)) {
+                let s = Some(Said { line: key_line(&text, kind, &k), key: k, value: t });
+                if slot == 0 {
+                    says.started = s;
+                } else {
+                    says.finished = s;
+                }
+            }
+        }
+    }
+    if says.command.is_none() && says.commit.is_none() && says.dirty.is_none() {
+        return None;
+    }
+    says.settings = flat.into_iter().filter(|(k, _)| !taken.contains(k)).collect();
+    Some(says)
+}
+
+/// The run config in a folder of one run, as the folder holds it: the first of RUN_CONFIG_NAMES there that says
+/// anything of its run.
+pub fn run_config_in(root: &Path, folder: &str) -> Option<RunSays> {
+    let base = folder.trim_end_matches('/');
+    RUN_CONFIG_NAMES.iter().find_map(|n| {
+        let rel = format!("{base}/{n}");
+        root.join(&rel).is_file().then(|| run_says(root, &rel)).flatten()
+    })
+}
+
+/// A folder of one run: its own record of the run, the results file its numbers are in, and the `rb run add` that
+/// records it with all the folder gives.
+#[derive(Debug, Clone)]
+pub struct RunFolder {
+    pub folder: String,
+    pub says: RunSays,
+    /// the results file, from the repository's top
+    pub results: String,
+    /// when the results file says the run finished, with its key and line
+    pub results_finished: Option<Said<String>>,
+    /// the experiment that reads the folder, when exactly one does
+    pub experiment: Option<String>,
+    /// rb run add's arguments, after `rb`
+    pub argv: Vec<String>,
+}
+
+impl RunFolder {
+    /// When the run's output existed, as the folder says it, with the file and line that says so.
+    pub fn produced_at(&self) -> Option<(String, String)> {
+        if let Some(f) = &self.results_finished {
+            return Some((f.value.clone(), format!("{}:{}", self.results, f.line)));
+        }
+        self.says.produced_at().map(|s| (s.value.clone(), format!("{}:{}", self.says.path, s.line)))
+    }
+
+    pub fn to_value(&self) -> Value {
+        crate::obj! {
+            "folder" => self.folder.clone(), "config" => self.says.to_value(), "results" => self.results.clone(),
+            "experiment" => Value::opt_str(self.experiment.clone()),
+            "produced_at" => self.produced_at().map_or(Value::Null, |(at, from)| crate::obj! {"at" => at, "from" => from}),
+            "settings" => Value::Dict(self.says.settings.clone()), "line" => format!("rb {}", crate::cli::shlex_join(&self.argv))
+        }
+    }
+}
+
+/// The results file of a folder of one run: a structured file that is not its run config, a .json one first, and one
+/// named for metrics or results before the rest.
+fn results_file_in(root: &Path, folder: &str, config: &str) -> Option<String> {
+    let base = folder.trim_end_matches('/');
+    let mut files: Vec<String> = sorted_children(&root.join(base))
+        .into_iter()
+        .filter(|p| p.is_file())
+        .map(|p| format!("{base}/{}", name_of(&p)))
+        .filter(|rel| {
+            let name = rel.rsplit('/').next().unwrap_or("");
+            rel != config && sources::structured_kind(rel).is_some() && !rel.ends_with(".jsonl") && !crate::journal::tool_file(name) && !RUN_CONFIG_NAMES.contains(&name.to_lowercase().as_str())
+        })
+        .collect();
+    let rank = |rel: &String| {
+        let n = rel.rsplit('/').next().unwrap_or("").to_lowercase();
+        let named = ["metrics", "results", "result", "eval", "scores", "summary"].iter().any(|w| n.starts_with(w));
+        (!named, !n.ends_with(".json"), n)
+    };
+    files.sort_by_key(rank);
+    files.into_iter().next()
+}
+
+/// What an experiment gives the `rb run add` line of a run folder: its per-run settings, what it varies, each variant
+/// with its own settings, and the names of the numbers its criteria read (and the catalogue's).
+#[derive(Debug, Clone, Default)]
+pub struct LineFacts {
+    pub per_run: Vec<String>,
+    pub varies: Vec<String>,
+    pub variants: Vec<(String, Dict)>,
+    pub metrics: Vec<String>,
+}
+
+/// A value a run config states for a setting: by its full key, else by its last part where exactly one key ends so
+/// (teacher.precision beside student.precision names no one value, and is never guessed).
+fn config_value<'a>(settings: &'a Dict, name: &str) -> Option<&'a Value> {
+    let last = name.rsplit('.').next().unwrap_or(name);
+    let by_last = || {
+        let ends: Vec<&Value> = settings.iter().filter(|(k, _)| k.rsplit('.').next() == Some(last)).map(|(_, v)| v).collect();
+        (ends.len() == 1).then(|| ends[0])
+    };
+    settings.get(name).or_else(by_last).filter(|v| !v.is_dict() && !v.is_list() && !v.is_null())
+}
+
+/// The one variant a run config's values of what the experiment varies name: a variant whose own value of a varied
+/// setting is the config's, or, where it has none, whose name is the config's value (prompt: plain names plain).
+fn variant_of(settings: &Dict, facts: &LineFacts) -> Option<String> {
+    let stated: Vec<(&String, String)> = facts.varies.iter().filter_map(|n| config_value(settings, n).map(|v| (n, pyjson::py_str(v)))).collect();
+    if stated.is_empty() {
+        return None;
+    }
+    let fits = |(name, own): &(String, Dict)| {
+        stated.iter().all(|(n, v)| match own.get(n.as_str()).or_else(|| own.get(n.rsplit('.').next().unwrap_or(n))) {
+            Some(x) => &pyjson::py_str(x) == v,
+            None => v == name,
+        })
+    };
+    let hits: Vec<&String> = facts.variants.iter().filter(|x| fits(x)).map(|(n, _)| n).collect();
+    (hits.len() == 1).then(|| hits[0].clone())
+}
+
+/// The names of the numbers a results file holds that an experiment reads, as --keys takes them.
+fn keys_read(root: &Path, results: &str, facts: &LineFacts) -> Vec<String> {
+    let Some(kind) = sources::structured_kind(results) else { return Vec::new() };
+    let p = root.join(results);
+    if file_size(&p) > MAX_DOC_BYTES {
+        return Vec::new();
+    }
+    let Ok(bytes) = std::fs::read(&p) else { return Vec::new() };
+    let Ok(doc) = sources::parse_structured(&String::from_utf8_lossy(&bytes), kind, results) else { return Vec::new() };
+    sources::flatten(&doc, "")
+        .into_iter()
+        // a number recorded under its own name, which is the name a criterion reads: a nested one (eval.top1) is recorded
+        // as eval.top1, so it is no key the line can give
+        .filter(|(k, v)| v.as_f64().is_some() && !v.is_bool() && facts.metrics.iter().any(|m| m == k))
+        .map(|(k, _)| k)
+        .collect()
+}
+
+/// Every results folder in `folders` that is a folder of one run: it holds a run config that says something of its
+/// run, and a results file beside it. `readers` gives the experiments that read a folder, and `facts` what an
+/// experiment gives its line: the variant the config's values of what it varies name, the numbers it reads (--keys),
+/// and its per-run settings, from the config where it says them. A folder no experiment reads takes the one experiment
+/// of `experiments` whose variants the config names one of, where exactly one does.
+pub fn run_folders(root: &Path, folders: &[(String, Vec<String>)], experiments: &[String], facts: &dyn Fn(&str) -> Option<LineFacts>) -> Vec<RunFolder> {
+    let mut out = Vec::new();
+    for (folder, readers) in folders {
+        let Some(says) = run_config_in(root, folder) else { continue };
+        let Some(results) = results_file_in(root, folder, &says.path) else { continue };
+        let results_finished = run_says_time(root, &results);
+        let experiment = (readers.len() == 1).then(|| readers[0].clone());
+        // the experiment the line records it on: the one that reads the folder, else the one whose variant it names
+        let line_exp = experiment.clone().or_else(|| {
+            let named: Vec<&String> = experiments.iter().filter(|e| facts(e).map_or(false, |f| variant_of(&says.settings, &f).is_some())).collect();
+            (readers.is_empty() && named.len() == 1).then(|| named[0].clone())
+        });
+        let mut argv: Vec<String> = vec!["run".into(), "add".into(), line_exp.clone().unwrap_or_else(|| "<experiment>".into()), "--from".into(), results.clone()];
+        if let Some(f) = line_exp.as_deref().and_then(facts) {
+            if let Some(v) = variant_of(&says.settings, &f) {
+                argv.extend(["--variant".to_string(), v]);
+            }
+            let keys = keys_read(root, &results, &f);
+            if !keys.is_empty() {
+                argv.extend(["--keys".to_string(), keys.join(",")]);
+            }
+        }
+        argv.extend(["--config".to_string(), says.path.clone()]);
+        if let Some(f) = line_exp.as_deref().and_then(facts) {
+            for name in &f.per_run {
+                if let Some(v) = config_value(&says.settings, name) {
+                    argv.extend(["--set".to_string(), format!("{name}={}", pyjson::py_str(v))]);
+                }
+            }
+        }
+        if let Some(c) = &says.commit {
+            argv.extend(["--commit".to_string(), c.value.clone()]);
+        }
+        let rf = RunFolder { folder: folder.clone(), says: says.clone(), results, results_finished, experiment, argv: Vec::new() };
+        let mut rf = rf;
+        if let Some((at, _)) = rf.produced_at() {
+            argv.extend(["--produced-at".to_string(), at]);
+        }
+        if let Some(c) = says.command.as_ref().filter(|c| !says.command_list && !c.value.contains('\n')) {
+            argv.extend(["--command".to_string(), c.value.clone()]);
+            // the line the value starts on holds it, as --command-source checks it
+            let text = std::fs::read_to_string(root.join(&says.path)).unwrap_or_default();
+            let lines: Vec<&str> = text.split('\n').collect();
+            if crate::ledger::support::line_holds(&lines, c.line, &c.value) {
+                argv.extend(["--command-source".to_string(), format!("{}:{}", says.path, c.line)]);
+            }
+        }
+        rf.argv = argv;
+        out.push(rf);
+    }
+    out
+}
+
+/// When a results file says its run finished (or started, where it gives no end), with its key and line.
+fn run_says_time(root: &Path, rel: &str) -> Option<Said<String>> {
+    let kind = sources::structured_kind(rel)?;
+    let p = root.join(rel);
+    if file_size(&p) > MAX_DOC_BYTES {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&std::fs::read(&p).ok()?).into_owned();
+    let doc = sources::parse_structured(&text, kind, rel).ok()?;
+    for k in FINISHED_KEYS {
+        if let Some(t) = doc.get(k).and_then(said_text).filter(|t| crate::pytime::norm_time(t).is_some()) {
+            return Some(Said { line: key_line(&text, kind, k), key: k.to_string(), value: t });
+        }
+    }
+    None
+}
+
+/// The settings whose values differ between run folders that sit side by side (in the same parent folder): each key
+/// with its values, each value with the folders that hold it, in folder order.
+pub fn differing_settings(runs: &[RunFolder]) -> Vec<(String, Vec<(String, Vec<String>)>)> {
+    if runs.len() < 2 {
+        return Vec::new();
+    }
+    // each folder named from the folder all of them sit in: r012/ beside r011/, sweep/ga/0/ beside sweep/gb/0/
+    let parts: Vec<Vec<&str>> = runs.iter().map(|r| r.folder.trim_end_matches('/').split('/').collect()).collect();
+    let mut common = 0;
+    while parts.iter().all(|p| p.len() > common + 1 && p[common] == parts[0][common]) {
+        common += 1;
+    }
+    let mut keys: BTreeSet<String> = BTreeSet::new();
+    for r in runs {
+        keys.extend(r.says.settings.keys().cloned());
+    }
+    let mut out: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
+    for k in keys {
+        let mut values: IndexMap<String, Vec<String>> = IndexMap::new();
+        let mut holds_path = false;
+        for (r, p) in runs.iter().zip(&parts) {
+            let v = r.says.settings.get(&k).map(|v| pyjson::py_str(v)).unwrap_or_else(|| "(not given)".into());
+            let folder = r.folder.trim_end_matches('/');
+            let last = p.last().copied().unwrap_or("");
+            // a value that names its own folder (an output path) differs by construction
+            if v.contains(folder) || v.ends_with(&format!("/{last}")) || v.contains(&format!("/{last}/")) {
+                holds_path = true;
+            }
+            values.entry(v).or_default().push(p[common..].join("/"));
+        }
+        if values.len() > 1 && !holds_path {
+            out.push((k, values.into_iter().collect()));
+        }
+    }
+    out
+}
+
+/// One setting's values across run folders, in words: `eval.checker: answer_tag (9 folders), last_number (3:
+/// r010_worked_s0, r011_step_n500_s0, r012_plain_s0)`.
+pub fn differing_said(key: &str, values: &[(String, Vec<String>)]) -> String {
+    let parts: Vec<String> = values
+        .iter()
+        .map(|(v, fs)| {
+            let shown: String = v.chars().take(60).collect::<String>() + if v.chars().count() > 60 { "..." } else { "" };
+            if fs.len() <= 3 {
+                format!("{shown} ({})", fs.join(", "))
+            } else {
+                format!("{shown} ({} folders)", fs.len())
+            }
+        })
+        .collect();
+    format!("{key}: {}", parts.join(", "))
+}
+
+/// What a run's config (`rb run add --config`) says of the code it ran, where it says it had uncommitted changes:
+/// read from the file as it is, while its bytes are those the run's receipt kept (`sha256`), or None.
+pub fn config_dirty_line(root: &Path, path: &str, sha256: Option<&str>) -> Option<String> {
+    if let Some(want) = sha256.filter(|s| !s.is_empty()) {
+        let got = sources::file_ref(root, path).ok()?;
+        if got.get_str("sha256") != Some(want) {
+            return None;
+        }
+    }
+    run_says(root, path)?.dirty_line()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// On a file system that ignores case (Windows, macOS), results/ answers for a Results/ folder: the usual folder is
+    /// taken only by its own spelling, so Results/ is found once, as itself.
+    #[test]
+    fn a_usual_folder_is_taken_by_its_own_spelling() {
+        let listed: HashSet<String> = ["Results".to_string(), "out".to_string()].into_iter().collect();
+        let ignoring_case = |n: &str| listed.iter().any(|l| l.eq_ignore_ascii_case(n));
+        assert_eq!(usual_roots(&listed, &ignoring_case), vec!["out"]);
+    }
 }

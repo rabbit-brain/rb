@@ -79,7 +79,9 @@ def rbj(workdir, monkeypatch, capsys, tmp_path_factory):
                  ["experiment", "add", "INT8 against FP32", "--id", "int8", "--baseline", "fp32", "--candidate", "int8", "--varies", "precision"],
                  ["spec", "set", "int8", "seed", "--per-run"],
                  ["metric", "add", "top1", "--maximize", "--alias", "acc1"],
-                 ["metric", "add", "val_loss", "--minimize"]):
+                 ["metric", "add", "val_loss", "--minimize"],
+                 # a rule that reads top1 as a row gives it, with no arm: rows that name no variant are its runs
+                 ["criterion", "add", "Top-1 stays above a half", "-e", "int8", "--metric", "top1", "--at-least", "0.5"]):
         assert run(*argv)[0] == 0, argv
     return run
 
@@ -227,7 +229,7 @@ def test_after_a_spec_change_rb_points_at_replaces_never_at_again(rbj, capsys):
     assert f"--replaces {first}" in err and "under an earlier spec" in err
     code, env = rbj(*read)
     assert env.data["duplicate_of"] == first and any(f"--replaces {first}" in w for w in env.data["warnings"])
-    [item] = [i for i in rbj("status")[1].data["open"] if i["code"] == "untested"]
+    [item] = [i for i in rbj("status")[1].data["open"] if i["code"] == "untested" and i["subject"] == "c1"]
     assert f"1 run was recorded under an earlier spec ({first})" in item["what"] and "--replaces <run>" in item["what"]
     with pytest.warns(rb.RBWarning, match=f"--replaces {first}"):
         assert rb.open().experiment("int8").record_from("results.db", table="evals", where={"run_name": "r3"},
@@ -244,6 +246,7 @@ def test_one_row_read_as_a_run_in_two_experiments_is_said_at_the_write_and_by_st
     database("results.db")
     assert rbj("experiment", "add", "INT8 again", "--id", "int8b", "--baseline", "fp32", "--candidate", "int8")[0] == 0
     assert rbj("spec", "set", "int8b", "seed", "--per-run")[0] == 0
+    assert rbj("criterion", "add", "Top-1 stays above a half", "-e", "int8b", "--metric", "top1", "--at-least", "0.5")[0] == 0
     first = rbj("run", "add", "int8", "--from", "results.db", "--table", "evals", "--where", "run_name=r3", "--set", "seed=@seed")[1].data["object"]["id"]
     code, env = rbj("run", "add", "int8", "--from", "results.db", "--table", "evals", "--where", "run_name=r3", "--set", "seed=@seed")
     assert code == 0 and env.data["duplicate_of"] == first and not env.data.get("warnings")
@@ -353,8 +356,8 @@ def test_a_column_named_by_an_alias_is_read_as_its_metric(rbj):
 def test_select_narrows_the_metric_columns(rbj):
     database("results.db")
     where = ["--from", "results.db", "--table", "evals", "--where", "run_name=r3", "--set", "seed=2"]
-    code, env = rbj("run", "add", "int8", *where, "--select", "val_loss")
-    assert code == 0 and env.data["object"]["metrics"] == {"val_loss": 1.04} and env.data["object"]["receipt"]["row"]["columns"] == {"val_loss": "val_loss"}
+    code, env = rbj("run", "add", "int8", *where, "--select", "val_loss", "--variant", "int8")
+    assert code == 0 and env.data["object"]["metrics"] == {"int8.val_loss": 1.04} and env.data["object"]["receipt"]["row"]["columns"] == {"int8.val_loss": "val_loss"}
     code, env = rbj("run", "add", "int8", *where, "--select", "acc5")
     assert code == 2 and env.errors[0].message == "--select acc5: acc5 names no metric the project declares."
     assert env.errors[0].fix.startswith("Declare it first: rb metric add acc5")
@@ -363,7 +366,7 @@ def test_select_narrows_the_metric_columns(rbj):
     code, env = rbj("run", "add", "int8", *where, "--keys", "acc*")
     assert code == 2 and "--select picks" in env.errors[0].message
     code, env = rbj("run", "add", "int8", "--table", "evals", "--where", "run_name=r3", "--set", "seed=2")
-    assert code == 2 and env.errors[0].message.endswith("give --from <database>.")
+    assert code == 2 and env.errors[0].message.endswith("give --from <database or table>.")
 
 
 def test_per_run_values_and_the_produced_time_come_from_the_rows_columns(rbj, capsys):
@@ -716,10 +719,11 @@ def test_the_sdk_and_mcp_read_a_row_as_the_command_line_does(rbj):
         server.close()
     assert not answer["isError"], answer
     over_mcp = answer["structuredContent"]["data"]["object"]
-    assert over_mcp["metrics"] == {"val_loss": 1.05} and over_mcp["per_run"] == {"seed": 1} and over_mcp["via"] == "mcp"
+    # val_loss alone, which no criterion reads as given, is the variant the row's precision=int8 names
+    assert over_mcp["metrics"] == {"int8.val_loss": 1.05} and over_mcp["per_run"] == {"seed": 1} and over_mcp["via"] == "mcp"
     assert {k: over_mcp["receipt"]["row"][k] for k in ("store", "path", "table", "where", "rowid", "columns", "per_run", "produced_at")} == {
         "store": "sqlite", "path": "results.db", "table": "evals", "where": {"precision": "int8", "seed": 1}, "rowid": 2,
-        "columns": {"val_loss": "val_loss"}, "per_run": {"seed": "seed"}, "produced_at": "finished_at"}
+        "columns": {"int8.val_loss": "val_loss"}, "per_run": {"seed": "seed"}, "produced_at": "finished_at"}
 
 
 def configs_database(path="results.db") -> Path:
@@ -952,6 +956,7 @@ def test_what_a_file_holds_that_is_not_a_number_is_a_note_after_the_run(rbj, cap
     Path("out/seed1").mkdir(parents=True)
     Path("out/seed1/metrics.json").write_text(json.dumps({"run_id": "r1", "finished_at": "2026-05-01", "fp32": {"top1": 76.1},
                                                           "int8": {"top1": 75.9}}), encoding="utf-8")
+    assert rbj("criterion", "add", "INT8 keeps top-1 within a point", "-e", "int8", "--metric", "change.top1", "--at-least", "-1")[0] == 0
     code, out, err = said(capsys, "run", "add", "int8", "--from", "out/seed1/metrics.json", "--set", "seed=1")
     assert code == 0, err
     assert "rb run add:" not in err + out, (out, err)

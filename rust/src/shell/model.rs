@@ -588,7 +588,7 @@ fn overview(led: &Ledger, doc: &mut Dict, st: &Value, home: &Home) -> Res<()> {
             }
         }
     }
-    let integrity = integrity_of(doc, st, home);
+    let integrity = integrity_of(doc, st, home, &replacers_of(led)?);
     let queue = queue_of(led, doc, home, &findings, &pending, &experiments)?;
     if let Some(Value::Dict(h)) = doc.get_mut("home") {
         h.insert("standing".into(), Value::List(standing));
@@ -854,7 +854,7 @@ fn without_command_line(k: usize, r: usize) -> String {
 /// What weakens the whole body of evidence, each part one plain line with its numbers and the ids it counts, for the
 /// link to that filtered list: criteria declared after their evidence, runs with no command as given, runs retracted,
 /// records edited outside rb; then one line on what they affect. No part, no line.
-fn integrity_of(doc: &Dict, st: &Value, home: &Home) -> Value {
+fn integrity_of(doc: &Dict, st: &Value, home: &Home, replacers: &IndexMap<String, String>) -> Value {
     let mut parts: Vec<Value> = Vec::new();
     let part = |kind: &str, n: usize, of: usize, line: String, ids: Vec<String>| crate::obj! {"kind" => kind, "n" => n, "of" => of, "line" => line, "ids" => Value::list_of_str(ids)};
     let made = |k: &str| home.made.get(k).and_then(Value::as_i64).unwrap_or(0) as usize;
@@ -875,7 +875,10 @@ fn integrity_of(doc: &Dict, st: &Value, home: &Home) -> Value {
         parts.push(part("without_command", k, r, without_command_line(k, r), none));
     }
     let runs = doc.get("runs").and_then(Value::as_dict).cloned().unwrap_or_default();
-    let retracted: Vec<String> = runs.iter().filter(|(_, v)| v.get("retracted").map_or(false, |x| !x.is_null())).map(|(id, _)| id.clone()).collect();
+    // a run another replaced (--replaces) was recorded again, and is no reason to doubt the work: the runs rb retracted
+    // when another replaced them (replacers_of), never a reason someone typed that reads the same
+    let retracted: Vec<String> =
+        runs.iter().filter(|(id, v)| v.get("retracted").map_or(false, |x| !x.is_null()) && !replacers.contains_key(*id)).map(|(id, _)| id.clone()).collect();
     if !retracted.is_empty() {
         let k = retracted.len();
         let line = if k == 1 { "1 run was retracted.".to_string() } else { format!("{k} runs were retracted.") };
@@ -1184,6 +1187,26 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
             "other_code" => f.other_code.clone(),
             "witness" => found.get("witness").cloned().unwrap_or_else(|| crate::obj! {"total" => 0, "afterwards" => 0})
         };
+        // what rb show says under the rule, in its words (says.notes): every note but the one-unit one, and a cited value
+        // that differs only where no not_comparable problem says it already
+        if let Some(Value::Dict(says)) = v.as_dict_mut().and_then(|d| d.get_mut("says")) {
+            let problems = found.get("integrity").and_then(Value::as_list).cloned().unwrap_or_default();
+            let comparable_said = problems.iter().any(|p| text(p, "code") == "not_comparable");
+            let notes: Vec<String> = found
+                .get("caveats")
+                .and_then(Value::as_list)
+                .map(|cs| {
+                    cs.iter()
+                        .filter(|c| text(c, "code") != "single_unit" && !(comparable_said && text(c, "code") == "cited_differs"))
+                        .map(|c| text(c, "text"))
+                        .filter(|t| !t.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default();
+            if !notes.is_empty() {
+                says.insert("notes".into(), Value::list_of_str(notes));
+            }
+        }
         if let Value::Dict(d) = &mut v {
             d.extend(fields);
             d.extend(graphed);
@@ -1386,6 +1409,11 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
         n: f.units.n,
         problem: problem.as_deref().unwrap_or(""),
     });
+    // a rule met only where its runs pool a per-run setting's values says so in the sentence it opens with
+    let verdict = match f.caveats.iter().find(|c| c.code == "pooled_misses") {
+        Some(c) => format!("{verdict} Only pooled: {}.", c.text),
+        None => verdict,
+    };
     // the compact row's rule and margin in the card's words and digits (FIX4): "≥ 5 points" and "margin -1.40 points"
     // beside a reading of 3.60 points, "≥ 75.5%" for a level's
     let ratio = c.metric.starts_with("ratio.") || metric.starts_with("ratio.");
@@ -1412,12 +1440,16 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
     };
     let margin_said = match (r.and_then(|r| r.estimate), c.target) {
         (Some(e), Some(t)) if matches!(c.comparator.as_str(), "at_most" | "at_least" | "equals") && c.over == "mean" => {
+            // a reading on its number is that number: the distance from it is snapped, never the band around it
+            let off = if (e - t).abs() <= crate::assess::close(e, t) { 0.0 } else { e - t };
+            let tol = c.tolerance.unwrap_or(0.0);
             let m = match c.comparator.as_str() {
-                "at_most" => t - e,
-                "at_least" => e - t,
-                _ => c.tolerance.unwrap_or(0.0) - (e - t).abs(),
+                "at_most" => -off,
+                "at_least" => off,
+                // a reading on the band's edge is on it: the residue of working out tolerance less distance is no margin
+                _ if (tol - off.abs()).abs() <= crate::assess::close(tol, off.abs()).max(crate::assess::close(e, t)) => 0.0,
+                _ => tol - off.abs(),
             };
-            let m = if m.abs() <= crate::assess::close(e, t) { 0.0 } else { m };
             // in the digits the verdict says the reading in, and the unit it says a distance in (points for a percentage)
             let mut xs = vec![e];
             xs.extend(r.and_then(|r| r.lo.zip(r.hi)).map(|(lo, hi)| [lo, hi]).into_iter().flatten());
@@ -1449,6 +1481,8 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
         "unit_amended" => unit_amended, "receipt_rows" => Value::List(rows), "cited" => cited,
         "state" => state.clone(), "state_label" => state_label(&state), "subject_label" => subject_label, "reference_label" => reference_label,
         "reading_short" => reading_short, "verdict" => verdict, "tags" => Value::list_of_str(tags.into_iter().map(str::to_string)),
+        // the headline's words on a reading that pools a per-run setting, as rb show says them
+        "pooled" => f.says.get("headline").and_then(|h| h.split(" \u{b7} ").find(|p| p.starts_with("pooled over "))).unwrap_or("").to_string(),
         "reads_baseline" => reference.is_empty() && matches!(role_of(&subject).as_str(), "baseline" | "control"),
         "row_words" => crate::obj! {"criterion" => rule_said, "margin" => margin_said}
     })

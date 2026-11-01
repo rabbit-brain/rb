@@ -7,7 +7,7 @@
     "Project 'settings' started: @BASE@/work/.rb",
     "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
     "",
-    "Then paste this line into your agent's chat:",
+    "If you work with a coding agent, paste this line into its chat:",
     "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
     ""
    ],
@@ -172,6 +172,7 @@
    "exit": 0,
    "out": [
     "e1/schedule = cosine \u00b7 provisional",
+    "  cited: step (papers/method.txt)",
     "  It stays provisional until a file (file#key, file:LINE, or --quote) or a run's JSON that states it is its source; a url or a note is recorded but cannot be checked.",
     "  schedule is cosine here and step in the cited source: while they differ, a criterion of e1 that cites a number is not comparable, and its rule reads undetermined.",
     ""

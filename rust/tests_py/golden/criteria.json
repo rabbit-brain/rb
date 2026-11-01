@@ -7,7 +7,7 @@
     "Project 'criteria' started: @BASE@/work/.rb",
     "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
     "",
-    "Then paste this line into your agent's chat:",
+    "If you work with a coding agent, paste this line into its chat:",
     "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
     ""
    ],
@@ -60,7 +60,7 @@
     "  change.val_loss \u2264 0.05 (n \u2265 3, noise 0.01) \u00b7 primary \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 base.val_loss=<value> wide.val_loss=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -75,7 +75,7 @@
     "  wide.top1 \u2265 0.8 \u00b7 primary \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 wide.top1=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -90,7 +90,7 @@
     "  top1 = 0.8 \u00b1 0.01 \u00b7 secondary \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 top1=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -105,7 +105,7 @@
     "  top1: wide vs base better, its interval clear of 0 \u00b7 exploratory \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 base.top1=<value> wide.top1=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -120,7 +120,7 @@
     "  val_loss: wide vs base no worse than 0.1, its interval's worse bound inside 0.1 \u00b7 primary \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 base.val_loss=<value> wide.val_loss=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -135,7 +135,7 @@
     "  val_loss: wide vs base within \u00b10.2, its interval inside \u00b10.2 \u00b7 gate \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 base.val_loss=<value> wide.val_loss=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -150,7 +150,7 @@
     "  each unit's wide.top1 \u2265 0.5 \u00b7 primary \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 wide.top1=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -165,7 +165,7 @@
     "  change.val_loss, upper bound \u2264 0.2 \u00b7 primary \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 base.val_loss=<value> wide.val_loss=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -181,7 +181,7 @@
     "  cited: papers/paper.txt \"top1 accuracy of 0.83\" (Table 2) \u00b7 states 0.83 (read 'On the held-out split the model reaches a top1 accuracy of 0.83 (Table 2).')",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 top1=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -244,7 +244,7 @@
     "  change.val_loss \u2264 -0.001 \u00b7 primary \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 base.val_loss=<value> wide.val_loss=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -262,7 +262,7 @@
     "Since this session last looked:",
     "  - No model is recorded for your writes, and this session has no id to keep one under   (RB_MODEL=<your model id> on each command)",
     "",
-    "Next: rb run add e1 wide.top1=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -361,7 +361,7 @@
     " },",
     " \"errors\": [],",
     " \"next\": [",
-    "  \"rb run add e1 wide.top1=<value> --command \\\"...\\\"\"",
+    "  \"rb run add e1 --from <the results file a run wrote>\"",
     " ],",
     " \"rb_delta\": []",
     "}",
@@ -395,12 +395,9 @@
     "",
     "The design of 1 experiment is not confirmed: rb confirm lists it.",
     "",
-    "Can be done now (4)",
-    "  - 4 \u00d7 untested:",
-    "      rb run add e1 base.val_loss=<value> wide.val_loss=<value> --command \"...\"",
-    "      rb run add e1 wide.top1=<value> --command \"...\"",
-    "      rb run add e1 base.top1=<value> wide.top1=<value> --command \"...\"",
-    "      rb run add e1 top1=<value> --command \"...\"",
+    "Can be done now (1)",
+    "  - c1 is untested: wide costs at most 0.05; c3rosg3 is untested: json; c4teabd is untested: better; c4zuz4h is untested: neg; c6pqyge is untested: bound; c7pjy2o is untested: cited; cedhdx7 is untested: equivalent; ceszfgw is untested: agent one; cf3hlli is untested: noninferior; cp5h4s6 is untested: wide reaches 0.8; cprswmo is untested: each; cqtdhpa is untested: equals",
+    "      rb run add e1 --from <the results file a run wrote>",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
@@ -481,7 +478,7 @@
     "Experiments",
     "  e1      e \u00b7 planned \u00b7 base (baseline) vs wide (candidate) \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
     "",
-    "Next: rb confirm  \u00b7  rb run add e1 base.val_loss=<value> wide.val_loss=<value> --command \"...\"  \u00b7  rb run add e1 wide.top1=<value> --command \"...\"",
+    "Next: rb confirm  \u00b7  rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -1426,30 +1423,9 @@
     "   {",
     "    \"who\": \"agent\",",
     "    \"code\": \"untested\",",
-    "    \"subject\": \"c1, c4zuz4h, c6pqyge, cedhdx7, cf3hlli\",",
-    "    \"what\": \"c1 is untested: wide costs at most 0.05; c4zuz4h is untested: neg; c6pqyge is untested: bound; cedhdx7 is untested: equivalent; cf3hlli is untested: noninferior\",",
-    "    \"do\": \"rb run add e1 base.val_loss=<value> wide.val_loss=<value> --command \\\"...\\\"\"",
-    "   },",
-    "   {",
-    "    \"who\": \"agent\",",
-    "    \"code\": \"untested\",",
-    "    \"subject\": \"c3rosg3, ceszfgw, cp5h4s6, cprswmo\",",
-    "    \"what\": \"c3rosg3 is untested: json; ceszfgw is untested: agent one; cp5h4s6 is untested: wide reaches 0.8; cprswmo is untested: each\",",
-    "    \"do\": \"rb run add e1 wide.top1=<value> --command \\\"...\\\"\"",
-    "   },",
-    "   {",
-    "    \"who\": \"agent\",",
-    "    \"code\": \"untested\",",
-    "    \"subject\": \"c4teabd\",",
-    "    \"what\": \"c4teabd is untested: better\",",
-    "    \"do\": \"rb run add e1 base.top1=<value> wide.top1=<value> --command \\\"...\\\"\"",
-    "   },",
-    "   {",
-    "    \"who\": \"agent\",",
-    "    \"code\": \"untested\",",
-    "    \"subject\": \"c7pjy2o, cqtdhpa\",",
-    "    \"what\": \"c7pjy2o is untested: cited; cqtdhpa is untested: equals\",",
-    "    \"do\": \"rb run add e1 top1=<value> --command \\\"...\\\"\"",
+    "    \"subject\": \"c1, c3rosg3, c4teabd, c4zuz4h, c6pqyge, c7pjy2o, cedhdx7, ceszfgw, cf3hlli, cp5h4s6, cprswmo, cqtdhpa\",",
+    "    \"what\": \"c1 is untested: wide costs at most 0.05; c3rosg3 is untested: json; c4teabd is untested: better; c4zuz4h is untested: neg; c6pqyge is untested: bound; c7pjy2o is untested: cited; cedhdx7 is untested: equivalent; ceszfgw is untested: agent one; cf3hlli is untested: noninferior; cp5h4s6 is untested: wide reaches 0.8; cprswmo is untested: each; cqtdhpa is untested: equals\",",
+    "    \"do\": \"rb run add e1 --from <the results file a run wrote>\"",
     "   }",
     "  ],",
     "  \"gate\": {",
@@ -1514,8 +1490,7 @@
     " \"errors\": [],",
     " \"next\": [",
     "  \"rb confirm\",",
-    "  \"rb run add e1 base.val_loss=<value> wide.val_loss=<value> --command \\\"...\\\"\",",
-    "  \"rb run add e1 wide.top1=<value> --command \\\"...\\\"\"",
+    "  \"rb run add e1 --from <the results file a run wrote>\"",
     " ],",
     " \"rb_delta\": []",
     "}",

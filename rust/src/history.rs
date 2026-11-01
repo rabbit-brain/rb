@@ -152,6 +152,9 @@ struct Call {
     action: String,
     why: String,
     standing: Standing,
+    /// where the call goes against its criterion's rule as it read when the call was made, the rule's word for it
+    /// (`not met`, `not reproduced`, `criterion met`)
+    against: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -345,7 +348,16 @@ impl Facts {
                 }
                 _ => Standing::Proposed,
             };
-            f.calls.insert(d.id.clone(), Call { subject: d.subject.clone(), action: d.action.clone(), why: d.why.clone(), standing });
+            // a call that accepts a rule not met (or rejects one met) says what it accepted, as rb decide says it
+            let against = match (d.action.as_str(), led.load::<Criterion>(&d.subject).ok()) {
+                (a @ ("accept" | "reject"), Some(c)) => {
+                    let rule = d.basis.get(&d.subject).and_then(|b| b.get("rule")).map(crate::pyjson::py_str).unwrap_or_default();
+                    let goes_against = (a == "accept" && matches!(rule.as_str(), "misses" | "undetermined")) || (a == "reject" && rule == "meets");
+                    if goes_against { crate::assess::rule_label(&crate::assess::rule_word(&rule, &c.role, &c.origin), 1) } else { String::new() }
+                }
+                _ => String::new(),
+            };
+            f.calls.insert(d.id.clone(), Call { subject: d.subject.clone(), action: d.action.clone(), why: d.why.clone(), standing, against });
         }
         for r in led.all::<Run>()?.iter() {
             let row = match &r.receipt.row {
@@ -1082,6 +1094,9 @@ fn call_said(alone: &str, id: &str, d: &Dict, f: &Facts) -> Said {
 fn done(c: &Call) -> String {
     match c.action.as_str() {
         "investigate" => format!("put {} under investigation", named(&c.subject)),
+        // an undetermined rule has nothing to go against: a call on it is made while rb cannot judge it
+        a if c.against.contains("undetermined") => format!("{} {} while rb cannot judge its rule ({})", crate::ledger::made(a), named(&c.subject), c.against),
+        a if !c.against.is_empty() => format!("{} {} against its rule ({})", crate::ledger::made(a), named(&c.subject), c.against),
         a => format!("{} {}", crate::ledger::made(a), named(&c.subject)),
     }
 }
@@ -1300,7 +1315,7 @@ mod tests {
     }
 
     fn call(subject: &str, action: &str, why: &str, standing: Standing) -> Call {
-        Call { subject: subject.into(), action: action.into(), why: why.into(), standing }
+        Call { subject: subject.into(), action: action.into(), why: why.into(), standing, against: String::new() }
     }
 
     #[test]
@@ -2235,7 +2250,7 @@ mod tests {
         }
         f.experiment_of.insert("c5".into(), "e2".into());
         // the calls: c1 made, a proposal on c4 the user confirmed, a proposal on c3, and a past call a session mentioned
-        let call = |subject: &str, action: &str, why: &str, standing: Standing| Call { subject: subject.into(), action: action.into(), why: why.into(), standing };
+        let call = |subject: &str, action: &str, why: &str, standing: Standing| Call { subject: subject.into(), action: action.into(), why: why.into(), standing, against: String::new() };
         f.calls.insert("dec1".into(), call("c1", "accept", "holds on all three seeds", Standing::Made));
         f.calls.insert("dec5".into(), call("c4", "accept", "per-class drop stays under 2 points", Standing::Proposed));
         f.calls.insert("dec6".into(), call("c4", "accept", "per-class drop stays under 2 points", Standing::Confirmed));

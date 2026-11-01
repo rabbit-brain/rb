@@ -107,7 +107,7 @@ def test_a_met_rule_reads_with_what_it_rests_on(rb):
     # A rule met on a point only, with nothing wrong under it, is met on its estimate alone, so it never reads good; the
     # sentence ends on when the rule was declared, against the evidence it reads. No single word stands for the whole.
     assert not cq.good and cq.standing == "estimate meets criterion · point only" and "estimate meets criterion" in cq.sentence
-    assert cq.sentence.rstrip().endswith("declared before the evidence (by record times).")
+    assert cq.sentence.rstrip().endswith("declared before the evidence (by production times).")
     assert 'accepted: "pf/static2.rule" (read off the run configs)' in b.ruled and b.still_open == []
     vouched = [c.code for c in state().finding("cq").caveats if c.subject.endswith(".rule")]
     assert vouched == ["vouched", "vouched"]

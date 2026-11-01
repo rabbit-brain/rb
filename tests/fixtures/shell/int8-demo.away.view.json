@@ -1049,7 +1049,8 @@
    "reading_short": "int8 against the fp32 baseline: -0.0029 [-0.0046, -0.0012] top1",
    "verdict": "Met: int8 is 0.0029 below fp32 (-0.0046 to -0.0012). A real loss, but 0.0071 past the -0.01 the rule asks for.",
    "tags": [],
-   "reads_baseline": false
+   "reads_baseline": false,
+   "pooled": ""
   },
   "c2": {
    "criterion_id": "c2",
@@ -1232,7 +1233,8 @@
    "tags": [
     "retrospective"
    ],
-   "reads_baseline": true
+   "reads_baseline": true,
+   "pooled": ""
   },
   "c3": {
    "criterion_id": "c3",
@@ -1376,7 +1378,8 @@
    "tags": [
     "uncertainty_remains"
    ],
-   "reads_baseline": false
+   "reads_baseline": false,
+   "pooled": ""
   },
   "c4": {
    "criterion_id": "c4",
@@ -1506,7 +1509,8 @@
    "reading_short": "int8: 0.994 share",
    "verdict": "Met on its estimate: int8 is 0.994 share. One arm measured on its own. It is 0.0040 share past the 0.99 share the rule asks for.",
    "tags": [],
-   "reads_baseline": false
+   "reads_baseline": false,
+   "pooled": ""
   },
   "c5": {
    "criterion_id": "c5",
@@ -1744,7 +1748,8 @@
    "reading_short": "no reading yet",
    "verdict": "Not met: 1 of 4 units, in 4 design cells, is below -0.01 (calib_images=128).",
    "tags": [],
-   "reads_baseline": false
+   "reads_baseline": false,
+   "pooled": ""
   },
   "c6": {
    "criterion_id": "c6",
@@ -1874,7 +1879,8 @@
     "retrospective",
     "uncertainty_remains"
    ],
-   "reads_baseline": false
+   "reads_baseline": false,
+   "pooled": ""
   }
  },
  "experiments": [

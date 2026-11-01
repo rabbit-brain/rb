@@ -36,7 +36,7 @@ import pytest
 
 import rabbit_brain
 from rabbit_brain import RBWarning
-from rbtest import AGENT_VARS, Mcp, command, environment, object_card
+from rbtest import AGENT_VARS, Mcp, command, environment, made_now, object_card
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="a run's files are dated by git and their own times")
 
@@ -60,7 +60,7 @@ class Rec:
             subprocess.run(["git", *args], cwd=root, env=self.env, check=True, capture_output=True)
 
     def run(self, *argv: str, agent: dict | None = None, extra: dict | None = None) -> subprocess.CompletedProcess:
-        return subprocess.run([*command(), *argv], cwd=self.root, env={**self.env, **(agent or {}), **(extra or {})}, capture_output=True,
+        return subprocess.run([*command(), *made_now(argv, {**self.env, **(extra or {})})], cwd=self.root, env={**self.env, **(agent or {}), **(extra or {})}, capture_output=True,
                               stdin=subprocess.DEVNULL, encoding="utf-8", errors="replace")
 
     def rb(self, *argv: str, agent: dict | None = None, extra: dict | None = None) -> tuple[int, dict]:
@@ -309,7 +309,8 @@ def test_a_file_written_after_its_run_is_not_its_own_output(rec, monkeypatch, tm
     own = rec.run_id(rec.ok("run", "add", "int8", "--from", "out/seed2.json", "--set", "seed=2", "--produced-at", MAY))
     assert rec.ok("show", own)["data"]["file_written_after"] is None
     [item] = rec.open_items("file_written_after")
-    assert item["records"] == [export] and "rb run add int8 --from <database> --table <table> --where <column>=<value>" in item["do"]
+    # no database here: rb names none, and points at the run's own output where it is kept
+    assert item["records"] == [export] and "<database>" not in item["do"] and f"rb run add int8 --from <its file> --replaces {export}" in item["do"]
     rec.ok("criterion", "add", "INT8 within 0.5", "-e", "int8", "-q", "q1", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
            "--at-least", "-0.5", "--id", "c1")
     [finding] = [f for f in rec.ok("status")["data"]["findings"] if f["criterion"] == "c1"]
@@ -637,7 +638,7 @@ def test_late_criteria_name_both_arms_where_runs_are_expected(rec):
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8", "--why", "the next step")
     [item] = rec.open_items("late")
     assert item["what"] == "int8: 2 criteria were declared after their evidence existed: a reading of their own needs their subjects' runs made after the declaration"
-    assert item["do"].startswith("rb run add int8 fp32.top1=<value> int8.top1=<value> --set seed=<value>")
+    assert item["do"].startswith("rb run add int8 --from <the results file a run wrote> --set seed=<value>")
     assert rabbit_brain.open(rec.root).status()["open"] == rec.ok("status")["data"]["open"]
 
 

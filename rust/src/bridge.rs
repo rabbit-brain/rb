@@ -596,7 +596,7 @@ fn op_add_run(led: &Ledger, a: &Args) -> Res<Value> {
     let (mut per_run, mut produced_at) = (a.mapping("per_run")?, a.opt_text("produced_at")?);
     // the numbers were logged by the code that made them: the files exp.record and a run block keep, as --artifact
     // keeps one, never date the run
-    let (mut basis, mut numbers_from, mut row) = ("logged".to_string(), Vec::new(), None);
+    let (mut basis, mut numbers_from, mut row, mut table_row) = ("logged".to_string(), Vec::new(), None, None);
     // exp.record_from: the numbers of a file, or of one row of a SQLite database, read as rb run add --from reads them
     if let Some(path) = a.opt_text("from_file")? {
         let got = crate::cmds::record::read_from(led, &path, &a.texts("keys")?, a.opt_text("table")?.as_deref(), &a.mapping("where")?, &a.texts("select")?, per_run, produced_at)?;
@@ -607,7 +607,7 @@ fn op_add_run(led: &Ledger, a: &Args) -> Res<Value> {
             say(Some(&format!("{}: not numbers, so not metrics: {}", got.shown, got.skipped.join(", "))));
         }
         metrics.extend(got.metrics);
-        (per_run, produced_at, row) = (got.per_run, got.produced_at, got.row);
+        (per_run, produced_at, row, table_row) = (got.per_run, got.produced_at, got.row, got.table_row);
         let rel = crate::cmds::root_relative(&path, &led.root);
         files.push(rel.clone());
         numbers_from.push(rel);
@@ -636,6 +636,7 @@ fn op_add_run(led: &Ledger, a: &Args) -> Res<Value> {
         tree: None,
         numbers_from,
         row,
+        table_row,
     };
     let shape = if new.basis == "file" { crate::cmds::record::Shape::File } else { crate::cmds::record::Shape::Sdk };
     let got = led.add_run(&a.need_text("experiment")?, new)?;

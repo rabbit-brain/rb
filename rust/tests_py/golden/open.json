@@ -81,7 +81,7 @@
     "Project 't' started: @BASE@/work/.rb",
     "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
     "",
-    "Then paste this line into your agent's chat:",
+    "If you work with a coding agent, paste this line into its chat:",
     "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
     ""
    ],

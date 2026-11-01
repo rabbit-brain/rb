@@ -184,7 +184,7 @@ impl Ledger {
             .standing_runs()?
             .iter()
             .filter(|r| r.experiment == d.subject)
-            .filter(|r| r.produced_at.as_deref().and_then(crate::pytime::parse_iso).map_or(false, |t| t.timestamp() > end))
+            .filter(|r| super::support::run_produced(r).and_then(crate::pytime::parse_iso).map_or(false, |t| t.timestamp() > end))
             .map(|r| r.id.clone())
             .collect())
     }

@@ -239,6 +239,12 @@ fn strs<'a>(v: &'a Value, key: &str) -> Vec<&'a str> {
     list(v, key).iter().filter_map(Value::as_str).collect()
 }
 
+/// The notes as a list under a finding, in rb show's words (says.notes, the ids in them named by what they are).
+fn notes_list(f: &Value) -> String {
+    let items: String = strs(f, "says.notes").iter().map(|t| format!("<li>{}</li>", esc(t))).collect();
+    if items.is_empty() { items } else { format!("<ul class=\"notes\">{items}</ul>") }
+}
+
 /// The (id, object) pairs of a map of the document, in its order.
 fn entries<'a>(v: &'a Value, key: &str) -> Vec<(&'a str, &'a Value)> {
     at(v, key).and_then(Value::as_dict).map_or_else(Vec::new, |d| d.iter().map(|(k, v)| (k.as_str(), v)).collect())
@@ -921,7 +927,9 @@ impl Doc<'_> {
             // points") and is drawn as M words it (FIX5); a bare number is said in the reading's digits and unit
             let said = match parsed(margin) {
                 Some(v) => {
-                    let shown = fixed(v, reading_digits(f), false);
+                    // a margin smaller than the reading's digits keeps digits enough to say it (5e-07, never 0.000000)
+                    let d = (reading_digits(f)..=12).find(|&d| v == 0.0 || parsed(&fixed(v, d, false)).map_or(true, |x| x != 0.0)).unwrap_or(12);
+                    let shown = fixed(v, d, false);
                     with_unit(&shown, &unit_word(&unit_of(f), compared(f), parsed(&shown).unwrap_or(v).abs()))
                 }
                 None => margin.to_string(),
@@ -956,7 +964,8 @@ impl Doc<'_> {
         }
         // what rb checked under the reading, told here and not beside the verdict (FIX2): a problem in full, ok quietly
         let integrity = s(f, "says.integrity");
-        if !integrity.is_empty() {
+        // "ok" only on a card whose notes say nothing more: a card with notes leaves its checks to them
+        if !integrity.is_empty() && !(integrity == "ok" && !strs(f, "says.notes").is_empty()) {
             let cls = if integrity == "ok" { " class=\"dim\"" } else { "" };
             dl += &format!("<dt>{}</dt><dd{cls}>{}</dd>", term("integrity", "checks"), esc(integrity));
         }
@@ -972,12 +981,7 @@ impl Doc<'_> {
             review += &format!("{DOT}<a href=\"#{}:decide\">{}</a>", esc(&id), self.calls_view());
         }
         dl += &format!("<dt>review</dt><dd>{review}</dd>");
-        let mut notes = String::new();
-        for c in strs(f, "says.caveats") {
-            let (code, text) = c.split_once(": ").unwrap_or(("", c));
-            notes += &format!("<li><b>{}</b> {}</li>", esc(&code.replace('_', " ")), esc(text));
-        }
-        let notes = if notes.is_empty() { notes } else { format!("<ul class=\"notes\">{notes}</ul>") };
+        let notes = notes_list(f);
         format!("<section class=\"part\" id=\"{}:rule\"><h4>{AS_WRITTEN}</h4><dl class=\"ax\">{dl}</dl>{notes}</section>", esc(id))
     }
 
@@ -1968,16 +1972,7 @@ impl Doc<'_> {
             };
             out += &format!("<p class=\"sm\">{said}{DOT}{}</p>", link(&fa, "the whole finding"));
         }
-        let notes: String = strs(f, "says.caveats")
-            .iter()
-            .map(|c| {
-                let (code, text) = c.split_once(": ").unwrap_or(("", c));
-                format!("<li><b>{}</b> {}</li>", esc(&code.replace('_', " ")), esc(text))
-            })
-            .collect();
-        if !notes.is_empty() {
-            out += &format!("<ul class=\"notes\">{notes}</ul>");
-        }
+        out += &notes_list(f);
         // what is recorded on it: the call line rb gives, or that nothing is yet
         let recorded = match self.call_line(f) {
             "" => NOTHING_RECORDED.to_string(),
@@ -3081,6 +3076,16 @@ pub(crate) fn reading_digits(f: &Value) -> usize {
 /// number. "Not met: step by step is 3.60 points higher than the plain baseline (+0.62 to +6.58), short of the 5
 /// the rule asks for." What a rule reads (a gain, a level) is never said as its state.
 pub(crate) fn verdict(f: &Value) -> String {
+    let said = verdict_said(f);
+    // a reading that pools a per-run setting's values says so after its state word, in rb show's headline words
+    let pooled = s(f, "pooled");
+    match said.split_once(':').filter(|_| !pooled.is_empty()) {
+        Some((word, rest)) => format!("{word}, {pooled}:{rest}"),
+        None => said,
+    }
+}
+
+fn verdict_said(f: &Value) -> String {
     let state = s(f, "state");
     let word = match state {
         "meets" | "gate met" => "Met",
@@ -3338,10 +3343,11 @@ fn unit_of(f: &Value) -> String {
     if u == metric_name(f) || ratio(f) { String::new() } else { u.to_string() }
 }
 
-/// The digits a declared number was written with ("0.01" has 2, "1" none), at most 6.
+/// The digits a declared number was written with ("0.01" has 2, "1" none, "0.0000005" 7), at most 12: a tolerance of
+/// 5e-07 is said as itself, never rounded to 0.
 pub(crate) fn digits(v: f64) -> usize {
     let t = format!("{v}");
-    t.split_once('.').map_or(0, |(_, d)| d.len()).min(6)
+    t.split_once('.').map_or(0, |(_, d)| d.len()).min(12)
 }
 
 /// Whether a word of a receipt row is a hash, a path or a file (P4: monospace only for ids, commands, paths and

@@ -410,7 +410,7 @@ def test_where_the_runs_are_in_a_database_rb_hints_at_reading_a_row_not_typing_o
     rule = ["criterion", "add", "INT8 loses at most 0.01 top-1", "-e", "int8", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
             "--at-least", "-0.01"]
     code, env = rb(*rule, "--id", "c-typed")
-    assert env.next == ["rb run add int8 fp32.top1=<value> int8.top1=<value> --set seed=<value> --command \"...\""]
+    assert env.next == ["rb run add int8 --from <the results file a run wrote> --set seed=<value>"]
     con = sqlite3.connect("results.db")
     con.execute("create table evals (precision text, seed integer, top1 real)")
     con.commit()
@@ -561,8 +561,9 @@ def test_the_paste_line_is_the_same_everywhere_it_is_given(rb, workdir):
     assert f"`{PASTE}`" in (ROOT / "AGENTS.md").read_text(encoding="utf-8") and PASTE in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     code, env = rb("ui")
     assert code == 2 and env.errors[0].code == "E_NO_PROJECT" and env.errors[0].message.endswith(PASTE)
+    # with no agent files asked for, the line is for whoever works with an agent, never a step left undone
     text = rb.text("init", "INT8 ResNet-50 on ImageNet", "--no-agents")
-    assert text.rstrip("\n").endswith(f"Then paste this line into your agent's chat:\n  {PASTE}") and "Next:" not in text
+    assert text.rstrip("\n").endswith(f"If you work with a coding agent, paste this line into its chat:\n  {PASTE}") and "Next:" not in text
     assert home(workdir).quiet == f"Nothing recorded yet. To start, paste this line into your agent's chat: {PASTE}"
 
 

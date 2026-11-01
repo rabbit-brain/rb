@@ -296,7 +296,7 @@ impl Ledger {
             // a run's own file (its config, its output) is that run's, whenever it was committed
             .filter(|r| run.map_or(true, |id| r.id == id))
             .filter(|r| r.experiment == exp.id && reads(r) && !r.files.iter().any(|f| f.path == path) && r.receipt.config.as_ref().map_or(true, |c| c.path != path) && super::support::made_before_start(r, &began) == Some(true))
-            .filter_map(|r| r.produced_at.as_deref().and_then(crate::pytime::parse_iso).map(|t| (t, r.id.clone(), r.produced_at.clone().unwrap_or_default())))
+            .filter_map(|r| super::support::run_produced(r).and_then(|p| crate::pytime::parse_iso(p).map(|t| (t, r.id.clone(), p.to_string()))))
             .min_by_key(|(t, _, _)| *t);
         let Some((when, rid, at)) = first_run else { return Ok(None) };
         let day = utc_day(&at);
@@ -457,7 +457,11 @@ impl Ledger {
                 }
             }
             let cn = canon(&c.metric, exp, &aliases);
-            read.insert(cn.clone());
+            // where two or more variants compare, a criterion that names its arms reads no number by its bare name: a
+            // run giving one names no variant, which rb run add refuses (writes.rs names_no_arm)
+            if subject.is_empty() && reference.is_empty() || cn.starts_with("change.") || cn.starts_with("ratio.") || exp.live_variants().len() < 2 {
+                read.insert(cn.clone());
+            }
             let (head, _, rest) = partition(&cn, ".");
             if head == "change" && !rest.is_empty() {
                 let (v2, _, m2) = partition(rest, ".");
@@ -780,7 +784,7 @@ impl Ledger {
         let in_cell = |unit: String, per_run: &Dict| unit_within(unit, per_run, unit_setting.as_deref(), &design_factors);
         let mut runs: Vec<Run> = self.all::<Run>()?.iter().filter(|r| r.experiment == exp.id).cloned().collect();
         runs.sort_by(|a, b| (&a.created_at, &a.id).cmp(&(&b.created_at, &b.id)));
-        let recorded: HashMap<String, String> = runs.iter().filter(|r| r.produced_basis == "unknown").map(|r| (r.id.clone(), r.created_at.clone())).collect();
+        let recorded: HashMap<String, String> = runs.iter().filter(|r| super::support::run_basis(r) == "unknown").map(|r| (r.id.clone(), r.created_at.clone())).collect();
         let mut obs: Vec<Observation> = Vec::new();
         let mut notes: Vec<Caveat> = Vec::new();
         let mut problems: Vec<Caveat> = Vec::new();
@@ -830,8 +834,8 @@ impl Ledger {
             };
             let unit = scoped_unit(r, crit, unit_setting.as_deref(), &unit_of);
             unit_of.insert(r.id.clone(), unit.clone());
-            let mut produced = if r.produced_basis != "unknown" { r.produced_at.clone() } else { None };
-            if produced.is_none() && r.produced_basis != "unknown" {
+            let mut produced = super::support::run_produced(r).map(str::to_string);
+            if produced.is_none() && super::support::run_basis(r) != "unknown" {
                 produced = Some(r.created_at.clone());
             }
             let mut reason = String::new();
@@ -892,7 +896,7 @@ impl Ledger {
             o.reason = reason;
             o.per_run = r.per_run.clone();
             o.produced_at = produced;
-            o.produced_basis = r.produced_basis.clone();
+            o.produced_basis = super::support::run_basis(r).to_string();
             o.repeats = r.repeats.clone();
             obs.push(o);
         }
@@ -1023,7 +1027,7 @@ impl Ledger {
         }
         if crit.scoped() {
             let skipped = runs.iter().filter(|r| r.retracted.is_none() && !selected(crit, r)).count();
-            if skipped > 0 { notes.push(Caveat::note("run_scope", &crit.id, format!("{skipped} runs outside this criterion's per-run selectors are not read"))); }
+            if skipped > 0 { notes.push(Caveat::note("run_scope", &crit.id, if skipped == 1 { "1 run outside this criterion's per-run selectors is not read".to_string() } else { format!("{skipped} runs outside this criterion's per-run selectors are not read") })); }
         }
         // a paired reading leaves out a run whose unit has one arm only, and one arm's run in a unit where a run gives
         // the difference by itself: it is shown, not counted; across design cells, as each cell's reading does
@@ -1067,7 +1071,13 @@ impl Ledger {
                     seen.push(v);
                 }
             }
-            if seen.len() > 1 {
+            // two arms each at one value of it, recorded apart, pool nothing: the arms differ in it, which that note says
+            let one_each = !reference.is_empty() && in_reading.iter().all(|o| !o.arm.is_empty()) && [true, false].iter().all(|subj| {
+                let mut vs: Vec<String> = in_reading.iter().filter(|o| of_subject(subject, reference, &o.arm) == *subj).map(|o| o.per_run.get(&s.name).map(unit_value).unwrap_or_default()).collect();
+                vs.dedup();
+                vs.len() == 1
+            });
+            if seen.len() > 1 && !one_each {
                 seen.sort_by(|a, b| match (a.as_f64(), b.as_f64()) {
                     (Some(x), Some(y)) => x.partial_cmp(&y).unwrap_or(std::cmp::Ordering::Equal),
                     (Some(_), None) => std::cmp::Ordering::Less,
@@ -1083,10 +1093,63 @@ impl Ledger {
                 ));
             }
         }
+        // two arms read from runs of their own that hold no value of a per-run setting in common (500 problems against
+        // 250, one grader against another): the comparison mixes that difference in, and says so, as a shared
+        // setting's undeclared difference is said; the unit, a design factor and a setting both arms select alike are
+        // no such difference, and one the arms select apart is one only where they are different variants too
+        if !reference.is_empty() {
+            let same_variant = subject == reference;
+            for s in exp.settings.iter().filter(|s| s.retracted.is_none() && s.per_run && Some(s.name.as_str()) != unit_setting.as_deref() && s.design_factor != Some(true)) {
+                if crit.r#where.contains_key(&s.name) || (same_variant && (crit.subject_where.contains_key(&s.name) || crit.reference_where.contains_key(&s.name))) {
+                    continue;
+                }
+                let values = |subj: bool| -> Vec<String> {
+                    let mut vs: Vec<String> = Vec::new();
+                    for o in in_reading.iter().filter(|o| !o.arm.is_empty() && of_subject(subject, reference, &o.arm) == subj) {
+                        let v = o.per_run.get(&s.name).map(unit_value).unwrap_or_else(|| "none".into());
+                        if !vs.contains(&v) {
+                            vs.push(v);
+                        }
+                    }
+                    vs
+                };
+                let (sv, rv) = (values(true), values(false));
+                // or a unit whose two arms hold no value in common, though the arms share values across units
+                let unit_values = |unit: &str, subj: bool| -> Vec<String> {
+                    in_reading
+                        .iter()
+                        .filter(|o| o.unit == unit && !o.arm.is_empty() && of_subject(subject, reference, &o.arm) == subj)
+                        .map(|o| o.per_run.get(&s.name).map(unit_value).unwrap_or_else(|| "none".into()))
+                        .collect()
+                };
+                let within = in_reading.iter().filter(|o| !o.arm.is_empty()).map(|o| o.unit.clone()).collect::<BTreeSet<String>>().into_iter().any(|u| {
+                    let (a, b) = (unit_values(&u, true), unit_values(&u, false));
+                    !a.is_empty() && !b.is_empty() && !a.iter().any(|v| b.contains(v))
+                });
+                let apart = !sv.is_empty() && !rv.is_empty() && !sv.iter().any(|v| rv.contains(v));
+                if apart || within {
+                    let few = |vs: &[String]| assess::first_few(vs, 5, ", ");
+                    // a variant compared with itself is named by each arm's selection: wide at loops=8, wide at loops=6
+                    let at = |w: &Dict| w.iter().map(|(k, v)| format!("{k}={}", show(v))).collect::<Vec<_>>().join(" and ");
+                    let held = if apart && same_variant {
+                        format!("the runs of {subject} at {} hold {}, those of {reference} at {} hold {}", at(&crit.subject_where), few(&sv), at(&crit.reference_where), few(&rv))
+                    } else if apart {
+                        format!("{}'s runs hold {}, {}'s {}", subject, few(&sv), reference, few(&rv))
+                    } else {
+                        "within a unit, the two arms' runs hold different values".to_string()
+                    };
+                    notes.push(Caveat::note(
+                        "arms_differ",
+                        &format!("{}/{}", exp.id, s.name),
+                        format!("the arms differ in {}: {held}, so the comparison carries that difference too", s.name),
+                    ));
+                }
+            }
+        }
         let mut superseded_early = Vec::new();
         let mut baseline_early: Vec<String> = obs.iter().filter(|o| o.before_declared && !of_subject(subject, reference, &o.arm)).map(|o| o.run.clone()).collect();
         for (r, why_) in &superseded {
-            let produced = if r.produced_basis != "unknown" { by_record(r.produced_at.as_deref().filter(|p| !p.is_empty()).unwrap_or(&r.created_at), &r.created_at) } else { r.created_at.clone() };
+            let produced = if super::support::run_basis(r) != "unknown" { by_record(super::support::run_produced(r).unwrap_or(&r.created_at), &r.created_at) } else { r.created_at.clone() };
             if crate::pytime::before(Some(&produced), Some(declared_at)) {
                 // a rule's timing is read on its subject's runs: a superseded run of its baseline alone came first as the
                 // baseline's runs do
@@ -1106,9 +1169,16 @@ impl Ledger {
         if reading.is_some() && fitted {
             // the units the reading rests on known to have come after it: no run of theirs came before it, or at a time nobody knows
             // (its subject's runs: its baseline's coming first leave a unit after it)
-            let not_after: HashSet<&String> =
-                in_reading.iter().filter(|o| of_subject(subject, reference, &o.arm) && (o.before_declared || o.produced_basis == "unknown")).map(|o| &o.unit).collect();
-            let after: Vec<Observation> = in_reading.iter().filter(|o| !not_after.contains(&o.unit)).cloned().collect();
+            // an unpaired reading counts each arm's units apart, as the timing's count does: a unit of either arm
+            // produced before it is not after it
+            let unpaired = reading.as_ref().map_or(false, |r| r.method.starts_with("unpaired"));
+            let key = |o: &Observation| if unpaired { format!("{}\u{0}{}", of_subject(subject, reference, &o.arm), o.unit) } else { o.unit.clone() };
+            let not_after: HashSet<String> = in_reading
+                .iter()
+                .filter(|o| (unpaired || of_subject(subject, reference, &o.arm)) && (o.before_declared || o.produced_basis == "unknown"))
+                .map(key)
+                .collect();
+            let after: Vec<Observation> = in_reading.iter().filter(|o| !not_after.contains(&key(o))).cloned().collect();
             if !after.is_empty() {
                 prospective = read(&after).0;
             }
@@ -1211,7 +1281,7 @@ impl Ledger {
             for u in &r.inputs {
                 if u.resource == res.id && assess::is_eval_role(&u.role) {
                     out.push(crate::dict! {
-                        "how" => "evaluated", "at" => r.produced_at.clone().filter(|p| !p.is_empty()).unwrap_or_else(|| r.created_at.clone()), "by" => r.created_by.clone(),
+                        "how" => "evaluated", "at" => super::support::run_produced(r).unwrap_or(&r.created_at).to_string(), "by" => r.created_by.clone(),
                         "why" => "", "run" => r.id.clone(), "experiment" => r.experiment.clone(), "reported" => false
                     });
                 }
@@ -1405,10 +1475,7 @@ impl Ledger {
                 notes.push(c);
             }
         }
-        let cited_differs: Vec<Caveat> = notes.iter().filter(|c| c.code == "cited_differs").cloned().collect();
-        if crit.origin == "cited" && !cited_differs.is_empty() {
-            problems.push(Caveat::problem("not_comparable", &crit.id, cited_differs.iter().map(|c| c.text.clone()).collect::<Vec<_>>().join("; ")));
-        }
+        let mut cited_differs: Vec<Caveat> = notes.iter().filter(|c| c.code == "cited_differs").cloned().collect();
         let mut observations: Vec<Observation> = Vec::new();
         let mut unit_values: Option<Vec<(String, f64)>> = None;
         let mut prospective: Option<Reading> = None;
@@ -1417,11 +1484,56 @@ impl Ledger {
         let mut fitted: Vec<(String, String, String)> = Vec::new();
         let mut exposed_resources: BTreeSet<String> = BTreeSet::new();
         let rr_ = if crit.estimand.is_empty() { self.run_reading(&exp, crit, &subject, &reference, &metric, &crit.created_at)? } else { RunReading::default() };
+        // a per-run setting with a cited value: the runs the reading counts each give their own, and one that differs
+        // from the cited source's is said as a shared setting's is
+        let counted_ids: HashSet<&String> = rr_.counted.iter().map(|o| &o.run).collect();
+        if !counted_ids.is_empty() {
+            let runs: Vec<Run> = self.live::<Run>()?.into_iter().filter(|r| counted_ids.contains(&r.id)).collect();
+            for (name, st) in exp.all_settings() {
+                let Some(c) = st.cited.as_ref().filter(|_| st.per_run && st.retracted.is_none()) else { continue };
+                let mut differ: Vec<String> = Vec::new();
+                for r in &runs {
+                    if let Some(v) = r.per_run.get(&name).filter(|v| !same_value(&c.value, v)) {
+                        let shown = show(v);
+                        if !differ.contains(&shown) {
+                            differ.push(shown);
+                        }
+                    }
+                }
+                if !differ.is_empty() {
+                    let cav = Caveat::note(
+                        "cited_differs",
+                        &format!("{}/{name}", exp.id),
+                        format!("{name} {} in the runs it reads vs {} in the cited source", differ.join(", "), show(&c.value)),
+                    );
+                    notes.push(cav.clone());
+                    cited_differs.push(cav);
+                }
+            }
+        }
         let mut readings = self.analysis_readings(&exp, &subject, &reference, &metric, &crit.estimand)?;
         let design_declared = crit.estimand.is_empty() && exp.settings.iter().any(|s| s.retracted.is_none() && s.design_factor == Some(true));
         if (crit.scoped() || design_declared) && !readings.is_empty() {
             notes.push(Caveat::note("analysis_scope", &crit.id, "Existing analyses do not declare these per-run selectors or fixed design cells; this criterion reads the scoped runs only."));
             readings.clear();
+        }
+        // a cited difference read against rb's paired reading, which leaves out runs whose unit one arm alone ran: the
+        // two are different estimands (with every unit paired, the mean of the differences is the difference of the
+        // means), so the cited number is not compared with it, and rb says the difference of the arms' means it reads
+        // a cited number, or one a clone brought with its criterion (`--equals` read as reproduced or not)
+        let reads_number = crit.origin == "cited" || (crit.origin == "inherited" && crit.comparator == "equals");
+        if reads_number && readings.is_empty() {
+            if let Some(cav) = paired_against_means(&rr_, crit, &subject, &reference) {
+                notes.push(cav.clone());
+                cited_differs.push(cav);
+            }
+        }
+        // a cited value bears on a rule that cites a number; a rule of the work's own cites nothing to differ from
+        if !reads_number {
+            notes.retain(|c| c.code != "cited_differs");
+        }
+        if reads_number && !cited_differs.is_empty() {
+            problems.push(Caveat::problem("not_comparable", &crit.id, cited_differs.iter().map(|c| c.text.clone()).collect::<Vec<_>>().join("; ")));
         }
         let mut current: Option<Reading> = None;
         let mut cur_a: Option<Analysis> = None;
@@ -1539,14 +1651,14 @@ impl Ledger {
                     // number alone came first as the baseline's runs do
                     let (sv, rv, diff, _) = self.pair(&exp, &subject, &reference, &metric, crit, &rr, &aliases);
                     if !reference.is_empty() && sv.is_none() && diff.is_none() && rv.is_some() {
-                        if crate::pytime::before(Some(rr.produced_at.as_deref().filter(|p| !p.is_empty()).unwrap_or(&rr.created_at)), Some(&crit.created_at)) {
+                        if crate::pytime::before(Some(super::support::run_produced(&rr).unwrap_or(&rr.created_at)), Some(&crit.created_at)) {
                             baseline_early.push(rid.clone());
                         }
                     } else {
                         evidence_times.push((
-                        if rr.produced_basis != "unknown" { Some(by_record(rr.produced_at.as_deref().filter(|p| !p.is_empty()).unwrap_or(&rr.created_at), &rr.created_at)) } else { None },
+                        if super::support::run_basis(&rr) != "unknown" { Some(by_record(super::support::run_produced(&rr).unwrap_or(&rr.created_at), &rr.created_at)) } else { None },
                         format!("{rid}, which {} rests on,", ca.id),
-                        rr.produced_basis.clone(),
+                        super::support::run_basis(&rr).to_string(),
                         ));
                     }
                     if rr.retracted.as_ref().map_or(false, |x| x.scope.is_empty()) {
@@ -1701,6 +1813,21 @@ impl Ledger {
                     notes.push(Caveat::note("config_unchecked", &crit.id, "no run config was compared with the spec (record runs with --config)"));
                 }
             }
+            // a run whose own config says the code had uncommitted changes when it ran: the rule that reads it says so,
+            // in the config's words
+            let mut dirty: Vec<String> = Vec::new();
+            for o in rr_.counted.iter().filter(read) {
+                let r: Run = self.load(&o.run)?;
+                if let Some(d) = r.receipt.config.as_ref().and_then(|c| crate::repo::config_dirty_line(&self.root, &c.path, c.sha256.as_deref())) {
+                    let said = format!("{}: {d}", r.id);
+                    if !dirty.contains(&said) {
+                        dirty.push(said);
+                    }
+                }
+            }
+            if !dirty.is_empty() {
+                notes.push(Caveat::note("uncommitted_code", &crit.id, crate::assess::first_few(&dirty, RUNS_NAMED, "; ")));
+            }
         }
         // the axes
         let eq_margin = if crit.comparator == "equivalent" { crit.margin } else { None };
@@ -1745,7 +1872,7 @@ impl Ledger {
             }
             why_rule = said.join("; ");
         }
-        if crit.origin == "cited" && !cited_differs.is_empty() && (outcome == "meets" || outcome == "misses") {
+        if reads_number && !cited_differs.is_empty() && (outcome == "meets" || outcome == "misses") {
             outcome = "undetermined".into();
             why_rule = format!("not comparable: {}", cited_differs.iter().map(|c| c.text.clone()).collect::<Vec<_>>().join("; "));
         }
@@ -1826,9 +1953,13 @@ impl Ledger {
                 if let Some(ru) = &run_units {
                     // the units the reading rests on; a run the paired reading leaves out is said as a run
                     // read on its subject's runs: a unit whose baseline's run alone came first is not one of them
-                    let late: BTreeSet<&String> = ru.iter().filter(|o| o.before_declared && of_subject(&subject, &reference, &o.arm)).map(|o| &o.unit).collect();
-                    let unsure: BTreeSet<&String> =
-                        ru.iter().filter(|o| o.produced_basis == "unknown" && of_subject(&subject, &reference, &o.arm) && !late.contains(&o.unit)).map(|o| &o.unit).collect();
+                    // an unpaired reading counts each arm's units apart (its n is both arms' units), so it counts the units
+                    // produced before the declaration in both arms; a paired one counts a unit by its subject's run
+                    let unpaired = cur.method.starts_with("unpaired");
+                    let key = |o: &Observation| if unpaired { format!("{}\u{0}{}", of_subject(&subject, &reference, &o.arm), o.unit) } else { o.unit.clone() };
+                    let counts = |o: &Observation| unpaired || of_subject(&subject, &reference, &o.arm);
+                    let late: BTreeSet<String> = ru.iter().filter(|o| o.before_declared && counts(o)).map(key).collect();
+                    let unsure: BTreeSet<String> = ru.iter().filter(|o| o.produced_basis == "unknown" && counts(o)).map(key).filter(|k| !late.contains(k)).collect();
                     let lone = &lone_early;
                     // across fixed design cells the reading's n counts cells, and the units are those within them
                     let cells = cur.design.get("count").and_then(Value::as_i64);
@@ -1951,8 +2082,32 @@ impl Ledger {
             Some(v) if outcome == "misses" && crit.over == "each" => assess::missed_units(crit, v),
             _ => Vec::new(),
         };
+        // a reading that pools several values of a per-run setting says so in its headline, and names each value whose
+        // runs alone would not meet the rule
+        let pooled = if current.as_ref().map_or(false, |c| c.source == "runs") { pooled_values(crit, &notes, &rr_.counted, &subject, &reference, &direction) } else { Vec::new() };
+        let mut notes = notes;
+        for (name, values, missed) in &pooled {
+            if !missed.is_empty() && outcome == "meets" {
+                let at = missed.iter().map(|(v, x)| format!("{name}={v} ({x})")).collect::<Vec<_>>().join(", ");
+                let text = if missed.len() == values.len() {
+                    format!("the runs at each {name} value alone would not meet the rule ({at}); only pooled do they")
+                } else {
+                    format!("the runs at {at} alone would not meet the rule; pooled with the other {name} values they do")
+                };
+                notes.push(Caveat::note("pooled_misses", &crit.id, text));
+            }
+        }
         let notes = grouped(unique(notes.into_iter().filter(|c| !c.problem).collect()));
-        let says = self.says(crit, current.as_ref(), result, &outcome, &why_rule, &timing, &timing_why, &declared, &units, &problems, review.as_ref(), &history, &metric_unit, prospective.as_ref(), &direction);
+        let mut says = self.says(crit, current.as_ref(), result, &outcome, &why_rule, &timing, &timing_why, &declared, &units, &problems, review.as_ref(), &history, &metric_unit, prospective.as_ref(), &direction);
+        if let Some(h) = says.get_mut("headline") {
+            for (name, values, missed) in &pooled {
+                h.push_str(&format!(" · pooled over {} {name} values", values.len()));
+                if !missed.is_empty() && outcome == "meets" {
+                    let word = assess::rule_label(&assess::rule_word("misses", &crit.role, &crit.origin), 1);
+                    h.push_str(&format!(", {word} at {}", missed.iter().map(|(v, _)| format!("{name}={v}")).collect::<Vec<_>>().join(", ")));
+                }
+            }
+        }
         let mut f = base();
         f.comparison = current;
         f.result = result.to_string();
@@ -2295,6 +2450,13 @@ pub fn arms_with(exp: &Experiment, crit: &Criterion, aliases: &IndexMap<String, 
     (String::new(), String::new(), alias(&crit.metric), None)
 }
 
+/// Whether a criterion reads a number by the name a run gives it, naming no arm: --metric val_loss, or eval.top1 where
+/// eval is no variant or role, with no --subject or --reference.
+pub fn reads_as_given(exp: &Experiment, crit: &Criterion, aliases: &IndexMap<String, String>) -> bool {
+    let (subject, reference, _, _) = arms_with(exp, crit, aliases);
+    subject.is_empty() && reference.is_empty()
+}
+
 /// An analysis's readings of one comparison.
 pub fn analysis_rows(a: &Analysis, subject: &str, reference: &str, metric: &str, estimand: &str, aliases: &IndexMap<String, String>) -> Vec<Reading> {
     let mut rows = Vec::new();
@@ -2578,4 +2740,153 @@ fn days_apart(later: &str, earlier: &str) -> (String, String) {
     }
     let at = |t: &str| crate::pytime::parse_iso(t).map(|t| t.with_timezone(&chrono::Utc).format("%Y-%m-%d %H:%M UTC").to_string()).unwrap_or_else(|| t.to_string());
     (at(later), at(earlier))
+}
+
+/// For each per-run setting a reading pools (its `pooled_setting` note), the values its runs hold and each value whose
+/// runs alone would not meet the rule, with what they read there: a difference where the rule compares two arms (each
+/// run's own difference, or a unit's subject minus its reference, or where no unit holds both, the subject's mean
+/// minus the reference's), or the subject's level. A threshold rule judges the mean over that value's units, or for an
+/// --each rule each unit; an interval rule its estimate there, on the side its rule asks for.
+pub fn pooled_values(crit: &Criterion, notes: &[Caveat], counted: &[Observation], subject: &str, reference: &str, direction: &str) -> Vec<(String, Vec<String>, Vec<(String, String)>)> {
+    let mut out = Vec::new();
+    for n in notes.iter().filter(|n| n.code == "pooled_setting") {
+        let Some(name) = n.subject.split_once('/').map(|(_, s)| s.to_string()) else { continue };
+        let mut groups: IndexMap<String, Vec<&Observation>> = IndexMap::new();
+        for o in counted {
+            groups.entry(o.per_run.get(&name).map(unit_value).unwrap_or_else(|| "none".into())).or_default().push(o);
+        }
+        let mut missed = Vec::new();
+        for (v, obs) in &groups {
+            // each unit's value there: a run's own difference or level, or a unit's subject minus its reference
+            let mut own: IndexMap<String, Vec<f64>> = IndexMap::new();
+            let (mut subj, mut refr): (IndexMap<String, Vec<f64>>, IndexMap<String, Vec<f64>>) = (IndexMap::new(), IndexMap::new());
+            for o in obs {
+                if reference.is_empty() || o.arm.is_empty() {
+                    own.entry(o.unit.clone()).or_default().push(o.value);
+                } else if of_subject(subject, reference, &o.arm) {
+                    subj.entry(o.unit.clone()).or_default().push(o.value);
+                } else {
+                    refr.entry(o.unit.clone()).or_default().push(o.value);
+                }
+            }
+            let mut units: Vec<f64> = own.values().map(|xs| assess::fmean(xs)).collect();
+            let paired: Vec<f64> = subj.iter().filter_map(|(u, xs)| refr.get(u).map(|ys| assess::fmean(xs) - assess::fmean(ys))).collect();
+            units.extend(paired.iter().copied());
+            let estimate = if !units.is_empty() {
+                assess::fmean(&units)
+            } else if !subj.is_empty() && !refr.is_empty() {
+                let mean = |m: &IndexMap<String, Vec<f64>>| assess::fmean(&m.values().map(|xs| assess::fmean(xs)).collect::<Vec<_>>());
+                mean(&subj) - mean(&refr)
+            } else {
+                continue;
+            };
+            let sign = match direction {
+                "maximize" => 1.0,
+                "minimize" => -1.0,
+                _ => 0.0,
+            };
+            // what the runs at that value read: an --each rule's units outside it, with the farthest; else the estimate
+            // there and how many units it rests on
+            let n = units.len();
+            let rests = if n > 0 { format!(", {n} {}", if n == 1 { "unit" } else { "units" }) } else { String::new() };
+            let miss = if crate::record::THRESHOLDS.contains(&crit.comparator.as_str()) {
+                if crit.over == "each" && !units.is_empty() {
+                    let out: Vec<f64> = units.iter().copied().filter(|x| !assess::threshold(crit, *x).0).collect();
+                    let side = match crit.comparator.as_str() {
+                        "at_least" => "below",
+                        "at_most" => "above",
+                        _ => "outside",
+                    };
+                    // the unit farthest from the rule: the lowest below it, the highest above it, the farthest from its number
+                    let target = crit.target.unwrap_or(0.0);
+                    let dist = |x: f64| match side {
+                        "below" => target - x,
+                        "above" => x - target,
+                        _ => (x - target).abs(),
+                    };
+                    out.iter().copied().max_by(|a, b| dist(*a).partial_cmp(&dist(*b)).unwrap_or(std::cmp::Ordering::Equal)).map(|worst| {
+                        let bound = match (side, crit.tolerance) {
+                            ("outside", Some(t)) => format!("{} \u{b1} {}", assess::declared(target), assess::declared(t)),
+                            _ => crit.target.map(assess::declared).unwrap_or_default(),
+                        };
+                        let word = if side == "below" { "lowest" } else if side == "above" { "highest" } else { "farthest" };
+                        match (out.len(), n) {
+                            (1, 1) => format!("its unit {side} {bound}: {}", assess::g(worst)),
+                            (k, n) if k == n => format!("all {n} units {side} {bound}, {word} {}", assess::g(worst)),
+                            (1, n) => format!("1 of {n} units {side} {bound}: {}", assess::g(worst)),
+                            (k, n) => format!("{k} of {n} units {side} {bound}, {word} {}", assess::g(worst)),
+                        }
+                    })
+                } else {
+                    (!assess::threshold(crit, estimate).0).then(|| format!("{}{rests}", assess::g(estimate)))
+                }
+            } else {
+                // an interval rule, judged on its estimate there: on the better side, inside its margin
+                let margin = crit.margin.unwrap_or(0.0);
+                let off = match crit.comparator.as_str() {
+                    "better" => sign != 0.0 && estimate * sign <= 0.0,
+                    "noninferior" => sign != 0.0 && estimate * sign < -margin,
+                    "equivalent" => estimate.abs() > margin,
+                    _ => false,
+                };
+                off.then(|| format!("{}{rests}", assess::g(estimate)))
+            };
+            if let Some(x) = miss {
+                missed.push((v.clone(), x));
+            }
+        }
+        out.push((name, groups.keys().cloned().collect(), missed));
+    }
+    out
+}
+
+/// Where rb's paired reading of two arms leaves out runs whose unit one arm alone ran, what rb says to a cited
+/// difference: the units it paired, the runs it left out, and, where the arms are recorded in runs of their own and read
+/// outside design cells, the difference of the arms' means over all their units (a unit's cases averaged first, a case
+/// being a run with its repeats), which a cited difference of means gives. None where every unit pairs.
+fn paired_against_means(rr: &RunReading, crit: &Criterion, subject: &str, reference: &str) -> Option<Caveat> {
+    let rd = rr.reading.as_ref()?;
+    if subject.is_empty() || reference.is_empty() {
+        return None;
+    }
+    let lone: Vec<&Observation> = rr.left_out.iter().filter(|o| !o.arm.is_empty() && o.reason.starts_with("its unit has no ")).collect();
+    if lone.is_empty() {
+        return None;
+    }
+    let left: Vec<String> = lone.iter().map(|o| o.run.clone()).collect();
+    let left = assess::first_few(&left, 4, ", ");
+    let units = assess::plural(if rd.unit.is_empty() { "unit" } else { rd.unit.as_str() }, 2);
+    let note = |text: String| Some(Caveat::note("cited_differs", subject, text));
+    let all: Vec<&Observation> = rr.counted.iter().chain(lone.iter().copied()).collect();
+    // across design cells, or where some units give the difference in one run, rb has no means of its own to set beside it
+    if !rd.design.is_empty() || all.iter().any(|o| o.arm.is_empty()) {
+        let within = if rd.design.is_empty() { "" } else { " within each design cell" };
+        return note(format!(
+            "rb's paired reading reads only the units both arms ran{within} and leaves out {left}, so it is not a difference of the arms' means over all their {units}"
+        ));
+    }
+    // each arm's mean over its units: a case is a run with its repeats, a unit's cases averaged, then the units
+    let arm_mean = |subj: bool| -> Option<(f64, usize)> {
+        let mut by_unit: IndexMap<&str, IndexMap<&str, Vec<f64>>> = IndexMap::new();
+        for o in all.iter().filter(|o| of_subject(subject, reference, &o.arm) == subj) {
+            by_unit.entry(o.unit.as_str()).or_default().entry(o.repeats.as_deref().unwrap_or(o.run.as_str())).or_default().push(o.value);
+        }
+        let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+        let means: Vec<f64> = by_unit.values().map(|cases| mean(&cases.values().map(|c| mean(c)).collect::<Vec<_>>())).collect();
+        (!means.is_empty()).then(|| (mean(&means), means.len()))
+    };
+    let ((sm, sn), (rm, rn)) = (arm_mean(true)?, arm_mean(false)?);
+    // a variant compared with itself is named by each arm's selection
+    let at = |w: &Dict| w.iter().map(|(k, v)| format!("{k}={}", show(v))).collect::<Vec<_>>().join(" and ");
+    let (sname, rname) = if subject == reference {
+        (format!("{subject} at {}", at(&crit.subject_where)), format!("{reference} at {}", at(&crit.reference_where)))
+    } else {
+        (subject.to_string(), reference.to_string())
+    };
+    let paired = rr.read_units.len();
+    note(format!(
+        "rb's paired reading reads only the {paired} {} both arms ran and leaves out {left}, so it is not a difference of the arms' means over all their {units} ({sname} over {sn}, {rname} over {rn}), which is {} here",
+        assess::plural(if rd.unit.is_empty() { "unit" } else { rd.unit.as_str() }, paired as i64),
+        assess::n4(Some(sm - rm), true)
+    ))
 }

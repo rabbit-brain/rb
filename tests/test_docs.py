@@ -372,7 +372,8 @@ def test_the_manual_and_the_readme_state_rb_s_limits_and_where_it_looks():
                  "and every finding is computed from the files, not from the agent's account."):
         assert said in bounds, said
     readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
-    assert ("on its own it looks in `out/`, `outputs/`, `results/`, `eval-out/`, `metrics/` and any folder a recorded run named, at the files in "
+    assert ("on its own it looks in `out/`, `outputs/`, `results/`, `eval-out/`, `metrics/`, every folder named for results down to four levels "
+            "(`reports/stage1/eval/`, `artifacts/`) and any folder a recorded run named, at the files in "
             "the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed, and it reads what code, configs, docs "
             "and database rows say only where the record points to them.") in readme
 
@@ -469,7 +470,8 @@ def test_llms_txt_states_the_limits_the_readme_states():
     readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
     for said in ("It cannot make an agent record a choice that only lived in the chat, and it cannot judge whether a method fits the question.",
                  "It sees only what is in the repository and what runs through `rb journal run`: on its own it looks in `out/`, `outputs/`, "
-                 "`results/`, `eval-out/`, `metrics/` and any folder a recorded run named,",
+                 "`results/`, `eval-out/`, `metrics/`, every folder named for results down to four levels (`reports/stage1/eval/`, `artifacts/`) "
+                 "and any folder a recorded run named,",
                  "not proof of what produced it."):
         assert said in llms and said in readme, said
 

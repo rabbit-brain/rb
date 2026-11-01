@@ -3426,7 +3426,7 @@ pub fn run_rows(led: &Ledger, limit: usize) -> Res<Vec<RunRow>> {
             per_run: r.per_run.iter().map(|(k, v)| (k.clone(), Value::Str(show(v)))).collect(),
             // a session id is never on a screen; the record keeps it
             session: String::new(),
-            produced: r.produced_at.as_deref().filter(|p| !p.is_empty() && r.produced_basis != "unknown").map(|p| p.chars().take(10).collect()).unwrap_or_default(),
+            produced: crate::ledger::support::run_produced(r).map(|p| p.chars().take(10).collect()).unwrap_or_default(),
             facts: {
                 let card = Value::Dict(receipt_card(r));
                 let (mut facts, blockers) = run_facts(r, &card);

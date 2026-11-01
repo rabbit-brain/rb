@@ -53,7 +53,7 @@ import pytest
 
 from rabbit_brain.errors import RBError
 from rabbit_brain.models import Envelope
-from rbtest import AGENT_SIGNS, AGENT_VARS, as_the_user, main, rbyaml, ROOT, SESSION_LEFTOVERS, SESSION_SIGNS, state
+from rbtest import AGENT_SIGNS, AGENT_VARS, as_the_user, main, now, rbyaml, ROOT, SESSION_LEFTOVERS, SESSION_SIGNS, state
 
 HAS_GIT = shutil.which("git") is not None
 needs_git = pytest.mark.skipif(not HAS_GIT, reason="git is not installed")
@@ -125,8 +125,10 @@ def start(capsys, *experiment_args) -> None:
 
 
 def record(capsys, *pairs, exp="e1") -> str:
-    """rb run add; returns the run's id."""
-    return ok(capsys, "run", "add", exp, *pairs).data["object"]["id"]
+    """rb run add, of a run made as it is recorded (numbers typed with no time are of a time nobody knows, unless it is
+    given); returns the run's id."""
+    made = () if any(p in pairs for p in ("--from", "--produced-at")) else ("--produced-at", now())
+    return ok(capsys, "run", "add", exp, *pairs, *made).data["object"]["id"]
 
 
 def finding(capsys, criterion="c1") -> dict:

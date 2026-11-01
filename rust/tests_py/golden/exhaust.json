@@ -9,8 +9,8 @@
     "  data/blob.bin  \u00b7  other",
     "  data/metrics.json  \u00b7  structured  \u00b7  3 numbers (acc, other, top1)",
     "  data/run.py  \u00b7  code",
-    "  data/table.csv  \u00b7  table  \u00b7  columns seed, top1, top5",
-    "  data/tabs.tsv  \u00b7  table  \u00b7  columns a, b",
+    "  data/table.csv  \u00b7  table  \u00b7  1 row  \u00b7  columns seed, top1, top5  \u00b7  numbers in seed, top1, top5",
+    "  data/tabs.tsv  \u00b7  table  \u00b7  0 rows  \u00b7  columns a, b",
     "  data/unknown.json  \u00b7  structured  \u00b7  1 number (zz)",
     "",
     "No record here yet. A compiled record starts with the work's theme, then each question the work asks:",
@@ -67,7 +67,7 @@
     "Project 'exhaust' started: @BASE@/work/.rb",
     "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
     "",
-    "Then paste this line into your agent's chat:",
+    "If you work with a coding agent, paste this line into its chat:",
     "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
     ""
    ],
@@ -135,7 +135,7 @@
     "  wide.top1 \u2265 0.7 \u00b7 primary \u00b7 on e1",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e1 wide.top1=<value> --command \"...\"",
+    "Next: rb run add e1 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -148,6 +148,7 @@
    "out": [
     "runp5h4s6 on e1: base.top1=0.7, wide.top1=0.74",
     "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
     "  c1 estimate meets criterion \u00b7 point only: wide.top1: 0.74 \u00b7 mean, 1 run (rb)",
     "  rb put the code in git at refs/rb/snapshots/87390d922376c91b74ab0a5fc455b62542ea44b0, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/87390d922376c91b74ab0a5fc455b62542ea44b0 removes it.",
     "",
@@ -164,7 +165,9 @@
    "out": [
     "runqtdhpa on e1: base.top1=0.7, wide.top1=0.74",
     "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers> --produced-at <when> --replaces runqtdhpa --why \"<when they were made>\"",
     "  c1 estimate meets criterion \u00b7 point only: wide.top1: 0.74 \u00b7 mean, 2 runs (rb)",
+    "  --command is kept as given and reads as a command given later, not observed: when it was made is unknown, and neither rb's journal nor a log line written then shows this command made it. A command from a README, a paper or a script is a recipe: put it in a note with its file and line. A log line written when it ran that records the launch is cited with --command-source <file>:<line>.",
     "",
     "Next: rb show c1",
     ""
@@ -201,8 +204,10 @@
     "  data/blob.bin  \u00b7  other",
     "  data/metrics.json  \u00b7  structured  \u00b7  3 numbers (acc, other, top1)",
     "  data/run.py  \u00b7  code",
-    "  data/table.csv  \u00b7  table  \u00b7  columns seed, top1, top5",
-    "  data/tabs.tsv  \u00b7  table  \u00b7  columns a, b",
+    "  data/table.csv  \u00b7  table  \u00b7  1 row  \u00b7  columns seed, top1, top5  \u00b7  numbers in seed, top1, top5",
+    "      metric columns top1",
+    "      a row is a run: rb run add <experiment> --from data/table.csv --where <column>=<value>",
+    "  data/tabs.tsv  \u00b7  table  \u00b7  0 rows  \u00b7  columns a, b",
     "  data/unknown.json  \u00b7  structured  \u00b7  1 number (zz)  \u00b7  holds numbers nothing declares yet",
     "  notes/empty.md  \u00b7  prose",
     "  notes/plain.txt  \u00b7  prose  \u00b7  \"first line says something\"",
@@ -426,7 +431,7 @@
     "  wide.top1 \u2265 0.5 \u00b7 primary \u00b7 on e2",
     "  declared; no evidence recorded yet",
     "",
-    "Next: rb run add e2 wide.top1=<value> --command \"...\"",
+    "Next: rb run add e2 --from <the results file a run wrote>",
     ""
    ],
    "err": [
@@ -514,6 +519,10 @@
    "sha256": "b227cae91d12c1deb8ab21b5b801df55396a577e2cb03483d0529fddc95b1f3a",
    "bytes": 201
   },
+  ".rb/cache/objects/0f/0f959ed69fe372876766c4fe7574391a03f271966a051b3d6d1bfcb7e6c4afe3.json.gz": {
+   "sha256": "c18cca8ec458220692496e7d54d44567b9fc0b0952aef0c98b9e4137d87aa5cf",
+   "bytes": 1148
+  },
   ".rb/cache/objects/2a/2a2c4c58ccb20540b6ca5d8c64a52a3a5b13f4123420e0934336e4590565aed2.json.gz": {
    "sha256": "bfb03000a9d3a250af14d4944a41e4d252af827e2c997c6840365732aeccd4bd",
    "bytes": 137
@@ -530,6 +539,10 @@
    "sha256": "66d2219a58317088f0e0d4c1c43f9233016ab51f7cd2dd403cd5baa31273c5b7",
    "bytes": 150
   },
+  ".rb/cache/objects/69/694a09ff7d6476ae376eb99931558a289ace38149a1c2b193348b1cc7b2d6c15.json.gz": {
+   "sha256": "ffd10dbbf148626456b806f4c27907df2de9578373f54f83dda05bd72f12c07d",
+   "bytes": 1166
+  },
   ".rb/cache/objects/6b/6b73b0a2bcd29b45910f30dc0d43486c355bd0dae6ae8908d5d181c4789a698e.json.gz": {
    "sha256": "38c5714c760dd413a554d0b6846ddc91f4fd0acaec8171669af018bb40a6626f",
    "bytes": 370
@@ -538,17 +551,9 @@
    "sha256": "9d309ceb709b4e649a5138d0b96174dbe9c53747cbb83e91fc17bcec5fc2df46",
    "bytes": 782
   },
-  ".rb/cache/objects/85/855159424c56f0dd6484cc7776803a96f03a68287f49a71dc844d18241f9edb4.json.gz": {
-   "sha256": "4ddaab53ec775e7f7be3342aac36b9e2d8788da3339d67388db1ba8e89d83d35",
-   "bytes": 1149
-  },
   ".rb/cache/objects/97/976f541e2fe8ac2e5638e5eb477211172d1db075297fab2c6f813144fda20966.json.gz": {
    "sha256": "ee78efee65c9edb37f64c17dae21ef972cc77f61bc49d982fde916225cb09492",
    "bytes": 156
-  },
-  ".rb/cache/objects/a6/a620448fe202c7e9382f209b8fc00ce0170a5c2deff1f2901aa3fb7e788e92d9.json.gz": {
-   "sha256": "51e897c8b52b8312cdcf0a37a2c992d12a7702619674230e3fa8d0a66a57c48e",
-   "bytes": 1167
   },
   ".rb/cache/objects/b2/b25f2761e5885179565e1c493166029a9d14d54fe1112052438aafe7a8449024.json.gz": {
    "sha256": "ea33d5bad9d36c417ff13a0882624cf1d17bf105ddbcc5ed7b5d42d3122be2e4",
@@ -655,7 +660,7 @@
    "metrics:",
    "  base.top1: 0.7",
    "  wide.top1: 0.74",
-   "produced_basis: recorded",
+   "produced_basis: unknown",
    "basis: typed",
    "spec_sha256: 61021da0cf05f1774e412e748165a40ff49998240cf4982ec4540e4363ac1bf9",
    "settings:",
@@ -703,7 +708,7 @@
    "metrics:",
    "  base.top1: 0.7",
    "  wide.top1: 0.74",
-   "produced_basis: recorded",
+   "produced_basis: unknown",
    "basis: typed",
    "spec_sha256: 61021da0cf05f1774e412e748165a40ff49998240cf4982ec4540e4363ac1bf9",
    "settings:",
@@ -819,8 +824,8 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"metric\", \"id\": \"top1\", \"sha256\": \"2a2c4c58ccb20540b6ca5d8c64a52a3a5b13f4123420e0934336e4590565aed2\", \"path\": \".rb/metrics/top1.yaml\"}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"spec_set\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"6b73b0a2bcd29b45910f30dc0d43486c355bd0dae6ae8908d5d181c4789a698e\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"setting\": \"lr\", \"change\": \"setting lr: new, 0.0003\", \"value\": 0.0003, \"status\": \"provisional\", \"required\": true, \"source\": null, \"changed_parts\": {\"e1\": {\"setting:lr\": \"0.0003\", \"source:lr\": null}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c1\", \"sha256\": \"b25f2761e5885179565e1c493166029a9d14d54fe1112052438aafe7a8449024\", \"path\": \".rb/experiments/e1/criteria/c1.yaml\", \"detail\": {\"rule\": \"wide.top1 \u2265 0.7\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:c1\": \"primary\", \"rule:c1\": \"wide.top1 \u2265 0.7\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"855159424c56f0dd6484cc7776803a96f03a68287f49a71dc844d18241f9edb4\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"a620448fe202c7e9382f209b8fc00ce0170a5c2deff1f2901aa3fb7e788e92d9\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"0f959ed69fe372876766c4fe7574391a03f271966a051b3d6d1bfcb7e6c4afe3\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"694a09ff7d6476ae376eb99931558a289ace38149a1c2b193348b1cc7b2d6c15\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"a1\", \"sha256\": \"6ce596216f32edfef3282cc2cff2c02e673ff6e906dfde1037ca3aa3b96832be\", \"path\": \".rb/experiments/e1/analyses/a1.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e2\", \"sha256\": \"62daadbc4304c4ac81e286cf603aba38957d785776e9dfb6ead3231a66c74382\", \"path\": \".rb/experiments/e2/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e2/base\", \"path\": \".rb/experiments/e2/variants/base.yaml\", \"sha256\": \"eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695\"}, {\"kind\": \"variant\", \"id\": \"e2/wide\", \"path\": \".rb/experiments/e2/variants/wide.yaml\", \"sha256\": \"4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb\"}], \"detail\": {\"variants\": [\"base\", \"wide\"], \"like\": null, \"questions\": [], \"changed_parts\": {\"e2\": {\"variant:base\": \"baseline\", \"variant:wide\": \"candidate\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c2\", \"sha256\": \"e3cedc086881f1eb2aedf1470c2a6991ce9e6e7dc728a5b453cf91be3941b611\", \"path\": \".rb/experiments/e2/criteria/c2.yaml\", \"detail\": {\"rule\": \"wide.top1 \u2265 0.5\", \"experiment\": \"e2\", \"role\": \"primary\", \"changed_parts\": {\"e2\": {\"role:c2\": \"primary\", \"rule:c2\": \"wide.top1 \u2265 0.5\"}}}}",

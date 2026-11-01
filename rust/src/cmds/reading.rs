@@ -1151,6 +1151,9 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             if let Some(row) = &r.receipt.row {
                 out.say(format!("  {}", crate::cmds::record::row_words(row)));
             }
+            if let Some(row) = r.receipt.extra.get("table_row").and_then(Value::as_dict) {
+                out.say(format!("  {}", crate::cmds::record::table_row_words(row)));
+            }
             if let Some(rep) = r.replaces.as_ref().filter(|x| !x.is_empty()) {
                 out.say(format!("  replaces {rep} (retracted)"));
             }
@@ -1189,6 +1192,16 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                     None => String::new(),
                 },
             );
+            if let Some(d) = rc.config.as_ref().and_then(|c| crate::repo::config_dirty_line(&led.root, &c.path, c.sha256.as_deref())) {
+                out.say(format!("  {d}"));
+                data.insert("config_dirty".into(), Value::Str(d));
+            } else if let Some(c) = rc.config.as_ref().filter(|c| c.sha256.as_ref().map_or(false, |s| !s.is_empty())) {
+                // a config changed since the run was recorded is not read for what it says of the run
+                let now = crate::sources::file_ref(&led.root, &c.path).ok().and_then(|f| f.get("sha256").map(pyjson::py_str));
+                if now.as_deref() != c.sha256.as_deref() {
+                    out.say(format!("  {} changed since the run was recorded: rb reads nothing it says of the run now", c.path));
+                }
+            }
             if let Some(att) = rc.attached.as_ref().filter(|a| !a.is_empty()) {
                 let commit = att.get("commit").filter(|v| v.truthy()).map(|c| cut(&pyjson::py_str(c), 12)).unwrap_or_else(|| "no commit yet".into());
                 let dirty = att.get("dirty").map_or(false, |v| v.truthy());

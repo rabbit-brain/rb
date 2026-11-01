@@ -121,13 +121,13 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser) -> None:
         s.add_argument("pairs", nargs="*", metavar="NAME=VALUE", help="results, e.g. int8.val_loss=5.64 latency_ms=25.1")
         s.add_argument("--variant", default=None, help="the variant these numbers are for: val_loss=5.64 becomes <variant>.val_loss")
         s.add_argument("--from", dest="from_file", default=None, metavar="FILE",
-                       help="a JSON/YAML/TOML object of metric names to numbers (nested keys join with dots), or a SQLite database with --table")
+                       help="a JSON/YAML/TOML object of metric names to numbers (nested keys join with dots), a CSV or TSV table with --where, or a SQLite database with --table")
         s.add_argument("--keys", action="append", default=None, help="with --from: only these numbers, glob patterns, e.g. \"summary.*\" (the file is still hashed whole)")
         s.add_argument("--table", default=None, help="with --from a SQLite database: the table that holds the run's row (the database is read, never written)")
         s.add_argument("--where", action="append", default=None, metavar="COLUMN=VALUE",
-                       help="with --table: the row's columns and their values, e.g. precision=int8,seed=1; exactly one row must have them all")
+                       help="with --table, or a CSV or TSV table: the row's columns and their values, e.g. precision=int8,seed=1; exactly one row must have them all")
         s.add_argument("--select", action="append", default=None, metavar="COLUMN",
-                       help="with --table: only these of the row's columns that name a declared metric (default: all of them)")
+                       help="with --table, or a CSV or TSV table: only these of the row's columns that name a declared metric (default: all of them)")
         s.add_argument("--config", default=None, help="the run's own resolved config (Hydra, W&B config.yaml, hparams.yaml): checks it ran with the spec")
         s.add_argument("--set", action="append", default=None, metavar="NAME=VALUE",
                        help="a per-run setting this run used, e.g. seed=2; with --table, seed=@seed takes the row's seed column, and seed=@configs.seed (or @configs[config_id].seed) the seed of the row of configs that table links")

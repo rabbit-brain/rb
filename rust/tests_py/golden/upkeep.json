@@ -7,7 +7,7 @@
     "Project 'upkeep' started: @BASE@/work/.rb",
     "Rabbit Brain YAML files beside the code: commit .rb/ with it, so the record travels with the work.",
     "",
-    "Then paste this line into your agent's chat:",
+    "If you work with a coding agent, paste this line into its chat:",
     "  Use Rabbit Brain to track this: read rb context, then record where the work stands.",
     ""
    ],
@@ -75,6 +75,7 @@
     "runp5h4s6 on e1: fast.wall_s=7, slow.wall_s=10",
     "  read data1 (eval)",
     "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
     "",
     "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric fast.wall_s --at-most <x>   (write the criterion before the next run)",
     ""
@@ -193,6 +194,7 @@
    "exit": 0,
    "out": [
     "upkeep",
+    "Kept with rb since 2026-10-01. 1 run was recorded afterwards, not as it happened.",
     "",
     "Is it fast? (open)",
     "  No criterion is linked directly to this question.",
@@ -207,7 +209,7 @@
     "",
     "Experiments",
     "  e1      fast vs slow \u00b7 open \u00b7 slow (baseline) vs fast (candidate) \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 1",
-    "          to run again: code missing \u00b7 environment ok \u00b7 eval (data1) missing",
+    "          to run again: code unknown \u00b7 environment unknown \u00b7 eval (data1) missing",
     "",
     "Runs: 1 recorded on 1 experiment \u00b7 every receipt is what rb wrote",
     "",
@@ -605,6 +607,10 @@
    "sha256": "38c16d78a67f1c4335e387bded5144e1c1439f4a067dbb4914d0243a23e9a485",
    "bytes": 117
   },
+  ".rb/cache/objects/3a/3adb17c698fa089b6eea6c9f356112fc3dacfa8fc7c7d8713c7c57847b88cfec.json.gz": {
+   "sha256": "4fa0bc82c0c929a5c4b28e82cb28643fb22b7c963cdf7cc56518ca9f2ade9fc9",
+   "bytes": 1050
+  },
   ".rb/cache/objects/57/57ddf013b2b9232154139d4e43d19f6a8d1bb54a4c94cf01887713a849626d6f.json.gz": {
    "sha256": "9f70b360c6407821ecac7b94804b5077270cc09482aff93c38757422006875f2",
    "bytes": 132
@@ -624,10 +630,6 @@
   ".rb/cache/objects/d2/d24a5229466de7ee20e26110faa6f052e409eff0eeda4d312cb6c711262d075a.json.gz": {
    "sha256": "81d09d4d0da72823dafbf0ac6524e99f01a354998f5734bb69c52c8e0ebea6ff",
    "bytes": 154
-  },
-  ".rb/cache/objects/dd/dd89d41e084046bccca40366fa55f0218f4eae0cc66f0f945b6bba200d7cac31.json.gz": {
-   "sha256": "5b160c1a444b1ba76d33248fda5de877dfe362f6f80018aad45b31ffaa7946bd",
-   "bytes": 1051
   },
   ".rb/cache/objects/e5/e5a5783e7c4096230023c7bb4dae122472ef4f15f7b40ac80a7ef81ef1f64359.json.gz": {
    "sha256": "a14466299d3630abb8c89bd47ba252a5d32bd2aad07afbc44c55b455a9e02a45",
@@ -655,7 +657,7 @@
    "metrics:",
    "  slow.wall_s: 10.0",
    "  fast.wall_s: 7.0",
-   "produced_basis: recorded",
+   "produced_basis: unknown",
    "inputs:",
    "  - resource: data1",
    "    role: eval",
@@ -719,7 +721,7 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"331816459c124535a4ed7ea080588f64553aee4ea8d98729abdf3eb3cbff3a9a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/slow\", \"path\": \".rb/experiments/e1/variants/slow.yaml\", \"sha256\": \"e5a5783e7c4096230023c7bb4dae122472ef4f15f7b40ac80a7ef81ef1f64359\"}, {\"kind\": \"variant\", \"id\": \"e1/fast\", \"path\": \".rb/experiments/e1/variants/fast.yaml\", \"sha256\": \"cdee8a4190ca7dfcea8ecda7661e677b97295740e523bc227ed4723584e5c956\"}], \"detail\": {\"variants\": [\"slow\", \"fast\"], \"like\": null, \"questions\": [\"q1\"], \"changed_parts\": {\"e1\": {\"variant:slow\": \"baseline\", \"variant:fast\": \"candidate\", \"question:q1\": \"q1\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"metric\", \"id\": \"wall_s\", \"sha256\": \"57ddf013b2b9232154139d4e43d19f6a8d1bb54a4c94cf01887713a849626d6f\", \"path\": \".rb/metrics/wall_s.yaml\"}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"data1\", \"sha256\": \"bc7753b5bce6998c312e028e16dde8a67094f72aad80b25b79228bb0d2ef85d7\", \"path\": \".rb/resources/data1.yaml\", \"detail\": {\"type\": \"dataset\", \"name\": \"data one\"}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"dd89d41e084046bccca40366fa55f0218f4eae0cc66f0f945b6bba200d7cac31\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"slow.wall_s\": 10.0, \"fast.wall_s\": 7.0}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"3adb17c698fa089b6eea6c9f356112fc3dacfa8fc7c7d8713c7c57847b88cfec\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"slow.wall_s\": 10.0, \"fast.wall_s\": 7.0}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"agent:claude-code\", \"actor_via\": \"detected:CLAUDECODE\", \"via\": \"cli\", \"op\": \"adopt\", \"kind\": \"question\", \"id\": \"q1\", \"agent\": {\"name\": \"claude-code\", \"provider\": \"anthropic\", \"provider_from\": \"inferred\"}, \"words\": \"keep my wording\", \"sha256\": \"35c38dead66715b457341a5ee985ae83019839ba6c3b9437e066bb13d14cf174\", \"path\": \".rb/questions/q1.yaml\", \"detail\": {\"why\": \"clarify the question\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"restore\", \"kind\": \"metric\", \"id\": \"wall_s\", \"sha256\": \"57ddf013b2b9232154139d4e43d19f6a8d1bb54a4c94cf01887713a849626d6f\", \"path\": \".rb/metrics/wall_s.yaml\"}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"restore\", \"kind\": \"resource\", \"id\": \"data1\", \"sha256\": \"bc7753b5bce6998c312e028e16dde8a67094f72aad80b25b79228bb0d2ef85d7\", \"path\": \".rb/resources/data1.yaml\"}",

@@ -674,16 +674,11 @@ fn is_parent(p: &Path, of: &Path) -> bool {
     of.parent().map_or(false, |_| of.ancestors().skip(1).any(|a| a == p))
 }
 
-/// Where results land: the usual output directories that exist, and every directory a run has named a file in, but in
+/// Where results land: the usual output directories that exist, every folder below named for results that holds any
+/// (`repo::discover`), and every directory a run has named a file in, but in
 /// a worktree nested in the checkout: another checkout, whose files are not this one's.
 pub fn watch_roots(led: &Ledger) -> Vec<PathBuf> {
-    let mut roots: Vec<PathBuf> = Vec::new();
-    for name in DEFAULT_DIRS {
-        let p = led.root.join(name);
-        if p.is_dir() {
-            roots.push(p);
-        }
-    }
+    let mut roots: Vec<PathBuf> = crate::repo::result_roots_of(&led.root).iter().map(|r| led.root.join(r.trim_end_matches('/'))).collect();
     if let Ok(runs) = led.live::<Run>() {
         for ev in runs {
             for fr in &ev.files {
@@ -767,7 +762,7 @@ fn walk(led: &Ledger) -> (Dict, bool) {
 /// there: its loose files and its usual output directories, as {path from the record's root: {mt, sz}}, plus whether
 /// the walk hit the cap.
 fn walk_here(led: &Ledger) -> (Dict, bool) {
-    let roots: Vec<PathBuf> = DEFAULT_DIRS.iter().map(|d| led.here.join(d)).filter(|p| p.is_dir()).collect();
+    let roots: Vec<PathBuf> = crate::repo::result_roots_of(&led.here).iter().map(|r| led.here.join(r.trim_end_matches('/'))).collect();
     walk_in(&led.root, &led.here, roots)
 }
 
@@ -2822,15 +2817,15 @@ pub fn find(led: &Ledger, item_id: &str) -> Res<Option<Found>> {
 // ---------------------------------------------------------------- what changed that nothing in the record cites
 
 /// Folders whose files are a dependency's or a build tool's, never the research's.
-const DEPENDENCY_DIRS: &[&str] = &[
+pub const DEPENDENCY_DIRS: &[&str] = &[
     "node_modules", "vendor", "vendored", "third_party", "third-party", "site-packages", "dist-packages", "venv", "virtualenv", "bower_components",
     "jspm_packages", "__pypackages__", "__pycache__", "rb-export", "_build", "htmlcov",
 ];
 /// A build tool's output folders, at the repository's top only: further down the same names can hold research files
 /// (data/target/, analysis/dist/).
-const BUILD_DIRS: &[&str] = &["build", "dist", "target"];
+pub const BUILD_DIRS: &[&str] = &["build", "dist", "target"];
 /// Continuous integration, editor, type-checker, lint, spell, docs-site and test-runner configs outside a dot-folder,
-/// and test-coverage reports.
+/// test-coverage reports, and a project's package and environment manifests (pyproject.toml, package.json).
 const TOOL_CONFIGS: &[&str] = &[
     "azure-pipelines.yml", "azure-pipelines.yaml", "bitbucket-pipelines.yml", "appveyor.yml", "appveyor.yaml", "codecov.yml", "codecov.yaml",
     "bitrise.yml", "bitrise.yaml", "codemagic.yaml", "codemagic.yml", "wercker.yml", "wercker.yaml", "screwdriver.yaml", "shippable.yml",
@@ -2840,7 +2835,8 @@ const TOOL_CONFIGS: &[&str] = &[
     "mypy.toml", "pytest.toml", "tox.toml", "cspell.json", "cspell.yaml", "cspell.yml", "cspell.config.yaml", "jest.config.json", "deno.json",
     "dprint.json", "typos.toml", "_typos.toml", "lefthook.yml", "lefthook.yaml", "mkdocs.yml", "mkdocs.yaml", "eslint.config.json",
     "prettier.config.json", "stylelint.config.json", "babel.config.json", "commitlint.config.json", "markdownlint.json", "lerna.json", "nx.json",
-    "turbo.json", "deny.toml",
+    "turbo.json", "deny.toml", "pyproject.toml", "package.json", "cargo.toml", "composer.json", "pubspec.yaml", "pixi.toml", "environment.yml",
+    "environment.yaml", "conda.yaml", "conda.yml",
 ];
 
 /// Whether a path is one rb leaves out of what changed: its own files (in .rb/ or another dot-folder, .mcp.json, and
@@ -3500,6 +3496,10 @@ fn in_nested(led: &Ledger, path: &str) -> bool {
 pub struct Scope {
     /// the folders the look walks, from the repository's top, each with a slash
     pub folders: Vec<String>,
+    /// those of them below the top that rb looks in for their names (`repo::discover`), not because a run named them
+    pub by_name: Vec<String>,
+    /// the search for folders named for results stopped at its cap
+    pub search_cut: bool,
     /// when rb last looked (rb's time), none before its first look
     pub looked_at: Option<String>,
     /// the last look stopped at the file cap, or kept the first of more changed files than the cap
@@ -3528,6 +3528,9 @@ impl Scope {
                 }
             }
         }
+        let discovered = crate::repo::discover(&led.root);
+        let found = discovered.roots.clone();
+        let by_name: Vec<String> = folders.iter().filter(|f| !DEFAULT_DIRS.iter().any(|d| f.as_str() == format!("{d}/")) && found.contains(f)).cloned().collect();
         let looked = st.get("looked");
         let looked_at = looked.and_then(|l| l.get_str("at")).map(str::to_string);
         // after a look, the state says whether this is git; before one, git does
@@ -3535,7 +3538,7 @@ impl Scope {
             Some(_) => st.get("git").map_or(false, |g| g.is_dict()),
             None => sources::git_top(&led.root).is_some(),
         };
-        Scope { folders, looked_at, cap_hit: looked.and_then(|l| l.get("cut")).map_or(false, |c| c.truthy()), git, aside: kept_aside(&led.root) }
+        Scope { folders, by_name, search_cut: discovered.cut, looked_at, cap_hit: looked.and_then(|l| l.get("cut")).map_or(false, |c| c.truthy()), git, aside: kept_aside(&led.root) }
     }
 
     /// The one quiet line: where rb looks and when it last did, then what it reads only where the record points to it,
@@ -3550,7 +3553,13 @@ impl Scope {
         let others = &self.folders[usual..];
         named.extend(others.iter().take(2).cloned());
         if others.len() > 2 {
-            named.push(format!("{} more folders runs named", others.len() - 2));
+            let rest = &others[2..];
+            let by_name = rest.iter().filter(|f| self.by_name.contains(*f)).count();
+            named.push(match by_name {
+                0 => format!("{} more folders runs named", rest.len()),
+                n if n == rest.len() => format!("{n} more folders named for results"),
+                _ => format!("{} more folders named for results or named by runs", rest.len()),
+            });
         }
         let top = if self.git { "the repository's top folder" } else { "the project's top folder" };
         let what = if self.git {
@@ -3562,7 +3571,8 @@ impl Scope {
             Some(at) => format!("It last looked at {} UTC.", at.chars().take(16).collect::<String>().replace('T', " ")),
             None => "It has not looked yet.".to_string(),
         };
-        let cap = if self.cap_hit { format!(" That look stopped at {MAX_FILES} files, so some were not looked at.") } else { String::new() };
+        let cap = if self.cap_hit { format!(" That look stopped at {MAX_FILES} files, so some were not looked at.") } else { String::new() }
+            + if self.search_cut { " The search for folders named for results stopped at its cap, so some folders were not looked in." } else { "" };
         let aside = if self.aside {
             " Git's folder cannot be written here, so rb keeps its journal in .rb/journal/, which git ignores, until a look can move it there."
         } else {
@@ -3586,13 +3596,20 @@ impl Scope {
     }
 
     pub fn to_value(&self) -> Value {
-        crate::obj! {
+        let mut v = crate::obj! {
             "looked_at" => Value::opt_str(self.looked_at.clone()), "cap_hit" => self.cap_hit, "file_cap" => MAX_FILES as i64,
             "folders" => Value::list_of_str(self.folders.iter().cloned()), "top_level_files" => true, "git_changes" => self.git,
             "kinds" => Value::list_of_str(if self.git { vec![".json".to_string(), ".yaml".into(), ".yml".into(), ".toml".into()] } else { Vec::new() }),
             "commands" => "rb journal run", "not_watched" => Value::list_of_str(NOT_WATCHED.iter().map(|s| s.to_string())), "said" => self.said(),
             "journal_aside" => self.aside
+        };
+        // said only where the search for folders named for results stopped at its cap
+        if self.search_cut {
+            if let Value::Dict(d) = &mut v {
+                d.insert("search_cut".into(), Value::Bool(true));
+            }
         }
+        v
     }
 }
 

@@ -2120,8 +2120,12 @@ def test_integrity_counts_what_weakens_the_whole_body_of_evidence(int8_demo, tmp
     none = parts["without_command"]
     assert (none["n"], none["of"]) == (made["runs"] - made["with_command"], made["runs"]), none
     assert none["line"] == f"{none['n']} of {none['of']} runs have no command from when they ran.", none
-    retracted = [r for r, v in doc["runs"].items() if v["retracted"]]
-    assert parts["retracted"]["ids"] == retracted and parts["retracted"]["line"] == f"{len(retracted)} run{' was' if len(retracted) == 1 else 's were'} retracted."
+    # a run another replaced (--replaces) was recorded again: it is no reason to doubt the work
+    retracted = [r for r, v in doc["runs"].items() if v["retracted"] and not v["retracted"]["why"].startswith("replaced by ")]
+    replaced = [r for r, v in doc["runs"].items() if v["retracted"] and v["retracted"]["why"].startswith("replaced by ")]
+    assert replaced and (retracted or "retracted" not in parts)
+    if retracted:
+        assert parts["retracted"]["ids"] == retracted and parts["retracted"]["line"] == f"{len(retracted)} run{' was' if len(retracted) == 1 else 's were'} retracted."
     assert integrity["affects"] == "Treat them as a record of what happened, not as a test planned in advance."
 
 
@@ -2614,12 +2618,12 @@ def test_a_rule_s_timing_is_read_on_its_subject_s_runs(tmp_path, before):
     status = rec.rb(Writers.HUMAN, "status")
     if before == 0:
         assert f["timing"] == "before", f["says"]
-        assert f["says"]["timing"] == "declared before its runs (by record times; its baseline's runs came first)", f["says"]
+        assert f["says"]["timing"] == "declared before its runs (by production times; its baseline's runs came first)", f["says"]
         assert "after_evidence" not in parts and doc["home"]["made"]["after_evidence"] == 0, parts
         assert "declared before its runs" in status and "its baseline's runs came first" in status, status
         assert "late" not in [i["code"] for i in rec.json(Writers.HUMAN, "status")["data"]["open"]]
         context = rec.rb(Writers.HUMAN, "context")
-        assert "declared before its runs (by record times; its baseline's runs came first)" in context, context
+        assert "declared before its runs (by production times; its baseline's runs came first)" in context, context
         assert "before its runs, when only its baseline's runs came first: timing is read on the subject's runs" in context, context
     else:
         assert f["timing"] == "after_evidence", f["says"]
@@ -2647,7 +2651,7 @@ def test_a_rule_before_every_run_reads_before_with_no_baseline_words(tmp_path):
         rb("run", "add", "e1", f"top1={fp32}", "--variant", "fp32", "--set", f"seed={seed}")
         rb("run", "add", "e1", f"top1={int8}", "--variant", "int8", "--set", f"seed={seed}")
     f = rec.json(Writers.HUMAN, "show", "c1")["data"]["finding"]
-    assert f["timing"] == "before" and f["says"]["timing"] == "declared before the evidence (by record times)", f["says"]
+    assert f["timing"] == "before" and f["says"]["timing"] == "declared before the evidence (by production times)", f["says"]
 
 
 def test_an_analysis_or_a_retraction_reads_the_timing_on_the_subject_s_runs_too(tmp_path):
@@ -2695,7 +2699,7 @@ def test_a_rule_whose_reference_is_no_baseline_says_the_runs_it_compares_against
     for seed, v in enumerate([75.69, 75.71, 75.66], 1):
         rb("run", "add", "e1", f"top1={v}", "--variant", "fp32", "--set", f"seed={seed}")
     f = rec.json(Writers.HUMAN, "show", "c1")["data"]["finding"]
-    assert f["says"]["timing"] == "declared before its runs (by record times; the runs it compares against came first)", f["says"]
+    assert f["says"]["timing"] == "declared before its runs (by production times; the runs it compares against came first)", f["says"]
 
 
 def test_an_id_leading_a_sentence_keeps_its_case(tmp_path):

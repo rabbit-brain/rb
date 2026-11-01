@@ -244,6 +244,7 @@ thread_local! {
 /// repository (a command it watched, a repository it made).
 pub fn forget_git() {
     ANSWERS.with(|a| a.borrow_mut().clear());
+    crate::repo::forget_roots();
 }
 
 /// How long git's answer to a question holds while one command line runs. rb changes none of these, one command asks
@@ -450,6 +451,9 @@ pub fn git_state(root: &Path, exclude: &str) -> Option<Dict> {
 fn code_pathspec(root: &Path, exclude: &str, top: &Path) -> Vec<String> {
     let skip = rel_to(&resolve_path(&root.join(exclude)), top).unwrap_or_else(|| exclude.to_string());
     let mut spec = vec!["--".to_string(), ":(top)".to_string(), format!(":(top,exclude){skip}")];
+    for rel in rb_written(root, top) {
+        spec.push(format!(":(top,exclude,literal){rel}"));
+    }
     for line in git(top, &["worktree", "list", "--porcelain"]).unwrap_or_default().lines() {
         let Some(listed) = line.strip_prefix("worktree ") else { continue };
         let path = resolve_path(Path::new(listed));
@@ -460,6 +464,72 @@ fn code_pathspec(root: &Path, exclude: &str, top: &Path) -> Vec<String> {
         }
     }
     spec
+}
+
+/// The files rb itself installed in the checkout (rb init, rb skill add: a skill, a rule, an MCP entry, a hook, rb's
+/// section of AGENTS.md) that differ from the last commit by rb's own write alone, from `top`: a file rb made that holds
+/// what rb wrote, and a file rb added to that holds what rb left there over what the last commit holds. None of them
+/// is the code a run ran; a file anyone changed since is.
+pub fn rb_written(root: &Path, top: &Path) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let lines = crate::owned::entries(root);
+    for line in &lines {
+        let how = line.get("how").and_then(Value::as_str).unwrap_or("");
+        if !["created", "replaced", "section", "mcp_entry", "hook_entry"].contains(&how) {
+            continue;
+        }
+        let Some(path) = line.get("path").and_then(Value::as_str).map(PathBuf::from) else { continue };
+        let Some(rel) = rel_to(&resolve_path(&path), top).filter(|r| !r.is_empty() && !r.starts_with("..")) else { continue };
+        if out.contains(&rel) {
+            continue;
+        }
+        // the last line for the file says what rb left there
+        let Some(last) = crate::owned::last_for(&lines, &path, &["created", "replaced", "section", "mcp_entry", "hook_entry"]) else { continue };
+        let Some(now) = crate::owned::sha256_of(&path) else { continue };
+        if last.get("sha256_after").and_then(Value::as_str) != Some(now.as_str()) {
+            continue;
+        }
+        let committed = git_bytes(top, &["show", &format!("HEAD:{rel}")]);
+        let ok = match last.get("how").and_then(Value::as_str).unwrap_or("") {
+            // a file rb made: rb's own while no commit holds it
+            "created" => committed.is_none(),
+            // a file rb wrote in place of another, or added to: rb's own write alone while the commit holds what was there
+            _ => match (committed, last.get("sha256_before").and_then(Value::as_str)) {
+                (Some(b), Some(before)) if crate::rbyaml::sha256_hex(&b) == before => true,
+                // git keeps the file in its own form (core.autocrlf, a filter: CRLF here, LF in the commit): what the file
+                // held before rb wrote, put back from the ledger, is rb's own write alone where git reads it as the commit's
+                (Some(_), Some(_)) => held_before(&path, &last).map_or(false, |was| same_as_committed(top, &rel, &was)),
+                _ => false,
+            },
+        };
+        if ok {
+            out.push(rel);
+        }
+    }
+    out.sort();
+    out
+}
+
+/// What a file rb wrote in place of, or added to, held before: the text the ledger kept of a file rb's own replaced, or
+/// the file with rb's part taken out, where that gives the sha256 the file had before.
+fn held_before(path: &Path, line: &Dict) -> Option<Vec<u8>> {
+    let before = line.get("sha256_before").and_then(Value::as_str)?;
+    if let Some(text) = line.get("before").and_then(Value::as_str).filter(|t| crate::rbyaml::sha256_hex(t.as_bytes()) == before) {
+        return Some(text.as_bytes().to_vec());
+    }
+    let now = std::fs::read_to_string(path).ok()?;
+    crate::owned::as_before(&now, line).map(String::into_bytes)
+}
+
+/// Whether bytes at `rel` are what HEAD holds there as git reads a working file: hashed with the path's own attributes
+/// (line endings, filters), never written to the object store.
+fn same_as_committed(top: &Path, rel: &str, bytes: &[u8]) -> bool {
+    let top_s = top.to_string_lossy().into_owned();
+    let hashed = run("git", &["-C", &top_s, "hash-object", "--path", rel, "--stdin"], None, &[], Some(bytes), Duration::from_secs(30))
+        .filter(|r| r.code == 0)
+        .map(|r| String::from_utf8_lossy(&r.stdout).trim().to_string());
+    let head = git(top, &["rev-parse", &format!("HEAD:{rel}")]).map(|h| h.trim().to_string());
+    matches!((hashed, head), (Some(a), Some(b)) if !a.is_empty() && a == b)
 }
 
 /// The exact code of a working tree with uncommitted changes, as one git tree written through a temporary index.

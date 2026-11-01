@@ -281,7 +281,8 @@ def small_record(root: Path) -> Writers:
     rb(you, "spec", "set", "e1", "seed", "--per-run")
     rb(you, "criterion", "add", "INT8 keeps top-1 within a point", "-e", "e1", "--metric", "change.top1", "--at-least", "-1", "--id", "c1")
     rb(you, "resource", "add", "imagenet-val", "--type", "dataset", "--name", "ImageNet-1k validation")
-    runs = [rec.json(you, "run", "add", "e1", "--from", "results.db", "--table", "evals", "--where", f"seed={s}", "--set", "seed=@seed", "--input",
+    # the rows feed the analyses; their columns name no variant, so each row is recorded as int8's
+    runs = [rec.json(you, "run", "add", "e1", "--from", "results.db", "--table", "evals", "--where", f"seed={s}", "--set", "seed=@seed", "--variant", "int8", "--input",
                      "imagenet-val:eval")["data"]["object"]["id"] for s in (1, 2, 3)]
     rb(you, "analysis", "add", "e1", "--compare", "int8/fp32:top1=-0.16[-0.21,-0.11]", "--method", "paired bootstrap over images", "--reads",
        ",".join(runs), "--id", "a1")

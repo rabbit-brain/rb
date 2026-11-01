@@ -91,6 +91,14 @@ tests/test_shell_contract.py	I
 tests/test_docs.py	I
 tests/test_no_writer_on_screens.py	I
 tests/test_git_invariant.py	I
+tests/test_results_where_kept.py	I
+tests/test_rb_files_not_code.py	I
+tests/test_arms_and_pools.py	I
+tests/test_csv_rows.py	I
+tests/test_page_notes.py	I
+tests/test_readings_said.py	I
+tests/test_run_folders.py	I
+tests/test_small_things.py	I
 AGENTS.md	I
 README.md	I
 CHANGELOG.md	I

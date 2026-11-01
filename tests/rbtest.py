@@ -83,9 +83,30 @@ def environment() -> dict:
     return env
 
 
-def main(argv: Optional[list] = None) -> int:
-    """`rb <argv>` here: prints what rb printed (stdout and stderr, each where it went), returns rb's exit code."""
+def now() -> str:
+    """The time now, as --produced-at takes it: numbers typed on the command line are of a time nobody knows unless it is
+    given, so a test whose numbers stand for a run made as it is recorded says so."""
+    import datetime
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def made_now(argv: tuple, env: Optional[dict] = None) -> tuple:
+    """rb run add of numbers typed for a run made as it is recorded, with the time it was made given (rb's clock where a
+    test fixes it, RB_TEST_NOW in `env`): typed with no time, they are of a time nobody knows. Any other command line is
+    as given."""
+    # a file the run names (--from, --artifact) gives rb a sign of its own of when the run was made
+    if tuple(argv[:2]) == ("run", "add") and not any(a in argv for a in ("--from", "--artifact", "--produced-at", "--")):
+        return (*argv, "--produced-at", (env if env is not None else os.environ).get("RB_TEST_NOW") or now())
+    return tuple(argv)
+
+
+def main(argv: Optional[list] = None, typed: bool = False) -> int:
+    """`rb <argv>` here: prints what rb printed (stdout and stderr, each where it went), returns rb's exit code. Numbers a
+    test types into rb run add stand for a run made as it is recorded (`made_now`); a test of typed numbers as rb reads
+    them, of a time nobody knows, passes `typed=True`."""
     argv = list(sys.argv[1:] if argv is None else argv)
+    if not typed:
+        argv = list(made_now(tuple(argv), environment()))
     r = subprocess.run([*command(), *argv], cwd=os.getcwd(), env=environment(), capture_output=True, stdin=subprocess.DEVNULL)
     sys.stdout.write(r.stdout.decode("utf-8", "replace"))
     sys.stderr.write(r.stderr.decode("utf-8", "replace"))
@@ -355,13 +376,13 @@ class Writers:
 
     def rb(self, who: dict, *argv: str, cwd: Optional[Path] = None) -> str:
         """rb <argv> as `who`, which must do its job (exit 0 or 1): what it printed, stdout then stderr."""
-        r = self.run(who, *argv, cwd=cwd)
+        r = self.run(who, *made_now(argv, {**self.env, **who}), cwd=cwd)
         assert r.returncode in (0, 1), (argv, r.returncode, r.stdout, r.stderr)
         return r.stdout + r.stderr
 
     def json(self, who: dict, *argv: str) -> dict:
         """rb <argv> --json as `who`: its envelope, which must be ok."""
-        r = self.run(who, *argv, "--json")
+        r = self.run(who, *made_now(argv, {**self.env, **who}), "--json")
         env = json.loads(r.stdout)
         assert r.returncode in (0, 1) and env["ok"], (argv, r.returncode, r.stdout, r.stderr)
         return env
@@ -588,7 +609,7 @@ class Places:
         env = {**self.env, **(who or {})}
         if who and "CLAUDECODE" in who:
             env.pop("RB_ACTOR", None)
-        r = subprocess.run([*command(), *argv, "--json"], cwd=cwd or self.root, env=env, capture_output=True, encoding="utf-8", errors="replace",
+        r = subprocess.run([*command(), *made_now(argv, env), "--json"], cwd=cwd or self.root, env=env, capture_output=True, encoding="utf-8", errors="replace",
                            stdin=subprocess.DEVNULL)
         out = json.loads(r.stdout)
         assert out["ok"] and r.returncode in (0, 1), (argv, r.returncode, out.get("errors"), r.stderr)
@@ -681,6 +702,7 @@ class Recorder:
 
     def rb(self, *argv: str, who: Optional[dict] = None, cwd: Optional[Path] = None, name: Optional[str] = None) -> Any:
         """rb <argv> --json (before a `--`, so a watched command gets its own arguments), which must do its job."""
+        argv = made_now(argv, {**self.env, **(who or {})})
         cut = argv.index("--") if "--" in argv else len(argv)
         r = subprocess.run([*command(), *argv[:cut], "--json", *argv[cut:]], cwd=cwd or self.root, env={**self.env, **(who or {})},
                            capture_output=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)

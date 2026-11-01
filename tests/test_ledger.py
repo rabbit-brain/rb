@@ -866,10 +866,10 @@ def test_counts_of_one_and_two_read_as_the_only_one_both_or_neither(project, cap
     Path("results/calib").mkdir(parents=True)
     Path("results/calib/README.md").write_text("# Calibration\n", encoding="utf-8")
     commit_all("a report")
-    assert main(["reconcile"]) == 0 and "git: the only report or results file is tracked · folder clean" in capsys.readouterr().out
+    assert main(["reconcile"]) == 0 and "git: the only report or results file is tracked · folder unchanged since the last commit" in capsys.readouterr().out
     Path("results/calib/metrics.json").write_text('{"top1": 0.75}', encoding="utf-8")
     commit_all("its results")
-    assert main(["reconcile"]) == 0 and "git: both report and results files are tracked · folder clean" in capsys.readouterr().out
+    assert main(["reconcile"]) == 0 and "git: both report and results files are tracked · folder unchanged since the last commit" in capsys.readouterr().out
 
 
 @needs_git
@@ -1040,38 +1040,35 @@ def test_run_add_names_as_unread_only_the_numbers_no_criterion_reads(lab, capsys
 
 
 def test_a_run_none_of_whose_numbers_a_criterion_reads_says_so_in_one_line(lab, capsys):
-    """A flat metrics.json ({"val_loss": ...}) names no variant of a two-arm experiment, so the criterion on
-    change.val_loss reads none of it: rb says so in one line, with the names its criteria read and the shape a file
-    gives them in, and the SDK's run.log, which said nothing, says it as an RBWarning with the run.log that gives them.
-    A run whose numbers a criterion reads says nothing of the kind."""
+    """A flat metrics.json ({"val_loss": ...}) names no variant of a two-arm experiment, so no criterion could read it as
+    any variant's: rb refuses it, saying how to name the variant, from the command line, a file and the SDK alike. Numbers
+    named for a variant no criterion reads are recorded, with one line that says so."""
     int8_experiment(capsys)
     ok(capsys, "criterion", "add", "INT8 adds at most 0.05 validation loss", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.05")
     nothing = lambda data: [w for w in data.get("warnings", []) if "counts toward nothing" in w]  # noqa: E731
     Path("out/seed1").mkdir(parents=True)
     Path("out/seed1/metrics.json").write_text(json.dumps({"val_loss": 0.987}), encoding="utf-8")
-    assert nothing(ok(capsys, "run", "add", "e1", "--from", "out/seed1/metrics.json")) == [
-        "e1: no criterion reads val_loss, so this run counts toward nothing. Its criteria read fp32.val_loss, int8.val_loss: a file gives "
-        'them as {"fp32": {"val_loss": ...}, "int8": {"val_loss": ...}}, or --variant <name> takes one variant\'s numbers.']
-    assert main(["run", "add", "e1", "val_loss=0.99"]) == 0
-    err = capsys.readouterr().err
-    assert err.count("counts toward nothing") == 1 and "a run gives them as fp32.val_loss=<value> int8.val_loss=<value>," in err
+    said = refused(capsys, 2, "E_OBJECT_INVALID", "run", "add", "e1", "--from", "out/seed1/metrics.json")
+    assert said["message"] == "e1 compares fp32, int8, and these numbers name no variant (val_loss), so no criterion could read them as any variant's. Nothing written."
+    assert said["fix"].startswith("Name the variant they are for: --variant <fp32|int8> takes one variant's numbers")
+    refused(capsys, 2, "E_OBJECT_INVALID", "run", "add", "e1", "val_loss=0.99")
     Path("out/seed2").mkdir()
     Path("out/seed2/metrics.json").write_text(json.dumps({"fp32": {"val_loss": 0.961}, "int8": {"val_loss": 0.987}}), encoding="utf-8")
     assert nothing(ok(capsys, "run", "add", "e1", "--from", "out/seed2/metrics.json")) == []
     assert nothing(ok(capsys, "run", "add", "e1", "val_loss=0.97", "--variant", "int8")) == []
-    # the SDK's run.log records through the same rules and says the same, as an RBWarning
-    import warnings
+    assert nothing(ok(capsys, "run", "add", "e1", "int8.top1=75.6")) == [
+        "e1: no criterion reads int8.top1, so this run counts toward nothing. Its criteria read fp32.val_loss, int8.val_loss: a run gives "
+        "them as fp32.val_loss=<value> int8.val_loss=<value>."]
+    # the SDK's run.log records through the same rules: refused with no variant, recorded with one
     import rabbit_brain
     exp = rabbit_brain.open().experiment("e1")
-    with warnings.catch_warnings(record=True) as told:
-        warnings.simplefilter("always")
+    with pytest.raises(rabbit_brain.RBError) as raised:
         with exp.run(per_run={}) as run:
             run.log({"val_loss": 0.975})
-        with exp.run(variant="int8") as run:
-            run.log(val_loss=0.976)
-    assert [str(w.message) for w in told if issubclass(w.category, rabbit_brain.RBWarning) and "counts toward nothing" in str(w.message)] == [
-        'e1: no criterion reads val_loss, so this run counts toward nothing. Its criteria read fp32.val_loss, int8.val_loss: a run logs '
-        'them as run.log({"fp32.val_loss": ..., "int8.val_loss": ...}), or variant=<name> takes one variant\'s numbers.']
+    assert "name no variant" in str(raised.value) and "variant= from Python" in str(raised.value.fix if hasattr(raised.value, "fix") else raised.value)
+    with exp.run(variant="int8") as run:
+        run.log(val_loss=0.976)
+    assert run.record is not None
 
 
 def test_a_run_whose_names_are_close_to_a_criterions_says_the_criterion_is_likely_misspelt(lab, capsys):
@@ -2143,10 +2140,10 @@ def test_a_run_from_a_results_file_takes_only_the_keys_asked_for(project, capsys
     int8_experiment(capsys)
     Path("results.json").write_text(json.dumps({"summary": {"delta_err": 0.21, "n": 64, "ok": True},
                                                 "cases": {"a": {"err": 1.0}, "b": {"err": 2.0}}}), encoding="utf-8")
-    data = ok(capsys, "run", "add", "e1", "--from", "results.json", "--keys", "summary.*")
-    assert data["object"]["metrics"] == {"summary.delta_err": 0.21, "summary.n": 64}
+    data = ok(capsys, "run", "add", "e1", "--from", "results.json", "--keys", "summary.*", "--variant", "int8")
+    assert data["object"]["metrics"] == {"int8.summary.delta_err": 0.21, "int8.summary.n": 64}
     assert data["object"]["files"][0]["path"] == "results.json"
-    refused(capsys, 2, "E_OBJECT_INVALID", "run", "add", "e1", "--from", "results.json", "--keys", "nothing.*")
+    refused(capsys, 2, "E_OBJECT_INVALID", "run", "add", "e1", "--from", "results.json", "--keys", "nothing.*", "--variant", "int8")
 
 
 def test_a_code_line_gives_its_value_when_none_is_typed(project, capsys):

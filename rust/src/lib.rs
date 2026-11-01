@@ -25,6 +25,7 @@ pub mod record_gen;
 pub mod record;
 pub mod pyyaml;
 pub mod sources;
+pub mod csvtable;
 pub mod sqlite;
 pub mod environment;
 pub mod assess;
@@ -56,7 +57,7 @@ pub mod telemetry;
 pub mod usage;
 pub mod cmds;
 
-pub const VERSION: &str = "0.6.3";
+pub const VERSION: &str = "0.7.0";
 
 /// The version rb says it is: VERSION, or RB_TEST_VERSION when the tests pin it (as RB_TEST_NOW pins the clock and
 /// RB_TEST_SEED the ids), so what they expect outlives a release.

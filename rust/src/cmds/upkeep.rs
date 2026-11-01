@@ -716,6 +716,31 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
         out.say("");
         out.say(loose_line(&loose, "no recorded run named"));
     }
+    let exps = led.live::<Experiment>()?;
+    let criteria = led.live::<Criterion>()?;
+    let aliases = led.metric_aliases()?;
+    let catalogue: Vec<String> = aliases.keys().cloned().chain(aliases.values().cloned()).collect();
+    let mut line_facts: std::collections::HashMap<String, repo::LineFacts> = std::collections::HashMap::new();
+    for x in exps.iter() {
+        let mine: Vec<Criterion> = criteria.iter().filter(|c| c.experiment == x.id).cloned().collect();
+        // the bare names its criteria read (int8.top1 and change.top1 read top1), and the catalogue's
+        let mut metrics: Vec<String> = led.read_metrics(x, &mine)?.into_iter().map(|m| m.rsplit('.').next().unwrap_or(&m).to_string()).collect();
+        metrics.extend(catalogue.iter().cloned());
+        metrics.sort();
+        metrics.dedup();
+        let variants = x.live_variants().iter().map(|v| (v.name.clone(), x.all_settings().into_iter().filter(|(n, s)| s.retracted.is_none() && n.starts_with(&format!("{}.", v.name))).map(|(n, s)| (n[v.name.len() + 1..].to_string(), s.value.clone())).collect::<Dict>())).collect();
+        line_facts.insert(x.id.clone(), repo::LineFacts {
+            per_run: x.all_settings().into_iter().filter(|(_, s)| s.per_run && s.retracted.is_none()).map(|(n, _)| n).collect(),
+            varies: x.varies.clone(),
+            variants,
+            metrics,
+        });
+    }
+    let ids: Vec<String> = exps.iter().map(|x| x.id.clone()).collect();
+    let per_run = |e: &str| -> Option<repo::LineFacts> { line_facts.get(e).cloned() };
+    let recorded_from: std::collections::HashMap<String, String> =
+        led.live::<Run>()?.iter().flat_map(|r| r.files.iter().map(move |f| (f.path.clone(), r.id.clone()))).collect();
+    run_folder_lines(&led.root, &plan, &ids, &per_run, &recorded_from, out);
     let mut blocks = 0usize;
     for fp in &plan.folders {
         if fp.unplaced() {
@@ -834,6 +859,8 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
         })
         .filter(|w| !usual.iter().any(|u| w.starts_with(u.as_str())))
         .collect();
+    let read_files: Vec<String> = led.live::<Run>()?.iter().flat_map(|r| r.files.iter().map(|f| f.path.clone())).collect();
+    not_read_lines(&led.root, &read_files, out);
     if plan.folders.is_empty() && placed.is_empty() && unplaced.is_empty() && uncited.is_empty() {
         let where_ = format!("the usual results folders ({})", usual.join(", ")) + &if others.is_empty() { String::new() } else { format!(" or {}", others.join(", ")) };
         out.say(
@@ -889,11 +916,141 @@ fn loose_line(folders: &[String], what: &str) -> String {
     let rule = "rb run add <experiment> --from <its file> records a run from";
     match folders {
         [one] => format!("{one} holds results files {what}. With no report of its own it is no experiment: {rule} it."),
-        many => format!(
+        many if many.len() <= 3 => format!(
             "{} results folders hold results files {what}: {}. With no report of its own none is an experiment: {rule} one.",
             many.len(),
             crate::assess::first_few(many, 3, ", ")
         ),
+        // many: every place they are, a folder alone by its path and folders side by side by the folder they sit in
+        many => format!(
+            "{} results folders hold results files {what}, in {}. With no report of its own none is an experiment: {rule} one.",
+            many.len(),
+            crate::assess::first_few(&grouped_folders(many), 100, ", ")
+        ),
+    }
+}
+
+/// Folders said by where they are: one alone by its own path, several in one folder as that folder and their count
+/// ("artifacts/sweep/ (12 folders)"), in the order first seen.
+fn grouped_folders(folders: &[String]) -> Vec<String> {
+    let mut groups: indexmap::IndexMap<String, Vec<&String>> = indexmap::IndexMap::new();
+    for f in folders {
+        let parent = f.trim_end_matches('/').rsplit_once('/').map(|(p, _)| format!("{p}/")).unwrap_or_else(|| "./".into());
+        groups.entry(parent).or_default().push(f);
+    }
+    // folders at the top are each named, never as "./"
+    groups.into_iter().flat_map(|(p, fs)| if fs.len() == 1 || p == "./" { fs.into_iter().cloned().collect::<Vec<_>>() } else { vec![format!("{p} ({} folders)", fs.len())] }).collect()
+}
+
+/// The results folders that are folders of one run, each with what its own record says of the run and the `rb run add`
+/// that records it with all the folder gives, then the settings that differ between folders side by side.
+fn run_folder_lines(root: &std::path::Path, plan: &repo::Plan, ids: &[String], per_run: &dyn Fn(&str) -> Option<repo::LineFacts>, recorded: &std::collections::HashMap<String, String>, out: &mut Out) {
+    let folders: Vec<(String, Vec<String>)> = plan.folders.iter().map(|fp| {
+        let mut readers = fp.read_by.clone();
+        if let Some(e) = &fp.experiment {
+            if !readers.contains(e) {
+                readers.insert(0, e.clone());
+            }
+        }
+        (fp.folder.clone(), readers)
+    }).collect();
+    let runs = repo::run_folders(root, &folders, ids, per_run);
+    if runs.is_empty() {
+        return;
+    }
+    out.data.insert(
+        "run_folders".into(),
+        Value::List(
+            runs.iter()
+                .map(|r| {
+                    let mut v = r.to_value();
+                    if let Value::Dict(d) = &mut v {
+                        d.insert("recorded_as".into(), Value::opt_str(recorded.get(&r.results).cloned()));
+                    }
+                    v
+                })
+                .collect(),
+        ),
+    );
+    let differ = repo::differing_settings(&runs);
+    out.data.insert(
+        "run_folder_differences".into(),
+        Value::List(
+            differ
+                .iter()
+                .map(|(k, vs)| crate::obj! {"key" => k.clone(), "values" => Value::List(vs.iter().map(|(v, fs)| crate::obj! {"value" => v.clone(), "folders" => Value::list_of_str(fs.iter().cloned())}).collect())})
+                .collect(),
+        ),
+    );
+    out.say("");
+    out.say(format!(
+        "Run folders, each with its own record of the run ({}). What each record says is the file's, not what rb saw:",
+        runs.len()
+    ));
+    for r in runs.iter().take(SHOWN_CHANGES) {
+        let name = r.says.path.strip_prefix(r.folder.as_str()).unwrap_or(&r.says.path);
+        out.say(format!("  {}  {name} says {}", r.folder, r.says.said().join(" · ")));
+        if let Some(d) = r.says.dirty_line() {
+            out.say(format!("    {d}"));
+        }
+        match recorded.get(&r.results) {
+            Some(run) => out.say(format!("    recorded as {run}: rb show {run}")),
+            None => out.say(format!("    rb {}", crate::cli::shlex_join(&r.argv))),
+        }
+    }
+    if runs.len() > SHOWN_CHANGES {
+        out.say(format!("  and {} more: rb reconcile --json lists every one", runs.len() - SHOWN_CHANGES));
+    }
+    if !differ.is_empty() {
+        out.say(format!("  Settings that differ between them ({}):", differ.len()));
+        for (k, vs) in differ.iter().take(SHOWN_CHANGES) {
+            out.say(format!("    {}", repo::differing_said(k, vs)));
+        }
+        if differ.len() > SHOWN_CHANGES {
+            out.say(format!("    and {} more: rb reconcile --json lists every one", differ.len() - SHOWN_CHANGES));
+        }
+    }
+}
+
+/// What the search for results folders passed and does not read, each with why, and the rule it follows: said where
+/// any such folder holds results-like files, so a repository that keeps its results elsewhere hears where rb did not look.
+fn not_read_lines(root: &std::path::Path, read: &[String], out: &mut Out) {
+    let mut d = repo::discover(root);
+    // a folder a recorded run read a file in is read, by that run: never listed as not read
+    // (a folder of too many folders to look in stays named: one file read deep in it says nothing of the rest)
+    d.not_read.retain(|n| n.folders > 0 || !read.iter().any(|f| f.starts_with(&n.folder)));
+    if !d.not_read.is_empty() {
+        out.say("");
+        out.say(format!(
+            "Not read ({}): rb looks for results in folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), down to {} levels from the top:",
+            d.not_read.len(),
+            repo::MAX_ROOT_DEPTH
+        ));
+        for n in d.not_read.iter().take(SHOWN_CHANGES) {
+            let held = if n.folders > 0 {
+                format!("{} folders", n.folders)
+            } else {
+                format!("{} .json, .jsonl, .csv or .tsv {}", n.files, if n.files == 1 { "file" } else { "files" })
+            };
+            out.say(format!("  {} ({held}): {}; rb compile {} reads it", n.folder, n.why, n.folder));
+        }
+        if d.not_read.len() > SHOWN_CHANGES {
+            out.say(format!("  and {} more: rb reconcile --json lists every one", d.not_read.len() - SHOWN_CHANGES));
+        }
+    }
+    if d.cut {
+        out.say("");
+        out.say(format!("The search for results folders stopped at {} folders, so some were not looked in: rb compile <folder> reads one.", repo::MAX_DIRS_LOOKED));
+    }
+    // in --json only where there is something to say
+    if !d.not_read.is_empty() {
+        out.data.insert(
+            "not_read".into(),
+            Value::List(d.not_read.iter().map(|n| crate::obj! {"folder" => n.folder.clone(), "files" => n.files as i64, "folders" => n.folders as i64, "why" => n.why}).collect()),
+        );
+    }
+    if d.cut {
+        out.data.insert("search_cut".into(), Value::Bool(true));
     }
 }
 
@@ -934,6 +1091,7 @@ fn reconcile_unrecorded(ns: &Namespace, out: &mut Out) -> R {
         out.say("");
         out.say(loose_line(&loose, "nothing records yet"));
     }
+    run_folder_lines(&root, &plan, &[], &|_: &str| None, &std::collections::HashMap::new(), out);
     let mut blocks = 0usize;
     for fp in &plan.folders {
         if !fp.adds() {
@@ -968,6 +1126,7 @@ fn reconcile_unrecorded(ns: &Namespace, out: &mut Out) -> R {
             out.say(format!("  {} · not run under rb's watch", c.path) + &if c.command.is_empty() { String::new() } else { format!(" · run it: rb journal run -- {}", c.command) });
         }
     }
+    not_read_lines(&root, &[], out);
     if let Some(there) = crate::elsewhere::record_elsewhere(&cwd) {
         // a worktree whose project's record is in another worktree: bring that record here, never start a second one
         out.say("");
@@ -984,7 +1143,11 @@ fn reconcile_unrecorded(ns: &Namespace, out: &mut Out) -> R {
         out.say(format!("No results folder here holds a report, so rb reconcile --apply would add no experiment. Start the record: rb init \"{title}\""));
         out.next = vec![format!("rb init \"{title}\""), "rb docs --start".into()];
     } else {
-        out.say(format!("Nothing to compile: no results folder ({}) holds a report or a results file yet.", result_roots().join(", ")));
+        let looked = repo::result_roots_of(&root);
+        out.say(format!(
+            "Nothing to compile: no results folder ({}) holds a report or a results file yet.",
+            if looked.is_empty() { result_roots().join(", ") } else { looked.join(", ") }
+        ));
         out.say("");
         out.say(format!("Start the record anyway: rb init \"{title}\""));
         out.next = vec![format!("rb init \"{title}\""), "rb docs --start".into()];
@@ -1001,7 +1164,10 @@ fn reconcile_unrecorded(ns: &Namespace, out: &mut Out) -> R {
     out.data.insert("uncited_changes".into(), Value::List(Vec::new()));
     out.data.insert("uncited_from_head".into(), Value::Null);
     out.data.insert("scan".into(), Value::Null);
-    out.data.insert("looked_in".into(), Value::list_of_str(result_roots()));
+    // the usual folders, there or not, then each folder below named for results
+    let usual = result_roots();
+    let found: Vec<String> = repo::result_roots_of(&root).into_iter().filter(|f| !usual.contains(f)).collect();
+    out.data.insert("looked_in".into(), Value::list_of_str(usual.into_iter().chain(found)));
     out.data.insert("record".into(), Value::Null);
     out.data.insert(
         "would_start".into(),

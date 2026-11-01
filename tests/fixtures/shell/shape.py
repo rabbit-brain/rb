@@ -93,6 +93,7 @@ PHASE = [  # (path prefix, phase, where today's code computes it, or what builds
     ("findings.{id}.reading_short", "M6", "the compact row's reading, arms labelled"), ("findings.{id}.verdict", "P4B", "model.rs verdict: the rule's one sentence (status word, reading, result class in words, distance from its number)"),
     ("findings.{id}.reading.unit_said", "P4B", "model.rs: the unit as a sentence says it (points for a difference of percentages)"), ("findings.{id}.tags", "M6", "at most two ontology tags"),
     ("findings.{id}.reads_baseline", "M6", "it reads the baseline or control arm alone"),
+    ("findings.{id}.pooled", "M6", "rb show's headline words for a reading that pools a per-run setting's values; empty where none"),
     ("experiments[].compares", "M6", "model.rs compares, arms labelled"),
     # CITE (CITE.md items 1 and 4): every file:line the text cites, resolved (ledger/cite.rs, M's CITE-FIELDS.md)
     # PIVOT (the experiment's comparison as a grid; a reader's queue rows say what stands): rb compare's cells, additive

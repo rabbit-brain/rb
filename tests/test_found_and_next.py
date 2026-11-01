@@ -1262,7 +1262,7 @@ def test_a_thousand_results_folders_read_as_one_line_of_reconcile_and_a_short_an
     Path("results/calibration").mkdir(parents=True)
     Path("results/calibration/README.md").write_text("# INT8 calibration\n\n## Results\n\n512 images calibrate INT8.\n", encoding="utf-8")
     Path("results/calibration/metrics.json").write_text('{"val_loss": 0.97}', encoding="utf-8")
-    line = f"{n} results folders hold results files {{}}: out/seed0/, out/seed1/, out/seed10/ and {n - 3} more. With no report of its own none is an experiment"
+    line = f"{n} results folders hold results files {{}}, in out/ ({n} folders). With no report of its own none is an experiment"
     before = rb("reconcile", text=True)
     assert line.format("nothing records yet") in before and len(before.splitlines()) < 40 and len(before) < 6000, before
     rb("init", "INT8 ResNet-50")

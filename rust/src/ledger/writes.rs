@@ -146,6 +146,8 @@ pub struct NewRun {
     pub numbers_from: Vec<String>,
     /// the row of a SQLite database among `files` its numbers were read from
     pub row: Option<FromRow>,
+    /// the row of a CSV or TSV table among `files` its numbers were read from, as the receipt keeps it (`table_row`)
+    pub table_row: Option<Dict>,
 }
 
 /// The row of a SQLite database a run is read from (`rb run add --from <database> --table --where`): what the receipt
@@ -246,6 +248,7 @@ impl Default for NewRun {
             tree: None,
             numbers_from: Vec::new(),
             row: None,
+            table_row: None,
         }
     }
 }
@@ -314,7 +317,7 @@ fn truncate(s: &str, n: usize) -> String {
 /// bytes its numbers were read from (produced.existed), is more than an hour before it was recorded (a file is written a
 /// moment before rb reads it). Another file it names is no such sign, as a run may keep one it did not make.
 pub fn made_before_recorded(r: &Run) -> bool {
-    if r.produced_basis == "unknown" {
+    if super::support::run_basis(r) == "unknown" {
         return true;
     }
     let at = if r.receipt.at.is_empty() { &r.created_at } else { &r.receipt.at };
@@ -1751,6 +1754,17 @@ impl Ledger {
             }
         }
         let who = self.actor()?;
+        // a row picked by the value of what the experiment varies names its variant (--where precision=int8)
+        // only where the numbers would otherwise name no variant no criterion reads as given
+        let mut a = a;
+        if a.variant.is_none() {
+            if let Ok(exp) = self.load::<Experiment>(experiment_id) {
+                let keys: Vec<String> = a.metrics.keys().map(|k| self.metric_key_for(&exp, k, None)).collect();
+                if self.names_no_arm(&exp, &keys)? {
+                    a.variant = row_variant(&exp, &a);
+                }
+            }
+        }
         let mut values: IndexMap<String, Value> = IndexMap::new();
         let files = a.files.clone();
         let basis = a.basis.clone();
@@ -1772,6 +1786,31 @@ impl Ledger {
                 }
                 if values.is_empty() {
                     return Err(RBError::msg("E_OBJECT_INVALID", "A run needs at least one number: NAME=VALUE, or --from file.json."));
+                }
+                // numbers that name no arm, on an experiment that compares two or more: no criterion can read them as
+                // any variant's, so they are refused, unless a criterion reads a name as given
+                let variants: Vec<String> = exp.live_variants().iter().map(|v| v.name.clone()).collect();
+                if a.variant.is_none() {
+                    let keys: Vec<String> = values.keys().cloned().collect();
+                    if self.names_no_arm(&exp, &keys)? {
+                        {
+                            let first = keys.first().cloned().unwrap_or_default();
+                            return Err(RBError::msg_fix(
+                                "E_OBJECT_INVALID",
+                                format!(
+                                    "{} compares {}, and these numbers name no variant ({}), so no criterion could read them as any variant's. Nothing written.",
+                                    exp.id,
+                                    variants.join(", "),
+                                    crate::assess::first_few(&keys, 4, ", ")
+                                ),
+                                format!(
+                                    "Name the variant they are for: --variant <{}> takes one variant's numbers (variant= from Python), or give each as <variant>.{first}=<value> (a file as {{\"{}\": {{\"{first}\": ...}}}}).",
+                                    variants.join("|"),
+                                    variants[0]
+                                ),
+                            ));
+                        }
+                    }
                 }
                 let given = a.per_run.clone();
                 for k in given.keys() {
@@ -1847,6 +1886,11 @@ impl Ledger {
                     let mut fs: Vec<String> = refs.iter().filter(|r| r.path != crate::sys::typed(&row.path)).map(|r| r.sha256.clone()).collect();
                     fs.sort();
                     sha(&crate::obj! {"files" => str_list(&fs), "record" => Value::Null, "row" => row.identity.clone()})
+                } else if let Some(tr) = &a.table_row {
+                    // one row of a table is one run: the table's other rows are other runs, and the table grows
+                    let mut fs: Vec<String> = refs.iter().filter(|r| Some(r.path.as_str()) != tr.get_str("path")).map(|r| r.sha256.clone()).collect();
+                    fs.sort();
+                    sha(&crate::obj! {"files" => str_list(&fs), "record" => Value::Null, "table_row" => tr.get("path").cloned().unwrap_or(Value::Null), "row" => tr.get("row_sha256").cloned().unwrap_or(Value::Null)})
                 } else if !refs.is_empty() {
                     let mut fs: Vec<String> = refs.iter().map(|r| r.sha256.clone()).collect();
                     fs.sort();
@@ -1946,7 +1990,19 @@ impl Ledger {
                     "run_record" => Value::Null, "config" => check.as_ref().map(|c| c.to_value()), "row" => row_v
                 };
                 // what rb saw of the command now: a run of it the journal watched, or the log line given for its launch
-                if let Some(seen) = self.command_seen(a.command.as_deref(), a.command_source.as_deref(), &refs, &values.clone().into_iter().collect())? {
+                if let Some(tr) = &a.table_row {
+                    receipt.insert("table_row".into(), Value::Dict(tr.clone()));
+                }
+                let seen = self.command_seen(a.command.as_deref(), a.command_source.as_deref(), &refs, &values.clone().into_iter().collect())?;
+                // numbers typed on the command line or over MCP, with no file, no row and no time given, could have been
+                // made at any time: when is unknown, unless rb's journal watched the command print them just now
+                let watched = seen.as_ref().map_or(false, |s| s.get_str("by") == Some("journal"));
+                let (produced, produced_basis) = if basis == "typed" && self.via != "sdk" && refs.is_empty() && a.row.is_none() && produced_basis == "recorded" && !watched {
+                    (None, "unknown".to_string())
+                } else {
+                    (produced, produced_basis)
+                };
+                if let Some(seen) = seen {
                     receipt.insert("command_seen".into(), seen);
                 }
                 let receipt = Value::Dict(receipt);
@@ -1992,10 +2048,12 @@ impl Ledger {
                 Err(dup) => return Ok(dup),
             }
         };
-        if a.repeats.is_none() && !a.per_run.is_empty() {
+        // a run whose config disagrees with the spec does not count: it shares a unit with no run, and none with it
+        let counts = |r: &Run| r.receipt.config.as_ref().map_or(true, |c| c.mismatches.is_empty());
+        if a.repeats.is_none() && !a.per_run.is_empty() && counts(&run) {
             let given = Value::Dict(a.per_run.clone());
             let same = self.live::<Run>()?.into_iter().find(|r| {
-                r.experiment == exp.id && r.id != run.id && Value::Dict(r.per_run.clone()) == given && r.spec_sha256 == run.spec_sha256 && variants_of(r) == variants_of(&run)
+                r.experiment == exp.id && r.id != run.id && Value::Dict(r.per_run.clone()) == given && r.spec_sha256 == run.spec_sha256 && variants_of(r) == variants_of(&run) && counts(r)
             });
             if let Some(same) = same {
                 if self.unit_setting(&exp).is_none() {
@@ -2015,7 +2073,7 @@ impl Ledger {
             }
         }
         let watched = !a.numbers_from.is_empty() && self.journal_wrote(&a.numbers_from);
-        for line in super::support::told_after_add(&run, a.produced_at.is_some(), &a.numbers_from, watched) {
+        for line in super::support::told_after_add(&run, a.produced_at.is_some(), &a.numbers_from, watched, &self.root) {
             crate::plain::tell(line);
         }
         let warning = if notices.is_empty() { None } else { Some(notices.join("; ")) };
@@ -2533,10 +2591,21 @@ impl Ledger {
             }
             row
         };
+        // a run's own config that says the code had uncommitted changes when it ran: its commit is not all the code
+        // (reproduce::Recipes says it the same way)
+        let dirty = runs.iter().filter(|r| r.receipt.config.as_ref().and_then(|c| crate::repo::config_dirty_line(&self.root, &c.path, c.sha256.as_deref())).is_some()).count();
+        let dirty_why = said(
+            dirty,
+            "the run's config says the code had uncommitted changes when it ran",
+            "the runs' configs say the code had uncommitted changes when they ran",
+            "both runs' configs say the code had uncommitted changes when they ran",
+            "has a config that says the code had uncommitted changes when it ran",
+            "have configs that say the code had uncommitted changes when they ran",
+        );
         if code.is_empty() {
-            rows.push(crate::dict! {"what" => "code", "state" => "unknown", "detail" => code_why.clone()});
+            rows.push(partly(crate::dict! {"what" => "code", "state" => "unknown", "detail" => code_why.clone()}, dirty, &dirty_why));
         } else {
-            rows.push(partly(self.code_row(&code), unnamed, &code_why));
+            rows.push(partly(partly(self.code_row(&code), unnamed, &code_why), dirty, &dirty_why));
         }
         if let Some(last) = envs.last() {
             let keys: Vec<&str> = ["python", "torch", "numpy", "jax", "tensorflow", "cuda"].into_iter().filter(|k| last.contains_key(*k)).collect();
@@ -3370,6 +3439,21 @@ impl Ledger {
                     self.commit(&who, "retract", Obj::Experiment(exp), merge(crate::dict! {"variant" => name.clone(), "why" => why}, amended))?;
                     return Ok(("variant".to_string(), format!("{eid}/{name}"), deps));
                 }
+                // a name declared in --varies with no setting of its own (a name mistyped there) is taken back from it
+                if let (exp_id, Some(name)) = parse_address(subject) {
+                    if let Ok(mut exp) = self.load::<Experiment>(&exp_id) {
+                        if exp.varies.contains(&name) && exp.lookup(&name).is_none() && !exp.live_variants().iter().any(|v| v.setting(&name).is_some()) {
+                            let before = self.freeze_sha(&exp, None)?;
+                            exp.varies.retain(|v| v != &name);
+                            let after = self.freeze_sha(&exp, None)?;
+                            let amend = if exp.frozen.is_some() { Some(why) } else { None };
+                            let amended = self.guard(&mut exp, &before, &after, amend, &who, &format!("{name} taken back from what it varies"))?;
+                            let eid = exp.id.clone();
+                            self.commit(&who, "retract", Obj::Experiment(exp), merge(crate::dict! {"varies" => name.clone(), "why" => why}, amended))?;
+                            return Ok(("varied setting".to_string(), format!("{eid}/{name}"), Vec::new()));
+                        }
+                    }
+                }
                 let (mut exp, name, _s) = self.resolve_setting(subject)?;
                 let deps = self.rests_on("setting", None, &format!("{}/{name}", exp.id))?;
                 let before = self.freeze_sha(&exp, None)?;
@@ -3516,5 +3600,57 @@ fn not_a_store_row(src: Option<&Source>, root: &std::path::Path, what: &str) -> 
             "Read the row as a run (rb run add <experiment> --from <database> --table <table> --where <column>=<value>), or cite the document that states the number.",
         )),
         None => Ok(()),
+    }
+}
+
+/// The variant a run's row names, read with no --variant: the row was picked by a value of a setting the experiment
+/// varies, and exactly one variant holds that value as its own or is named by it (--where precision=int8 names int8).
+fn row_variant(exp: &Experiment, a: &NewRun) -> Option<String> {
+    let picked: Dict = match (&a.row, &a.table_row) {
+        (Some(r), _) => r.key.clone(),
+        (None, Some(t)) => t.get("where").and_then(Value::as_dict).cloned()?,
+        _ => return None,
+    };
+    let said = |v: &Value| crate::pyjson::py_str(v);
+    let mut hits: Vec<String> = Vec::new();
+    for name in &exp.varies {
+        let Some(v) = picked.get(name).or_else(|| picked.get(last_part(name))) else { continue };
+        for var in exp.live_variants() {
+            let own = exp.all_settings().into_iter().find(|(n, s)| s.retracted.is_none() && (n == &format!("{}.{name}", var.name))).map(|(_, s)| s.value.clone());
+            // a value matches as text or as the same number (8 and 8.0)
+            let same = |a: &Value, b: &Value| said(a) == said(b) || matches!((a.as_f64().or_else(|| said(a).parse().ok()), b.as_f64().or_else(|| said(b).parse().ok())), (Some(x), Some(y)) if x == y);
+            let named = match own {
+                Some(o) if !o.is_null() => same(&o, v),
+                _ => var.name == said(v),
+            };
+            if named && !hits.contains(&var.name) {
+                hits.push(var.name.clone());
+            }
+        }
+    }
+    (hits.len() == 1).then(|| hits.remove(0))
+}
+
+impl Ledger {
+    /// Whether numbers by these names, on an experiment that compares two or more variants, name no variant (nor the
+    /// change between them) and no criterion reads one as given: a criterion reads a number as given only when it names
+    /// no arm (--metric val_loss, no subject or reference).
+    fn names_no_arm(&self, exp: &Experiment, keys: &[String]) -> Res<bool> {
+        let variants: Vec<String> = exp.live_variants().iter().map(|v| v.name.clone()).collect();
+        if variants.len() < 2 {
+            return Ok(false);
+        }
+        let names_arm = |k: &str| k.starts_with("change.") || k.split_once('.').map_or(false, |(v, _)| variants.iter().any(|x| x == v));
+        if keys.iter().any(|k| names_arm(k)) {
+            return Ok(false);
+        }
+        let aliases = self.metric_aliases()?;
+        let as_given: HashSet<String> = self
+            .live::<Criterion>()?
+            .into_iter()
+            .filter(|c| c.experiment == exp.id && super::findings::reads_as_given(exp, c, &aliases))
+            .map(|c| canon(&c.metric, exp, &aliases))
+            .collect();
+        Ok(!keys.iter().any(|k| as_given.contains(&canon(k, exp, &aliases))))
     }
 }

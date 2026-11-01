@@ -152,13 +152,6 @@ impl Ledger {
                 exp.id
             ));
         }
-        let pairs = if !reference.is_empty() {
-            format!("{reference}.{metric}=<value> {subject}.{metric}=<value>")
-        } else if !subject.is_empty() {
-            format!("{subject}.{metric}=<value>")
-        } else {
-            format!("{}=<value>", c.metric)
-        };
         let per_run = exp.all_settings().into_iter().filter(|(_, s)| s.per_run && s.retracted.is_none()).map(|(n, _)| format!("--set {n}=<value>")).collect::<Vec<_>>().join(" ");
         let per_run = if per_run.is_empty() { String::new() } else { format!(" {per_run}") };
         // where the work keeps its runs in a database, a run is read from its row: no number typed, no command
@@ -168,7 +161,9 @@ impl Ledger {
             let arm = if reference.is_empty() && subject.is_empty() { "" } else { " --variant <variant>" };
             return Ok(format!("rb run add {}{arm} --from {store} --table <table> --where <column>=<value>{per_run}", exp.id));
         }
-        Ok(format!("rb run add {} {pairs}{per_run} --command \"...\"", exp.id))
+        // a run is read from the file it wrote, never typed in: a number typed could be the claim's own (a cited
+        // rule's), and a command typed beside it reads as given later
+        Ok(format!("rb run add {} --from <the results file a run wrote>{per_run}", exp.id))
     }
 
     /// The question link a criterion add on this experiment gives: the one live question it is filed under, or a
@@ -1228,15 +1223,16 @@ impl Ledger {
                 // folded with the experiment's other late criteria, after this loop
                 late.entry(c.experiment.clone()).or_default().push((c.id.clone(), f.timing.clone(), hint.clone()));
             } else if primary && f.timing == "unknown" {
-                item(
-                    &mut items,
-                    "agent",
-                    "timing_unknown",
-                    &c.id,
-                    &format!("{}: {}: whether it was declared before its evidence cannot be read", c.id, says("timing")),
-                    &format!("{hint}   (evidence with a known production time reads prospectively)"),
-                    vec![],
-                );
+                // numbers typed with no time: the same numbers again with the time they were made, in place of that run
+                let typed = f.observations.iter().find(|o| o.basis == "typed" && o.produced_basis == "unknown");
+                let do_ = match typed {
+                    Some(o) => format!(
+                        "rb run add {} <the same numbers> --produced-at <when> --replaces {} --why \"<when they were made>\"   (numbers typed with no time are of a time nobody knows)",
+                        c.experiment, o.run
+                    ),
+                    None => format!("{hint}   (evidence with a known production time reads prospectively)"),
+                };
+                item(&mut items, "agent", "timing_unknown", &c.id, &format!("{}: {}: whether it was declared before its evidence cannot be read", c.id, says("timing")), &do_, vec![]);
             }
             for p in &f.integrity {
                 match p.code.as_str() {
@@ -1889,7 +1885,7 @@ impl Ledger {
                 crate::obj! {
                     "id" => x.id.clone(), "uid" => x.uid.clone(), "experiment_id" => x.experiment.clone(), "basis" => x.basis.clone(),
                     "metrics" => Value::list_of_str(ms.into_iter().cloned()), "per_run" => Value::Dict(x.per_run.clone()), "synthetic" => x.synthetic,
-                    "recorded" => x.created_at.clone(), "produced_at" => x.produced_at.clone(), "produced_basis" => x.produced_basis.clone(),
+                    "recorded" => x.created_at.clone(), "produced_at" => super::support::run_produced(x).map(str::to_string), "produced_basis" => super::support::run_basis(x).to_string(),
                     "repeats" => x.repeats.clone(), "by" => x.created_by.clone(), "session" => x.receipt.session.clone(),
                     "inputs" => Value::List(x.inputs.iter().map(|u| Value::Dict(u.dump(false))).collect()),
                     "outputs" => Value::List(x.outputs.iter().map(|u| Value::Dict(u.dump(false))).collect()),

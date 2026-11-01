@@ -42,7 +42,7 @@ pub fn standing_words(f: &Value) -> String {
 
 /// Whether a finding's met rule is drawn green: nothing wrong under it, and met across its whole interval, not only on
 /// its estimate; a reading with no interval (a point only) is met on its estimate alone; a gate met is policy, never
-/// green (D4).
+/// green (D4); nor is a rule met only where its runs pool a per-run setting's values, one of whose runs alone miss it.
 pub fn green(f: &Value) -> bool {
     fn listed<'a>(f: &'a Value, k: &str) -> &'a [Value] {
         match f.get(k) {
@@ -57,7 +57,7 @@ pub fn green(f: &Value) -> bool {
         && bound("hi")
         && pget(f, "result", "") != "point_only"
         && listed(f, "integrity").is_empty()
-        && !listed(f, "caveats").iter().any(|c| pget(c, "code", "") == "straddles")
+        && !listed(f, "caveats").iter().any(|c| ["straddles", "pooled_misses"].contains(&pget(c, "code", "").as_str()))
 }
 
 /// The first integrity problem as its one shared phrase, with the count of the rest.
@@ -290,6 +290,8 @@ mod tests {
         assert!(!green(&met("point_only", crate::obj! {"estimate" => 0.8}, "", false)));
         assert!(!green(&met("measured", crate::obj! {"estimate" => 0.8, "lo" => 0.75, "hi" => Value::Null}, "", false)));
         assert!(!green(&met("measured", interval(), "straddles", false)));
+        // a rule met on a reading that pools several values of a per-run setting, one of which alone misses it
+        assert!(!green(&met("measured", interval(), "pooled_misses", false)));
         assert!(!green(&met("measured", interval(), "", true)));
         assert!(!green(&crate::obj! {"rule_outcome" => "misses", "result" => "measured", "comparison" => interval()}));
     }

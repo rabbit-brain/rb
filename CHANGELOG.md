@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.7.0 (2026-11-02)
+
+`rb reconcile` finds results where a repository keeps them and reads each run folder's own record, and readings say what they rest on: a time rb cannot know, arms that ran differently, values pooled together.
+
+- **Results where they are.** `rb reconcile` looks in every folder named for results (`results/`, `eval/`, `metrics/`, `reports/`, `artifacts/` and the like), down to four levels, not only in five folders at the top. rb's journal looks in the same folders.
+  - It passes over code, packages and environments. `rb reconcile` and rb's journal never propose `pyproject.toml`, `package.json`, `Cargo.toml` or `environment.yml` as a run, nor list them as a changed file nothing cites.
+  - Under "Not read" it names a folder it passed over that holds results files of its own, and a folder of more than 300 folders.
+  - It names every place its loose results folders are, up to 100, and names a folder once on a file system that does not tell `Results/` from `results/`.
+  - A large Markdown file no longer stalls it.
+- **Each run folder's own record.** Where each run keeps a folder with its config and its numbers, `rb reconcile` says what each folder records: the command, the commit, whether the code had uncommitted changes (`dirty: true`), and the settings that differ between folders. Where an experiment reads the folder, it prints the `rb run add` line that records it, with its arm, its keys and its settings.
+  - On an experiment that compares two or more variants, numbers that name no variant are refused, unless a rule reads them as given. The message says how to name one.
+  - `--command-source` takes a command that YAML folds over several lines, and a log first committed up to a week after the run.
+  - A run whose config says `dirty: true` says so on every rule that rests on it. A folder reads "unchanged since the last commit" where it read "clean".
+  - A file's first commit is never "written after the run", and no hint offers a database where there is none.
+- **CSV and TSV.** `rb run add --from <file>.csv --where <column>=<value>` reads one row as a run, as a database row is read. A CSV, TSV or database row picked by a varied setting names its variant. `rb compile` lists a table's numbers. Given more than 200 sources, it says it lists the first 200 and how to read the rest.
+- **A time rb cannot know.** Numbers typed in on the command line or through MCP with no `--produced-at` have no time of their own. A rule over them reads "order unknown", never "declared before the evidence", and they count among the runs recorded afterwards. A rule still reads a watched command's numbers and the SDK's as made when they were recorded.
+  - Records an earlier rb wrote read the same way after the upgrade. Nothing in `.rb/` is rewritten.
+  - So `rb status --fail-on late`, `unestablished` or `undecided` can fail where it passed, and a call made before the upgrade can read as made on an earlier reading.
+  - `rb run add <exp> <the same numbers and per-run values> --produced-at <when> --replaces <run> --why "<when they were made>"` gives such a run its time.
+- **Arms that ran differently.** Where the arms a rule compares differ in a per-run setting (500 problems against 250, or another grader), the reading says so. Arms that each ran at one value of a setting pool nothing.
+- **Pooled readings.** Where `population.unit` is declared and a rule's runs pool several values of a setting, its headline says so. It names the value that misses, with what its runs read there: for an `--each` rule, the units outside it and the farthest. Such a rule is never drawn as a clean pass.
+- **Cited numbers.**
+  - A cited value on a per-run setting that differs from the runs makes the rule not comparable, not "not reproduced".
+  - So does a cited difference of means that rb's paired reading cannot give. Where each arm is recorded in runs of its own, rb's own difference of means is shown beside it.
+  - `rb spec set --cited` says the value back, and a cited value's note shows only on rules that cite a number.
+- **The page says what the terminal says.** A rule's card carries the notes `rb show` gives: typed in, pooled, arms that differ, a run with uncommitted changes. A pooled reading leads with `rb show`'s words for it, and numbers keep the rule's digits. "checks ok" shows only on a card with no notes. Runs replaced with `--replaces` are not among the reasons to doubt.
+- **rb's own files.** The files `rb init` and `rb skill add` install do not make a run's tree read as uncommitted, on Windows too.
+- **Words.**
+  - A call that goes against its rule says so: "accepted c1 against its rule (criterion not met)", and "accepted c1 while rb cannot judge its rule (criterion undetermined)".
+  - An unpaired reading's timing counts both arms' units.
+  - No suggested next run (after `rb criterion add`, in `rb status`) offers `<metric>=<value>` or `--command`.
+  - Counts say "1 run".
+  - `rb retract <exp>/<name>` takes back a `--varies` name that has no setting.
+
 ## 0.6.3 (2026-10-31)
 
 `rb login` waits through a dropped connection, and `rb clone` says no part of a password in git's message.

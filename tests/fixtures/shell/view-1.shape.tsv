@@ -392,6 +392,7 @@ findings.{id}.reading_short	string	M6	the compact row's reading, arms labelled	b
 findings.{id}.verdict	string	P4B	model.rs verdict: the rule's one sentence (status word, reading, result class in words, distance from its number)	both
 findings.{id}.tags	list	M6	at most two ontology tags	both
 findings.{id}.reads_baseline	bool	M6	it reads the baseline or control arm alone	both
+findings.{id}.pooled	string	M6	rb show's headline words for a reading that pools a per-run setting's values; empty where none	both
 findings.{id}.cited.path	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
 findings.{id}.cited.line	number	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
 findings.{id}.cited.locator	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both

@@ -17,7 +17,7 @@ jobs:
         include:
           - { platform: linux-x86_64, os: ubuntu-24.04, target: x86_64, manylinux: "2014" }
           - { platform: linux-aarch64, os: ubuntu-24.04-arm, target: aarch64, manylinux: "2014" }
-          - { platform: macos-aarch64, os: macos-14, target: aarch64, manylinux: auto }
+          - { platform: macos-aarch64, os: macos-15, target: aarch64, manylinux: auto }
           - { platform: macos-x86_64, os: macos-15-intel, target: x86_64, manylinux: auto }
           - { platform: windows-x86_64, os: windows-latest, target: x86_64, manylinux: auto }
     runs-on: ${{ matrix.os }}

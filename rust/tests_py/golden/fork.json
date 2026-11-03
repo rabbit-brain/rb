@@ -242,7 +242,7 @@
     "runp5h4s6 on e1: base.top1=0.7, wide.top1=0.74 \u00b7 seed=1",
     "  read data1 (eval)",
     "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
-    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
     "  c1 not reproduced \u00b7 point only: top1: 0.74 \u00b7 mean, 1 seed (rb)",
     "  c2 criterion undetermined \u00b7 point only: change.top1: +0.04 \u00b7 paired difference, 1 seed (rb)",
     "  rb put the code in git at refs/rb/snapshots/23df1289630ddc64be38d06332d21b450aa988e1, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/23df1289630ddc64be38d06332d21b450aa988e1 removes it.",
@@ -1161,8 +1161,8 @@
    "bytes": 17
   },
   "bundle.zip": {
-   "sha256": "9a547c5522227c05831c5a0f3ffc9ceef96b37d2560f0b066c6d6cef8d803901",
-   "bytes": 147666
+   "sha256": "f1dcfe9745e892b347c474e4d70b00fe9cff64ac7356af057d226f2777a78c21",
+   "bytes": 147660
   },
   "bundle/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1235,10 +1235,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 143919,",
+   " \"bytes\": 143913,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"766849567497198f297245b1ca507429cbcea55f291907d91647f15e7487739e\",",
+   "  \"page.html\": \"4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -1272,8 +1272,8 @@
    ""
   ],
   "bundle/page.html": {
-   "sha256": "766849567497198f297245b1ca507429cbcea55f291907d91647f15e7487739e",
-   "bytes": 125214
+   "sha256": "4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7",
+   "bytes": 125208
   },
   "bundle/record/.rb/.gitattributes": [
    "* -text",
@@ -3504,10 +3504,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 143919,",
+   " \"bytes\": 143913,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"766849567497198f297245b1ca507429cbcea55f291907d91647f15e7487739e\",",
+   "  \"page.html\": \"4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -3541,8 +3541,8 @@
    ""
   ],
   "newer/page.html": {
-   "sha256": "766849567497198f297245b1ca507429cbcea55f291907d91647f15e7487739e",
-   "bytes": 125214
+   "sha256": "4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7",
+   "bytes": 125208
   },
   "newer/record/.rb/.gitattributes": [
    "* -text",
@@ -4005,10 +4005,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 143919,",
+   " \"bytes\": 143913,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"766849567497198f297245b1ca507429cbcea55f291907d91647f15e7487739e\",",
+   "  \"page.html\": \"4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -4042,8 +4042,8 @@
    ""
   ],
   "other/page.html": {
-   "sha256": "766849567497198f297245b1ca507429cbcea55f291907d91647f15e7487739e",
-   "bytes": 125214
+   "sha256": "4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7",
+   "bytes": 125208
   },
   "other/record/.rb/.gitattributes": [
    "* -text",
@@ -4463,17 +4463,17 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 125846,",
+   " \"bytes\": 125840,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"e7565254588749be705f633c6706c390aae422ff18cf06a457fc2d945f18164f\"",
+   "  \"page.html\": \"12266ebb31826a9bb6d89ff14a7e5a4ec8ce3f8611d8bd9a1bb984761a66c3b3\"",
    " }",
    "}",
    ""
   ],
   "page/page.html": {
-   "sha256": "e7565254588749be705f633c6706c390aae422ff18cf06a457fc2d945f18164f",
-   "bytes": 125255
+   "sha256": "12266ebb31826a9bb6d89ff14a7e5a4ec8ce3f8611d8bd9a1bb984761a66c3b3",
+   "bytes": 125249
   },
   "proj/.rb/.gitattributes": [
    "* -text",
@@ -5028,8 +5028,8 @@
    ""
   ],
   "pub/bundle.zip": {
-   "sha256": "49eda2cf85d216be94eea7ae9e85dbe29b524e69973535a7d9460a53a757bf26",
-   "bytes": 152225
+   "sha256": "e4c3f4dc3f79616a25c423b6258167485c06d2fc49296e0d9cbe5e83015ddf6f",
+   "bytes": 152219
   },
   "pub/manifest.json": [
    "{",
@@ -5044,10 +5044,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 148479,",
+   " \"bytes\": 148473,",
    " \"files\": {",
    "  \"README.md\": \"e6cf0e19d0322c60bbd65e4a17f823478f187a80608a68e49b6570badc9af542\",",
-   "  \"page.html\": \"3e5478de68771bffbe977af7efcc163e6ddaaf87895f89f62ef3b7a27140e622\",",
+   "  \"page.html\": \"0ebb66ada770c319bd755a951d4d5396df4b401bf50a1236998465c441c2104a\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -5082,8 +5082,8 @@
    ""
   ],
   "pub/page.html": {
-   "sha256": "3e5478de68771bffbe977af7efcc163e6ddaaf87895f89f62ef3b7a27140e622",
-   "bytes": 129676
+   "sha256": "0ebb66ada770c319bd755a951d4d5396df4b401bf50a1236998465c441c2104a",
+   "bytes": 129670
   },
   "pub/record/.rb/.gitattributes": [
    "* -text",
@@ -5547,10 +5547,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 143919,",
+   " \"bytes\": 143913,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"766849567497198f297245b1ca507429cbcea55f291907d91647f15e7487739e\",",
+   "  \"page.html\": \"4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -5584,8 +5584,8 @@
    ""
   ],
   "tampered/page.html": {
-   "sha256": "766849567497198f297245b1ca507429cbcea55f291907d91647f15e7487739e",
-   "bytes": 125214
+   "sha256": "4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7",
+   "bytes": 125208
   },
   "tampered/record/.rb/.gitattributes": [
    "* -text",

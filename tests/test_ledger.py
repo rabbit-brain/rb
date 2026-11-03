@@ -741,7 +741,7 @@ def test_a_metric_reference_reads_the_right_number(lab, capsys, metric, expected
     (False, ["1.8"], "misses", "criterion not met"),
     (False, ["1.2", "1.6"], "meets", "estimate meets criterion"),      # one run over 1.5: the rule reads the mean over units (1.4), not a vote
     (True, [], "untested", "criterion untested"),
-    (True, ["1.44"], "meets", "reproduced"),
+    (True, ["1.44"], "meets", "reproduced on the estimate"),        # one run, no interval: met on its estimate alone (round 4)
     (True, ["1.60"], "misses", "not reproduced"),
 ])
 def test_the_rule_word_for_own_and_cited_criteria(project, capsys, cited, values, outcome, word):
@@ -1065,7 +1065,7 @@ def test_a_run_none_of_whose_numbers_a_criterion_reads_says_so_in_one_line(lab, 
     with pytest.raises(rabbit_brain.RBError) as raised:
         with exp.run(per_run={}) as run:
             run.log({"val_loss": 0.975})
-    assert "name no variant" in str(raised.value) and "variant= from Python" in str(raised.value.fix if hasattr(raised.value, "fix") else raised.value)
+    assert "name no variant" in str(raised.value) and "variant=\"<fp32|int8>\"" in str(raised.value.fix if hasattr(raised.value, "fix") else raised.value)
     with exp.run(variant="int8") as run:
         run.log(val_loss=0.976)
     assert run.record is not None
@@ -1661,6 +1661,7 @@ def test_a_per_run_setting_a_variant_holds_two_values_of_splits_the_table_and_th
                      ("int8", 512): pytest.approx(0.752), ("int8", 1024): pytest.approx(0.762)}
     assert rabbit_brain.open().experiment("e1").compare()["rows"] == t["rows"]
     pooled = [c for c in ok(capsys, "show", "c1")["finding"]["caveats"] if c["code"] == "pooled_setting"]
+    # the arms hold different calibration sizes: a condition, never offered as a repeat
     assert [c["text"] for c in pooled] == ["the runs it reads hold calib 512 and 1024, pooled in one reading: a rule with --where calib=<value> reads one"]
     ok(capsys, "criterion", "add", "INT8 against FP32 at 1024", "-e", "e1", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
        "--better", "--where", "calib=1024", "--id", "c2")

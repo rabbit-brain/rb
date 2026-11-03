@@ -506,6 +506,27 @@ pub fn rb_written(root: &Path, top: &Path) -> Vec<String> {
             out.push(rel);
         }
     }
+    // rb's own outputs in the tree: a page or an export as rb wrote it (rb page, rb export), and rb tour's folder as the
+    // tour left it, are no code a run ran either, committed or not
+    for line in &lines {
+        let how = line.get("how").and_then(Value::as_str).unwrap_or("");
+        let Some(path) = line.get("path").and_then(Value::as_str).map(PathBuf::from) else { continue };
+        let Some(rel) = rel_to(&resolve_path(&path), top).filter(|r| !r.is_empty() && !r.starts_with("..")) else { continue };
+        if out.iter().any(|o| *o == rel || o.trim_end_matches('/') == rel) {
+            continue;
+        }
+        let ours = match how {
+            "output" if path.is_dir() => crate::remove::rb_export_as_written(&path),
+            "output" => crate::owned::as_rb_wrote(root, &path),
+            "dir" if line.get("kind").and_then(Value::as_str) == Some("tour") && path.is_dir() => {
+                line.get("files").and_then(Value::as_dict).map_or(false, |f| crate::owned::tree_sums(&path).iter().all(|(k, v)| f.get(k) == Some(v)))
+            }
+            _ => false,
+        };
+        if ours {
+            out.push(rel);
+        }
+    }
     out.sort();
     out
 }
@@ -684,10 +705,10 @@ pub fn code_snapshot(root: &Path, exclude: &str) -> Option<Dict> {
 
 // ---------------------------------------------------------------- reading files
 
-/// A key path into a SQLite database: one column of a stored row, a measurement a run reads, never a number someone
-/// else stated.
+/// A key path into a SQLite database or a CSV, TSV or JSON Lines table: one column of a stored row, a measurement a
+/// run reads, never a number someone else stated.
 pub fn is_store_row(source: &Source, root: &Path) -> bool {
-    source.kind == "file" && source.key.is_some() && source.path.as_deref().map_or(false, |p| crate::sqlite::is_database(&full_path(root, p)))
+    source.kind == "file" && source.key.is_some() && source.path.as_deref().map_or(false, |p| crate::csvtable::is_table(p) || crate::sqlite::is_database(&full_path(root, p)))
 }
 
 
@@ -1379,6 +1400,88 @@ pub fn cut_trailing_comments(path: &str, lines: &[String]) -> Vec<String> {
 /// are read: by a syntax with comments of its own. A log, a table, a text file and output in a block that names no
 /// language have none, so their lines are read whole, as rb read every analysis's source before (` * Acc@1 81.800` is
 /// what an eval printed).
+/// The lines of one section of a document that state `numbers` between them (1-based, in order): the estimate's line
+/// and the line that states both bounds, else a line for each; never a comment, nor a comment that ends a line. A
+/// section runs from a Markdown heading to the next; `locator` narrows it to a line range ("83-91", "lines 83-91") or
+/// to the sections whose heading holds its words ("Statistics"). None where no section states them all.
+pub fn section_stating(lines: &[String], comments: &[bool], cut: &[String], locator: Option<&str>, numbers: &[f64]) -> Option<Vec<usize>> {
+    let heading = |l: &str| l.trim_start().starts_with('#');
+    let mut sections: Vec<(usize, usize)> = Vec::new();
+    let mut start = 0;
+    for (i, l) in lines.iter().enumerate() {
+        if heading(l) && i > start {
+            sections.push((start, i));
+            start = i;
+        }
+    }
+    sections.push((start, lines.len()));
+    let loc = locator.map(|l| l.trim()).filter(|l| !l.is_empty());
+    // a line range names those lines alone: one outside the document names none, never another section
+    let range = loc.and_then(|l| {
+        let l = l.strip_prefix("lines ").or_else(|| l.strip_prefix("line ")).unwrap_or(l);
+        let (a, b) = l.split_once('-')?;
+        let (a, b) = (a.trim().parse::<usize>().ok()?, b.trim().parse::<usize>().ok()?);
+        Some(if a >= 1 && a <= b && b <= lines.len() { Some((a - 1, b)) } else { None })
+    });
+    let chosen: Vec<(usize, usize)> = match (range, loc) {
+        (Some(None), _) => return None,
+        (Some(Some(r)), _) => vec![r],
+        (None, Some(words)) => {
+            let w = words.to_lowercase();
+            let named: Vec<(usize, usize)> = sections.iter().copied().filter(|(a, _)| lines.get(*a).map_or(false, |h| heading(h) && h.to_lowercase().contains(&w))).collect();
+            if named.is_empty() { sections } else { named }
+        }
+        _ => sections,
+    };
+    let said = |i: usize, x: f64| !comments.get(i).copied().unwrap_or(false) && states(cut.get(i).unwrap_or(&lines[i]), &Value::Float(x));
+    // within a section, the lines of one block (a table, a paragraph: lines with no blank line between them), never
+    // figures far apart that happen to match; a line range given is read as one block
+    let explicit = matches!(range, Some(Some(_)));
+    let mut blocks: Vec<(usize, usize)> = Vec::new();
+    for (a, b) in chosen {
+        if explicit {
+            blocks.push((a, b));
+            continue;
+        }
+        let mut start = None;
+        for i in a..=b {
+            let blank = i == b || lines[i].trim().is_empty() || (i > a && heading(&lines[i]));
+            match (start, blank) {
+                (None, false) => start = Some(i),
+                (Some(st), true) => {
+                    blocks.push((st, i));
+                    start = if i < b && !lines[i].trim().is_empty() { Some(i) } else { None };
+                }
+                _ => {}
+            }
+        }
+    }
+    for (a, b) in blocks {
+        let (est, bounds) = (numbers[0], &numbers[1..]);
+        let Some(e) = (a..b).find(|i| said(*i, est)) else { continue };
+        let mut picked = vec![e];
+        match (a..b).find(|i| bounds.iter().all(|x| said(*i, *x))) {
+            Some(both) => picked.push(both),
+            None => {
+                let mut all = true;
+                for x in bounds {
+                    match (a..b).find(|i| said(*i, *x)) {
+                        Some(i) => picked.push(i),
+                        None => all = false,
+                    }
+                }
+                if !all {
+                    continue;
+                }
+            }
+        }
+        picked.sort_unstable();
+        picked.dedup();
+        return Some(picked.into_iter().map(|i| i + 1).collect());
+    }
+    None
+}
+
 pub fn stated_lines(path: &str, lines: &[String]) -> (Vec<bool>, Vec<String>) {
     line_syntaxes(path, lines)
         .into_iter()
@@ -1752,6 +1855,9 @@ fn resolve_inner(source: &Source, value: &Value, root: &Path, name: &str, previo
     if let Some(key) = source.key.as_deref().filter(|_| crate::sqlite::is_database(&full_path(root, &path))) {
         return resolve_row(source, value, root, &path, key, name, named);
     }
+    if let Some(key) = source.key.as_deref().filter(|_| crate::csvtable::is_table(&path)) {
+        return resolve_table_cell(source, value, root, &path, key, name, named, previous);
+    }
     let (data, commit) = read_source(root, &path, source, previous)?;
     let text = String::from_utf8_lossy(&data).into_owned();
     let kind = structured_kind(&path);
@@ -1965,6 +2071,93 @@ fn resolve_row(source: &Source, value: &Value, root: &Path, path: &str, key: &st
         return Err(u);
     }
     Ok(resolution(now(), committed_on_disk(&full, &file.0), file.1.clone(), None, trunc(&text, 400), got))
+}
+
+/// A key into a CSV, TSV or JSON Lines table, as a setting's source names it: `[<column>=<value>,...].<column>`, the
+/// same with the file's own name before the brackets (`results[...].mode`), or `<column>` alone where the table has one
+/// row. Split into the row's key and the column; None when the key is not of that form.
+pub fn table_key_of(path: &str, key: &str) -> Option<(Vec<String>, String)> {
+    match key.find('[') {
+        Some(at) => {
+            let close = key.rfind(']')?;
+            let col = key.get(close + 1..)?.strip_prefix('.')?;
+            let named = &key[..at];
+            let stem = Path::new(path).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            (close > at && !col.is_empty() && (named.is_empty() || named == stem)).then(|| (vec![key[at + 1..close].to_string()], col.to_string()))
+        }
+        None => (!key.is_empty()).then(|| (Vec::new(), key.to_string())),
+    }
+}
+
+/// A setting's source that is one column of one row of a CSV, TSV or JSON Lines table: the row the brackets pick, as
+/// `--where` picks a run's row, and its column, which names the setting as a key does.
+#[allow(clippy::too_many_arguments)]
+fn resolve_table_cell(source: &Source, value: &Value, root: &Path, path: &str, key: &str, name: &str, named: bool, previous: Option<&Resolution>) -> R<Resolution> {
+    let Some((_, column)) = table_key_of(path, key) else {
+        return Err(Unresolved::new(
+            "E_SOURCE_UNRESOLVED",
+            format!("{path} is a {}: name a column of one row, {path}#[<column>=<value>,...].<column> (got #{key})", crate::csvtable::kind_said(path)),
+        ));
+    };
+    if named && !key_names(&column, name, source.term.as_deref()) {
+        return Err(Unresolved::new(
+            "E_SOURCE_UNRESOLVED",
+            format!("{path}#{key} is the column {column}, not {name}: point at {name}'s own column, or give --term with the name the table uses"),
+        ));
+    }
+    let (data, commit) = read_source(root, path, source, previous)?;
+    let (got, text) = cell_of_table(&data, path, key)?;
+    if !equal(value, &got) {
+        let (is, not) = beside(&got, value);
+        let mut u = Unresolved::new("E_SOURCE_UNRESOLVED", format!("{path}#{key} is {is}, not {not}")).found(got);
+        u.differs = true;
+        return Err(u);
+    }
+    Ok(resolution(now(), commit, sha256_bytes(&data), None, trunc(&text, 400), got))
+}
+
+/// The value one column of one row of a CSV, TSV or JSON Lines table holds, as a setting's source names it, read at
+/// the source's commit where it gives one: (the value, what the row and column read, as a line says it).
+pub fn table_cell(root: &Path, path: &str, key: &str, source: &Source) -> R<(Value, String)> {
+    let (data, _) = read_file(root, path, source.commit.as_deref())?;
+    cell_of_table(&data, path, key)
+}
+
+fn cell_of_table(data: &[u8], path: &str, key: &str) -> R<(Value, String)> {
+    let Some((given, column)) = table_key_of(path, key) else {
+        return Err(Unresolved::new(
+            "E_SOURCE_UNRESOLVED",
+            format!("{path} is a {}: name a column of one row, {path}#[<column>=<value>,...].<column> (got #{key})", crate::csvtable::kind_said(path)),
+        ));
+    };
+    let pairs = crate::cmds::record::where_items(&given)
+        .and_then(|items| crate::cmds::parse_pairs(&items, "the row's key", false))
+        .map_err(|e| Unresolved::new("E_SOURCE_UNRESOLVED", e.message.clone()))?;
+    let table = crate::csvtable::read(&String::from_utf8_lossy(data), path).map_err(|e| Unresolved::new("E_SOURCE_UNRESOLVED", e))?;
+    for k in pairs.keys().chain(std::iter::once(&column)) {
+        if !table.columns.contains(k) {
+            return Err(Unresolved::new("E_SOURCE_UNRESOLVED", format!("{path} has no column {k}; its columns are {}", table.columns.join(", "))));
+        }
+    }
+    let hits: Vec<&crate::csvtable::CsvRow> =
+        table.rows.iter().filter(|r| pairs.iter().all(|(k, v)| r.column(k).map_or(false, |(_, cell)| crate::csvtable::matches(cell, v)))).collect();
+    let by = pairs.iter().map(|(k, v)| format!("{k}={}", crate::sqlite::value_said(v))).collect::<Vec<_>>().join(", ");
+    let row = match hits.as_slice() {
+        [one] => *one,
+        [] => return Err(Unresolved::new("E_SOURCE_UNRESOLVED", format!("no row of {path} has {}", if by.is_empty() { "nothing to pick it by".to_string() } else { by }))),
+        many => {
+            return Err(Unresolved::new(
+                "E_SOURCE_UNRESOLVED",
+                format!("{} rows of {path} have {}: name one row, {path}#[<column>=<value>,...].{column}", many.len(), if by.is_empty() { "no key".to_string() } else { by }),
+            ))
+        }
+    };
+    let cell = row.column(&column).map(|(_, v)| v.clone()).unwrap_or_default();
+    let at = format!("{path}, line {}{}", row.line, if by.is_empty() { String::new() } else { format!(" ({by})") });
+    if cell.is_empty() && !row.is_text(&column) {
+        return Err(Unresolved::new("E_SOURCE_UNRESOLVED", format!("{at} holds nothing in {column}, which states no value")));
+    }
+    Ok((row.value_of(&column).unwrap_or(Value::Null), format!("{at}: {column} {cell}")))
 }
 
 fn io_unresolved(source: &Source, e: std::io::Error) -> Unresolved {

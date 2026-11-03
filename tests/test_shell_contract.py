@@ -31,7 +31,7 @@ shape_py = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(shape_py)
 
 
-CONTRACT = "rb-shell-view/1.11"   # a minor bump adds fields only (section 1.8), so a document of an earlier minor still meets it
+CONTRACT = "rb-shell-view/1.12"   # a minor bump adds fields only (section 1.8), so a document of an earlier minor still meets it
 
 
 def same_major(contract) -> bool:

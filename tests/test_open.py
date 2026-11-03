@@ -1729,8 +1729,13 @@ def test_shell_each_waiting_call_is_listed_once_under_its_deepest_inquiry(workdi
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     monkeypatch.setenv("RB_ACTOR", "human:ana")
     subprocess.run(["git", "init", "-q"], check=True)
+    # a clock for the writes, a second apart and all in the last minute: the queue puts the newest first by the minute,
+    # so two runs either side of a minute would reorder it
+    clock = iter(range(int(time.time()) // 60 * 60 - 60, 10**10))
 
     def rb(*argv):
+        if clock:
+            monkeypatch.setenv("RB_TEST_NOW", time.strftime("%Y-%m-%dT%H:%M:%S.000+00:00", time.gmtime(next(clock))))
         code = main([*argv, "--json"])
         out = capsys.readouterr().out
         assert code == 0, out
@@ -1750,6 +1755,8 @@ def test_shell_each_waiting_call_is_listed_once_under_its_deepest_inquiry(workdi
     rb("run", "add", "calib", "c1024.top1=75.9", "c512.top1=75.4", "c1024.top5=92.8", "c512.top5=92.5")
     assert [i["subject"] for i in rb("status").data["open"] if i["who"] == "human"] == ["c-top1", "c-calib", "c-calib5"]
 
+    clock = None
+    monkeypatch.delenv("RB_TEST_NOW")
     server = Open()
     try:
         doc = _shell(server.url)

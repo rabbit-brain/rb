@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.7.1 (2026-11-03)
+
+`rb reconcile` names every file that holds results, readings say what they pair by, and no note offers a command that would take away a miss rb has just named.
+
+- **Every results file, named.** `rb reconcile` never says "0 results folders" or "Nothing to compile" while a results folder holds files. It names each file with its kind, its rows and number columns, and the line that records a row. What it cannot read (a file a folder further down, a database, a form rb does not read) it names, with why.
+  - A results file in the top folder is named too: a table (`results.tsv`, `results.csv`, `results.jsonl`, or one named `metrics`, `scores`, `runs`, `ledger` and the like) with the line that reads a row, and a report in prose (`RESULTS.md`, `report.md`, `summary.md` and the like), from which rb reads no run.
+  - Once a table's rows are recorded, it says how many ("40 of 40 rows recorded as runs"). It never turns back to "0 results folders".
+  - `rb reconcile` reads a CSV or TSV table whose first line holds a number with a decimal point as having no header line: it says so, counts every row, and names no column from that line.
+- **JSON Lines.** A `.jsonl` or `.ndjson` file is a table, one row a run, picked with `--where` as a CSV row is. A nested object's keys are joined with dots. `rb compile` lists its rows and numbers. A `--where` that picks no row, or several, says what the rows hold or differ in.
+- **Every row in one command.** `rb run add --from <table> --where ... --every-row` records each row `--where` picks as its own run, with its `@<column>` values (`--set`, `--produced-at`, `--commit`) from its own row. A row already recorded is passed. Every row is read before any is written. Without the flag, a `--where` that picks several rows offers it. CSV, TSV and JSON Lines only.
+- **Rows.**
+  - `--commit @<column>` reads the commit from the row, and refuses a cell that holds no commit.
+  - A table row reads "(row)" in `rb show`.
+  - A CSV, TSV or JSON Lines row recorded as a run in two experiments is said at the write and listed by `rb status`, as a database row is.
+  - `rb spec set ... --source <file>.csv#[...]` reads the column of the row the brackets pick. A path that names no file is refused.
+- **What a reading pairs by.** A reading that pairs arms recorded apart says what it pairs them by, in the terminal, on the page and in `--json` (`pairing`), such as "paired by epoch". The unpaired reading is beside it, unless it says exactly the same. rb never decides whether runs are linked: you do.
+  - `rb spec set <exp> population.repeat epoch --no-verify` (or `seed,epoch`) says a setting only numbers repeats. No reading is then said to pool it, it is never a value a rule is read at alone, and it is never offered as the unit.
+  - A note offers that command only for a setting whose values are whole numbers that every arm holds alike, and says it is for a counter only. Where a rule misses, no note offers any command that changes how its runs are counted.
+  - "pooled over N values" is never said of a declared repeat. A value is said to miss alone only where it holds enough units of its own.
+- **Cited rules.**
+  - A direction cited with `--source --quote` and no number is read as its rule says. "not comparable" only where the cited number is one rb's reading could miss, and the two readings would say different things.
+  - A cited rule met on a reading with no interval, or one that crosses its line, reads "reproduced on the estimate", as an own rule reads "estimate meets criterion" there.
+  - `rb analysis add ... --source <file>` reads an estimate and its bounds stated on separate lines of one table or paragraph, where no one line states them all.
+- **Dates and uncommitted code.**
+  - A setting is dated only against the runs the reading counts, and a variant's setting against that variant's runs.
+  - rb's own page, export and tour folder never make a run's code read as uncommitted, and add no snapshot ref.
+  - Where a rule counts a run made on uncommitted code, its integrity line says "a run it counts ran on code with uncommitted changes" in place of "ok", and `rb status` keeps the note it points to in view.
+  - The SDK: `exp.record({...})` outside a run block takes `produced_at=`. Without it, when its numbers were made is unknown, as for numbers typed in. So `--fail-on late` or `unestablished` can fail where it passed. A run block keeps its time, and so does one an earlier rb recorded.
+- **Runs no rule counts.** On an experiment with one variant, a rule reads a number that names no variant as that variant's. `rb show` says which runs a rule does not count, and why: one by one where they are outside its arms, and how many where they are outside its per-run selectors. A refusal names only the experiment's declared metrics, and offers the `--variant` the run's config names.
+- **The tally.** Where rules are met on the estimate alone, the tally says how many: "Rules: 5 reproduced, 2 of them on the estimate alone", on `rb status`, and on the page's questions and its Rules tab.
+- **The page.**
+  - A card lists every problem it has, never "(and 1 more)".
+  - Two runs whose names read the same are told apart by their results folder or file, never by the second each was recorded.
+  - A run's card and its row in a runs table no longer round a number to two decimals. Grids and sentences give a reading in the rule's digits, one way everywhere.
+  - A metric whose name joins words with `_` is named as declared (`val_bpb`), never split at `_` or called by its unit.
+- **Words.**
+  - A tolerance is said as the amount it is: "within 0.05 points of 49.6%", never "within 0.05%".
+  - A note's number carries the digits its rule's tolerance needs (`+0.4821` beside `± 0.005`, never `+0.48`).
+  - The hint that gives a run its time asks for the per-run values too: `rb run add <exp> <the same numbers and per-run values> ...`.
+- **Tool files.** `rb compile` never proposes a lockfile or a tool's config (`pyproject.toml`, `package.json`) as a run, and a folder that holds only such files is no results folder. A lockfile is known by its name (`package-lock.json`, `poetry.lock`, `pylock.toml` and the like), so `eval_lock.json` is a run's file again.
+- **A team on two versions.** rb 0.7.0 reads a record that 0.7.1 writes, with no part it does not know. Its readings differ in two places:
+  - on an experiment with one variant, 0.7.0 finds no number for a rule over a number recorded with no variant;
+  - on an experiment with `population.repeat`, 0.7.0 reads the runs as if no repeat were declared.
+
+  A call made on such a reading reads "made on an earlier reading" in 0.7.0.
+
+  Upgrade everyone who shares a record together.
+
 ## 0.7.0 (2026-11-02)
 
 `rb reconcile` finds results where a repository keeps them and reads each run folder's own record, and readings say what they rest on: a time rb cannot know, arms that ran differently, values pooled together.

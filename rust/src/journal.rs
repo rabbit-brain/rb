@@ -2862,13 +2862,20 @@ pub fn left_alone(path: &str) -> bool {
     tool_file(name)
 }
 
-/// Whether a file's name makes it a lockfile or a tool's config. A lockfile goes by its name's own word for it
-/// (package-lock.json, pnpm-lock.yaml, conda-lock.yml, uv.lock), never by a name that only ends in the letters
-/// (resblock.yaml, clock.json).
+/// The lockfiles a tool writes under a name with no lock word before its extension: bun's, gradle's, and pip's and
+/// uv's PEP 751 pylock.toml (or pylock.<name>.toml).
+const LOCKFILES: &[&str] = &["bun.lockb", "gradle.lockfile"];
+
+/// Whether a file's name makes it a lockfile or a tool's config. A lockfile goes by the name its tool gives it: the
+/// extension .lock (uv.lock), a name whose last word is lock after a dash or a dot (package-lock.json, pnpm-lock.yaml,
+/// conda-lock.yml, packages.lock.json, lock.json), npm's shrinkwrap, and those LOCKFILES names. Never by a name that
+/// only ends in the letters (resblock.yaml, clock.json), nor by one that holds the word after an underscore
+/// (eval_lock.json, a run's own file).
 pub fn tool_file(name: &str) -> bool {
     let name = name.to_lowercase();
     let (stem, ext) = name.rsplit_once('.').unwrap_or((name.as_str(), ""));
-    let lock = ext == "lock" || stem == "lock" || [".lock", "-lock", "_lock"].iter().any(|w| stem.ends_with(w)) || stem.ends_with("shrinkwrap");
+    let pylock = ext == "toml" && (stem == "pylock" || stem.starts_with("pylock."));
+    let lock = ext == "lock" || stem == "lock" || [".lock", "-lock"].iter().any(|w| stem.ends_with(w)) || stem.ends_with("shrinkwrap") || pylock || LOCKFILES.contains(&name.as_str());
     lock || TOOL_CONFIGS.contains(&name.as_str()) || (name.starts_with("tsconfig.") && name.ends_with(".json"))
 }
 

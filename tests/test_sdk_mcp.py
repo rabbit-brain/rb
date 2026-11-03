@@ -64,9 +64,10 @@ def test_run_block_records_what_it_logged_with_the_scripts_command(project, monk
 
 @pytest.mark.skipif(not HAS_GIT, reason="git is not installed")
 def test_a_run_block_is_recorded_where_and_when_it_ran(project, monkeypatch):
-    """A run block, and exp.record, are recorded by the code that ran them, so their receipt's code and environment are
-    their own, even when they keep a file git committed long before, as rb run add --artifact keeps one; numbers
-    recorded with a time months earlier are not."""
+    """A run block is recorded by the code that ran it, so its receipt's code and environment are its own, even when it
+    keeps a file git committed long before, as rb run add --artifact keeps one. Numbers exp.record() is given outside a
+    block with no time were made at a time nobody gave rb (fix round 3, H4): like numbers recorded with a time months
+    earlier, they are not known to be this environment's."""
     Path("configs/train.yaml").write_text("optim:\n  lr: 2e-4\n", encoding="utf-8")
     Path("results.json").write_text('{"int8": {"val_loss": 5.66}}', encoding="utf-8")
     subprocess.run(["git", "add", "-A"], check=True, capture_output=True)
@@ -78,8 +79,8 @@ def test_a_run_block_is_recorded_where_and_when_it_ran(project, monkeypatch):
     assert "existed" not in run.record.receipt.produced
     assert {r["what"]: r["state"] for r in exp.rerunnability()}["environment"] == "ok"
     got = exp.record({"int8.val_loss": 5.66}, files=["results.json"])
-    assert "existed" not in got.receipt.produced
-    assert {r["what"]: r["state"] for r in exp.rerunnability()}["environment"] == "ok"
+    assert "existed" not in got.receipt.produced and got.produced_basis == "unknown"
+    assert {r["what"]: r["state"] for r in exp.rerunnability()}["environment"] == "partial"
     exp.record({"int8.val_loss": 5.7}, produced_at="2026-05-02")
     assert {r["what"]: r["state"] for r in exp.rerunnability()}["environment"] == "partial"
 

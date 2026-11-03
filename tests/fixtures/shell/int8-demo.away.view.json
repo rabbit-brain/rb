@@ -1,5 +1,5 @@
 {
- "contract": "rb-shell-view/1.11",
+ "contract": "rb-shell-view/1.12",
  "surface": "open",
  "tier": "live",
  "rb_version": "0.6.0",
@@ -27,9 +27,9 @@
    "at": "2026-10-19 09:40 UTC"
   },
   "latest": {
-   "head": "2026-10-19, 09:25 to 09:40 UTC · 4 changes",
+   "head": "2026-10-19, 09:25 to 09:40 UTC · 5 changes",
    "calls_made": 0,
-   "line": "Latest changes: 2026-10-19, 09:25 to 09:40 UTC · 4 changes · no calls made"
+   "line": "Latest changes: 2026-10-19, 09:25 to 09:40 UTC · 5 changes · no calls made"
   },
   "made": {
    "criteria": 6,
@@ -100,6 +100,7 @@
    ]
   ],
   "muted": [],
+  "tally_on_estimate": {},
   "open_line": "Also open: 3 items that need no decision · 1 setting unknown",
   "notes": [
    {
@@ -1003,6 +1004,7 @@
     "total": 3,
     "afterwards": 0
    },
+   "on_estimate": false,
    "receipt_rows": [
     [
      "declared",
@@ -1168,6 +1170,7 @@
     "total": 3,
     "afterwards": 0
    },
+   "on_estimate": false,
    "receipt_rows": [
     [
      "declared",
@@ -1330,6 +1333,7 @@
     "total": 1,
     "afterwards": 0
    },
+   "on_estimate": false,
    "receipt_rows": [
     [
      "declared",
@@ -1461,6 +1465,7 @@
     "total": 3,
     "afterwards": 0
    },
+   "on_estimate": false,
    "receipt_rows": [
     [
      "declared",
@@ -1695,6 +1700,7 @@
     "total": 4,
     "afterwards": 0
    },
+   "on_estimate": false,
    "receipt_rows": [
     [
      "declared",
@@ -1837,6 +1843,7 @@
     "total": 1,
     "afterwards": 1
    },
+   "on_estimate": false,
    "receipt_rows": [
     [
      "declared",
@@ -4729,7 +4736,7 @@
   }
  },
  "history": {
-  "summary": "47 changes recorded",
+  "summary": "52 changes recorded",
   "log": [
    {
     "at": "2026-10-19 09:40 UTC",
@@ -4738,7 +4745,7 @@
     "refs": [
      "notes.md"
     ],
-    "log_index": 46,
+    "log_index": 51,
     "witness": {
      "seen": "afterwards",
      "basis": "past_call"
@@ -4751,7 +4758,7 @@
     "refs": [
      "c3"
     ],
-    "log_index": 45,
+    "log_index": 50,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -4764,7 +4771,20 @@
     "refs": [
      "q1a"
     ],
-    "log_index": 44,
+    "log_index": 49,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
+   },
+   {
+    "at": "2026-10-19 09:30 UTC",
+    "op": "amend",
+    "sentence": "amended e2 after locking it: c5 filed under q1a",
+    "refs": [
+     "e2"
+    ],
+    "log_index": 48,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -4777,7 +4797,7 @@
     "refs": [
      "e2"
     ],
-    "log_index": 43,
+    "log_index": 47,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -4790,7 +4810,7 @@
     "refs": [
      "e1"
     ],
-    "log_index": 42,
+    "log_index": 46,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -4804,7 +4824,7 @@
      "e1",
      "n1"
     ],
-    "log_index": 41,
+    "log_index": 45,
     "witness": {
      "seen": "as_it_ran",
      "basis": "written"
@@ -4817,7 +4837,20 @@
     "refs": [
      "q1"
     ],
-    "log_index": 40,
+    "log_index": 44,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
+   },
+   {
+    "at": "2026-10-15 09:09 UTC",
+    "op": "amend",
+    "sentence": "amended e1 after locking it: c4 filed under q1",
+    "refs": [
+     "e1"
+    ],
+    "log_index": 43,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -4830,7 +4863,7 @@
     "refs": [
      "c4"
     ],
-    "log_index": 39,
+    "log_index": 42,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -4843,7 +4876,7 @@
     "refs": [
      "c4"
     ],
-    "log_index": 38,
+    "log_index": 41,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -4856,7 +4889,7 @@
     "refs": [
      "c1"
     ],
-    "log_index": 37,
+    "log_index": 40,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -4870,7 +4903,33 @@
      "c2",
      "q1"
     ],
-    "log_index": 36,
+    "log_index": 39,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
+   },
+   {
+    "at": "2026-10-13 15:02 UTC",
+    "op": "amend",
+    "sentence": "amended e1 after locking it: c2 filed under q1",
+    "refs": [
+     "e1"
+    ],
+    "log_index": 38,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
+   },
+   {
+    "at": "2026-10-13 15:00 UTC",
+    "op": "add",
+    "sentence": "added criterion c2 on e1",
+    "refs": [
+     "c2"
+    ],
+    "log_index": 37,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -4879,12 +4938,11 @@
    {
     "at": "2026-10-13 15:00 UTC",
     "op": "amend",
-    "sentence": "amended e1 after locking it: criterion c2 added",
+    "sentence": "amended e1 after locking it: new criterion c2",
     "refs": [
-     "e1",
-     "c2"
+     "e1"
     ],
-    "log_index": 35,
+    "log_index": 36,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -4897,7 +4955,7 @@
     "refs": [
      "a1"
     ],
-    "log_index": 34,
+    "log_index": 35,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -4910,7 +4968,7 @@
     "refs": [
      "runs3"
     ],
-    "log_index": 33,
+    "log_index": 34,
     "witness": {
      "seen": "as_it_ran",
      "basis": "watched"
@@ -4923,7 +4981,7 @@
     "refs": [
      "runc2048"
     ],
-    "log_index": 32,
+    "log_index": 33,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -4936,7 +4994,7 @@
     "refs": [
      "runc1024"
     ],
-    "log_index": 31,
+    "log_index": 32,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -4949,7 +5007,7 @@
     "refs": [
      "runc512"
     ],
-    "log_index": 30,
+    "log_index": 31,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -4962,7 +5020,7 @@
     "refs": [
      "runc128"
     ],
-    "log_index": 29,
+    "log_index": 30,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -4975,7 +5033,7 @@
     "refs": [
      "e2"
     ],
-    "log_index": 28,
+    "log_index": 29,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -4989,7 +5047,7 @@
      "c5",
      "q1a"
     ],
-    "log_index": 27,
+    "log_index": 28,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -5003,7 +5061,7 @@
      "e2",
      "q1a"
     ],
-    "log_index": 26,
+    "log_index": 27,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -5016,7 +5074,7 @@
     "refs": [
      "e2"
     ],
-    "log_index": 25,
+    "log_index": 26,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -5029,7 +5087,7 @@
     "refs": [
      "c5"
     ],
-    "log_index": 24,
+    "log_index": 25,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -5042,7 +5100,7 @@
     "refs": [
      "e2"
     ],
-    "log_index": 23,
+    "log_index": 24,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -5055,7 +5113,7 @@
     "refs": [
      "e2"
     ],
-    "log_index": 22,
+    "log_index": 23,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -5069,7 +5127,7 @@
      "q1a",
      "q1"
     ],
-    "log_index": 21,
+    "log_index": 22,
     "witness": {
      "seen": "as_it_ran",
      "basis": "declared"
@@ -5083,7 +5141,7 @@
      "runs2b",
      "runs2"
     ],
-    "log_index": 20,
+    "log_index": 21,
     "witness": {
      "seen": "as_it_ran",
      "basis": "recorded_as_made"
@@ -5096,6 +5154,19 @@
     "refs": [
      "runs2"
     ],
+    "log_index": 20,
+    "witness": {
+     "seen": "as_it_ran",
+     "basis": "declared"
+    }
+   },
+   {
+    "at": "2026-10-12 08:06 UTC",
+    "op": "add",
+    "sentence": "added criterion c6 on e1",
+    "refs": [
+     "c6"
+    ],
     "log_index": 19,
     "witness": {
      "seen": "as_it_ran",
@@ -5105,10 +5176,9 @@
    {
     "at": "2026-10-12 08:06 UTC",
     "op": "amend",
-    "sentence": "amended e1 after locking it: criterion c6 added",
+    "sentence": "amended e1 after locking it: new criterion c6",
     "refs": [
-     "e1",
-     "c6"
+     "e1"
     ],
     "log_index": 18,
     "witness": {
@@ -5357,9 +5427,9 @@
    {
     "first": "2026-10-19 09:25 UTC",
     "last": "2026-10-19 09:40 UTC",
-    "n": 4,
+    "n": 5,
     "calls": 0,
-    "head": "2026-10-19, 09:25 to 09:40 UTC · 4 changes · no calls made",
+    "head": "2026-10-19, 09:25 to 09:40 UTC · 5 changes · no calls made",
     "lines": [
      {
       "first": "2026-10-19 09:25 UTC",
@@ -5371,20 +5441,21 @@
       ],
       "why": "the cells are the unit",
       "note": "",
-      "log_index": 43
+      "log_index": 47
      },
      {
       "first": "2026-10-19 09:30 UTC",
       "last": "2026-10-19 09:30 UTC",
-      "n": 1,
-      "sentence": "Added a note on what rule c5 means for q1a, not confirmed",
+      "n": 2,
+      "sentence": "Amended e2 after locking it: filed rule c5 under q1a, and added a note on what rule c5 means for q1a, not confirmed",
       "refs": [
+       "e2",
        "c5",
        "q1a"
       ],
       "why": "",
       "note": "only the 128-image cell misses",
-      "log_index": 44
+      "log_index": 48
      },
      {
       "first": "2026-10-19 09:35 UTC",
@@ -5396,7 +5467,7 @@
       ],
       "why": "",
       "note": "one seed is enough for the export check\\u200b",
-      "log_index": 45
+      "log_index": 50
      },
      {
       "first": "2026-10-19 09:40 UTC",
@@ -5406,7 +5477,7 @@
       "refs": [],
       "why": "",
       "note": "",
-      "log_index": 46
+      "log_index": 51
      }
     ]
    },
@@ -5425,9 +5496,9 @@
       "refs": [
        "e1"
       ],
-      "why": "",
+      "why": "the budget is half a point",
       "note": "",
-      "log_index": 42
+      "log_index": 46
      }
     ]
    },
@@ -5448,16 +5519,16 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 41
+      "log_index": 45
      }
     ]
    },
    {
     "first": "2026-10-15 09:05 UTC",
     "last": "2026-10-15 09:09 UTC",
-    "n": 2,
+    "n": 3,
     "calls": 1,
-    "head": "2026-10-15, 09:05 to 09:09 UTC · 2 changes · 1 call made",
+    "head": "2026-10-15, 09:05 to 09:09 UTC · 3 changes · 1 call made",
     "lines": [
      {
       "first": "2026-10-15 09:05 UTC",
@@ -5469,20 +5540,21 @@
       ],
       "why": "",
       "note": "per-class drop stays under 2 points",
-      "log_index": 39
+      "log_index": 42
      },
      {
       "first": "2026-10-15 09:09 UTC",
       "last": "2026-10-15 09:09 UTC",
-      "n": 1,
-      "sentence": "Added a note on what rule c4 means for q1",
+      "n": 2,
+      "sentence": "Amended e1 after locking it: filed rule c4 under q1, and added a note on what rule c4 means for q1",
       "refs": [
+       "e1",
        "c4",
        "q1"
       ],
       "why": "c1 and c4 hold on three seeds",
       "note": "",
-      "log_index": 40
+      "log_index": 43
      }
     ]
    },
@@ -5503,7 +5575,7 @@
       ],
       "why": "",
       "note": "per-class drop stays under 2 points",
-      "log_index": 38
+      "log_index": 41
      }
     ]
    },
@@ -5524,16 +5596,16 @@
       ],
       "why": "holds on all three seeds",
       "note": "",
-      "log_index": 37
+      "log_index": 40
      }
     ]
    },
    {
     "first": "2026-10-13 14:10 UTC",
     "last": "2026-10-13 15:02 UTC",
-    "n": 18,
+    "n": 20,
     "calls": 0,
-    "head": "2026-10-13, 14:10 to 15:02 UTC · 18 changes · no calls made",
+    "head": "2026-10-13, 14:10 to 15:02 UTC · 20 changes · no calls made",
     "lines": [
      {
       "first": "2026-10-13 14:10 UTC",
@@ -5545,7 +5617,7 @@
       ],
       "why": "evaluated on the train split",
       "note": "",
-      "log_index": 19
+      "log_index": 20
      },
      {
       "first": "2026-10-13 14:12 UTC",
@@ -5559,7 +5631,7 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 20
+      "log_index": 21
      },
      {
       "first": "2026-10-13 14:16 UTC",
@@ -5572,7 +5644,7 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 21
+      "log_index": 22
      },
      {
       "first": "2026-10-13 14:20 UTC",
@@ -5584,7 +5656,7 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 22
+      "log_index": 23
      },
      {
       "first": "2026-10-13 14:24 UTC",
@@ -5596,7 +5668,7 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 23
+      "log_index": 24
      },
      {
       "first": "2026-10-13 14:28 UTC",
@@ -5609,7 +5681,7 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 24
+      "log_index": 25
      },
      {
       "first": "2026-10-13 14:31 UTC",
@@ -5621,21 +5693,33 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 25
+      "log_index": 26
      },
      {
       "first": "2026-10-13 14:34 UTC",
-      "last": "2026-10-13 14:36 UTC",
-      "n": 2,
-      "sentence": "Filed e2 and c5 under q1a",
+      "last": "2026-10-13 14:34 UTC",
+      "n": 1,
+      "sentence": "Filed e2 under q1a",
       "refs": [
        "e2",
-       "q1a",
-       "c5"
+       "q1a"
       ],
       "why": "",
       "note": "",
-      "log_index": 26
+      "log_index": 27
+     },
+     {
+      "first": "2026-10-13 14:36 UTC",
+      "last": "2026-10-13 14:36 UTC",
+      "n": 1,
+      "sentence": "Filed c5 under q1a",
+      "refs": [
+       "c5",
+       "q1a"
+      ],
+      "why": "q1a asks for the smallest size that holds",
+      "note": "",
+      "log_index": 28
      },
      {
       "first": "2026-10-13 14:40 UTC",
@@ -5647,7 +5731,7 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 28
+      "log_index": 29
      },
      {
       "first": "2026-10-13 14:44 UTC",
@@ -5665,7 +5749,7 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 29
+      "log_index": 30
      },
      {
       "first": "2026-10-13 14:56 UTC",
@@ -5677,42 +5761,42 @@
       ],
       "why": "",
       "note": "",
-      "log_index": 34
+      "log_index": 35
      },
      {
       "first": "2026-10-13 15:00 UTC",
       "last": "2026-10-13 15:00 UTC",
-      "n": 1,
+      "n": 2,
       "sentence": "Amended e1 after locking it: added rule c2",
       "refs": [
        "e1",
        "c2"
       ],
-      "why": "",
+      "why": "the baseline must match the paper",
       "note": "",
-      "log_index": 35
+      "log_index": 36
      },
      {
       "first": "2026-10-13 15:02 UTC",
       "last": "2026-10-13 15:02 UTC",
-      "n": 1,
-      "sentence": "Filed c2 under q1",
+      "n": 2,
+      "sentence": "Amended e1 after locking it: filed rule c2 under q1",
       "refs": [
-       "c2",
-       "q1"
+       "e1",
+       "c2"
       ],
-      "why": "",
+      "why": "q1 is read against a baseline that matches",
       "note": "",
-      "log_index": 36
+      "log_index": 38
      }
     ]
    },
    {
     "first": "2026-10-12 08:02 UTC",
     "last": "2026-10-12 08:06 UTC",
-    "n": 2,
+    "n": 3,
     "calls": 0,
-    "head": "2026-10-12, 08:02 to 08:06 UTC · 2 changes · no calls made",
+    "head": "2026-10-12, 08:02 to 08:06 UTC · 3 changes · no calls made",
     "lines": [
      {
       "first": "2026-10-12 08:02 UTC",
@@ -5730,13 +5814,13 @@
      {
       "first": "2026-10-12 08:06 UTC",
       "last": "2026-10-12 08:06 UTC",
-      "n": 1,
+      "n": 2,
       "sentence": "Amended e1 after locking it: added rule c6",
       "refs": [
        "e1",
        "c6"
       ],
-      "why": "",
+      "why": "latency is why int8 ships",
       "note": "",
       "log_index": 18
      }
@@ -5821,7 +5905,7 @@
        "c3",
        "c4"
       ],
-      "why": "",
+      "why": "q1 is read by these rules",
       "note": "",
       "log_index": 7
      },

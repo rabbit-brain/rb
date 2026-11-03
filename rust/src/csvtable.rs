@@ -1,6 +1,7 @@
-//! A CSV or TSV table, read as rb reads a SQLite table: one row of it is a run (`rb run add --from <file>.csv --where
-//! <column>=<value>`). The first line names the columns; a field in double quotes may hold the delimiter, a quote
-//! written twice and a line break.
+//! A CSV, TSV or JSON Lines table, read as rb reads a SQLite table: one row of it is a run (`rb run add --from
+//! <file>.csv --where <column>=<value>`). A CSV's first line names the columns; a field in double quotes may hold the
+//! delimiter, a quote written twice and a line break. A JSON Lines file holds one JSON object a line: each is a row,
+//! its keys the columns, a nested object's keys joined with dots as a JSON file's are.
 
 use crate::value::Value;
 
@@ -9,12 +10,33 @@ use crate::value::Value;
 pub struct CsvRow {
     pub line: usize,
     pub cells: Vec<(String, String)>,
+    /// the columns whose cell is JSON text in a JSON Lines row: text, never read as a number
+    pub texts: Vec<String>,
 }
 
 impl CsvRow {
     /// The cell of a column, by its exact name.
     pub fn column(&self, name: &str) -> Option<&(String, String)> {
         self.cells.iter().find(|(c, _)| c == name)
+    }
+
+    /// Whether a column's cell is text the row's own form says is text (a JSON string), whatever it spells.
+    pub fn is_text(&self, name: &str) -> bool {
+        self.texts.iter().any(|t| t == name)
+    }
+
+    /// A column's number, where its cell holds one.
+    pub fn number_of(&self, name: &str) -> Option<f64> {
+        if self.is_text(name) {
+            return None;
+        }
+        self.column(name).and_then(|(_, v)| number(v))
+    }
+
+    /// A column's cell as a per-run value: its number where it holds one, else its text.
+    pub fn value_of(&self, name: &str) -> Option<Value> {
+        let (_, cell) = self.column(name)?;
+        Some(if self.is_text(name) { Value::Str(cell.clone()) } else { value(cell) })
     }
 }
 
@@ -25,10 +47,106 @@ pub struct CsvTable {
     pub rows: Vec<CsvRow>,
 }
 
-/// Whether a path names a table rb reads by its rows: a .csv or a .tsv file.
+/// Whether a path names a table rb reads by its rows: a .csv, a .tsv or a JSON Lines file.
 pub fn is_table(path: &str) -> bool {
     let lower = path.to_lowercase();
-    lower.ends_with(".csv") || lower.ends_with(".tsv")
+    lower.ends_with(".csv") || lower.ends_with(".tsv") || is_jsonl(path)
+}
+
+/// Whether a path names a JSON Lines file: .jsonl, or .ndjson.
+pub fn is_jsonl(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    lower.ends_with(".jsonl") || lower.ends_with(".ndjson")
+}
+
+/// What kind of table a path names, in rb's words: "CSV table", "TSV table" or "JSON Lines file".
+pub fn kind_said(path: &str) -> &'static str {
+    if is_jsonl(path) {
+        "JSON Lines file"
+    } else if path.to_lowercase().ends_with(".tsv") {
+        "TSV table"
+    } else {
+        "CSV table"
+    }
+}
+
+/// The table a file holds, told by its name: a JSON Lines file's rows, or a CSV or TSV table's. A JSON Lines line that
+/// is not a JSON object is said with its line.
+pub fn read(text: &str, path: &str) -> Result<CsvTable, String> {
+    if is_jsonl(path) {
+        parse_jsonl(text, path)
+    } else {
+        let t = parse(text, path);
+        // a first line that names a number is a data row, not a header: rb names no column from it, and so offers no
+        // column (nor an alias for one) that is a number
+        let numbers: Vec<&String> = t.columns.iter().filter(|c| number(c).is_some() && c.contains('.')).collect();
+        if !numbers.is_empty() {
+            let shown: Vec<String> = numbers.iter().take(4).map(|c| c.to_string()).collect();
+            let rows = t.rows.iter().filter(|r| r.cells.iter().any(|(_, v)| !v.is_empty())).count() + 1;
+            return Err(format!(
+                "{path} seems to have no header line: its first line reads as a data row (it holds {}), so rb cannot name its columns; it holds {rows} row{}, that line among them",
+                shown.join(", "),
+                if rows == 1 { "" } else { "s" }
+            ));
+        }
+        Ok(t)
+    }
+}
+
+/// A JSON Lines file's rows: one JSON object a line (blank lines skipped), its keys the columns in the order they are
+/// first met, a nested object's keys joined with dots. A row without a column holds nothing there.
+pub fn parse_jsonl(text: &str, path: &str) -> Result<CsvTable, String> {
+    let mut columns: Vec<String> = Vec::new();
+    let mut parsed: Vec<(usize, crate::value::Dict)> = Vec::new();
+    for (i, line) in text.trim_start_matches('\u{feff}').split('\n').enumerate() {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.trim().is_empty() {
+            continue;
+        }
+        let doc = crate::pyjson::loads(line).map_err(|e| format!("{path}, line {}, is not JSON: {}", i + 1, e.to_string().lines().next().unwrap_or("")))?;
+        if !matches!(doc, Value::Dict(_)) {
+            return Err(format!("{path}, line {}, is not a JSON object, so it is no row", i + 1));
+        }
+        // a key that two of the object's own keys both read as ("eval.top1" beside "eval": {"top1"}) names no one cell
+        let mut flat = crate::value::Dict::new();
+        if let Some(twice) = flatten_once(&doc, "", &mut flat) {
+            return Err(format!("{path}, line {}, holds two keys that both read as {twice}, so rb cannot tell which is the cell", i + 1));
+        }
+        for k in flat.keys() {
+            if !columns.contains(k) {
+                columns.push(k.clone());
+            }
+        }
+        parsed.push((i + 1, flat));
+    }
+    let rows = parsed
+        .into_iter()
+        .map(|(line, flat)| {
+            let mut texts = Vec::new();
+            let cells = columns
+                .iter()
+                .map(|c| {
+                    let cell = match flat.get(c) {
+                        None | Some(Value::Null) => String::new(),
+                        Some(Value::Str(s)) => {
+                            texts.push(c.clone());
+                            s.clone()
+                        }
+                        Some(Value::Bool(b)) => if *b { "true" } else { "false" }.to_string(),
+                        Some(Value::Int(n)) => n.to_string(),
+                        Some(Value::Float(f)) => crate::pyfloat::repr(*f),
+                        Some(v) => {
+                            texts.push(c.clone());
+                            crate::pyjson::dumps(v)
+                        }
+                    };
+                    (c.clone(), cell)
+                })
+                .collect();
+            CsvRow { line, cells, texts }
+        })
+        .collect();
+    Ok(CsvTable { columns, rows })
 }
 
 /// The records of `text`, each with the line it starts on, split at `delim` outside double quotes.
@@ -89,9 +207,32 @@ pub fn parse(text: &str, path: &str) -> CsvTable {
     let Some((_, header)) = recs.next() else { return CsvTable::default() };
     let columns: Vec<String> = header.iter().map(|h| h.trim().to_string()).collect();
     let rows = recs
-        .map(|(line, fields)| CsvRow { line, cells: columns.iter().cloned().zip(fields.into_iter().map(|f| f.trim().to_string()).chain(std::iter::repeat(String::new()))).collect() })
+        .map(|(line, fields)| CsvRow { line, cells: columns.iter().cloned().zip(fields.into_iter().map(|f| f.trim().to_string()).chain(std::iter::repeat(String::new()))).collect(), texts: Vec::new() })
         .collect();
     CsvTable { columns, rows }
+}
+
+/// `doc`'s keys joined with dots into `out`, as a JSON file's are: the first key two of them both read as, where any.
+fn flatten_once(doc: &Value, prefix: &str, out: &mut crate::value::Dict) -> Option<String> {
+    if let Value::Dict(d) = doc {
+        for (k, v) in d {
+            let key = if prefix.is_empty() { k.clone() } else { format!("{prefix}.{k}") };
+            match v {
+                Value::Dict(inner) if !inner.is_empty() => {
+                    if let Some(t) = flatten_once(v, &key, out) {
+                        return Some(t);
+                    }
+                }
+                _ => {
+                    if out.contains_key(&key) {
+                        return Some(key);
+                    }
+                    out.insert(key, v.clone());
+                }
+            }
+        }
+    }
+    None
 }
 
 /// A cell's number, where it holds one.
@@ -144,6 +285,20 @@ mod tests {
         assert_eq!(number(&t.rows[0].column("top1").unwrap().1), Some(75.6));
         assert_eq!(number(&t.rows[2].column("top1").unwrap().1), None);
         assert!(matches("8", &Value::Int(8)) && matches("8.0", &Value::Str("8".into())) && !matches("80", &Value::Int(8)));
+    }
+
+    #[test]
+    fn a_json_lines_file_is_a_table_of_its_objects() {
+        let t = read("{\"mode\": \"int8\", \"seed\": 1, \"eval\": {\"top1\": 75.6}, \"tag\": \"3\"}\n\n{\"mode\": \"fp32\", \"seed\": 2, \"eval\": {\"top1\": 76.1}, \"ok\": true}\n", "r.jsonl").unwrap();
+        assert_eq!(t.columns, ["mode", "seed", "eval.top1", "tag", "ok"]);
+        assert_eq!(t.rows.len(), 2);
+        assert_eq!(t.rows[1].line, 3);
+        assert_eq!(t.rows[0].number_of("eval.top1"), Some(75.6));
+        assert_eq!(t.rows[0].number_of("tag"), None);
+        assert_eq!(t.rows[0].value_of("tag"), Some(Value::Str("3".into())));
+        assert_eq!(t.rows[1].value_of("seed"), Some(Value::Int(2)));
+        assert_eq!(t.rows[1].column("tag").unwrap().1, "");
+        assert!(read("{\"a\": 1}\n[1]\n", "r.jsonl").unwrap_err().contains("line 2"));
     }
 
     #[test]

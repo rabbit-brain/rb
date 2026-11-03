@@ -444,6 +444,175 @@ pub const RESULTS_DEPTH: usize = 4;
 /// The files whose being in a folder rb does not read is worth a word: what results are usually written as.
 const RESULTISH: &[&str] = &[".json", ".jsonl", ".csv", ".tsv"];
 
+/// Where rb looks for results, as every read that says so words it.
+pub fn where_rb_looks() -> String {
+    format!("folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), down to {MAX_ROOT_DEPTH} levels from the top")
+}
+
+/// Files that hold results in a form rb does not read, each with its kind's name.
+const UNREAD_KINDS: &[(&str, &str)] = &[
+    (".parquet", "Parquet"), (".feather", "Feather"), (".arrow", "Arrow"), (".npy", "NumPy"), (".npz", "NumPy"), (".pkl", "pickle"), (".pickle", "pickle"),
+    (".h5", "HDF5"), (".hdf5", "HDF5"), (".xlsx", "Excel"), (".xls", "Excel"), (".ipynb", "notebook"),
+];
+
+/// A results file that sits in a folder where results land, outside any results folder: a table whose rows are runs, a
+/// JSON, YAML or TOML file, or one in a form rb does not read.
+#[derive(Debug, Clone)]
+pub struct LooseFile {
+    /// from the repository's top
+    pub path: String,
+    /// "table", "structured", "database", "unread", "prose" (a report-named document in the top folder) or "other"
+    pub kind: &'static str,
+    /// a table's rows, where rb reads it
+    pub rows: Option<usize>,
+    /// a table's columns that hold numbers
+    pub numbers: Vec<String>,
+    /// why rb cannot read it: its form, or what is wrong in it
+    pub why: Option<String>,
+}
+
+impl LooseFile {
+    /// In rb's words, after its path: "a JSON Lines file of 54 rows, numbers in cost_usd, epoch, value".
+    pub fn said(&self) -> String {
+        match (self.kind, &self.why) {
+            ("unread" | "other", Some(w)) => w.clone(),
+            ("table", Some(w)) => match w.strip_prefix(&format!("{} ", self.path)) {
+                Some(rest) => format!("rb cannot read it as a table: it {rest}"),
+                None => format!("rb cannot read it as a table: {w}"),
+            },
+            ("prose", _) => "prose: rb reads no run from it; a number there is a cited rule".into(),
+            ("table", None) => {
+                let n = self.rows.unwrap_or(0);
+                let kind = crate::csvtable::kind_said(&self.path);
+                let kind = kind.strip_suffix(" table").or_else(|| kind.strip_suffix(" file")).unwrap_or(kind);
+                format!("a {kind} table of {n} {}", if n == 1 { "row" } else { "rows" })
+                    + &if self.numbers.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            ", numbers in {}{}",
+                            self.numbers.iter().take(6).cloned().collect::<Vec<_>>().join(", "),
+                            if self.numbers.len() > 6 { format!(" and {} more", self.numbers.len() - 6) } else { String::new() }
+                        )
+                    }
+            }
+            ("database", _) => "a SQLite database".into(),
+            _ => "a JSON, YAML or TOML file".into(),
+        }
+    }
+}
+
+/// The results files that sit in a folder where results land and in no results folder (results/showcase.jsonl): the
+/// usual folders' own files, and those of a folder below named for results that is no results folder itself. By path.
+/// The documents rb reads as prose: a report in the top folder by one of REPORT_STEMS is named as one.
+const PROSE_KINDS: &[&str] = &[".md", ".markdown", ".rst", ".txt"];
+/// The names of a report in the top folder (RESULTS.md, report.md, summary.md): what it holds is results, in prose.
+const REPORT_STEMS: &[&str] = &["results", "result", "report", "reports", "summary", "findings", "comparison", "comparisons", "benchmark", "benchmarks", "evaluation", "conclusions"];
+
+/// A table's name that says it holds results (results.tsv, phase3_results.csv, metrics.jsonl): its stem names results,
+/// or is one of the names of a folder where results land.
+fn results_named(stem: &str) -> bool {
+    stem.contains("result") || ["metrics", "scores", "eval", "evals", "evaluation", "benchmark", "benchmarks", "runs", "ledger", "leaderboard", "experiments"].contains(&stem)
+}
+
+pub fn loose_results(root: &Path, folders: &[String]) -> Vec<LooseFile> {
+    let mut out = Vec::new();
+    let common = crate::ledger::common_dir_of(root);
+    // the files of a folder where results land and of the folders below it that are no results folder of their own
+    // (results/run1/preds.parquet), down to RESULTS_DEPTH levels, at most MAX_LOOSE of them
+    const MAX_LOOSE: usize = 1000;
+    let mut found: Vec<(String, PathBuf)> = Vec::new();
+    for r in discover(root).roots {
+        let mut todo: Vec<(String, usize)> = vec![(r.clone(), 0)];
+        while let Some((dir, depth)) = todo.pop() {
+            if folders.iter().any(|f| dir.starts_with(f.as_str())) || found.len() >= MAX_LOOSE {
+                continue;
+            }
+            let children = sorted_children(&root.join(&dir));
+            for c in children.iter().rev().filter(|c| depth < RESULTS_DEPTH && searchable(c, common.as_deref())) {
+                todo.push((format!("{dir}{}/", name_of(c)), depth + 1));
+            }
+            for f in children.into_iter().filter(|p| p.is_file() && !std::fs::symlink_metadata(p).map(|m| m.file_type().is_symlink()).unwrap_or(true)) {
+                if found.len() < MAX_LOOSE {
+                    found.push((dir.clone(), f));
+                }
+            }
+        }
+    }
+    // the top folder's own files whose names say they hold results: a table (results.tsv, results.csv, results.jsonl)
+    // or a report (RESULTS.md, report.md, summary.md), which no folder named for results holds
+    for f in sorted_children(root).into_iter().filter(|p| p.is_file() && !std::fs::symlink_metadata(p).map(|m| m.file_type().is_symlink()).unwrap_or(true)) {
+        let lower = name_of(&f).to_lowercase();
+        let stem = lower.rsplit_once('.').map_or(lower.as_str(), |(s, _)| s);
+        if (crate::csvtable::is_table(&lower) && results_named(stem)) || (PROSE_KINDS.contains(&suffix(&lower).as_str()) && REPORT_STEMS.contains(&stem)) {
+            found.push((String::new(), f));
+        }
+    }
+    found.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| name_of(&a.1).cmp(&name_of(&b.1))));
+    {
+        for (r, f) in found {
+            let name = name_of(&f);
+            let lower = name.to_lowercase();
+            if lower.starts_with('.') || crate::journal::tool_file(&lower) {
+                continue;
+            }
+            let ext = suffix(&lower);
+            let path = format!("{r}{name}");
+            if let Some((_, form)) = UNREAD_KINDS.iter().find(|(e, _)| *e == ext) {
+                out.push(LooseFile {
+                    path,
+                    kind: "unread",
+                    rows: None,
+                    numbers: Vec::new(),
+                    why: Some(format!("a {form} file, which rb does not read: it reads JSON, YAML, TOML, CSV, TSV, JSON Lines and SQLite")),
+                });
+            } else if crate::csvtable::is_table(&lower) {
+                let big = std::fs::metadata(&f).map_or(true, |m| m.len() > 64 * 1024 * 1024);
+                let read = if big {
+                    Err("it is over 64 MB".to_string())
+                } else {
+                    std::fs::read(&f).map_err(|e| crate::sys::os_words(&e)).and_then(|b| crate::csvtable::read(&String::from_utf8_lossy(&b), &path))
+                };
+                match read {
+                    Ok(t) => {
+                        // as rb compile counts them: a column with a number, whose every other cell is empty
+                        let numbers = t
+                            .columns
+                            .iter()
+                            .filter(|c| t.rows.iter().any(|row| row.number_of(c).is_some()) && t.rows.iter().all(|row| row.number_of(c).is_some() || row.column(c).map_or(true, |(_, v)| v.is_empty() && !row.is_text(c))))
+                            .cloned()
+                            .collect();
+                        out.push(LooseFile { path, kind: "table", rows: Some(t.rows.len()), numbers, why: None });
+                    }
+                    Err(e) => out.push(LooseFile { path, kind: "table", rows: None, numbers: Vec::new(), why: Some(e) }),
+                }
+            } else if r.is_empty() && PROSE_KINDS.contains(&ext.as_str()) {
+                // a report in the top folder: rb reads no run from prose, and a number there is a cited rule
+                out.push(LooseFile { path, kind: "prose", rows: None, numbers: Vec::new(), why: None });
+            } else if STRUCTURED.contains(&ext.as_str()) {
+                out.push(LooseFile { path, kind: "structured", rows: None, numbers: Vec::new(), why: None });
+            } else if crate::sqlite::is_database(&f) {
+                out.push(LooseFile { path, kind: "database", rows: None, numbers: Vec::new(), why: None });
+            } else {
+                // any other file is named too, with why rb does not read it: a results folder is never said to be empty
+                let why = if [".md", ".markdown", ".txt", ".rst"].contains(&ext.as_str()) {
+                    format!("a {ext} document, which rb quotes only as the report of a results folder (a folder below this one)")
+                } else {
+                    let form = if ext.is_empty() { "a file with no extension".to_string() } else { format!("a {ext} file") };
+                    format!("{form}, which rb does not read as results: it reads JSON, YAML, TOML, CSV, TSV, JSON Lines and SQLite")
+                };
+                out.push(LooseFile { path, kind: "other", rows: None, numbers: Vec::new(), why: Some(why) });
+            }
+        }
+    }
+    // a plot, a log or a document is named only where nothing else is: never a folder said to be empty, and never a
+    // list of plots beside the results rb found
+    if !folders.is_empty() || out.iter().any(|f| f.kind != "other") {
+        out.retain(|f| f.kind != "other");
+    }
+    out
+}
+
 /// A folder that holds results-like files and that rb does not read, and why.
 #[derive(Debug, Clone)]
 pub struct NotRead {
@@ -719,7 +888,7 @@ pub fn stores(root: &Path) -> Vec<String> {
 fn holds_results(d: &Path) -> bool {
     let Ok(rd) = std::fs::read_dir(d) else { return false };
     let names: Vec<String> = rd.flatten().map(|e| e.path()).filter(|p| p.is_file()).map(|p| name_of(&p).to_lowercase()).collect();
-    names.iter().any(|n| REPORT_NAMES.contains(&n.as_str())) || names.iter().any(|n| STRUCTURED.contains(&suffix(n).as_str()))
+    names.iter().any(|n| REPORT_NAMES.contains(&n.as_str())) || names.iter().any(|n| STRUCTURED.contains(&suffix(n).as_str()) && !crate::journal::tool_file(n))
 }
 
 /// The experiment id a folder gets: its own name, made a valid id.
@@ -2287,8 +2456,8 @@ fn variant_of(settings: &Dict, facts: &LineFacts) -> Option<String> {
     (hits.len() == 1).then(|| hits[0].clone())
 }
 
-/// The names of the numbers a results file holds that an experiment reads, as --keys takes them.
-fn keys_read(root: &Path, results: &str, facts: &LineFacts) -> Vec<String> {
+/// The numbers a results file holds, by their flat names.
+fn numbers_of(root: &Path, results: &str) -> Vec<(String, Value)> {
     let Some(kind) = sources::structured_kind(results) else { return Vec::new() };
     let p = root.join(results);
     if file_size(&p) > MAX_DOC_BYTES {
@@ -2296,13 +2465,30 @@ fn keys_read(root: &Path, results: &str, facts: &LineFacts) -> Vec<String> {
     }
     let Ok(bytes) = std::fs::read(&p) else { return Vec::new() };
     let Ok(doc) = sources::parse_structured(&String::from_utf8_lossy(&bytes), kind, results) else { return Vec::new() };
-    sources::flatten(&doc, "")
-        .into_iter()
-        // a number recorded under its own name, which is the name a criterion reads: a nested one (eval.top1) is recorded
-        // as eval.top1, so it is no key the line can give
-        .filter(|(k, v)| v.as_f64().is_some() && !v.is_bool() && facts.metrics.iter().any(|m| m == k))
-        .map(|(k, _)| k)
-        .collect()
+    sources::flatten(&doc, "").into_iter().filter(|(_, v)| v.as_f64().is_some() && !v.is_bool()).collect()
+}
+
+/// The names of the numbers a results file holds that an experiment reads, as --keys takes them.
+fn keys_read(root: &Path, results: &str, facts: &LineFacts) -> Vec<String> {
+    // a number recorded under its own name, which is the name a criterion reads: a nested one (eval.top1) is recorded
+    // as eval.top1, so it is no key the line can give
+    numbers_of(root, results).into_iter().filter(|(k, _)| facts.metrics.iter().any(|m| m == k)).map(|(k, _)| k).collect()
+}
+
+/// With no metric to name, the numbers of a results file that are no setting: those whose name is neither a per-run
+/// setting of the experiment nor a key of the run's config with the same value (a seed it says in both). Empty where
+/// none is a setting, so the line needs no --keys.
+fn keys_not_settings(root: &Path, results: &str, facts: &LineFacts, config: &Dict) -> Vec<String> {
+    let all = numbers_of(root, results);
+    let setting = |k: &str, v: &Value| {
+        let last = k.rsplit('.').next().unwrap_or(k);
+        facts.per_run.iter().any(|p| p == k || p.rsplit('.').next() == Some(last)) || config_value(config, k).map_or(false, |c| crate::ledger::same_value(c, v))
+    };
+    let kept: Vec<String> = all.iter().filter(|(k, v)| !setting(k, v)).map(|(k, _)| k.clone()).collect();
+    if kept.len() == all.len() {
+        return Vec::new();
+    }
+    kept
 }
 
 /// Every results folder in `folders` that is a folder of one run: it holds a run config that says something of its
@@ -2327,7 +2513,18 @@ pub fn run_folders(root: &Path, folders: &[(String, Vec<String>)], experiments: 
             if let Some(v) = variant_of(&says.settings, &f) {
                 argv.extend(["--variant".to_string(), v]);
             }
-            let keys = keys_read(root, &results, &f);
+            let mut keys = keys_read(root, &results, &f);
+            if keys.is_empty() {
+                keys = keys_not_settings(root, &results, &f, &says.settings);
+            }
+            if !keys.is_empty() {
+                argv.extend(["--keys".to_string(), keys.join(",")]);
+            }
+        }
+        if line_exp.as_deref().and_then(facts).is_none() {
+            // with no experiment to read for it, the numbers the run's config says too are its settings
+            let none = LineFacts { per_run: Vec::new(), varies: Vec::new(), variants: Vec::new(), metrics: Vec::new() };
+            let keys = keys_not_settings(root, &results, &none, &says.settings);
             if !keys.is_empty() {
                 argv.extend(["--keys".to_string(), keys.join(",")]);
             }

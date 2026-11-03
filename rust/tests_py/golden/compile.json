@@ -1014,7 +1014,7 @@
     "          next: \"Run a third seed, then decide whether warmup stays.\" (README.md:15)",
     "          checks: 1 not run under rb's watch \u00b7 audit.json says passed: false \u00b7 manifest.json: 1 source changed since frozen \u00b7 git: not ready to checkpoint",
     "",
-    "Rules: 1 met",
+    "Rules: 1 met, on the estimate alone",
     "",
     "Can be done now (5)",
     "  - warmup: 1 criterion was declared after its evidence existed: a reading of its own needs its subject's runs made after the declaration",
@@ -2221,8 +2221,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "edc3df3cf039820d7c02de9410789602d9e9dd8c422bf86e9d5bac6a292bdb1f",
-   "bytes": 199445
+   "sha256": "b277306671199323ecae9c1b3f2cd222d8da8305feef154d0382f882784beb01",
+   "bytes": 199465
   },
   "results/other/report.md": [
    "# Other",

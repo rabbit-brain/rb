@@ -1949,15 +1949,18 @@ def test_a_runs_row_says_its_values_once(record):
     heads = [said(t.text(e)) for e in t.all(table) if e["tag"] == "th"]
     assert doc["runs"]["runsql7"]["per_run_text"] == ""
     # fix 3: each metric's title once, over its arms by their plain names and the difference, as the grid says them
-    assert heads == ["Seed", "One cycle", "Top-1", "ONNX top-1", "Latency (ms)", "Produced", "Recorded", "run",
+    assert heads == ["Seed", "One cycle", "Top-1", "onnx_top1", "latency_ms", "Produced", "Recorded", "run",
                      "FP32", "INT8", "Difference", "FP32", "INT8", "Difference", "FP32", "INT8", "Difference"], heads
     groups = [e for e in t.all(table) if e["tag"] == "th" and e["attrs"].get("scope") == "colgroup"]
-    assert [(said(t.text(e)), e["attrs"]["colspan"]) for e in groups] == [("Top-1", "3"), ("ONNX top-1", "3"), ("Latency (ms)", "3")]
+    assert [(said(t.text(e)), e["attrs"]["colspan"]) for e in groups] == [("Top-1", "3"), ("onnx_top1", "3"), ("latency_ms", "3")]
     assert not t.of_class("rq", sec)
     row = next(r for r in t.all(table) if r["tag"] == "tr" and r["attrs"].get("data-go") == "run-runs1")
     cells = [c for c in row["kids"] if isinstance(c, dict)]
     # a column's decimals show two significant digits of its largest difference (P5), the full value on hover
-    assert [said(t.text(c)) for c in cells] == ["1", "1", "0.760", "0.757", "0.003 lower", "0.75690", "0.75660", "0.00030 lower", "", "", "", "2026-10-06", "2026-10-06", "receipt"]
+    # a run's numbers in rb's own digits, as its card says them (round 4: never rounded to the column)
+    shown = [said(t.text(c)) for c in cells]
+    assert shown[:4] == ["1", "1", "0.7598", "0.7569"] and shown[5:7] == ["0.7569", "0.7566"] and shown[8:] == ["", "", "", "2026-10-06", "2026-10-06", "receipt"], shown
+    assert shown[4].endswith(" lower") and shown[7].endswith(" lower"), shown
     assert cells[2]["attrs"]["title"] == "0.7598" and cells[4]["attrs"]["title"] == "-0.0029"
     # the row names the run; its last cell opens its receipt, never saying its id (Look 7)
     assert not t.of_class("cid", cells[-1]) and "runs1" not in said(t.text(table)) and "one_cycle" not in said(t.text(table))
@@ -3418,7 +3421,8 @@ def test_an_experiment_draws_rbs_digits_and_no_mark_on_a_design_the_user_owns(re
     # a mean in a screen's digits (P5, PIVOT: two decimals, more where its column's values need them), never a float's
     # whole form; one unit is one run
     cells = [said(t.text(e)) for e in t.all(t.by_id("x-e1:cmp")) if e["tag"] == "td"]
-    assert "0.720 · 3 seeds" in cmp and "0.7200000000000001" not in cmp and "5.00 · 1 run" in cells and "5.0 " not in cmp
+    # the column holds 0.7568, which its rule reads to 4 places: 0.7200 beside it (round 4)
+    assert "0.7200 · 3 seeds" in cmp and "0.7200000000000001" not in cmp and "5.00 · 1 run" in cells and "5.0 " not in cmp
     view = said(t.text(t.by_id("x-e1")))
     assert "yours" not in view and "not confirmed" not in view
     row = next(e for e in t.all(t.by_id("experiments")) if t.has(e, "srow") and e["attrs"]["data-go"] == "x-e1")
@@ -4166,7 +4170,7 @@ def test_one_set_of_settings_is_one_table_with_a_column_per_metric(record):
     doc["experiments"][0]["table"]["rows"][1]["metrics"]["top1"].update(lo=-0.0046, hi=-0.0012)
     t = Html(page_of(record, doc))
     [(title, heads, rows, cells)] = grids(t, "x-e1")
-    assert title == "" and heads == ["", "Top-1", "ONNX top-1", "Latency (ms)"], heads
+    assert title == "" and heads == ["", "Top-1", "onnx_top1", "latency_ms"], heads
     assert list(rows) == ["FP32 baseline", "INT8"] and [x for x in t.of_class("tag", t.by_id("x-e1:cmp"))].__len__() == 1
     assert rows["FP32 baseline"][0] == "0.7597 · 3 seeds", rows
     assert rows["INT8"][0] == "0.7568 · 3 seeds 0.0029 lower than FP32 (-0.0046 to -0.0012)", rows
@@ -4248,7 +4252,8 @@ def test_no_column_mixes_two_values_of_a_setting_that_does_not_vary(record):
     assert heads[1:] == ["Answer tag · 250 problems", "Last number · 250 problems", "Last number · 500 problems"], heads
     for r in rows_:
         col = " · ".join(words[kv] for kv in r["where"].items())
-        assert rows[label[r["variant"]]][heads.index(col) - 1].startswith(f"{r['metrics']['top1']['mean']:.2f} "), (r, rows)
+        # its mean, in the decimals its column takes (round 4: a rule's, where its values need them)
+        assert float(rows[label[r["variant"]]][heads.index(col) - 1].split(" ")[0]) == pytest.approx(r['metrics']['top1']['mean'], abs=0.005), (r, rows)
     # every other cell of a row is a set that row was not run under
     filled = sum(1 for cs in rows.values() for c in cs if c != "Not run")
     assert filled == len(rows_)

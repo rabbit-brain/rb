@@ -3157,6 +3157,7 @@ pub struct Reading {
     pub superseded: String,
     pub why_no_interval: String,
     pub design: Dict,
+    pub pairing: Dict,
 }
 
 impl Reading {
@@ -3181,6 +3182,7 @@ impl Reading {
         FieldMeta { name: "superseded", required: false, sub: None },
         FieldMeta { name: "why_no_interval", required: false, sub: None },
         FieldMeta { name: "design", required: false, sub: None },
+        FieldMeta { name: "pairing", required: false, sub: None },
     ] };
 
     pub fn validate(v: &Value, loc: &mut Loc, errs: &mut Vec<VErr>) -> Option<Reading> {
@@ -3206,7 +3208,8 @@ impl Reading {
         let mut f_superseded = f_str(d, "superseded", false, "".to_string(), &[], loc, errs);
         let mut f_why_no_interval = f_str(d, "why_no_interval", false, "".to_string(), &[], loc, errs);
         let mut f_design = f_dict_any(d, "design", false, Default::default(), &[], loc, errs);
-        extra_forbidden(d, &["subject", "reference", "metric", "estimand", "estimate", "lo", "hi", "level", "method", "unit", "n", "draws", "source", "basis", "produced_at", "produced_basis", "at", "superseded", "why_no_interval", "design"], loc, errs);
+        let mut f_pairing = f_dict_any(d, "pairing", false, Default::default(), &[], loc, errs);
+        extra_forbidden(d, &["subject", "reference", "metric", "estimand", "estimate", "lo", "hi", "level", "method", "unit", "n", "draws", "source", "basis", "produced_at", "produced_basis", "at", "superseded", "why_no_interval", "design", "pairing"], loc, errs);
         if errs.len() > start {
             return None;
         }
@@ -3231,6 +3234,7 @@ impl Reading {
             superseded: f_superseded.unwrap(),
             why_no_interval: f_why_no_interval.unwrap(),
             design: f_design.unwrap(),
+            pairing: f_pairing.unwrap(),
         };
         Some(m)
     }
@@ -3258,6 +3262,7 @@ impl Reading {
         d.insert("superseded".into(), Value::Str(self.superseded.clone()));
         d.insert("why_no_interval".into(), Value::Str(self.why_no_interval.clone()));
         d.insert("design".into(), Value::Dict(self.design.clone()));
+        d.insert("pairing".into(), Value::Dict(self.pairing.clone()));
         d
     }
 

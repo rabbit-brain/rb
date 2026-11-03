@@ -12,7 +12,7 @@
 
 use crate::value::Value;
 
-/// History's body under its heading and lede: the summary ("47 changes recorded"), then each sitting, newest first,
+/// History's body under its heading and lede: the summary ("52 changes recorded"), then each sitting, newest first,
 /// with its head and its lines, and under the head of each day's newest sitting the one link to that day's rows of the
 /// raw log. `held` says whether the page holds an element of that id, so a line links only where a link lands.
 pub fn sittings(doc: &Value, held: &dyn Fn(&str) -> bool) -> String {
@@ -546,7 +546,7 @@ mod tests {
     fn every_sitting_and_line_of_the_example_shows() {
         let d = example();
         let page = said(&sittings(&d, &all));
-        assert!(page.starts_with("47 changes recorded"), "{page}");
+        assert!(page.starts_with("52 changes recorded"), "{page}");
         for s in list(&d, "history.sittings") {
             assert!(page.contains(&said(text(s, "head"))), "{}", text(s, "head"));
             for l in list(s, "lines") {
@@ -684,7 +684,7 @@ mod tests {
         let d = example();
         let html = view(&d);
         assert!(html.contains("Amended <a class=\"mono\" href=\"#x-e2\">e2</a> after locking it"), "{html}");
-        assert!(html.contains("means for <a class=\"mono\" href=\"#q-q1a\">q1a</a>"), "{html}");
+        assert!(html.contains("under <a class=\"mono\" href=\"#q-q1a\">q1a</a>, and added a note on what rule c5 means for q1a, not confirmed"), "{html}");
         assert!(html.contains("Proposed a call to accept <a class=\"mono\" href=\"#criteria\">c3</a>, not made"), "{html}");
         assert!(html.contains("Retracted <a href=\"#runs\">run fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC</a>"), "{html}");
         assert!(!html.contains("href=\"#c-") && !html.contains("href=\"#run-") && !html.contains("href=\"#log-"), "{html}");
@@ -745,7 +745,7 @@ mod tests {
         let line = latest(&d);
         assert_eq!(
             line,
-            "<p class=\"counts latest\"><a href=\"#history\">Latest changes: 2026-10-19, 09:25 to 09:40 UTC \u{b7} 4 changes \u{b7} no calls made</a></p>"
+            "<p class=\"counts latest\"><a href=\"#history\">Latest changes: 2026-10-19, 09:25 to 09:40 UTC \u{b7} 5 changes \u{b7} no calls made</a></p>"
         );
         // it holds the newest sitting's head (the Overview's history.sittings[0].head)
         assert!(said(&line).contains(&said(text(&list(&d, "history.sittings")[0], "head"))));
@@ -758,7 +758,7 @@ mod tests {
         let d = example();
         let html = recent(&d, &all);
         let page = said(&html);
-        assert!(page.starts_with("Recent calls and changes 2026-10-19, 09:25 to 09:40 UTC · 4 changes · no calls made"), "{page}");
+        assert!(page.starts_with("Recent calls and changes 2026-10-19, 09:25 to 09:40 UTC · 5 changes · no calls made"), "{page}");
         assert!(page.ends_with("Every change, newest first \u{2192}"), "{page}");
         assert_eq!(html.matches("<li class=\"hev\">").count(), 4);
         assert!(!page.contains("in the log"), "the Overview's lines carry no log count: {page}");
@@ -815,7 +815,7 @@ mod tests {
         let d = one_line("{\"first\": \"2026-10-19 09:35 UTC\", \"n\": 1, \"sentence\": \"Locked e1\"}");
         let html = sittings(&d, &all);
         assert!(!html.contains("hsum") && !said(&html).contains("1 write in the log"), "{html}");
-        assert!(sittings(&example(), &all).contains("<p class=\"dim sm hsum\">47 changes recorded</p>"));
+        assert!(sittings(&example(), &all).contains("<p class=\"dim sm hsum\">52 changes recorded</p>"));
     }
 
     #[test]

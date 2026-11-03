@@ -247,10 +247,26 @@ pub fn parse_source(spec: Option<&str>, quote: Option<&str>, commit: Option<&str
         kind = "file";
         let (mut path, mut key, mut line): (String, Option<String>, Option<i64>) = (spec.to_string(), None, None);
         let (head, sep, tail) = crate::ledger::partition(spec, "#");
-        // a key path reads a YAML, JSON or TOML file, or names a column of one row of a SQLite database
-        if sep && !tail.is_empty() && (sources::structured_kind(head).is_some() || crate::sqlite::is_database(Path::new(head))) {
+        // a key path reads a YAML, JSON or TOML file, or names a column of one row of a CSV, TSV or JSON Lines table
+        // or of a SQLite database
+        if sep && !tail.is_empty() && (sources::structured_kind(head).is_some() || crate::csvtable::is_table(head) || crate::sqlite::is_database(Path::new(head))) {
             path = head.to_string();
             key = Some(tail.to_string());
+        } else if !Path::new(spec).exists() && spec.find('[').map_or(false, |at| Path::new(&spec[..at]).is_file()) {
+            // a row picked with no '#' before it: the file is there, and the path rb would keep names none
+            let at = spec.find('[').unwrap_or(0);
+            return Err(RBError::msg_fix(
+                "E_SOURCE_UNRESOLVED",
+                format!("--source {spec} names no file: {} is the file, and the row it picks follows a '#'.", &spec[..at]),
+                format!("--source '{}#{}'", &spec[..at], &spec[at..]),
+            ));
+        } else if sep && !tail.is_empty() && Path::new(head).is_file() && !Path::new(spec).exists() {
+            // a path is never kept that names no file: a key into a file rb reads by no key is refused
+            return Err(RBError::msg_fix(
+                "E_SOURCE_UNRESOLVED",
+                format!("--source {spec}: a key path (#{tail}) reads a YAML, JSON or TOML file, a CSV, TSV or JSON Lines table, or a SQLite database, and {head} is none of those."),
+                format!("Point at the line that states it ({head}:<line>), or give --source {head} with --quote \"<its exact words>\"."),
+            ));
         } else {
             let (h2, sep2, t2) = crate::ledger::rpartition(spec, ":");
             if sep2 && !t2.is_empty() && t2.chars().all(|c| c.is_ascii_digit()) && !h2.is_empty() {

@@ -5,7 +5,8 @@
    "exit": 0,
    "out": [
     "The repository (no commit yet): 0 results folders. No record here yet.",
-    "Nothing to compile: no results folder (out/, outputs/, results/, eval-out/, metrics/) holds a report or a results file yet.",
+    "",
+    "Nothing to compile where rb looks for results: folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top. No folder there holds a report or a results file yet.",
     "",
     "Start the record anyway: rb init \"The project's own title\"",
     "",

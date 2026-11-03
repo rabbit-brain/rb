@@ -430,20 +430,22 @@ class Experiment:
                outputs: Iterable[Any] = (), host: Optional[Mapping[str, str]] = None, again: Optional[str] = None,
                note: str = "", repeats: Optional[str] = None, produced_at: Optional[str] = None,
                replaces: Optional[str] = None, why: str = "", command_source: Optional[str] = None,
-               dry_run: bool = False) -> Optional[RunData]:
+               dry_run: bool = False, _block: bool = False) -> Optional[RunData]:
         """Record a run now, as logged by the code that produced it. Returns the run, or None when the same recording is
         already here (pass `again` with a reason to record a second execution, or `repeats` to check a run), with an
         RBWarning when the numbers given differ from what it recorded. `replaces` names an invalid run this one replaces:
         it is retracted with `why`, and the two are linked. `why` is kept on the log line. A `command` given for a run
         made before it was recorded reads as given later, not observed, unless `command_source` ("<file>:<line>") names
-        a log line written by then that records that launch."""
+        a log line written by then that records that launch. Numbers recorded here with no `produced_at` were made at a
+        time nobody gave rb, so their time is unknown; a run block (`with exp.run() as run:`) is seen to end, and its
+        numbers are dated then."""
         got = self.state._call(
             "add_run", _dry=dry_run, experiment=self.id, metrics={k: _number(k, v) for k, v in dict(metrics).items()}, variant=variant,
             per_run=dict(per_run or {}) or None, config=str(config) if config is not None else None, command=command,
             command_source=command_source, commit=commit,
             files=[str(f) for f in files], links=dict(links or {}), again=again, note=note, inputs=_uses(inputs),
             outputs=_uses(outputs), host={k: str(v) for k, v in dict(host or {}).items()}, repeats=repeats, produced_at=produced_at,
-            replaces=replaces, why=why)
+            replaces=replaces, why=why, **({"block": True} if _block else {}))
         return _shaped(got, _run)
 
     def record_from(self, path: PathLike, *, keys: Iterable[str] = (), table: Optional[str] = None, where: Optional[Mapping[str, Any]] = None,
@@ -621,6 +623,6 @@ class Run:
             raise RBError("E_OBJECT_INVALID", message=f"The run block on {self.exp.id} ended without logging a number: run.log(name=value).")
         got = self.exp.record(self.metrics, variant=self.variant, per_run=self.per_run, config=self.config, command=self.command,
                               commit=self.commit, files=self.files, links=self.links, inputs=self.inputs, outputs=self.outputs,
-                              host=self.host, again=self.again, note=self.note, dry_run=self.dry_run)
+                              host=self.host, again=self.again, note=self.note, dry_run=self.dry_run, _block=True)
         self.record, self.duplicate = got, got is None or (isinstance(got, DryRun) and got.value is None)
         return False

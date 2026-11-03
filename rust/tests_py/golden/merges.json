@@ -223,6 +223,7 @@
     "   \"design_pending_count\": 1",
     "  },",
     "  \"tally\": {},",
+    "  \"tally_on_estimate\": {},",
     "  \"results\": {},",
     "  \"findings\": [],",
     "  \"experiments\": [",

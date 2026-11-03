@@ -73,6 +73,8 @@ home.tally[]	list	today	view::home (Home)	both
 home.tally[][]	number|string	today	view::home (Home)	both
 home.muted	list	today	view::home (Home)	both
 home.muted[]	string	today	view::home (Home)	both
+home.tally_on_estimate	object	today	contract 1.12 (fix round 3): view::home (Home): rb status tally_on_estimate, the rules of each word met on the estimate alone	both
+home.tally_on_estimate.{key}	number	today	contract 1.12 (fix round 3): view::home (Home): rb status tally_on_estimate, the rules of each word met on the estimate alone	both
 home.open_line	string	today	view::home (Home)	both
 home.notes	list	today	Home.notes (split into id, at, text in M0)	both
 home.notes[]	object	today	Home.notes (split into id, at, text in M0)	both
@@ -379,6 +381,7 @@ findings.{id}.other_code	string	today	FindingLine	both
 findings.{id}.witness	object	WIT	WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards	both
 findings.{id}.witness.total	number	WIT	WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards	both
 findings.{id}.witness.afterwards	number	WIT	WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards	both
+findings.{id}.on_estimate	bool	today	contract 1.12 (fix round 3): ledger/views.rs on_estimate_alone: a rule met on the estimate alone, which a tally says apart	both
 findings.{id}.receipt_rows	list	1b	finding.declared and the Criterion (SS 5.1 receipts), as rows	both
 findings.{id}.receipt_rows[]	list	1b	finding.declared and the Criterion (SS 5.1 receipts), as rows	both
 findings.{id}.receipt_rows[][]	list|string	1b	finding.declared and the Criterion (SS 5.1 receipts), as rows	both
@@ -392,7 +395,7 @@ findings.{id}.reading_short	string	M6	the compact row's reading, arms labelled	b
 findings.{id}.verdict	string	P4B	model.rs verdict: the rule's one sentence (status word, reading, result class in words, distance from its number)	both
 findings.{id}.tags	list	M6	at most two ontology tags	both
 findings.{id}.reads_baseline	bool	M6	it reads the baseline or control arm alone	both
-findings.{id}.pooled	string	M6	rb show's headline words for a reading that pools a per-run setting's values; empty where none	both
+findings.{id}.pooled	string	M6	contract 1.12 (fix round 2): rb show's headline words for a reading that pools a per-run setting's values; empty where none	both
 findings.{id}.cited.path	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
 findings.{id}.cited.line	number	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
 findings.{id}.cited.locator	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both

@@ -3491,7 +3491,7 @@
               "--from"
              ],
              "dest": "from_file",
-             "help": "a JSON/YAML/TOML object of metric names to numbers (nested keys join with dots), a CSV or TSV table with --where, or a SQLite database with --table",
+             "help": "a JSON/YAML/TOML object of metric names to numbers (nested keys join with dots), a CSV, TSV or JSON Lines table with --where, or a SQLite database with --table",
              "metavar": "FILE"
             },
             {
@@ -3516,8 +3516,19 @@
               "--where"
              ],
              "dest": "where",
-             "help": "with --table, or a CSV or TSV table: the row's columns and their values, e.g. precision=int8,seed=1; exactly one row must have them all",
+             "help": "with --table, or a CSV, TSV or JSON Lines table: the row's columns and their values, e.g. precision=int8,seed=1; exactly one row must have them all",
              "metavar": "COLUMN=VALUE"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--every-row"
+             ],
+             "dest": "every_row",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "with a CSV, TSV or JSON Lines table: record every row --where picks, each as its own run, its @<column> values from its own row"
             },
             {
              "kind": "append",
@@ -3525,7 +3536,7 @@
               "--select"
              ],
              "dest": "select",
-             "help": "with --table, or a CSV or TSV table: only these of the row's columns that name a declared metric (default: all of them)",
+             "help": "with --table, or a CSV, TSV or JSON Lines table: only these of the row's columns that name a declared metric (default: all of them)",
              "metavar": "COLUMN"
             },
             {
@@ -3726,7 +3737,8 @@
               25,
               26,
               27,
-              28
+              28,
+              29
              ]
             }
            ],

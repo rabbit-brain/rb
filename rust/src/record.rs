@@ -943,6 +943,7 @@ impl Reading {
             superseded: String::new(),
             why_no_interval: String::new(),
             design: Dict::new(),
+            pairing: Dict::new(),
         }
     }
 }

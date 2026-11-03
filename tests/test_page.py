@@ -349,9 +349,10 @@ def test_a_rule_met_only_on_its_estimate_is_never_drawn_green(repo, capsys):
         # row and the Overview's standing card (short) say it without green
         # (the question's line links its count where a readings group holds it: a link, never green)
         # (each tally led by what it counts: "Rules: 2 met", plain words pass 3)
-        said = re.findall(r'<(?:span|a)((?: [\w-]+="[^"]*")*)>2 (?:rules )?met</', text)
+        # and the rules of it met on the estimate alone are said with it (a tally never hides a reading's outcome)
+        said = re.findall(r'<(?:span|a)((?: [\w-]+="[^"]*")*)>2 (?:rules )?met(?:, [^<]*on the estimate alone)?</', text)
         assert len(said) >= 4 and not [a for a in said if "good" in a], said
-        assert re.search(r'class="sw mute"[^>]*>2 met<', text) and not re.search(r'class="sw good"[^>]*>2 met<', text)
+        assert re.search(r'class="sw mute"[^>]*>2 met[,<]', text) and not re.search(r'class="sw good"[^>]*>2 met[,<]', text)
         assert '<span class="tl"><span class="k">Rules: </span><span>2 rules met</span>' in text.split('<div class="srow" data-go="x-e1">', 1)[1].split("</div></div>", 1)[0]
 
     text = page()

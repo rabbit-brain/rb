@@ -197,3 +197,32 @@ def test_with_no_question_recorded_its_next_step_is_the_question_not_rb_status(r
     assert rb("question", "add", "Does INT8 cost top-1 accuracy?", "--id", "q1")[0] == 0
     code, env = rb("compile", "report.md")
     assert code == 0 and env.next == ["rb status"], env.next
+
+
+def test_a_tool_s_config_is_never_proposed_as_a_run_whatever_numbers_it_holds(rb, capsys):
+    seeded(rb)
+    Path("pyproject.toml").write_text("[project]\nname = \"int8-resnet\"\n\n[tool.bench]\nval_loss = 5.62\n", encoding="utf-8")
+    Path("package.json").write_text(json.dumps({"name": "int8-page", "val_loss": 5.63}), encoding="utf-8")
+    code, env = rb("compile", "pyproject.toml", "package.json")
+    assert code == 0
+    assert env.data["proposals"] == []
+    notes = {s["path"]: s.get("note") for s in env.data["sources"]}
+    assert notes == {"pyproject.toml": "a tool's config: never proposed as a run", "package.json": "a tool's config: never proposed as a run"}
+    assert not any("--from pyproject.toml" in n or "--from package.json" in n for n in env.next)
+
+
+def test_a_file_named_for_a_lock_is_a_run_s_file_unless_its_tool_gives_it_that_name(rb, capsys):
+    seeded(rb)
+    Path("eval_lock.json").write_text(json.dumps({"fp32": {"val_loss": 5.60}, "int8": {"val_loss": 5.65}}), encoding="utf-8")
+    Path("package-lock.json").write_text(json.dumps({"lockfileVersion": 3, "val_loss": 5.63}), encoding="utf-8")
+    Path("pnpm-lock.yaml").write_text("lockfileVersion: 6\nval_loss: 5.63\n", encoding="utf-8")
+    Path("Packages").mkdir()
+    Path("Packages/packages-lock.json").write_text(json.dumps({"dependencies": {}, "val_loss": 5.63}), encoding="utf-8")
+    Path("pylock.toml").write_text("lock-version = \"1.0\"\nval_loss = 5.63\n", encoding="utf-8")
+    locks = ["package-lock.json", "pnpm-lock.yaml", "Packages/packages-lock.json", "pylock.toml"]
+    code, env = rb("compile", "eval_lock.json", *locks)
+    assert code == 0
+    assert [p["path"] for p in env.data["proposals"]] == ["eval_lock.json"]
+    notes = {s["path"]: s.get("note") for s in env.data["sources"]}
+    assert [notes[p] for p in locks] == ["a tool's config: never proposed as a run"] * 4, notes
+    assert notes.get("eval_lock.json") != "a tool's config: never proposed as a run"

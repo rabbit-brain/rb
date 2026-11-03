@@ -616,7 +616,7 @@ fn postdates_lines(led: &Ledger, exp: &Experiment, set: &[(String, Setting)], ru
     type Key = (String, String, String, Option<(String, String, Option<i64>)>);
     let mut later: indexmap::IndexMap<Key, Vec<String>> = indexmap::IndexMap::new();
     for (name, setting) in set.iter().filter(|(_, st)| st.status == "verified") {
-        if let Some((path, _, rid, day, at)) = led.source_postdates(exp, name, setting, None, run)? {
+        if let Some((path, _, rid, day, at)) = led.setting_postdates(exp, name, setting, run)? {
             later.entry((path, rid, day, at)).or_default().push(name.clone());
         }
     }
@@ -638,6 +638,8 @@ pub(crate) fn read_value(led: &Ledger, source: &Source, experiment: &str, name: 
         sources::pointer_get(&doc, &pointer).map(|v| v.clone()).map_err(|step| no_value(format!("nothing at {step} there")))?
     } else if let Some(key) = source.key.as_deref().filter(|_| crate::sqlite::is_database(&sources::full_path(&led.root, &path))) {
         sources::row_cell(&led.root, &path, key).map(|(v, _)| v).map_err(|u| no_value(u.reason))?
+    } else if let Some(key) = source.key.as_deref().filter(|_| crate::csvtable::is_table(&path)) {
+        sources::table_cell(&led.root, &path, key, source).map(|(v, _)| v).map_err(|u| no_value(u.reason))?
     } else {
         let (data, _) = sources::read_file(&led.root, &path, source.commit.as_deref()).map_err(|u| RBError::msg(&u.code, u.reason))?;
         let text = String::from_utf8_lossy(&data).into_owned();
@@ -851,7 +853,7 @@ fn spec_from(ns: &Namespace, out: &mut Out, led: &Ledger) -> R {
     let exp_now = led.load::<Experiment>(&experiment).ok();
     let mut verified = 0;
     for (n, st, _) in &rows {
-        if st.status == "verified" && !exp_now.as_ref().map_or(Ok(None), |e| led.source_postdates(e, n, st, None, None))?.is_some() {
+        if st.status == "verified" && !exp_now.as_ref().map_or(Ok(None), |e| led.setting_postdates(e, n, st, None))?.is_some() {
             verified += 1;
         }
     }
@@ -1103,14 +1105,47 @@ pub struct FromFile {
     /// the row of a CSV or TSV table its numbers were read from: its path, the line it starts on, the columns it was
     /// picked by with the row's own values, and the column each value came from
     pub table_row: Option<Dict>,
+    /// the commit given with --commit: as given, or the row's own value where it names a column (@<column>)
+    pub commit: Option<String>,
+}
+
+/// A commit as git names one: its hash in full or in short (7 to 64 hex digits), with git describe's -dirty after it;
+/// a short one of decimal digits alone (5000, 20260101) is a number or a date, never read as a commit.
+pub fn commit_like(c: &str) -> bool {
+    let h = c.strip_suffix("-dirty").unwrap_or(c);
+    (7..=64).contains(&h.len()) && h.chars().all(|x| x.is_ascii_hexdigit()) && (h.len() >= 40 || !h.chars().all(|x| x.is_ascii_digit()))
+}
+
+/// --commit @<column>: the row's own value, which must be a commit (never a name, a date or a number stored as one).
+fn commit_of_row(flag_value: &str, cell: Option<String>, holder: &str, column: &str) -> Res<String> {
+    match cell.map(|c| c.trim().to_string()).filter(|c| !c.is_empty()) {
+        Some(c) if commit_like(&c) => Ok(c),
+        other => Err(RBError::msg_fix(
+            "E_OBJECT_INVALID",
+            format!(
+                "--commit {flag_value}: {holder} holds {} in {column}, which is not a commit (7 to 64 hex digits, not a number).",
+                other.map_or("nothing".to_string(), |c| pyjson::repr_str(&c))
+            ),
+            "Give the commit itself, --commit <sha>, or leave --commit out.",
+        )),
+    }
 }
 
 /// One row of a CSV or TSV table as a run, as a database row is read: `--where` picks exactly one row, its numbers are
 /// the columns that name a metric the project declares (`--select` narrows them), and `@<column>` gives a per-run
 /// value or the time the run was made from the row.
-fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Dict, select: &[String], per_run: Dict, produced_at: Option<String>) -> Res<FromFile> {
+#[allow(clippy::too_many_arguments)]
+fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Dict, select: &[String], per_run: Dict, produced_at: Option<String>, commit: Option<String>, pick: Option<usize>) -> Res<FromFile> {
     let bytes = std::fs::read(file).map_err(|e| RBError::could_not_read(&e, shown))?;
-    let table = crate::csvtable::parse(&String::from_utf8_lossy(&bytes), shown);
+    let table = crate::csvtable::read(&String::from_utf8_lossy(&bytes), shown)
+        .map_err(|e| {
+            let fix = if crate::csvtable::is_jsonl(shown) {
+                "A JSON Lines file holds one JSON object a line, each a row: fix that line, or give --from another file."
+            } else {
+                "rb reads a CSV or TSV table by the names its first line gives its columns: give --from a table with a header line, or record its numbers as NAME=VALUE with --note naming the file and line."
+            };
+            RBError::msg_fix("E_OBJECT_INVALID", format!("{e}."), fix)
+        })?;
     let all_columns = table.columns.join(", ");
     // a column named twice cannot say which of its cells a value is
     if let Some(twice) = table.columns.iter().enumerate().find(|(i, c)| !c.is_empty() && table.columns[..*i].contains(c)).map(|(_, c)| c) {
@@ -1121,12 +1156,19 @@ fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Di
         ));
     }
     if table.rows.is_empty() {
-        return Err(RBError::msg("E_OBJECT_INVALID", format!("{shown} holds no rows under its first line ({all_columns}), so it gives no run.")));
+        return Err(RBError::msg(
+            "E_OBJECT_INVALID",
+            if crate::csvtable::is_jsonl(shown) { format!("{shown} holds no rows, so it gives no run.") } else { format!("{shown} holds no rows under its first line ({all_columns}), so it gives no run.") },
+        ));
     }
     if where_.is_empty() {
         return Err(RBError::msg_fix(
             "E_OBJECT_INVALID",
-            format!("{shown} is a table of {}, and rb reads one row of it as a run: its columns are {all_columns}.", if table.rows.len() == 1 { "1 row".to_string() } else { format!("{} rows", table.rows.len()) }),
+            format!(
+                "{shown} is a {} of {}, and rb reads one row of it as a run: its columns are {all_columns}.",
+                if crate::csvtable::is_jsonl(shown) { "JSON Lines file" } else { "table" },
+                if table.rows.len() == 1 { "1 row".to_string() } else { format!("{} rows", table.rows.len()) }
+            ),
             format!("Name the row: rb run add <experiment> --from {} --where <column>=<value>", crate::cli::shlex_quote(shown)),
         ));
     }
@@ -1138,21 +1180,32 @@ fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Di
     let picked = || where_.iter().map(|(k, v)| format!("{k}={}", show(v))).collect::<Vec<_>>().join(", ");
     let hits: Vec<&crate::csvtable::CsvRow> =
         table.rows.iter().filter(|r| where_.iter().all(|(k, v)| r.column(k).map_or(false, |(_, cell)| crate::csvtable::matches(cell, v)))).collect();
+    let names = crate::journal::names(led)?;
+    let declared = |c: &str| crate::journal::canon_of(c, &names).is_some();
     let row = match hits.as_slice() {
+        // --every-row: each of the rows --where picks in turn
+        rows if pick.is_some_and(|i| i < rows.len()) => rows[pick.unwrap_or(0)],
         [one] => *one,
-        [] => return Err(RBError::msg_fix("E_OBJECT_INVALID", format!("No row of {shown} has {}.", picked()), "Name a row the table holds: --where <column>=<value>, repeated or comma-separated.")),
-        many => {
-            let first = many[0].cells.iter().map(|(c, v)| format!("{c}={v}")).collect::<Vec<_>>().join(", ");
+        [] => {
             return Err(RBError::msg_fix(
                 "E_OBJECT_INVALID",
-                format!("{} rows of {shown} have {}; the first is line {}: {first}. Nothing written.", many.len(), picked(), many[0].line),
-                "Add a --where column that tells them apart, so exactly one row has them all.",
+                format!("No row of {shown} has {}. {}", picked(), rows_hold(&table.rows.iter().collect::<Vec<_>>(), &where_.keys().cloned().collect::<Vec<_>>(), &declared)),
+                "Name a row the table holds: --where <column>=<value>, repeated or comma-separated.",
+            ))
+        }
+        many => {
+            let apart: Vec<String> = table.columns.iter().filter(|c| !where_.contains_key(*c)).cloned().collect();
+            return Err(RBError::msg_fix(
+                "E_OBJECT_INVALID",
+                format!("{} rows of {shown} have {}; the first is line {}. {} Nothing written.", many.len(), picked(), many[0].line, rows_differ(many, &apart, &declared)),
+                format!(
+                    "Add a --where column that tells them apart, so exactly one row has them all; or record each of the {} as its own run: the same rb run add with --every-row.",
+                    many.len()
+                ),
             ));
         }
     };
     let shown_row = format!("{shown}, line {}", row.line);
-    let names = crate::journal::names(led)?;
-    let declared = |c: &str| crate::journal::canon_of(c, &names).is_some();
     let mut chosen: Vec<&(String, String)> = Vec::new();
     if select.is_empty() {
         chosen.extend(row.cells.iter().filter(|(c, _)| declared(c)));
@@ -1183,7 +1236,7 @@ fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Di
     let mut skipped = Vec::new();
     let mut columns = Dict::new();
     for (column, cell) in chosen {
-        match crate::csvtable::number(cell) {
+        match row.number_of(column) {
             Some(x) => {
                 metrics.insert(column.clone(), Value::Float(x));
                 columns.insert(column.clone(), Value::Str(column.clone()));
@@ -1213,7 +1266,7 @@ fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Di
         if cell.trim().is_empty() {
             return Err(RBError::msg("E_OBJECT_INVALID", format!("{flag}: {shown_row} holds nothing in {column}, which is no per-run value.")));
         }
-        resolved.insert(k.clone(), crate::csvtable::value(cell));
+        resolved.insert(k.clone(), row.value_of(column).unwrap_or_else(|| crate::csvtable::value(cell)));
         per_run_columns.insert(k, Value::Str(column.clone()));
     }
     let mut produced_column = Value::Null;
@@ -1233,16 +1286,74 @@ fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Di
         }
         None => produced_at,
     };
-    let key: Dict = where_.keys().filter_map(|k| row.column(k).map(|(c, v)| (c.clone(), crate::csvtable::value(v)))).collect();
+    let commit = match commit.as_deref().and_then(|t| t.strip_prefix('@')) {
+        Some(name) => {
+            let (column, cell) = cell_of(&format!("--commit @{name}"), name)?;
+            Some(commit_of_row(&format!("@{name}"), Some(cell.clone()), &shown_row, column)?)
+        }
+        None => commit,
+    };
+    let key: Dict = where_.keys().filter_map(|k| row.column(k).map(|(c, _)| (c.clone(), row.value_of(c).unwrap_or(Value::Null)))).collect();
     // the row is told by its own cells but the numbers it gives: whichever columns --where named, the same row is one
     // run, and a row whose numbers were changed since is still that run
     let identity: Vec<String> = row.cells.iter().filter(|(c, _)| !columns.contains_key(c)).map(|(c, v)| format!("{c}={v}")).collect();
     let table_row = crate::dict! {
-        "store" => "csv", "path" => crate::cmds::root_relative(shown, &led.root), "line" => row.line as i64, "where" => Value::Dict(key),
+        "store" => if crate::csvtable::is_jsonl(shown) { "jsonl" } else { "csv" }, "path" => crate::cmds::root_relative(shown, &led.root), "line" => row.line as i64, "where" => Value::Dict(key),
         "columns" => Value::Dict(columns), "per_run" => Value::Dict(per_run_columns), "produced_at" => produced_column,
         "row_sha256" => crate::rbyaml::sha256_hex(identity.join("\n").as_bytes())
     };
-    Ok(FromFile { metrics, skipped, shown: shown_row, per_run: resolved, produced_at, row: None, table_row: Some(table_row) })
+    Ok(FromFile { metrics, skipped, shown: shown_row, per_run: resolved, produced_at, row: None, table_row: Some(table_row), commit })
+}
+
+/// The values a few of `rows` hold in a column, as a reader is told them: "1, 2 and 3", or the first few and a count.
+fn values_said(rows: &[&crate::csvtable::CsvRow], column: &str) -> (usize, String) {
+    let mut seen: Vec<String> = Vec::new();
+    for r in rows {
+        if let Some((_, v)) = r.column(column) {
+            let v = if v.is_empty() { "(nothing)".to_string() } else { v.chars().take(40).collect() };
+            if !seen.contains(&v) {
+                seen.push(v);
+            }
+        }
+    }
+    let n = seen.len();
+    let said = if n > 5 { format!("{} and {} more", seen[..4].join(", "), n - 4) } else { crate::assess::first_few(&seen, 5, ", ") };
+    (n, said)
+}
+
+/// What the rows a --where picked differ in, as a refusal says it: the columns (other than the metrics a project
+/// declares) whose values are not all the same, each with what the rows hold there.
+fn rows_differ(rows: &[&crate::csvtable::CsvRow], columns: &[String], declared: &dyn Fn(&str) -> bool) -> String {
+    // the columns with the fewest values first: those name what the rows were run under, where an id or a time names
+    // each row alone
+    // and of as many, short words first (a variant's name), then whole numbers (an epoch), then other numbers (a
+    // measurement), then long text (a hash)
+    let class = |c: &str| {
+        let cells: Vec<&str> = rows.iter().filter_map(|r| r.column(c).map(|(_, v)| v.as_str())).collect();
+        if cells.iter().all(|v| crate::csvtable::number(v).is_none() && v.chars().count() <= 30) {
+            0
+        } else if cells.iter().all(|v| v.parse::<i64>().is_ok()) {
+            1
+        } else if cells.iter().all(|v| crate::csvtable::number(v).is_some()) {
+            2
+        } else {
+            3
+        }
+    };
+    let mut differing: Vec<(usize, &String, String)> = columns.iter().filter(|c| !declared(c)).map(|c| (values_said(rows, c), c)).filter(|((n, _), _)| *n > 1).map(|((n, said), c)| (n, c, said)).collect();
+    differing.sort_by_key(|(n, c, _)| (*n, class(c)));
+    let more = differing.len().saturating_sub(6);
+    let parts: Vec<String> = differing.iter().take(6).map(|(_, c, said)| format!("{c} ({said})")).collect();
+    if parts.is_empty() {
+        return "They differ only in the metrics the project declares.".into();
+    }
+    format!("They differ in {}{}.", parts.join(", "), if more > 0 { format!(" and {more} more columns") } else { String::new() })
+}
+
+/// What a table's rows hold in the columns a --where named, as a refusal that found no row says it.
+fn rows_hold(rows: &[&crate::csvtable::CsvRow], columns: &[String], _declared: &dyn Fn(&str) -> bool) -> String {
+    let parts: Vec<String> = columns.iter().map(|c| format!("{c} {}", values_said(rows, c).1)).collect();
+    format!("Its rows hold {}.", parts.join("; "))
 }
 
 /// What a run read from a row of a CSV or TSV table says of it: `row of results.csv, line 4 (mode=int8, bits=8)`.
@@ -1329,31 +1440,41 @@ pub fn where_items(items: &[String]) -> Res<Vec<String>> {
 /// narrows it), or one row of a SQLite database, picked by `table` and `where_`, whose columns that name a metric the
 /// project declares are its numbers (`select` narrows them). A per-run value or a produced time given as `@<column>`
 /// is that column's value in the row.
-pub fn read_from(led: &Ledger, path: &str, keys: &[String], table: Option<&str>, where_: &Dict, select: &[String], per_run: Dict, produced_at: Option<String>) -> Res<FromFile> {
+#[allow(clippy::too_many_arguments)]
+pub fn read_from(led: &Ledger, path: &str, keys: &[String], table: Option<&str>, where_: &Dict, select: &[String], per_run: Dict, produced_at: Option<String>, commit: Option<String>) -> Res<FromFile> {
+    read_from_row(led, path, keys, table, where_, select, per_run, produced_at, commit, None)
+}
+
+/// read_from, the `pick`th of the rows `--where` picks in a CSV, TSV or JSON Lines table (--every-row).
+#[allow(clippy::too_many_arguments)]
+fn read_from_row(led: &Ledger, path: &str, keys: &[String], table: Option<&str>, where_: &Dict, select: &[String], per_run: Dict, produced_at: Option<String>, commit: Option<String>, pick: Option<usize>) -> Res<FromFile> {
     let shown = pathlib_str(path);
     let file = PathBuf::from(crate::sys::typed(path));
     let table = table.filter(|t| !t.is_empty());
     // a file that is not there or cannot be read is said so, never taken for a file that is not a database
     let database = crate::sqlite::header(&file).map_err(|e| RBError::could_not_read(&e, &shown))?;
     if !database && crate::csvtable::is_table(path) {
+        let kind = crate::csvtable::kind_said(path);
         if table.is_some() {
             return Err(RBError::msg_fix(
                 "E_OBJECT_INVALID",
-                format!("--table names a table of a SQLite database, and {shown} is a CSV table: --where picks its row."),
+                format!("--table names a table of a SQLite database, and {shown} is a {kind}: --where picks its row."),
                 format!("rb run add <experiment> --from {} --where <column>=<value>", crate::cli::shlex_quote(&shown)),
             ));
         }
         if !keys.is_empty() {
-            return Err(RBError::msg("E_OBJECT_INVALID", format!("--keys picks the numbers of a JSON, YAML or TOML file; {shown} is a CSV table, whose metric columns --select picks.")));
+            return Err(RBError::msg("E_OBJECT_INVALID", format!("--keys picks the numbers of a JSON, YAML or TOML file; {shown} is a {kind}, whose metric columns --select picks.")));
         }
-        return read_table_row(led, &file, &shown, where_, select, per_run, produced_at);
+        return read_table_row(led, &file, &shown, where_, select, per_run, produced_at, commit, pick);
     }
     if !database {
         if table.is_some() || !where_.is_empty() || !select.is_empty() {
             return Err(RBError::msg_fix(
                 "E_OBJECT_INVALID",
-                format!("--table, --where and --select read a row of a SQLite database, and {shown} is not one: its first bytes are not SQLite's."),
-                "Read a JSON, YAML or TOML file without them, or give --from the database.",
+                format!(
+                    "--table, --where and --select read a row of a table: a SQLite database (--table names its table), or a CSV, TSV or JSON Lines file (.csv, .tsv, .jsonl). {shown} is none of those: its first bytes are not SQLite's, and its name is not a table's."
+                ),
+                "Read a JSON, YAML or TOML file without them, or give --from the table.",
             ));
         }
         let (mut nums, mut skipped) = metrics_from_file(path)?;
@@ -1365,7 +1486,7 @@ pub fn read_from(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
                 return Err(RBError::msg("E_OBJECT_INVALID", format!("--keys {} matches no number in {shown}.", patterns.join(", "))));
             }
         }
-        return Ok(FromFile { metrics: nums, skipped, shown, per_run, produced_at, row: None, table_row: None });
+        return Ok(FromFile { metrics: nums, skipped, shown, per_run, produced_at, row: None, table_row: None, commit });
     }
     if !keys.is_empty() {
         return Err(RBError::msg(
@@ -1484,6 +1605,17 @@ pub fn read_from(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
         }
         None => produced_at,
     };
+    let commit = match commit.as_deref().and_then(|t| t.strip_prefix('@')) {
+        Some(name) => {
+            let (_, cell, holder, held_in) = from_column(&format!("--commit @{name}"), name)?;
+            let text = match &cell {
+                crate::sqlite::Cell::Text(t) => Some(t.clone()),
+                _ => None,
+            };
+            Some(commit_of_row(&format!("@{name}"), text.or_else(|| Some(cell.said())), &holder, &held_in)?)
+        }
+        None => commit,
+    };
     let from = FromRow {
         path: root_relative(path, &led.root),
         table: row.table.clone(),
@@ -1495,7 +1627,7 @@ pub fn read_from(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
         identity: row.identity(),
         stamp,
     };
-    Ok(FromFile { metrics, skipped, shown: shown_row, per_run: resolved, produced_at, row: Some(from), table_row: None })
+    Ok(FromFile { metrics, skipped, shown: shown_row, per_run: resolved, produced_at, row: Some(from), table_row: None, commit })
 }
 
 /// A column of the one row of another table linked to the run's row (`@configs.seed`, `@configs[config_id].seed`): the
@@ -1576,6 +1708,101 @@ pub fn row_words(row: &RowRead) -> String {
 }
 
 pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
+    if flag(ns, "every_row") {
+        return run_add_every_row(ns, out);
+    }
+    run_add_one(ns, out, None)
+}
+
+/// rb run add --every-row: every row of a CSV, TSV or JSON Lines table that --where picks, each recorded as its own run
+/// through the same rb run add, its @<column> values from its own row. A row already recorded is said so and passed.
+fn run_add_every_row(ns: &Namespace, out: &mut Out) -> R {
+    let led = Ledger::open(None)?;
+    let Some(ff) = s(ns, "from_file") else {
+        return Err(RBError::msg("E_OBJECT_INVALID", "--every-row records every row --where picks of the table --from reads; give --from <table> --where <column>=<value>."));
+    };
+    let where_ = parse_pairs(&where_items(&list(ns, "where"))?, "--where", false)?;
+    if !crate::csvtable::is_table(&ff) || where_.is_empty() || s(ns, "table").is_some() {
+        return Err(RBError::msg_fix(
+            "E_OBJECT_INVALID",
+            "--every-row reads the rows --where picks of a CSV, TSV or JSON Lines table (.csv, .tsv, .jsonl).",
+            "rb run add <experiment> --from <table> --where <column>=<value> --every-row",
+        ));
+    }
+    if s(ns, "replaces").is_some() || s(ns, "repeats").is_some() {
+        return Err(RBError::msg_fix(
+            "E_OBJECT_INVALID",
+            "--replaces and --repeats name one run, and --every-row records several.",
+            "Record the row that replaces or repeats a run on its own: --where picking it alone, without --every-row.",
+        ));
+    }
+    let shown = pathlib_str(&ff);
+    let bytes = std::fs::read(crate::sys::typed(&ff)).map_err(|e| RBError::could_not_read(&e, &shown))?;
+    let table = crate::csvtable::read(&String::from_utf8_lossy(&bytes), &shown).map_err(|e| RBError::msg("E_OBJECT_INVALID", format!("{e}.")))?;
+    let hits: Vec<&crate::csvtable::CsvRow> = table.rows.iter().filter(|r| where_.iter().all(|(k, v)| r.column(k).map_or(false, |(_, cell)| crate::csvtable::matches(cell, v)))).collect();
+    let n = hits.len();
+    // a row is told by its own cells but the numbers it gives: two rows told apart by their numbers alone are one run
+    // to rb, so none is recorded and the lines are said, never one of them passed as recorded already
+    let names = crate::journal::names(&led)?;
+    let told = |r: &crate::csvtable::CsvRow| -> Vec<String> { r.cells.iter().filter(|(c, _)| crate::journal::canon_of(c, &names).is_none()).map(|(c, v)| format!("{c}={v}")).collect() };
+    for (i, a) in hits.iter().enumerate() {
+        if let Some(b) = hits[..i].iter().find(|b| told(b) == told(a)) {
+            return Err(RBError::msg_fix(
+                "E_OBJECT_INVALID",
+                format!("{shown}, lines {} and {}, hold the same cells but their numbers, so rb would read them as one run. Nothing written.", b.line, a.line),
+                "Give each row a column that tells it apart (a run id, a seed), or record one of them with --where picking it alone.",
+            ));
+        }
+    }
+    if n == 0 {
+        // said as one row's read says it: what the rows hold
+        return run_add_one(ns, out, None);
+    }
+    // every row read first, as its run would read it (its numbers, its @<column> values, its commit): a row that cannot be
+    // read is said before any run is written
+    let per_run = parse_pairs(&list(ns, "set"), "--set", false)?;
+    for i in 0..n {
+        read_from_row(&led, &ff, &list(ns, "keys"), None, &where_, &list(ns, "select"), per_run.clone(), s(ns, "produced_at"), s(ns, "commit"), Some(i))
+            .map_err(|e| RBError::msg_fix(&e.code, format!("row {} of the {n} --where picks: {} Nothing written.", i + 1, e.message), e.fix.clone()))?;
+    }
+    let (mut recorded, mut already, mut ids) = (Vec::new(), Vec::new(), Vec::new());
+    for i in 0..n {
+        let mut one = Out::new(&out.command, out.json_mode);
+        match run_add_one(ns, &mut one, Some(i)) {
+            Ok(_) => {
+                let id = one.data.get("object").and_then(|o| o.get("id")).map(pyjson::py_str).unwrap_or_default();
+                if one.data.contains_key("duplicate_of") {
+                    already.push(id.clone());
+                } else {
+                    recorded.push(id.clone());
+                    if let Some(first) = one.lines.first() {
+                        out.say(first.clone());
+                    }
+                }
+                out.warnings.extend(one.warnings);
+                out.notes.extend(one.notes);
+                ids.push(Value::Str(id));
+            }
+            Err(e) => {
+                let done = if recorded.is_empty() { String::new() } else { format!(" {} of them recorded before it: {}.", recorded.len(), recorded.join(", ")) };
+                return Err(RBError::msg_fix(&e.code, format!("row {} of the {n} --where picks: {}{done}", i + 1, e.message), e.fix.clone()));
+            }
+        }
+    }
+    let rows = if n == 1 { "row".to_string() } else { "rows".to_string() };
+    out.say(format!(
+        "{} of the {n} {rows} --where picks in {shown} recorded as runs{}.",
+        recorded.len(),
+        if already.is_empty() { String::new() } else { format!("; {} already recorded ({})", already.len(), crate::assess::first_few(&already, 4, ", ")) }
+    ));
+    actor_line(out, &led)?;
+    out.data.insert("runs".into(), Value::List(ids));
+    out.data.insert("recorded_count".into(), Value::Int(recorded.len() as i64));
+    out.data.insert("already_count".into(), Value::Int(already.len() as i64));
+    Ok(0)
+}
+
+fn run_add_one(ns: &Namespace, out: &mut Out, pick: Option<usize>) -> R {
     let led = Ledger::open(None)?;
     let tokens = list(ns, "pairs");
     let pairs = split_pairs(&tokens);
@@ -1591,6 +1818,7 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
     let mut numbers_from: Vec<String> = Vec::new();
     let mut basis = "typed".to_string();
     let mut produced_at = s(ns, "produced_at");
+    let mut commit = s(ns, "commit");
     let mut row = None;
     let mut table_row = None;
     let keys = list(ns, "keys");
@@ -1604,7 +1832,7 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
         return Err(RBError::msg("E_OBJECT_INVALID", "--table, --where and --select name a row of the SQLite database or CSV table --from reads; give --from <database or table>."));
     }
     if let Some(ff) = &from_file {
-        let got = read_from(&led, ff, &keys, table.as_deref(), &where_, &select, per_run, produced_at)?;
+        let got = read_from_row(&led, ff, &keys, table.as_deref(), &where_, &select, per_run, produced_at, commit, pick)?;
         let mut overlap: Vec<&String> = got.metrics.keys().filter(|k| metrics.contains_key(*k)).collect();
         overlap.sort();
         if !overlap.is_empty() {
@@ -1613,7 +1841,7 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
         for (k, v) in got.metrics {
             metrics.insert(k, v);
         }
-        (per_run, produced_at, row, table_row) = (got.per_run, got.produced_at, got.row, got.table_row);
+        (per_run, produced_at, row, table_row, commit) = (got.per_run, got.produced_at, got.row, got.table_row, got.commit);
         files.push(root_relative(ff, &led.root));
         numbers_from.push(root_relative(ff, &led.root));
         basis = if pairs.is_empty() { "file".into() } else { "typed".into() };
@@ -1639,7 +1867,7 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
             command_source: s(ns, "command_source"),
             per_run,
             config,
-            commit: s(ns, "commit"),
+            commit,
             basis,
             again: again(ns)?,
             note: s_or(ns, "note"),
@@ -1654,6 +1882,7 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
             numbers_from,
             row,
             table_row,
+            block: false,
         },
     )?;
     let run = result.record;
@@ -1774,7 +2003,7 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
                     "when is unknown; a database's times are not its row's. --produced-at @<column> reads a time the row holds.".into()
                 }
                 None if run.basis == "typed" && run.files.is_empty() => {
-                    format!("when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add {} <the same numbers> --produced-at <when> --replaces {} --why \"<when they were made>\"", run.experiment, run.id)
+                    format!("when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add {} <the same numbers and per-run values> --produced-at <when> --replaces {} --why \"<when they were made>\"", run.experiment, run.id)
                 }
                 None => "when is unknown".into(),
             }

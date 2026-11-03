@@ -201,6 +201,7 @@
     "  \"tally\": {",
     "   \"untested\": 1",
     "  },",
+    "  \"tally_on_estimate\": {},",
     "  \"results\": {",
     "   \"untested\": 1",
     "  },",

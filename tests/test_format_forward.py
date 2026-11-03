@@ -532,3 +532,26 @@ def test_an_older_rb_s_look_on_a_dirty_tree_reads_no_move(repo, capsys):
         assert rbj(capsys, "status")[0] == 0
         assert _older("journal", "scan")["scan"]["git_moved"] is False
         assert rbj(capsys, "journal", "scan")[1].data["scan"]["git_moved"] is False
+
+
+def test_a_question_call_keeps_no_part_an_older_rb_does_not_know(repo, capsys):
+    """A question call's snapshot (inquiry_basis) is format 1, which an older rb reads key by key: the reading it keeps
+    says no more than rb 0.7.0's did, so a paired reading's pairing, said with the reading, is not kept in it (6b at
+    MP-1103-0054: rb 0.7.0 read such a call as state_newer and failed every gate)."""
+    assert rbj(capsys, "init", "t")[0] == 0
+    assert rbj(capsys, "question", "add", "Does cand help?", "--id", "q1")[0] == 0
+    assert rbj(capsys, "experiment", "add", "x", "--id", "e1", "-q", "q1", "--baseline", "base", "--candidate", "cand")[0] == 0
+    assert rbj(capsys, "metric", "add", "acc", "--maximize")[0] == 0
+    assert rbj(capsys, "spec", "set", "e1", "seed", "--per-run")[0] == 0
+    assert rbj(capsys, "criterion", "add", "s", "-e", "e1", "-q", "q1", "--metric", "change.acc", "--at-least", "0", "--id", "c1")[0] == 0
+    for s in (1, 2, 3):   # each arm in runs of its own, so the reading pairs them by seed
+        assert rbj(capsys, "run", "add", "e1", f"acc=0.7{s}", "--variant", "base", "--set", f"seed={s}")[0] == 0
+        assert rbj(capsys, "run", "add", "e1", f"acc=0.8{s}", "--variant", "cand", "--set", f"seed={s}")[0] == 0
+    code, env = rbj(capsys, "show", "c1")
+    assert code == 0 and env.data["finding"]["comparison"]["pairing"], env.data["finding"]["comparison"]
+    code, env = rbj(capsys, "decide", "q1", "accept", "--why", "fine")
+    assert code == 0, env.errors
+    [d] = (Path(".rb") / "decisions").glob("*.yaml")
+    assert "pairing" not in d.read_text(encoding="utf-8")
+    code, env = rbj(capsys, "status")
+    assert not [i for i in env.data["open"] if i["code"] in ("state_newer", "decision_outdated")]

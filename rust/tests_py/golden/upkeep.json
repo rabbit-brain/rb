@@ -75,7 +75,7 @@
     "runp5h4s6 on e1: fast.wall_s=7, slow.wall_s=10",
     "  read data1 (eval)",
     "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
-    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
     "",
     "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric fast.wall_s --at-most <x>   (write the criterion before the next run)",
     ""

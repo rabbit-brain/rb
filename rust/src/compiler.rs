@@ -16,7 +16,7 @@ use std::sync::OnceLock;
 
 const PROSE: &[&str] = &[".md", ".markdown", ".qmd", ".rmd", ".mdx", ".txt", ".rst"];
 const STRUCTURED: &[&str] = &[".json", ".yaml", ".yml", ".toml"];
-const TABLES: &[&str] = &[".csv", ".tsv"];
+const TABLES: &[&str] = &[".csv", ".tsv", ".jsonl", ".ndjson"];
 const CODE: &[&str] = &[".py", ".sh", ".bash", ".js", ".mjs", ".ts", ".r", ".jl", ".ipynb"];
 const SKIP_DIRS: &[&str] = &[DIR, ".git", "__pycache__", "node_modules", ".venv", "venv"];
 const MAX_SOURCES: usize = 200;
@@ -218,21 +218,40 @@ fn source_entry(root: &Path, f: &Path, names: &IndexMap<String, String>) -> Dict
             }
         }
         "table" => {
-            let cols = columns(f);
-            if !cols.is_empty() {
-                entry.insert("columns".into(), Value::list_of_str(cols));
+            if !crate::csvtable::is_jsonl(&rel) {
+                let cols = columns(f);
+                if !cols.is_empty() {
+                    entry.insert("columns".into(), Value::list_of_str(cols));
+                }
             }
-            // a CSV or TSV table is read by its rows, as a database's is: its row count, and the columns that name a
-            // metric the project declares, each with how many of its rows hold a number there
+            // a CSV, TSV or JSON Lines table is read by its rows, as a database's is: its row count, and the columns
+            // that name a metric the project declares, each with how many of its rows hold a number there
             if crate::csvtable::is_table(&rel) && std::fs::metadata(f).map_or(false, |m| m.len() <= 64 * 1024 * 1024) {
                 if let Some(text) = text_of(f) {
-                    let t = crate::csvtable::parse(&text, &rel);
-                    entry.insert("rows".into(), Value::Int(t.rows.len() as i64));
-                    let metrics: Dict = t.columns.iter().filter_map(|c| crate::journal::canon_of(c, names).map(|m| (c.clone(), Value::Str(m)))).collect();
-                    let numeric: Vec<String> =
-                        t.columns.iter().filter(|c| !t.rows.is_empty() && t.rows.iter().all(|r| r.column(c).map_or(true, |(_, v)| v.is_empty() || crate::csvtable::number(v).is_some()))).cloned().collect();
-                    entry.insert("number_columns".into(), Value::list_of_str(numeric));
-                    entry.insert("metrics".into(), Value::Dict(metrics));
+                    match crate::csvtable::read(&text, &rel) {
+                        Ok(t) => {
+                            if crate::csvtable::is_jsonl(&rel) && !t.columns.is_empty() {
+                                entry.insert("columns".into(), Value::list_of_str(t.columns.iter().take(12).cloned()));
+                            }
+                            entry.insert("rows".into(), Value::Int(t.rows.len() as i64));
+                            let metrics: Dict = t.columns.iter().filter_map(|c| crate::journal::canon_of(c, names).map(|m| (c.clone(), Value::Str(m)))).collect();
+                            let numeric: Vec<String> = t
+                                .columns
+                                .iter()
+                                .filter(|c| {
+                                    !t.rows.is_empty()
+                                        && t.rows.iter().any(|r| r.number_of(c).is_some())
+                                        && t.rows.iter().all(|r| r.column(c).map_or(true, |(_, v)| (v.is_empty() && !r.is_text(c)) || r.number_of(c).is_some()))
+                                })
+                                .cloned()
+                                .collect();
+                            entry.insert("number_columns".into(), Value::list_of_str(numeric));
+                            entry.insert("metrics".into(), Value::Dict(metrics));
+                        }
+                        Err(e) => {
+                            entry.insert("note".into(), Value::Str(e));
+                        }
+                    }
                 }
             }
         }
@@ -443,6 +462,11 @@ fn proposals(led: &Ledger, sources: &mut [Dict]) -> Res<Vec<Dict>> {
             continue;
         }
         let path = s.get("path").map(py_str).unwrap_or_default();
+        // a lockfile or a tool's config (pyproject.toml, package.json) is never a run's output, as reconcile reads it
+        if crate::journal::tool_file(path.rsplit('/').next().unwrap_or(&path)) {
+            s.insert("note".into(), Value::Str("a tool's config: never proposed as a run".into()));
+            continue;
+        }
         let nums = crate::journal::numbers_in(&led.root, &path);
         let canon: HashSet<String> = nums.keys().filter_map(|k| crate::journal::canon_of(k, &aliases)).collect();
         if canon.is_empty() {

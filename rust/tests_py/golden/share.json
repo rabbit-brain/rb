@@ -160,7 +160,7 @@
     "runp5h4s6 on e1: base.top1=0.7, wide.top1=0.74",
     "  read evalset (eval) \u00b7 made far (checkpoint)",
     "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
-    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
     "  c1 criterion undetermined \u00b7 point only: top1: 0.74 \u00b7 mean, 1 run (rb)",
     "  c2 estimate meets criterion \u00b7 point only: change.top1: +0.04 \u00b7 paired difference, 1 run (rb)",
     "  rb put the code in git at refs/rb/snapshots/1ba8f0d43845b2c4663e438f544874b107c754d0, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/1ba8f0d43845b2c4663e438f544874b107c754d0 removes it.",
@@ -210,7 +210,7 @@
     " \"data\": {",
     "  \"path\": \"@BASE@/work/rb-export\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 135795,",
+    "  \"bytes\": 135692,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
@@ -279,7 +279,7 @@
     "",
     "Can be done now (2)",
     "  - c1: declared; order unknown: when runp5h4s6 was produced is unknown: whether it was declared before its evidence cannot be read",
-    "      rb run add e1 <the same numbers> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"   (numbers typed with no time are of a time nobody knows)",
+    "      rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"   (numbers typed with no time are of a time nobody knows)",
     "  - e1/schedule: schedule = cosine is provisional: no check of it is recorded",
     "      rb spec set e1 schedule cosine --source <file#key that states it>   (or vouch for it: rb decide e1/schedule accept --why \"...\")",
     "",
@@ -321,7 +321,7 @@
     "  far          checkpoint \u00b7 far ckpt \u00b7 remote \u00b7 name only: no hash, digest or version recorded \u00b7 how to get it again: train it again",
     "  named        code \u00b7 just a name \u00b7 lost \u00b7 name only: no hash, digest or version recorded",
     "",
-    "Next: rb decide c1 accept|reject|investigate --why \"...\"  \u00b7  rb run add e1 <the same numbers> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"   (numbers typed with no time are of a time nobody knows)  \u00b7  rb spec set e1 schedule cosine --source <file#key that states it>   (or vouch for it: rb decide e1/schedule accept --why \"...\")",
+    "Next: rb decide c1 accept|reject|investigate --why \"...\"  \u00b7  rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"   (numbers typed with no time are of a time nobody knows)  \u00b7  rb spec set e1 schedule cosine --source <file#key that states it>   (or vouch for it: rb decide e1/schedule accept --why \"...\")",
     ""
    ],
    "err": [
@@ -418,7 +418,7 @@
     " \"data\": {",
     "  \"path\": \"@BASE@/work/pub.zip\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 140628,",
+    "  \"bytes\": 140525,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
@@ -922,17 +922,17 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 121092,",
+   " \"bytes\": 120989,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"237bf42f54cf6af33abcd416506be0d5b7be3c7d74d9625f1643493f164e59d9\"",
+   "  \"page.html\": \"7a76026f258974a69a6197b5d0ff6a7a474d1595a99e48219f38ed162905f6c8\"",
    " }",
    "}",
    ""
   ],
   "bundles/b1/page.html": {
-   "sha256": "237bf42f54cf6af33abcd416506be0d5b7be3c7d74d9625f1643493f164e59d9",
-   "bytes": 120501
+   "sha256": "7a76026f258974a69a6197b5d0ff6a7a474d1595a99e48219f38ed162905f6c8",
+   "bytes": 120398
   },
   "configs/train.json": [
    "{\"optim\": {\"lr\": 0.0003, \"betas\": [0.9, 0.999]}, \"model\": {\"depth\": 18, \"width\": 64}, \"name\": \"base\"}",
@@ -981,21 +981,21 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 121092,",
+   " \"bytes\": 120989,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"237bf42f54cf6af33abcd416506be0d5b7be3c7d74d9625f1643493f164e59d9\"",
+   "  \"page.html\": \"7a76026f258974a69a6197b5d0ff6a7a474d1595a99e48219f38ed162905f6c8\"",
    " }",
    "}",
    ""
   ],
   "plain/page.html": {
-   "sha256": "237bf42f54cf6af33abcd416506be0d5b7be3c7d74d9625f1643493f164e59d9",
-   "bytes": 120501
+   "sha256": "7a76026f258974a69a6197b5d0ff6a7a474d1595a99e48219f38ed162905f6c8",
+   "bytes": 120398
   },
   "pub.zip": {
-   "sha256": "4ac2ba1272b0bb87da5b5146c4f2410aa50ab9a6880b901ef5fcb94a67ed3bac",
-   "bytes": 144211
+   "sha256": "61e3dafcdbbd06826a2da0edc15c721bb3f3901de743ca6018fe74a9910d8ce5",
+   "bytes": 144108
   },
   "published/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1060,8 +1060,8 @@
    ""
   ],
   "published/bundle.zip": {
-   "sha256": "c4532b8aff91600d313a590a0a8f410691c2e784d4e692323ea9a8a47b1d96ab",
-   "bytes": 144306
+   "sha256": "53325ac13bf532b0cbcc64c6b084b9f08f73286ea5642188bb7dcb4a75dc6869",
+   "bytes": 144203
   },
   "published/manifest.json": [
    "{",
@@ -1076,10 +1076,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 140672,",
+   " \"bytes\": 140569,",
    " \"files\": {",
    "  \"README.md\": \"fb3d38898e893f4588356c9f5015eca9d468bcd5f12881be5ac63effc32759cf\",",
-   "  \"page.html\": \"4b7068d064a10648cedb13aa5060df7dce7e839cb0c822fc81985075ced793d3\",",
+   "  \"page.html\": \"b5c207601760e73e53eba1c8d22bc0ba804b2ecf5eb67fd585c3019615a3e8c4\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
@@ -1122,8 +1122,8 @@
    ""
   ],
   "published/page.html": {
-   "sha256": "4b7068d064a10648cedb13aa5060df7dce7e839cb0c822fc81985075ced793d3",
-   "bytes": 125270
+   "sha256": "b5c207601760e73e53eba1c8d22bc0ba804b2ecf5eb67fd585c3019615a3e8c4",
+   "bytes": 125167
   },
   "published/record/.rb/.gitattributes": [
    "* -text",
@@ -1479,8 +1479,8 @@
    ""
   ],
   "rb-export.zip": {
-   "sha256": "ae432bf80f54851df9773549586a7d99cdddc56ec36336aa557e04bfb770aa79",
-   "bytes": 121600
+   "sha256": "f4abd37d2290b04d970374f54adbe159a6d3b0a1250741fd7b31e4456c988f3a",
+   "bytes": 121497
   },
   "rb-export/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1553,10 +1553,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 135795,",
+   " \"bytes\": 135692,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"510cffc727aab1936c861d0c338ec1c77f82100b17f20d17217a925295b78662\",",
+   "  \"page.html\": \"5ff4f4e02c8c331aff3d4786533e4a77134c92aaa98d4d077de522ad610c8392\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
@@ -1591,8 +1591,8 @@
    ""
   ],
   "rb-export/page.html": {
-   "sha256": "510cffc727aab1936c861d0c338ec1c77f82100b17f20d17217a925295b78662",
-   "bytes": 120492
+   "sha256": "5ff4f4e02c8c331aff3d4786533e4a77134c92aaa98d4d077de522ad610c8392",
+   "bytes": 120389
   },
   "rb-export/record/.rb/.gitattributes": [
    "* -text",

@@ -24,6 +24,13 @@ pub(crate) fn item(items: &mut Vec<Dict>, who: &str, code: &str, subject: &str, 
 
 /// Where a run was read from a row, the row as a key: its database and table, and its rowid, or the key it was read by.
 pub fn row_key(r: &Run) -> Option<(String, String)> {
+    // a row of a CSV, TSV or JSON Lines table: told by its own cells (row_sha256), named by its file and line
+    if let Some(t) = r.receipt.extra.get("table_row").filter(|t| r.receipt.row.is_none() && t.get("row_sha256").is_some()) {
+        let path = t.get("path").map(crate::pyjson::py_str).unwrap_or_default();
+        let line = t.get("line").map(crate::pyjson::py_str).unwrap_or_default();
+        // its line too: two rows whose cells differ only in their numbers are two rows here
+        return Some((format!("{path}:{line}#{}", t.get("row_sha256").map(crate::pyjson::py_str).unwrap_or_default()), format!("{path}, line {line}")));
+    }
     let row = r.receipt.row.as_ref()?;
     let id = match row.rowid {
         Some(n) => format!("rowid {n}"),
@@ -948,8 +955,14 @@ impl Ledger {
         let mut items: Vec<Dict> = Vec::new();
         let mut tally: IndexMap<String, i64> = IndexMap::new();
         let mut results: IndexMap<String, i64> = IndexMap::new();
+        // of the rules met, those met on the estimate alone: no interval, or one that crosses the rule's line
+        let mut qualified: IndexMap<String, i64> = IndexMap::new();
         for f in findings.values() {
-            *tally.entry(assess::rule_word(&f.rule_outcome, &f.role, &f.origin)).or_insert(0) += 1;
+            let word = assess::rule_word(&f.rule_outcome, &f.role, &f.origin);
+            if on_estimate_alone(f) {
+                *qualified.entry(word.clone()).or_insert(0) += 1;
+            }
+            *tally.entry(word).or_insert(0) += 1;
             *results.entry(f.result.clone()).or_insert(0) += 1;
         }
         let mut gate: IndexMap<String, bool> = GATES.iter().map(|g| (g.to_string(), false)).collect();
@@ -1227,7 +1240,7 @@ impl Ledger {
                 let typed = f.observations.iter().find(|o| o.basis == "typed" && o.produced_basis == "unknown");
                 let do_ = match typed {
                     Some(o) => format!(
-                        "rb run add {} <the same numbers> --produced-at <when> --replaces {} --why \"<when they were made>\"   (numbers typed with no time are of a time nobody knows)",
+                        "rb run add {} <the same numbers and per-run values> --produced-at <when> --replaces {} --why \"<when they were made>\"   (numbers typed with no time are of a time nobody knows)",
                         c.experiment, o.run
                     ),
                     None => format!("{hint}   (evidence with a known production time reads prospectively)"),
@@ -1943,7 +1956,7 @@ impl Ledger {
                 "analysis_count" => analyses.iter().filter(|a| a.retracted.is_none()).count(), "resource_count" => resources.len(), "decision_count" => decisions.len(),
                 "pending_count" => pending_rows.len(), "design_pending_count" => designs_pending.len()
             },
-            "tally" => counts(tally), "results" => counts(results),
+            "tally" => counts(tally), "tally_on_estimate" => counts(qualified), "results" => counts(results),
             "findings" => {
                 let mut rows = Vec::new();
                 for f in findings.values() {
@@ -2097,9 +2110,15 @@ pub fn call_reason(code: &str, what: &str, on: Option<(&Criterion, &Finding)>) -
     let caveat = |code: &str| f.caveats.iter().find(|x| x.code == code);
     let straddles = || if caveat("straddles").is_some() { super::findings::STRADDLES.to_string() } else { String::new() };
     if let Some(first) = f.integrity.first() {
-        let phrase = crate::surface::reason(&first.code).map(str::to_string).unwrap_or_else(|| first.text.clone());
-        let more = if f.integrity.len() > 1 { format!(" and {} more", f.integrity.len() - 1) } else { String::new() };
-        return r("Integrity problem", phrase + &more, String::new());
+        // every problem's phrase, never "and 1 more": a page's reader has no rb show to open
+        let mut phrases: Vec<String> = Vec::new();
+        for p in std::iter::once(first).chain(f.integrity.iter().skip(1)) {
+            let phrase = crate::surface::reason(&p.code).map(str::to_string).unwrap_or_else(|| p.text.clone());
+            if !phrases.contains(&phrase) {
+                phrases.push(phrase);
+            }
+        }
+        return r("Integrity problem", phrases.join("; "), String::new());
     }
     // rb asks for a call on an undetermined rule only for a reason other than its units, interval or direction
     if f.rule_outcome == "undetermined" {
@@ -2194,7 +2213,7 @@ pub fn open_head(code: &str) -> (&'static str, &'static str) {
         "file_run_time_unknown" => "Result files from a run whose time is unknown",
         "writer_words" => "Text that says who wrote it",
         "attributed_words" => "Text that names the user or the chat as its source",
-        "row_in_several_experiments" => "Database rows read in more than one experiment",
+        "row_in_several_experiments" => "Table and database rows read in more than one experiment",
         "drift" => "Locked experiments that no longer match their lock",
         "edited_outside_rb" => "Records changed outside rb",
         "merged_outside_rb" => "Records a merge changed",
@@ -2222,4 +2241,11 @@ fn count_said(units: usize, runs: usize, unit: &str) -> String {
         n if runs > n => format!("{runs} runs as {n} {}", if n == 1 { unit.to_string() } else { plural(unit) }),
         n => format!("{n} {}", plural(unit)),
     }
+}
+
+/// Whether a rule met is met on the estimate alone: its reading has no interval, or one that crosses the rule's line
+/// (`straddles`), so the tally says it apart from the rules met across the whole interval.
+pub fn on_estimate_alone(f: &crate::record_gen::Finding) -> bool {
+    let no_interval = f.comparison.as_ref().map_or(true, |c| c.lo.is_none() || c.hi.is_none());
+    f.rule_outcome == "meets" && (f.caveats.iter().any(|c| c.code == "straddles") || no_interval)
 }

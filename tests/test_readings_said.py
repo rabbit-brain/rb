@@ -326,7 +326,11 @@ def test_the_arms_means_average_a_units_cases_as_rbs_reading_does(rb):
     first = typed(rb, "top1=76.4", "--variant", "fp32", seed=3)
     typed(rb, "top1=76.0", "--variant", "fp32", "--repeats", first, seed=3)
     typed(rb, "top1=77.2", "--variant", "fp32", "--again", "--why", "a second execution", seed=3)
-    assert "(int8 over 2, fp32 over 3), which is -0.6 here" in not_comparable(rb, crit)
+    # the paired -0.4 and the means' -0.6 both miss -0.5 ± 0.05: the rule is judged, with the means said beside it
+    f = rb("show", crit).data["finding"]
+    assert f["rule_outcome"] == "misses" and not [p for p in f["integrity"] if p["code"] == "not_comparable"]
+    [said] = [c["text"] for c in f["caveats"] if c["code"] == "cited_differs"]
+    assert "(int8 over 2, fp32 over 3), which is -0.6000 here" in said
 
 
 def test_a_cited_difference_a_clone_brought_is_not_comparable_either(rb, tmp_path):
@@ -366,3 +370,44 @@ def test_a_call_on_an_undetermined_rule_is_said_as_unjudged_and_a_cited_value_is
     rb("page", "--out", "page.html")
     page = " ".join(re.sub(r"<[^>]+>", " ", Path(rb.root, "page.html").read_text(encoding="utf-8")).split())
     assert f"accepted {crit} while rb cannot judge its rule (criterion undetermined)" in page and "against its rule (criterion undetermined)" not in page
+
+
+def test_a_direction_cited_by_its_words_compares_nothing_and_reads_as_its_rule_says(rb):
+    """A file says INT8 is worse on every set, with no number: over unequal seeds the paired reading and the difference
+    of the means are both below 0, and nothing is compared, so the rule is judged, never "not comparable"."""
+    Path(rb.root, "notes.md").write_text("INT8 is worse than FP32 on every set.\n", encoding="utf-8")
+    rb("experiment", "add", "INT8 against FP32", "--id", "int8", "--purpose", "the note's claim", "--baseline", "fp32", "--candidate", "int8")
+    rb("spec", "set", "int8", "seed", "--per-run")
+    crit = rb("criterion", "add", "INT8 is worse than FP32", "-e", "int8", "--metric", "change.top1", "--at-most", "0",
+              "--source", "notes.md", "--quote", "INT8 is worse than FP32 on every set").data["object"]["id"]
+    for variant, seed, top1 in [("fp32", 1, 76.0), ("fp32", 2, 76.2), ("fp32", 3, 76.4), ("int8", 1, 75.5), ("int8", 2, 75.9)]:
+        rb("run", "add", "int8", f"top1={top1}", "--variant", variant, "--set", f"seed={seed}", "--produced-at", "2030-01-01T00:00:00Z")
+    f = rb("show", crit).data["finding"]
+    assert f["rule_outcome"] == "meets" and not [p for p in f["integrity"] if p["code"] == "not_comparable"], f
+
+
+def test_a_cited_number_both_readings_meet_is_judged_with_the_difference_said_beside_it(rb):
+    Path(rb.root, "paper.md").write_text("INT8 changes top-1 by -0.45 points against FP32.\n", encoding="utf-8")
+    rb("experiment", "add", "INT8 reproduced", "--id", "int8", "--purpose", "the paper's number", "--baseline", "fp32", "--candidate", "int8")
+    rb("spec", "set", "int8", "seed", "--per-run")
+    crit = rb("criterion", "add", "The paper's -0.45 top-1", "-e", "int8", "--metric", "change.top1", "--equals", "-0.45", "--tolerance", "0.1",
+              "--source", "paper.md", "--quote", "by -0.45 points", "--locator", "line 1").data["object"]["id"]
+    for variant, seed, top1 in [("fp32", 1, 76.0), ("fp32", 2, 76.2), ("fp32", 3, 76.4), ("int8", 1, 75.5), ("int8", 2, 75.9)]:
+        rb("run", "add", "int8", f"top1={top1}", "--variant", variant, "--set", f"seed={seed}", "--produced-at", "2030-01-01T00:00:00Z")
+    f = rb("show", crit).data["finding"]
+    assert f["rule_outcome"] == "meets" and not [p for p in f["integrity"] if p["code"] == "not_comparable"], f
+    assert [c for c in f["caveats"] if c["code"] == "cited_differs"]
+
+
+def test_a_zero_the_cited_words_state_is_a_number_the_reading_can_miss(rb):
+    """The paper says the change is at least 0 points: a stated 0 is compared as a number is, and where the paired reading
+    and the arms' means fall on either side of it the rule is not comparable."""
+    Path(rb.root, "paper.md").write_text("The change is at least 0 points.\n", encoding="utf-8")
+    rb("experiment", "add", "INT8 reproduced", "--id", "int8", "--purpose", "the paper's number", "--baseline", "fp32", "--candidate", "int8")
+    rb("spec", "set", "int8", "seed", "--per-run")
+    crit = rb("criterion", "add", "The change is at least 0", "-e", "int8", "--metric", "change.top1", "--at-least", "0",
+              "--source", "paper.md", "--quote", "at least 0 points").data["object"]["id"]
+    for variant, seed, top1 in [("fp32", 1, 76.0), ("fp32", 2, 76.0), ("fp32", 3, 90.0), ("int8", 1, 77.0), ("int8", 2, 77.0)]:
+        rb("run", "add", "int8", f"top1={top1}", "--variant", variant, "--set", f"seed={seed}", "--produced-at", "2030-01-01T00:00:00Z")
+    f = rb("show", crit).data["finding"]
+    assert f["rule_outcome"] == "undetermined" and [p for p in f["integrity"] if p["code"] == "not_comparable"], f["says"]

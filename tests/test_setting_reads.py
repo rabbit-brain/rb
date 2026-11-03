@@ -60,6 +60,11 @@ class Rec:
         assert r.returncode in (0, 1), (argv, r.stdout, r.stderr)
         return r.stdout
 
+    def reread(self, run: str, *numbers: str) -> str:
+        """The run recorded again under the spec as it is now, as rb says a run recorded before a setting is read."""
+        produced = next(r for r in self.ok("status")["data"]["runs"] if r["id"] == run)["produced_at"]
+        return self.ok("run", "add", "prec", *numbers, "--produced-at", produced, "--replaces", run, "--why", "read under the setting")["data"]["object"]["id"]
+
     def finding(self, cid: str) -> dict:
         return next(f for f in self.ok("status")["data"]["findings"] if f["criterion"] == cid)
 
@@ -146,11 +151,15 @@ def test_a_file_postdates_only_the_runs_a_finding_reads_and_a_write_says_so_at_o
     rec.ok("criterion", "add", "FP16 reaches 0.75 top-1", "-e", "prec", "--metric", "top1", "--subject", "fp16", "--at-least", "0.75",
            "--id", "c-fp16-level")
     may = rec.ok("run", "add", "prec", "fp32.top1=0.761", "int8.top1=0.755", "--produced-at", "2026-05-20T10:00:00Z")["data"]["object"]["id"]
-    rec.ok("run", "add", "prec", "fp32.top1=0.762", "fp16.top1=0.760", "--produced-at", "2026-07-02T10:00:00Z")
+    july = rec.ok("run", "add", "prec", "fp32.top1=0.762", "fp16.top1=0.760", "--produced-at", "2026-07-02T10:00:00Z")["data"]["object"]["id"]
     rec.write("docs/report.md", "# Report\n\nWe trained for 90 epochs.\n", when=JUNE)
     said = f"epochs is provisional: docs/report.md has no commit from before run {may} was produced (2026-05-20): the file postdates the run"
     env = rec.ok("spec", "set", "prec", "epochs", "90", "--source", "docs/report.md:3", "--quote", "for 90 epochs", "--term", "epochs")
     assert said in env["data"]["warnings"]
+    # a finding dates it against the runs it counts: recorded again under the setting, the May run is one
+    may2 = rec.reread(may, "fp32.top1=0.761", "int8.top1=0.755")
+    rec.reread(july, "fp32.top1=0.762", "fp16.top1=0.760")
+    said = said.replace(may, may2)
     notes = lambda cid: [c["text"] for c in rec.finding(cid)["caveats"] if c["code"] == "source_postdates_run"]
     assert notes("c-int8") == [said]
     assert notes("c-fp16-level") == []                    # it reads the July run alone, made after the June commit
@@ -171,6 +180,8 @@ def test_a_setting_verified_at_a_commit_made_after_a_past_run_is_said_to_postdat
             "the file postdates the run")
     env = rec.ok("spec", "set", "prec", "epochs", "90", "--source", "sweep/train.py:1", "--commit", june_commit[:7], "--term", "EPOCHS")
     assert env["data"]["object"]["status"] == "verified" and said in env["data"]["warnings"]
+    again = rec.reread(run, "fp32.top1=0.761", "int8.top1=0.755")
+    said = said.replace(run, again)
     notes = lambda cid: [c["text"] for c in rec.finding(cid)["caveats"] if c["code"] == "source_postdates_run"]
     assert notes("c-int8") == [said]
     env = rec.ok("spec", "set", "prec", "epochs", "90", "--source", "sweep/train.py:1", "--commit", may_commit[:7], "--term", "EPOCHS")
@@ -249,8 +260,9 @@ def test_the_users_vouch_for_a_setting_only_a_postdating_line_states_shows_as_an
     it was accepted and then shown on no screen. It reads as a vouch for a stored provisional setting does, in place of
     the postdates note."""
     rec.write("docs/report.md", "# Report\n\nWe trained for 90 epochs.\n", when=JUNE)
-    rec.ok("run", "add", "prec", "fp32.top1=0.761", "int8.top1=0.755", "--produced-at", "2026-05-20T10:00:00Z")
+    run = rec.ok("run", "add", "prec", "fp32.top1=0.761", "int8.top1=0.755", "--produced-at", "2026-05-20T10:00:00Z")["data"]["object"]["id"]
     rec.ok("spec", "set", "prec", "epochs", "90", "--source", "docs/report.md:3", "--quote", "for 90 epochs", "--term", "epochs")
+    rec.reread(run, "fp32.top1=0.761", "int8.top1=0.755")
     assert "postdates the run" in rec.text("show", "prec")
     rec.ok("decide", "prec/epochs", "accept", "--why", "we trained for 90 epochs")
     shown = rec.text("show", "prec")
@@ -273,11 +285,14 @@ def test_a_setting_read_from_the_working_tree_is_as_old_as_its_line_and_a_run_ad
     said = lambda run, day: f"lr is provisional: sweep/train.py:2 was last changed at {june}, committed 2026-06-01, after run {run} was produced ({day}): the line postdates the run"
     env = rec.ok("spec", "set", "prec", "lr", "0.2", "--source", "sweep/train.py:2", "--term", "LR")
     assert env["data"]["object"]["status"] == "verified" and said(first, "2026-05-20") in env["data"]["warnings"], env["data"].get("warnings")
+    first = rec.reread(first, "fp32.top1=0.761", "int8.top1=0.755")
     notes = lambda cid: [c["text"] for c in rec.finding(cid)["caveats"] if c["code"] == "source_postdates_run"]
     assert notes("c-int8") == [said(first, "2026-05-20")]
     # a line no commit after the run changed says nothing of the kind
     env = rec.ok("spec", "set", "prec", "epochs", "90", "--source", "sweep/train.py:1", "--term", "EPOCHS")
-    assert not [w for w in env["data"].get("warnings", []) if "postdates" in w] and notes("c-int8") == [said(first, "2026-05-20")]
+    assert not [w for w in env["data"].get("warnings", []) if "postdates" in w]
+    first = rec.reread(first, "fp32.top1=0.761", "int8.top1=0.755")
+    assert notes("c-int8") == [said(first, "2026-05-20")]
     # a run recorded under the setting says it at the write; one made after the line changed does not
     env = rec.ok("run", "add", "prec", "fp32.top1=0.760", "int8.top1=0.754", "--produced-at", "2026-05-21T10:00:00Z")
     second = env["data"]["object"]["id"]

@@ -11,7 +11,7 @@ use crate::ledger::Ledger;
 use crate::record::{Analysis, Criterion, Decision, Experiment, Run};
 use crate::value::{Dict, DictExt, Value};
 use indexmap::IndexMap;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// The longest pause between two writes of one sitting.
 pub const GAP_SECONDS: i64 = 5 * 60;
@@ -235,7 +235,20 @@ fn named_apart(led: &Ledger, rows: &[Dict]) -> Res<(HashMap<String, String>, Has
     let mut times: Vec<(String, String)> = runs.iter().map(|r| (r.id.clone(), if r.receipt.at.is_empty() { r.created_at.clone() } else { r.receipt.at.clone() })).collect();
     times.sort_by_key(|(id, _)| seq.get(id).copied().unwrap_or(usize::MAX));
     let times: IndexMap<String, String> = times.into_iter().collect();
-    let mut names = twins_told_apart(&said, &times);
+    // where each run's numbers came from: a row of a table, else the file it was read from
+    let places: IndexMap<String, String> = runs
+        .iter()
+        .filter_map(|r| {
+            if let Some(t) = r.receipt.extra.get("table_row") {
+                return Some((r.id.clone(), format!("{}, line {}", t.get("path").map(crate::pyjson::py_str).unwrap_or_default(), t.get("line").map(crate::pyjson::py_str).unwrap_or_default())));
+            }
+            if let Some(row) = &r.receipt.row {
+                return Some((r.id.clone(), format!("{}, {}", row.path, row.table)));
+            }
+            r.files.first().map(|f| (r.id.clone(), f.path.clone()))
+        })
+        .collect();
+    let mut names = twins_told_apart_by(&said, &times, &places);
     let mut bases: HashMap<String, String> = said.iter().filter(|(id, w)| names.get(*id) != Some(*w)).map(|(id, w)| (id.clone(), w.clone())).collect();
     for a in led.all::<Analysis>()?.iter().filter(|a| minted_id(&a.id, "a")) {
         // one with no title is said by its experiment and when it was recorded
@@ -285,7 +298,29 @@ fn is_minute(t: &str) -> bool {
 
 /// Each run's words (`said`), with a run whose words another's share told apart by when it was recorded (`times`, in
 /// the order the log recorded them).
+#[cfg(test)]
 fn twins_told_apart(said: &IndexMap<String, String>, times: &IndexMap<String, String>) -> HashMap<String, String> {
+    twins_told_apart_by(said, times, &IndexMap::new())
+}
+
+/// The same, a run told apart first by where its numbers came from (`places`): its results folder where the twins'
+/// folders differ (results/r012_plain_s0/), else its file or row, and by when it was recorded only where those do not
+/// tell them apart.
+fn twins_told_apart_by(said: &IndexMap<String, String>, times: &IndexMap<String, String>, places: &IndexMap<String, String>) -> HashMap<String, String> {
+    let folder = |p: &str| p.rsplit_once('/').map(|(d, _)| format!("{d}/")).unwrap_or_default();
+    let mut by_place: HashMap<String, String> = HashMap::new();
+    for (id, words) in said {
+        let twins: Vec<&String> = said.iter().filter(|(_, w)| *w == words).map(|(k, _)| k).collect();
+        if twins.len() < 2 || !twins.iter().all(|k| places.contains_key(k.as_str())) {
+            continue;
+        }
+        let distinct = |f: &dyn Fn(&str) -> String| twins.iter().map(|k| f(&places[k.as_str()])).collect::<HashSet<_>>().len() == twins.len();
+        if distinct(&|p| folder(p)) && !folder(&places[id.as_str()]).is_empty() {
+            by_place.insert(id.clone(), format!("{words}, from {}", folder(&places[id.as_str()])));
+        } else if distinct(&|p| p.to_string()) {
+            by_place.insert(id.clone(), format!("{words}, from {}", places[id.as_str()]));
+        }
+    }
     let at = |k: &str| times.get(k).cloned().unwrap_or_default();
     let to_minute = |k: &str| minute(&at(k));
     let to_second = |k: &str| match crate::pytime::parse_iso(&at(k)) {
@@ -294,6 +329,10 @@ fn twins_told_apart(said: &IndexMap<String, String>, times: &IndexMap<String, St
     };
     let mut out = HashMap::new();
     for (id, words) in said {
+        if let Some(w) = by_place.get(id) {
+            out.insert(id.clone(), w.clone());
+            continue;
+        }
         let twins: Vec<&String> = said.iter().filter(|(_, w)| *w == words).map(|(k, _)| k).collect();
         if twins.len() < 2 {
             out.insert(id.clone(), words.clone());
@@ -801,6 +840,16 @@ fn amendment_said(exp: &str, change: &str) -> String {
     change.to_string()
 }
 
+/// A filing's note on what rule `id` means for question `q`: cleared where its words are empty, else added, and not
+/// confirmed unless it is the user's (they declared it, or their confirmation of the design covers it as it reads now).
+fn interpretation_said(id: &str, q: &str, when_met: &str, row: &Dict, f: &Facts) -> String {
+    if when_met.is_empty() {
+        return format!("Cleared the note on what rule {id} means for {q}");
+    }
+    let theirs = crate::view::words_are_theirs(row.get_str("actor").unwrap_or("")) || f.owned_links.get(&(id.to_string(), q.to_string())).map(String::as_str) == Some(when_met);
+    format!("Added a note on what rule {id} means for {q}{}", if theirs { "" } else { ", not confirmed" })
+}
+
 /// One write, told, with the voice of its reason: a call's as rb's call lines say it (`call_said`), any other write's as
 /// rb log says a write's reason (`view::why_part` of its writer), the user's own as their why and a session's as its note.
 fn said(i: usize, row: &Dict, f: &Facts) -> Said {
@@ -832,7 +881,19 @@ fn write_said(i: usize, row: &Dict, f: &Facts) -> Said {
         if id != exp {
             refs.push(id.clone());
         }
-        let mut s = Said::new(Kind::Amended, &exp, &change, format!("Amended {exp} after locking it: {change}"), refs, a.get_str("why").unwrap_or(""));
+        // an interpretation filed on a locked experiment keeps its own sentence after the change, and links its question
+        let mut one = format!("Amended {exp} after locking it: {change}");
+        if let ("file", "criterion", Some(Value::Str(_))) = (op, kind, d.get("when_met")) {
+            let q = text("question");
+            let note = interpretation_said(&id, &q, &text("when_met"), row, f);
+            let mut c = note.chars();
+            let note: String = c.next().map(|x| x.to_lowercase().chain(c).collect()).unwrap_or_default();
+            one = format!("{one}, and {note}");
+            if !q.is_empty() && !refs.contains(&q) {
+                refs.push(q);
+            }
+        }
+        let mut s = Said::new(Kind::Amended, &exp, &change, one, refs, a.get_str("why").unwrap_or(""));
         s.on = exp;
         return s;
     }
@@ -1009,14 +1070,7 @@ fn write_said(i: usize, row: &Dict, f: &Facts) -> Said {
         }
         ("file", "criterion") if matches!(d.get("when_met"), Some(Value::Str(_))) => {
             let q = text("question");
-            let when_met = text("when_met");
-            let one = if when_met.is_empty() {
-                format!("Cleared the note on what rule {id} means for {q}")
-            } else {
-                // as the user's where they declared it, or their confirmation of the design covers it as it reads now
-                let theirs = crate::view::words_are_theirs(row.get_str("actor").unwrap_or("")) || f.owned_links.get(&(id.clone(), q.clone())) == Some(&when_met);
-                format!("Added a note on what rule {id} means for {q}{}", if theirs { "" } else { ", not confirmed" })
-            };
+            let one = interpretation_said(&id, &q, &text("when_met"), row, f);
             Said::new(Kind::Interpretation, &alone, "", one, vec![id.clone(), q], &why)
         }
         ("file", _) => {
@@ -1629,6 +1683,38 @@ mod tests {
     }
 
     #[test]
+    fn an_interpretation_filed_on_a_locked_experiment_keeps_its_sentence() {
+        // the amendment rb writes as two lines, the experiment's and the filing's, is one line that says what the rule
+        // means for the question, not confirmed while a session's, and links the question
+        let (ana, cc) = ("human:ana", "agent:claude-code");
+        let am = |c: &str, q: &str| crate::obj! {"change" => format!("criterion {c}: file under question {q}"), "why" => "only the 128-image cell misses"};
+        let filing = |secs, actor, sess, c: &str, q: &str, when_met: &str| {
+            vec![
+                line_at(secs, actor, sess, "cli", "amend", "experiment", "e2", crate::obj! {"amendment" => am(c, q)}),
+                line_at(secs, actor, sess, "cli", "file", "criterion", c, crate::obj! {"question" => q, "when_met" => when_met, "why" => "only the 128-image cell misses", "amendment" => am(c, q)}),
+            ]
+        };
+        let mut rows = filing(0, cc, "sess-a", "c5", "q1a", "512 images are enough");
+        rows.extend(filing(600, ana, "", "c6", "q1a", "512 images are enough"));
+        rows.extend(filing(1200, ana, "", "c7", "q1a", ""));
+        let mut f = Facts::default();
+        for c in ["c5", "c6", "c7"] {
+            f.experiment_of.insert(c.into(), "e2".into());
+        }
+        let h = told(&rows, &f);
+        let got: Vec<(String, Vec<String>)> = h.sittings.iter().rev().flat_map(|s| s.lines.iter()).map(|l| (l.sentence.clone(), l.refs.clone())).collect();
+        let refs = |c: &str| vec!["e2".to_string(), c.to_string(), "q1a".to_string()];
+        assert_eq!(
+            got,
+            vec![
+                ("Amended e2 after locking it: filed rule c5 under q1a, and added a note on what rule c5 means for q1a, not confirmed".to_string(), refs("c5")),
+                ("Amended e2 after locking it: filed rule c6 under q1a, and added a note on what rule c6 means for q1a".to_string(), refs("c6")),
+                ("Amended e2 after locking it: filed rule c7 under q1a, and cleared the note on what rule c7 means for q1a".to_string(), refs("c7")),
+            ]
+        );
+    }
+
+    #[test]
     fn a_sessions_reason_is_its_note() {
         // the reason a write gave reads in its voice: the user's own as their why, a session's as its note, for every
         // kind of write that gives one; two writes of one kind with the same words, one the user's and one a session's,
@@ -2158,9 +2244,9 @@ mod tests {
     /// example's own history.log, its runs' labels and times, its experiments' titles and its calls from the example's
     /// records, and what rb's log line holds beyond what the example shows (an op, a detail, who wrote it) from this
     /// table. History told from it is what the examples must hold, so they cannot drift from what rb writes. One row
-    /// stands for each write the example's log lists: an amendment that adds a rule is its criterion's row, where rb also
-    /// writes the experiment's, since the example's log counts it once. Facts are made here, not read from a ledger by
-    /// Facts::of and named_apart, which the tests over a real record above cover.
+    /// stands for each write the example's log lists, as rb writes them: a change to a locked experiment is two rows, the
+    /// experiment's amendment and then the criterion's own write, and every filing carries its why. Facts are made
+    /// here, not read from a ledger by Facts::of and named_apart, which the tests over a real record above cover.
     fn example_history(v: &Value) -> History {
         let (ana, helper) = ("human:ana", "agent:helper");
         let amend = |change: &str, why: &str| crate::obj! {"change" => change, "why" => why};
@@ -2172,9 +2258,9 @@ mod tests {
             (ana, "add", "criterion", "c1", crate::obj! {"experiment" => "e1"}),
             (ana, "add", "criterion", "c3", crate::obj! {"experiment" => "e1"}),
             (ana, "add", "criterion", "c4", crate::obj! {"experiment" => "e1"}),
-            (ana, "file", "criterion", "c1", crate::obj! {"question" => "q1"}),
-            (ana, "file", "criterion", "c3", crate::obj! {"question" => "q1"}),
-            (ana, "file", "criterion", "c4", crate::obj! {"question" => "q1"}),
+            (ana, "file", "criterion", "c1", crate::obj! {"question" => "q1", "why" => "q1 is read by these rules"}),
+            (ana, "file", "criterion", "c3", crate::obj! {"question" => "q1", "why" => "q1 is read by these rules"}),
+            (ana, "file", "criterion", "c4", crate::obj! {"question" => "q1", "why" => "q1 is read by these rules"}),
             (ana, "add", "resource", "imagenet-val", crate::obj! {}),
             (ana, "add", "resource", "imagenet-calib-512", crate::obj! {}),
             (ana, "add", "resource", "resnet50-fp32", crate::obj! {}),
@@ -2183,7 +2269,8 @@ mod tests {
             (ana, "record", "run", "runs1", crate::obj! {"experiment" => "e1"}),
             (ana, "record", "run", "runs2", crate::obj! {"experiment" => "e1"}),
             (ana, "record", "run", "runsql7", crate::obj! {"experiment" => "e1"}),
-            (ana, "add", "criterion", "c6", crate::obj! {"experiment" => "e1", "amendment" => amend("new criterion c6: onnx_top1", "")}),
+            (ana, "amend", "experiment", "e1", crate::obj! {"amendment" => amend("new criterion c6: ratio.latency_ms ≤ 0.6", "latency is why int8 ships")}),
+            (ana, "add", "criterion", "c6", crate::obj! {"experiment" => "e1", "why" => "latency is why int8 ships", "amendment" => amend("new criterion c6: ratio.latency_ms ≤ 0.6", "latency is why int8 ships")}),
             (ana, "retract", "run", "runs2", crate::obj! {"why" => "evaluated on the train split"}),
             (ana, "record", "run", "runs2b", crate::obj! {"experiment" => "e1", "replaces" => "runs2"}),
             (ana, "add", "question", "q1a", crate::obj! {"parent" => "q1"}),
@@ -2192,7 +2279,7 @@ mod tests {
             (ana, "add", "criterion", "c5", crate::obj! {"experiment" => "e2"}),
             (ana, "gate", "experiment", "e2", crate::obj! {"if_holds" => "ship int8 calibrated on 512 images", "if_not" => "keep fp32 for serving"}),
             (ana, "file", "experiment", "e2", crate::obj! {"question" => "q1a"}),
-            (ana, "file", "criterion", "c5", crate::obj! {"question" => "q1a"}),
+            (ana, "file", "criterion", "c5", crate::obj! {"question" => "q1a", "why" => "q1a asks for the smallest size that holds"}),
             (ana, "freeze", "experiment", "e2", crate::obj! {}),
             (ana, "record", "run", "runc128", crate::obj! {"experiment" => "e2"}),
             (ana, "record", "run", "runc512", crate::obj! {"experiment" => "e2"}),
@@ -2200,16 +2287,20 @@ mod tests {
             (ana, "record", "run", "runc2048", crate::obj! {"experiment" => "e2"}),
             (ana, "record", "run", "runs3", crate::obj! {"experiment" => "e1"}),
             (ana, "analyze", "analysis", "a1", crate::obj! {"experiment" => "e1"}),
-            (ana, "add", "criterion", "c2", crate::obj! {"experiment" => "e1", "amendment" => amend("new criterion c2: fp32.top1", "")}),
-            (ana, "file", "criterion", "c2", crate::obj! {"question" => "q1"}),
+            (ana, "amend", "experiment", "e1", crate::obj! {"amendment" => amend("new criterion c2: fp32.top1 = 0.7613 ± 0.001", "the baseline must match the paper")}),
+            (ana, "add", "criterion", "c2", crate::obj! {"experiment" => "e1", "why" => "the baseline must match the paper", "amendment" => amend("new criterion c2: fp32.top1 = 0.7613 ± 0.001", "the baseline must match the paper")}),
+            (ana, "amend", "experiment", "e1", crate::obj! {"amendment" => amend("criterion c2: file under question q1", "q1 is read against a baseline that matches")}),
+            (ana, "file", "criterion", "c2", crate::obj! {"question" => "q1", "why" => "q1 is read against a baseline that matches", "amendment" => amend("criterion c2: file under question q1", "q1 is read against a baseline that matches")}),
             (ana, "decide", "decision", "dec1", crate::obj! {"subject" => "c1"}),
             (helper, "decide", "decision", "dec5", crate::obj! {"subject" => "c4"}),
             (ana, "decide", "decision", "dec6", crate::obj! {"subject" => "c4", "confirms" => "dec5"}),
-            (ana, "file", "criterion", "c4", crate::obj! {"question" => "q1", "when_met" => "int8 serves within the accuracy budget", "why" => "c1 and c4 hold on three seeds"}),
+            (ana, "amend", "experiment", "e1", crate::obj! {"amendment" => amend("criterion c4: file under question q1", "c1 and c4 hold on three seeds")}),
+            (ana, "file", "criterion", "c4", crate::obj! {"question" => "q1", "when_met" => "int8 serves within the accuracy budget", "why" => "c1 and c4 hold on three seeds", "amendment" => amend("criterion c4: file under question q1", "c1 and c4 hold on three seeds")}),
             (ana, "note", "experiment", "e1", crate::obj! {"note" => "n1"}),
-            (ana, "amend", "experiment", "e1", crate::obj! {"amendment" => amend("hypothesis", "")}),
+            (ana, "amend", "experiment", "e1", crate::obj! {"amendment" => amend("hypothesis", "the budget is half a point")}),
             (ana, "amend", "experiment", "e2", crate::obj! {"amendment" => amend("unit run -> calib_images", "the cells are the unit")}),
-            (helper, "file", "criterion", "c5", crate::obj! {"question" => "q1a", "when_met" => "512 images are enough", "why" => "only the 128-image cell misses"}),
+            (helper, "amend", "experiment", "e2", crate::obj! {"amendment" => amend("criterion c5: file under question q1a", "only the 128-image cell misses")}),
+            (helper, "file", "criterion", "c5", crate::obj! {"question" => "q1a", "when_met" => "512 images are enough", "why" => "only the 128-image cell misses", "amendment" => amend("criterion c5: file under question q1a", "only the 128-image cell misses")}),
             (helper, "decide", "decision", "dec7", crate::obj! {"subject" => "c3"}),
             (helper, "decide", "decision", "dec4", crate::obj! {"subject" => "int8"}),
         ];

@@ -5,7 +5,7 @@
 //!   and when it is newer runs the same installer's upgrade (`uv tool upgrade`, `pipx upgrade`). The next command runs
 //!   the new rb; a screen that stays open says "✔ Update installed · Restart to update".
 //! - rb installed with pip, in a project's environment or conda: rb never touches that environment. It says one quiet
-//!   line, at most once a day: "rb 0.7.0 is out: pip install -U rabbit-brain".
+//!   line, at most once a day: "rb 0.8.0 is out: pip install -U rabbit-brain".
 //! - Neither runs in CI, in an agent session, under DO_NOT_TRACK, in the tests, or after `rb config auto-update off`.
 //!   The check sends nothing about the user (a GET of a public address), and a failed check or upgrade is silent and
 //!   changes no command's result.

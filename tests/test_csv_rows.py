@@ -117,7 +117,7 @@ def test_a_table_of_one_row_says_one_row(rb):
 def test_run_add_help_says_it_reads_a_csv_row(rb, capsys):
     code, out = rb("run", "add", "--help", text=True)
     said = " ".join(out.split())
-    assert "a CSV or TSV table with --where" in said and "with --table, or a CSV or TSV table: the row's columns" in said, said
+    assert "a CSV, TSV or JSON Lines table with --where" in said and "with --table, or a CSV, TSV or JSON Lines table: the row's columns" in said, said
 
 
 def test_a_row_picked_by_what_the_experiment_varies_names_its_variant(rb):

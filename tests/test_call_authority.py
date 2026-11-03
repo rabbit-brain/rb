@@ -1003,7 +1003,7 @@ def test_the_json_only_grows(rec):
     old = {"project", "root", "actor", "experiment_id", "counts", "tally", "results", "findings", "experiments", "runs", "analyses", "questions",
            "resources", "decisions", "retracted", "metrics", "repository", "open", "gate", "found_unrecorded", "elsewhere", "fail_on", "outcome"}
     assert old <= set(st) and set(st) - old == {"pending", "record_start", "gates_pending", "designs_pending", "scope", "uncited_changes", "found_needs",
-                                                 "witness"}
+                                                 "witness", "tally_on_estimate"}
     assert {"question_count", "experiment_count", "criterion_count", "run_count", "analysis_count", "resource_count", "decision_count"} <= set(st["counts"])
     [row] = st["decisions"]
     old_row = {"id", "subject", "action", "why", "revisit", "by", "at", "via", "session", "words", "basis", "inquiry_basis", "value", "across",

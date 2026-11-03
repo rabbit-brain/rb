@@ -230,7 +230,7 @@ def test_reproducing_here_flips_the_criterion(bundle, capsys, tmp_path_factory, 
     code, env = _rb_in(dest, "run", "add", "e1", "top1=0.81", capsys=capsys)
     assert code == 0
     findings = {f["criterion"]: f for f in env.data["findings"]}
-    assert findings["c1"]["says"]["headline"] == "reproduced · point only"      # inherited + met here = reproduced
+    assert findings["c1"]["says"]["headline"] == "reproduced on the estimate · point only"      # inherited + met here = reproduced, on one run
     code, env = _rb_in(dest, "run", "add", "e1", "top1=0.41", "--again", "--why", "a second run", capsys=capsys)
     rec = state(dest)
     st = {f["criterion"]: f for f in rec.status()["findings"]}

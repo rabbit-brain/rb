@@ -1019,7 +1019,7 @@ impl Plan {
 
 /// Whether a folder is an rb export as rb wrote it: rb's manifest, every file there as it says (one a removal stopped
 /// midway took is not missed), and no file it does not name.
-fn rb_export_as_written(dir: &Path) -> bool {
+pub(crate) fn rb_export_as_written(dir: &Path) -> bool {
     let marked = std::fs::read_to_string(dir.join("manifest.json")).ok().and_then(|t| crate::pyjson::loads(&t).ok()).map_or(false, |m| m.get("format").and_then(Value::as_str) == Some(crate::export::FORMAT));
     marked && crate::export::verify(dir).iter().all(|p| p.ends_with(": missing")) && crate::export::extra_files(dir).is_empty()
 }

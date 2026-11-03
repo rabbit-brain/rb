@@ -179,8 +179,12 @@ pub fn run_produced(r: &Run) -> Option<&str> {
 /// command rb's journal watched print them; as rb run add reads them now (the SDK's numbers come from the code that
 /// produced them).
 fn typed_untimed(r: &Run) -> bool {
-    r.basis == "typed"
-        && r.via != "sdk"
+    // the SDK's numbers recorded outside a run block (an earlier rb's run blocks kept no mark) are the same
+    // (an earlier rb's run block kept no mark, but its command: the script's own command line, which a bare
+    // exp.record() gives only where it is passed one)
+    let block = r.receipt.extra.get("block").map_or(false, |b| b.truthy()) || r.receipt.command.as_deref().map_or(false, |c| !c.is_empty());
+    let sdk_untimed = r.basis == "logged" && r.via == "sdk" && !block;
+    (r.basis == "typed" && r.via != "sdk" || sdk_untimed)
         && r.produced_basis == "recorded"
         && r.files.is_empty()
         && r.receipt.row.is_none()
@@ -1109,6 +1113,21 @@ mod tests {
         let mut sdk = d.clone();
         sdk.insert("via".into(), Value::Str("sdk".into()));
         assert_eq!(run_basis(&run(&sdk)), "recorded");
+        // the SDK's logged numbers: of unknown time outside a run block; a block rb marked, or one an earlier rb kept
+        // with the script's command line, keeps its time
+        let mut bare = sdk.clone();
+        bare.insert("basis".into(), Value::Str("logged".into()));
+        let Some(Value::Dict(rc)) = bare.get_mut("receipt") else { panic!() };
+        rc.insert("command".into(), Value::Null);
+        assert_eq!(run_basis(&run(&bare)), "unknown");
+        let mut earlier_block = bare.clone();
+        let Some(Value::Dict(rc)) = earlier_block.get_mut("receipt") else { panic!() };
+        rc.insert("command".into(), Value::Str("python eval.py".into()));
+        assert_eq!(run_basis(&run(&earlier_block)), "recorded");
+        let mut marked = bare.clone();
+        let Some(Value::Dict(rc)) = marked.get_mut("receipt") else { panic!() };
+        rc.insert("block".into(), Value::Bool(true));
+        assert_eq!(run_basis(&run(&marked)), "recorded");
     }
 
     /// rb says a run was made before it was recorded only where it knows when it was made.

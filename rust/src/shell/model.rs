@@ -1,4 +1,4 @@
-//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.11` of a record for one tier
+//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.12` of a record for one tier
 //! and place, from view::home and the per-object fields the build plan adds. It holds the fields rb computes today
 //! (M0), each object in the contract's shape and nothing outside it; the later phases add theirs. It names no writer:
 //! no actor, session, channel or "by <name>" enters it, and the Owner tier holds none of the Live tier's own values.
@@ -16,7 +16,7 @@ use crate::view::{self, ExperimentBrief, FindingLine, Home};
 use indexmap::IndexMap;
 
 /// The contract's version, as the document's `contract` names it.
-pub const CONTRACT: &str = "rb-shell-view/1.11";
+pub const CONTRACT: &str = "rb-shell-view/1.12";
 
 /// The document of `led` for `tier`, at `place` (rb open's chosen place and version; none on a page): drawn on rb open
 /// for the Live tier, on rb page for the Owner tier.
@@ -336,6 +336,7 @@ fn home_value(h: &Home, st: &Value) -> Value {
         }).collect()),
         "found_total" => h.found.len(), "unplaced" => strs(&h.unplaced), "waiting_line" => waiting_line(&h.pending, false),
         "tally" => Value::List(h.tally.iter().map(|(k, n)| crate::list![k.clone(), *n]).collect()), "muted" => strs(&h.muted),
+        "tally_on_estimate" => Value::Dict(h.tally_alone.clone()),
         "open_line" => h.open_besides.clone().unwrap_or_default(), "notes" => Value::List(notes), "quiet" => or(&h.quiet),
         "counts" => h.counts.clone(), "made" => h.made.clone(), "last_write" => crate::obj! {"at" => h.last_write.clone()},
         // the record's line as facts (WITNESS): when rb began keeping it, and how much was recorded afterwards
@@ -1185,7 +1186,9 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
             "observed" => f.observed.clone(), "observed_short" => f.observed_short.clone(),
             "observed_places" => Value::List(f.observed_places.iter().map(|(id, label)| crate::obj! {"id" => id.clone(), "label" => label.clone()}).collect()),
             "other_code" => f.other_code.clone(),
-            "witness" => found.get("witness").cloned().unwrap_or_else(|| crate::obj! {"total" => 0, "afterwards" => 0})
+            "witness" => found.get("witness").cloned().unwrap_or_else(|| crate::obj! {"total" => 0, "afterwards" => 0}),
+            // a rule met on the estimate alone, which a tally says apart (ledger/views.rs on_estimate_alone)
+            "on_estimate" => g.finding(&id).map_or(false, |(_, fd)| crate::ledger::views::on_estimate_alone(fd))
         };
         // what rb show says under the rule, in its words (says.notes): every note but the one-unit one, and a cited value
         // that differs only where no not_comparable problem says it already
@@ -1205,6 +1208,10 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
                 .unwrap_or_default();
             if !notes.is_empty() {
                 says.insert("notes".into(), Value::list_of_str(notes));
+            }
+            // every problem in full: a reader of the page has no rb show to open, so none is cut to "and 1 more"
+            if problems.len() > 1 {
+                says.insert("problems".into(), Value::list_of_str(problems.iter().map(|p| text(p, "text")).filter(|t| !t.is_empty())));
             }
         }
         if let Value::Dict(d) = &mut v {
@@ -1361,7 +1368,10 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
             let mut xs = vec![e];
             xs.extend(iv.map(|(lo, hi)| [lo, hi]).into_iter().flatten());
             // and apart from each other and from the rule's number, as the verdict says them
-            let p = said_places(&xs, c.target, &edges);
+            // and in the card's own digits (nodes::reading_digits): one reading is written one way on the page
+            let p = card_places(&xs, c.target, &edges, is_percent(&unit));
+            let decp = |x: f64, p: usize| super::nodes::fixed(x, p, false);
+            let signedp = |x: f64, p: usize| super::nodes::fixed(x, p, true);
             // the interval in brackets after its number, as every view says it (FIX4): a difference's bounds in the
             // points or units just said, a level's each with its unit
             match cited_target {
@@ -1453,7 +1463,8 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
             // in the digits the verdict says the reading in, and the unit it says a distance in (points for a percentage)
             let mut xs = vec![e];
             xs.extend(r.and_then(|r| r.lo.zip(r.hi)).map(|(lo, hi)| [lo, hi]).into_iter().flatten());
-            let said = decp(m, said_places(&xs, Some(t), &edges));
+            // and as the reading's short sentence says it (card_places): one reading, one way
+            let said = decp(m, card_places(&xs, Some(t), &edges, pct));
             let u = match () {
                 _ if ratio => String::new(),
                 _ if pct => format!(" {}", if said.trim_start_matches('-') == "1.00" { "point" } else { "points" }),
@@ -1592,6 +1603,7 @@ fn rule_places(xs: &[f64], edges: &[f64], from: usize) -> usize {
 }
 
 /// `x` with `p` decimals, its sign always said: "+0.05000004".
+#[cfg(test)]
 fn signedp(x: f64, p: usize) -> String {
     let said = decp(x, p);
     if said.starts_with('-') || said.trim_start_matches(['0', '.']).is_empty() { said } else { format!("+{said}") }
@@ -1634,6 +1646,10 @@ fn plain(arm: &str) -> String {
 /// its key: "top1" reads "Top-1"; an acronym keeps its case (FIX6), by nodes.rs's rule and word list, so every view
 /// says one title: "onnx_top1" reads "ONNX top-1", "int8_top1" "INT8 top-1".
 fn metric_said(name: &str) -> String {
+    // a name that joins words with "_" is an identifier: said as declared, never split into words (val_bpb)
+    if name.contains('_') {
+        return name.to_string();
+    }
     let topn = |t: &str| t.strip_prefix("top").filter(|d| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit())).map(|d| format!("top-{d}"));
     let word = |w: &str| {
         let low = w.to_lowercase();
@@ -1670,6 +1686,15 @@ fn said_places(xs: &[f64], target: Option<f64>, edges: &[f64]) -> usize {
     let mut ys = xs.to_vec();
     ys.extend(target);
     rule_places(xs, edges, apart(&ys))
+}
+
+/// The decimals a reading's numbers are said in on every part of the page (its card, its list sentence, its margin and
+/// the grid): `said_places`, the card's own (nodes::reading_digits: apart, the rule's digits, two significant digits of
+/// a small difference, a percentage's in two decimals).
+fn card_places(xs: &[f64], target: Option<f64>, edges: &[f64], pct: bool) -> usize {
+    let mut ys = xs.to_vec();
+    ys.extend(target);
+    said_places(xs, target, edges).max(super::nodes::decimals(&ys)).max(target.map_or(0, super::nodes::digits)).max(if pct { 2 } else { super::nodes::sig_places(xs) })
 }
 
 /// What a finding's verdict sentence is made of (`verdict`).
@@ -2789,12 +2814,12 @@ mod tests {
         assert_eq!(plain("the int8 baseline"), "the INT8 baseline");
         assert_eq!(plain("fp32_ref"), "fp32 ref");
         assert_eq!(plain("resnet50"), "resnet50");
-        assert_eq!(metric_said("onnx_top1"), "ONNX top-1");
-        assert_eq!(metric_said("int8_top1"), "INT8 top-1");
-        assert_eq!(metric_said("gpu_mfu"), "GPU MFU");
-        assert_eq!(metric_said("Calib_loss"), "Calib loss");
+        assert_eq!(metric_said("onnx_top1"), "onnx_top1", "a name joined with _ is said as declared (round 4)");
+        assert_eq!(metric_said("int8_top1"), "int8_top1");
+        assert_eq!(metric_said("gpu_mfu"), "gpu_mfu");
+        assert_eq!(metric_said("Calib_loss"), "Calib_loss");
         assert_eq!(metric_said("top1"), "Top-1");
-        assert_eq!(metric_said("latency_ms"), "Latency ms");
+        assert_eq!(metric_said("latency_ms"), "latency_ms");
     }
 
     /// DESIGN-PASS-1 P5: a sentence's numbers have 2 decimals (a small one keeps 2 significant figures, never "0"), an

@@ -1915,6 +1915,7 @@ pub fn screen_rule_word(w: &str) -> String {
         "criterion untested" => "not tested",
         "estimate meets criterion" => "estimate meets its rule",
         "recorded values meet criterion" => "recorded values meet the rule",
+        "reproduced on the estimate" => "reproduced on its estimate",
         "gate undetermined" => "gate: can't tell yet",
         "gate untested" => "gate: not tested",
         other => other,
@@ -1961,11 +1962,8 @@ pub fn finding_line(f: &Value, decided: &str) -> FindingLine {
     }
     let problems = list_of(f, "integrity");
     if !problems.is_empty() {
-        parts.push(format!(
-            "integrity: {}{}",
-            get_or(&problems[0], "text", ""),
-            if problems.len() > 1 { format!(" (and {} more)", problems.len() - 1) } else { String::new() }
-        ));
+        // every problem, never "(and 1 more)": a page's reader has no rb show to open
+        parts.push(format!("integrity: {}", problems.iter().map(|p| get_or(p, "text", "")).filter(|t| !t.is_empty()).collect::<Vec<_>>().join(" · ")));
     }
     if let Some(call) = call_said(f, decided) {
         parts.push(format!("decided: {call}"));
@@ -2494,6 +2492,8 @@ pub struct Home {
     /// Work filed under no question: its criteria, the calls on it and its open items.
     pub unfiled: Value,
     pub tally: Vec<(String, i64)>,
+    /// Of each rule word of `tally`, how many are met on the estimate alone (rb status's `tally_on_estimate`).
+    pub tally_alone: Dict,
     /// The met words of `tally` drawn without green.
     pub muted: Vec<String>,
     pub live: Vec<String>,
@@ -3072,6 +3072,7 @@ fn home_in(led: &Ledger, since_from: Option<Option<i64>>) -> Res<Home> {
             open_items: open_groups,
             unfiled,
             tally,
+            tally_alone: st.get("tally_on_estimate").and_then(Value::as_dict).map(|d| d.iter().map(|(k, v)| (k.replace('_', " "), v.clone())).collect()).unwrap_or_default(),
             muted,
             live: live_lines,
             weak_identity: weak,
@@ -3321,7 +3322,7 @@ pub fn receipt_card(run: &Run) -> Dict {
         "made_before" => crate::ledger::made_before_recorded(run),
         "config" => cfg,
         // a database row's numbers are a row's, though the record keeps `file`
-        "basis" => if run.basis == "file" && run.receipt.row.is_some() { "row".to_string() } else { run.basis.clone() }, "spec_frozen" => run.spec_frozen, "synthetic" => run.synthetic,
+        "basis" => if run.basis == "file" && (run.receipt.row.is_some() || run.receipt.extra.contains_key("table_row")) { "row".to_string() } else { run.basis.clone() }, "spec_frozen" => run.spec_frozen, "synthetic" => run.synthetic,
         "files" => Value::List(run.files.iter().map(|f| inside_of(crate::obj! {"path" => kept_path(&f.path, worktree), "sha256" => f.sha256.clone(), "bytes" => f.bytes}, &f.path, run)).collect()),
         "inputs" => uses(&run.inputs),
         "outputs" => uses(&run.outputs),
@@ -4124,6 +4125,7 @@ impl Home {
             "counts" => self.counts.clone(), "made" => self.made.clone(), "last_write" => self.last_write.clone(),
             "open_items" => Value::List(self.open_items.clone()), "unfiled" => self.unfiled.clone(),
             "tally" => Value::List(self.tally.iter().map(|(k, n)| crate::list![k.clone(), *n]).collect()),
+            "tally_on_estimate" => Value::Dict(self.tally_alone.clone()),
             "muted" => strs(&self.muted),
             "live" => strs(&self.live), "weak_identity" => opt_s(&self.weak_identity), "began" => opt_s(&self.began),
             "briefs" => Value::List(self.briefs.iter().map(|b| b.to_value()).collect()),

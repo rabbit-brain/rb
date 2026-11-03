@@ -385,11 +385,13 @@ def test_a_reconcile_that_finds_nothing_names_every_folder_it_looked_in(tmp_path
         return said, Envelope.model_validate_json(capsys.readouterr().out).data["looked_in"]
 
     said, looked = reconcile()
-    assert f"no results folder ({', '.join(usual)}) holds a report or a results file yet" in said and looked == usual
+    assert "Nothing to compile where rb looks for results: folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), " \
+           "down to 4 levels from the top. No folder there holds a report or a results file yet." in said and looked == usual
     assert main(["init", "t", "--no-agents"]) == 0
     capsys.readouterr()
     said, looked = reconcile()
-    assert f"Nothing to compile in the usual results folders ({', '.join(usual)})." in said and looked == usual
+    assert "Nothing to compile where rb looks for results: folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), " \
+           "down to 4 levels from the top." in said and looked == usual
     Path("out").mkdir()                                   # one of them, which rb watches
     Path("logs/a").mkdir(parents=True)
     Path("logs/a/run.txt").write_text("done\n", encoding="utf-8")
@@ -397,7 +399,7 @@ def test_a_reconcile_that_finds_nothing_names_every_folder_it_looked_in(tmp_path
     assert main(["run", "add", "e1", "m=1", "--artifact", "logs/a/run.txt"]) == 0
     capsys.readouterr()
     said, looked = reconcile()
-    assert f"Nothing to compile in the usual results folders ({', '.join(usual)}) or logs/a/." in said and looked == [*usual, "logs/a/"]
+    assert "down to 4 levels from the top, and logs/a/." in said and looked == [*usual, "logs/a/"]
 
 
 def test_the_decision_an_experiment_gates_can_be_set_later_and_revised_with_its_history(study, monkeypatch):

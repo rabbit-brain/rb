@@ -145,7 +145,7 @@ def test_a_rerun_goes_from_a_bundle_to_each_inherited_rule_s_reading(published, 
     # 4. rb status reads the inherited rule on the run made here
     code, env = rb_in(dest, capsys, "status")
     c1 = next(f for f in env.data["findings"] if f["criterion"] == "c1")
-    assert c1["says"]["headline"] == "reproduced · point only"
+    assert c1["says"]["headline"] == "reproduced on the estimate · point only"
     assert c1["integrity"] == []
     # the run's receipt names the fork's commit, whose code is the bundle's
     [run] = state(dest).records("run")

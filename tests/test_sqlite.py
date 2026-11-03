@@ -638,8 +638,9 @@ def test_a_file_is_a_database_by_its_first_bytes_never_by_its_name(rbj):
     Path("notes.db").write_text(json.dumps({"acc1": 0.75, "val_loss": 1.1}), encoding="utf-8")
     database("results.json")
     code, env = rbj("run", "add", "int8", "--from", "notes.db", "--table", "evals", "--where", "run_name=r3", "--set", "seed=2")
-    assert code == 2 and env.errors[0].message == ("--table, --where and --select read a row of a SQLite database, and notes.db is not one: "
-                                                   "its first bytes are not SQLite's.")
+    assert code == 2 and env.errors[0].message == ("--table, --where and --select read a row of a table: a SQLite database (--table names its "
+                                                   "table), or a CSV, TSV or JSON Lines file (.csv, .tsv, .jsonl). notes.db is none of those: its "
+                                                   "first bytes are not SQLite's, and its name is not a table's.")
     code, env = rbj("run", "add", "int8", "--from", "notes.db", "--set", "seed=2")
     assert code == 0 and env.data["object"]["metrics"] == {"acc1": 0.75, "val_loss": 1.1} and "row" not in rbyaml.loads(
         next(Path(".rb").rglob(f"{env.data['object']['id']}.yaml")).read_text(encoding="utf-8"))["receipt"]

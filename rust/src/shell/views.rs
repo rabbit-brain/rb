@@ -782,7 +782,7 @@ fn tag_of(key: &str) -> String {
 
 /// rb's tally of rule words (home.tally's [word, n] pairs) as the screens say it (plain words pass 3): "Rules: 4 met ·
 /// 1 not reproduced · 4 can't tell yet", each word short and plain in its colour, what the counts count leading them.
-fn rule_tally(pairs: &[Value], muted: &[String]) -> String {
+fn rule_tally(pairs: &[Value], muted: &[String], alone: Option<&Value>) -> String {
     let words: Vec<String> = pairs
         .iter()
         .filter_map(|t| {
@@ -790,7 +790,9 @@ fn rule_tally(pairs: &[Value], muted: &[String]) -> String {
             let rule = pair.first()?.as_str()?;
             let n = super::whole(pair.get(1)?)?;
             let full = format!("{n} {}", crate::assess::rule_label(rule, n));
-            let said = said_plain(&format!("{n} {}", w::short_rule(rule)));
+            // a tally never hides a reading's outcome: the rules met on the estimate alone are said with it
+            let estimate = alone.and_then(|a| a.get(rule)).and_then(Value::as_i64).unwrap_or(0);
+            let said = said_plain(&format!("{n} {}", w::short_rule(rule))) + &esc(&crate::cmds::reading::on_estimate_said(estimate, &n.to_string()));
             Some(match crate::surface::part_class(&full, muted).as_str() {
                 "dim" => format!("<span>{said}</span>"),
                 cls => format!("<span class=\"sw {cls}\">{said}</span>"),
@@ -864,9 +866,19 @@ fn plain_reading(f: &Value) -> String {
     // the unit as rb says it in a sentence (unit_said: "points" for a difference of percentages, "%" for one), else
     // rb's own unit; a percentage by any name is "%", never a name (fix 2)
     let given = match text(f, "reading.unit_said") { "points" | "%" => "%", _ => given };
-    let unit = said_unit(unit_word(given));
-    // a metric with no unit is named once by its title, as the grid heads it ("on Top-1"), never its key (fix 3)
-    let metric = if unit.is_empty() && !given.is_empty() { metric_label(given, "") } else { String::new() };
+    // the metric's own name (change.val_bpb reads val_bpb), and its unit unless that is the name itself
+    let name = { let m = text(f, "row.metric").split(':').next().unwrap_or("").trim(); m.rsplit('.').next().unwrap_or(m).to_string() };
+    // a unit that is no metric's name is said as the unit it is ("0.3289 bpb"); one that is the metric's own name, or a
+    // reading that names no metric, as before
+    let own = name.is_empty() || given == name;
+    let unit = if !said_unit(unit_word(given)).is_empty() || own || given.is_empty() { said_unit(unit_word(given)) } else { given };
+    // a metric with no unit of its own words is named once (fix 3): an identifier (val_bpb) as declared, else by its
+    // title, as the grid heads it ("on Top-1"); never by its unit ("on Bpb")
+    let metric = if said_unit(unit_word(given)).is_empty() && !given.is_empty() {
+        if name.contains('_') { name.clone() } else if own { metric_label(given, "") } else { metric_label(&name, "") }
+    } else {
+        String::new()
+    };
     let n = count(f, "reading.n").unwrap_or(0);
     let (lo, hi) = (num("lo"), num("hi"));
     let (subject, reference) = arms_said(f);
@@ -883,7 +895,8 @@ fn plain_reading(f: &Value) -> String {
     let p = if level {
         places(unit, &[lo.zip(hi).map(|(l, h)| h - l), target.map(|t| e - t)].into_iter().flatten().filter(|x| *x != 0.0).collect::<Vec<_>>())
     } else {
-        places(unit, &[Some(e), lo, hi].into_iter().flatten().collect::<Vec<_>>())
+        // as the rule's card says the same reading (nodes::reading_digits): one reading, one way on the page
+        places(unit, &[Some(e), lo, hi].into_iter().flatten().collect::<Vec<_>>()).max(if unit == "%" { 2 } else { super::nodes::reading_digits(f) })
     };
     // never fewer decimals than the cited number was written with, so the reading never rounds onto or past it
     let p = match target {
@@ -950,8 +963,9 @@ fn plain_reading(f: &Value) -> String {
         let first: String = c.next().map(|x| x.to_uppercase().collect()).unwrap_or_default();
         return format!("{first}{}: {out}.", c.as_str());
     }
-    // a sentence led by a variant's own name keeps it as written ("int8 is ..."); rb's words are capitalised
-    if !subject.is_empty() {
+    // a sentence led by a variant's own name keeps it as written ("int8 is ..."), and so does one led by a metric's
+    // declared name (val_bpb); rb's words are capitalised
+    if !subject.is_empty() || out.split(' ').next().map_or(false, |w| w.contains('_')) {
         return format!("{out}.");
     }
     let mut c = out.chars();
@@ -1093,6 +1107,12 @@ fn arm_label(v: &str) -> String {
 fn metric_label(name: &str, unit: &str) -> String {
     // a unit that is the metric's own name is none; a percentage by any name is "%"
     let unit = if unit == name { "" } else { unit_word(unit) };
+    // a name that joins words with "_" is an identifier: said as declared, never split at "_" nor cut at its unit
+    // (val_bpb in bpb heads "val_bpb", never "Val (bpb)"), its unit after it where the name does not end in it
+    if name.contains('_') {
+        let ends = !unit.is_empty() && name.to_ascii_lowercase().ends_with(&format!("_{}", unit.to_ascii_lowercase()));
+        return if unit.is_empty() || ends { name.to_string() } else { format!("{name} ({unit})") };
+    }
     // a name that ends in its unit says it once ("latency_ms" in ms is "Latency (ms)")
     let name = name.strip_suffix(&format!("_{unit}")).filter(|n| !n.is_empty() && !unit.is_empty()).unwrap_or(name);
     let (base, unit) = match name.rsplit_once('_') {
@@ -1679,7 +1699,9 @@ impl<'a> Page<'a> {
             let value_cell = |v: &str, col: &[(String, String)], m: &Value| -> String {
                 let Some(cell) = cell_of(row_at(v, col), m) else { return format!("<td>{}</td>", w::NOT_RUN) };
                 let Some(mean) = at(cell, "mean").and_then(Value::as_f64) else { return format!("<td>{}</td>", w::NOT_RUN) };
-                let shown = dec(mean, place_of(m).0, false);
+                // never fewer decimals than a rule of this experiment reads the metric in (its card's)
+                let xs: Vec<f64> = rows.iter().filter_map(|r| cell_of(Some(r), m).and_then(|c| at(c, "mean")).and_then(Value::as_f64)).collect();
+                let shown = dec(mean, super::nodes::places_for(&xs, place_of(m).0, super::nodes::rule_places_of(self.doc, text(x, "id"), text(m, "name"))), false);
                 let n = count(cell, "n").unwrap_or(0);
                 // rb's count where it gives one ("3 seeds", "1 run"); else one unit is one run, more counted by their unit
                 let units = match text(cell, "count_said") {
@@ -1818,7 +1840,9 @@ impl<'a> Page<'a> {
             _ => (Vec::new(), None),
         };
         let p = if edges.is_empty() || ratio {
-            places(said_unit(unit_word(text(m, "unit"))), &xs).max(p.min(6))
+            // never fewer decimals than a rule of this experiment reads the metric in (its card's)
+            let base = places(said_unit(unit_word(text(m, "unit"))), &xs).max(p.min(6));
+            if ratio { base } else { super::nodes::places_for(&xs, base, super::nodes::rule_places_of(self.doc, text(x, "id"), text(m, "name"))) }
         } else {
             let all: Vec<f64> = xs.iter().copied().chain(target).collect();
             let apart = (2..=6).find(|&q| all.iter().enumerate().all(|(i, a)| all[i + 1..].iter().all(|b| (a - b).abs() <= crate::assess::close(*a, *b) || own_digits(*a, q, false) != own_digits(*b, q, false)))).unwrap_or(6);
@@ -1828,8 +1852,28 @@ impl<'a> Page<'a> {
             }));
             (apart..=17).find(|&q| keeps(q)).unwrap_or(apart)
         };
+        // the reading a rule's card says, said here as the card says it: one reading is written one way on the page
+        let same_reading = !ratio
+            && reading.is_some_and(|r| {
+                let near = |a: Option<f64>, b: Option<f64>| match (a, b) {
+                    (Some(a), Some(b)) => (a - b).abs() <= crate::assess::close(a, b),
+                    (None, None) => true,
+                    _ => false,
+                };
+                near(Some(e), num(Some(r), "estimate")) && near(lo, num(Some(r), "lo")) && near(hi, num(Some(r), "hi"))
+            });
+        let card = rule.as_deref().and_then(|c| self.finding(c)).filter(|_| same_reading).map(|f| super::nodes::reading_digits(f).max(places(said_unit(unit_word(text(m, "unit"))), &xs)));
+        let p = card.map_or(p, |c| c.max(p));
         // a number under 0.01 keeps two significant figures where a rule's sentence says it, as the finding does
-        let dec = |x: f64, p: usize, signed: bool| if edges.is_empty() || ratio { dec(x, p, signed) } else { own_digits(x, p, signed) };
+        let dec = |x: f64, p: usize, signed: bool| {
+            if card.is_some() {
+                super::nodes::fixed(x, p, signed)
+            } else if edges.is_empty() || ratio {
+                dec(x, p, signed)
+            } else {
+                own_digits(x, p, signed)
+            }
+        };
         let by = if unit.is_empty() { String::new() } else { format!(" {unit}") };
         let mut said = if ratio {
             format!("{} times {base}", dec(e, p, false))
@@ -2371,11 +2415,14 @@ impl<'a> Page<'a> {
         let unit = |m: &str| units.iter().find(|(x, _)| x == m).map(|(_, u)| u.as_str()).unwrap_or("");
         // each metric's decimals, from the size of its differences (P5)
         let num_at = |ns: &Vec<((String, String), String)>, key: &(String, String)| ns.iter().find(|(k, _)| k == key).and_then(|(_, v)| v.parse::<f64>().ok());
+        let eid = runs.first().map_or("", |(_, r)| text(r, "experiment"));
         let mplaces: Vec<(String, usize)> = metrics
             .iter()
             .map(|m| {
                 let ds: Vec<f64> = diffs.iter().filter(|(x, _)| x == m).flat_map(|(_, other)| numbers.iter().filter_map(|ns| Some(num_at(ns, &(other.clone(), m.clone()))? - num_at(ns, &(baseline.to_string(), m.clone()))?)).collect::<Vec<_>>()).collect();
-                (m.clone(), places(unit(m), &ds))
+                // never fewer decimals than a rule of the runs' experiment reads the metric in, as far as they tell
+                // the differences apart
+                (m.clone(), super::nodes::places_for(&ds, places(unit(m), &ds), super::nodes::rule_places_of(self.doc, eid, m)))
             })
             .collect();
         let places_of = |m: &str| mplaces.iter().find(|(x, _)| x == m).map_or(2, |(_, p)| *p);
@@ -2445,7 +2492,8 @@ impl<'a> Page<'a> {
                 for m in &metrics {
                     for key in cols.iter().filter(|(_, x)| x == m) {
                         let full = ns.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str()).unwrap_or("");
-                        let shown = num(key).map(|v| dec(v, places_of(&key.1), false)).unwrap_or_else(|| full.to_string());
+                        // a run's number in rb's own digits, as its card says it (0.99609375, never 1.00)
+                        let shown = if full.is_empty() { num(key).map(|v| dec(v, places_of(&key.1), false)).unwrap_or_default() } else { full.to_string() };
                         cells.push_str(&format!("<td class=\"num\" title=\"{}\">{}</td>", esc(full), esc(&shown)));
                     }
                     for (_, other) in diffs.iter().filter(|(x, _)| x == m) {
@@ -3143,7 +3191,9 @@ impl<'a> Page<'a> {
         rows.push(("timing", timing));
         let integrity = text(f, "says.integrity");
         if !integrity.is_empty() && integrity != "ok" {
-            rows.push(("checks", esc(integrity)));
+            // every problem, one a line, never "(and 1 more)": a page's reader has no rb show to open
+            let all = texts(f, "says.problems");
+            rows.push(("checks", if all.len() > 1 { all.iter().map(|p| esc(p)).collect::<Vec<_>>().join("<br>") } else { esc(integrity) }));
         }
         if let Some(link) = list(f, "receipt_rows").iter().filter_map(Value::as_list).filter(|_| !held).find(|r| {
             r.first().and_then(Value::as_str) == Some("question link") && r.get(2).and_then(Value::as_list).is_some_and(|refs| refs.iter().any(|x| x.as_str() == Some(qid)))
@@ -3419,7 +3469,7 @@ impl<'a> Page<'a> {
 
     /// The tally alone: rb's standing words with their counts, coloured.
     fn tally_words(&self) -> String {
-        let said = rule_tally(list(self.doc, "home.tally"), &texts(self.doc, "home.muted"));
+        let said = rule_tally(list(self.doc, "home.tally"), &texts(self.doc, "home.muted"), super::at(self.doc, "home.tally_on_estimate"));
         if said.is_empty() { String::new() } else { format!("<p class=\"quiet\">{said}</p>") }
     }
 
@@ -3581,11 +3631,16 @@ impl<'a> Page<'a> {
             Some(l) => tally_pairs(l),
             None => self.counts_of(q),
         };
+        // the rules of a word met on the estimate alone, said with it: a tally never hides a reading's outcome
+        let given = s.map(|s| list(s, "tallies")).filter(|l| !l.is_empty()).unwrap_or_else(|| list(q, "tallies"));
+        let alone = |word: &str| -> i64 {
+            given.iter().filter(|t| text(t, "state") == word).flat_map(|t| texts(t, "criteria")).filter(|c| self.finding(c).is_some_and(|f| at(f, "on_estimate").is_some_and(Value::truthy))).count() as i64
+        };
         let words: Vec<String> = pairs
             .iter()
             .filter(|(_, n)| *n > 0)
             .map(|(word, n)| {
-                let said = said_plain(&format!("{n} {}", w::short_rule(word)));
+                let said = said_plain(&format!("{n} {}", w::short_rule(word))) + &esc(&crate::cmds::reading::on_estimate_said(alone(word), &n.to_string()));
                 let full = format!("{n} {}", crate::assess::rule_label(word, *n));
                 let to = format!("{qid}:rd:{}", reading_key(&full));
                 let cls = crate::surface::part_class(&full, &muted);
@@ -4640,7 +4695,7 @@ mod tests {
         assert_eq!(plain_value("step_by_step", false), "step by step");
         assert_eq!(plain_value("int8", false), "INT8");
         let m = crate::pyjson::loads(r#"{"name": "latency_ms", "unit": "ms"}"#).unwrap();
-        assert_eq!(metric_title(&m), "Latency (ms)");
+        assert_eq!(metric_title(&m), "latency_ms", "a name joined with _ is said as declared, its unit in it (round 4)");
         let m = crate::pyjson::loads(r#"{"name": "accuracy", "unit": "percent"}"#).unwrap();
         assert_eq!(metric_title(&m), "Accuracy (%)");
     }
@@ -5300,7 +5355,7 @@ mod tests {
         d.get_mut("findings").unwrap().as_dict_mut().unwrap().insert("c0".into(), diff);
         d.get_mut("findings").unwrap().as_dict_mut().unwrap().insert("c9".into(), level);
         let html = page(&live, Surface::Open);
-        assert!(html.contains(">ONNX top-1 (%)</th>"), "the runs table's head");
+        assert!(html.contains(">onnx_top1 (%)</th>"), "the runs table's head");
         assert!(!html.contains(">ONNX top-1</th>"));
     }
 
@@ -5385,8 +5440,8 @@ mod tests {
     #[test]
     fn a_heading_says_a_metric_and_an_arm_in_words() {
         assert_eq!(metric_label("top1", "%"), "Top-1 (%)");
-        assert_eq!(metric_label("size_kb", ""), "Size (KB)");
-        assert_eq!(metric_label("latency_ms", "ms"), "Latency (ms)");
+        assert_eq!(metric_label("size_kb", ""), "size_kb");
+        assert_eq!(metric_label("latency_ms", "ms"), "latency_ms");
         assert_eq!(plain_key("calib_images"), "Calib images");
         assert_eq!(arm_label("int8"), "INT8");
         assert_eq!(arm_label("per_channel"), "per_channel");
@@ -5435,7 +5490,7 @@ mod tests {
         assert!(plain_reading(&f).starts_with("ONNX top-1 is 75.38%, 1 seed"), "{}", plain_reading(&f));
         let f = crate::pyjson::loads(r#"{"state": "meets", "subject_label": "", "rule": "onnx_top1 at least 75.5", "reading_short": "",
             "row": {"metric": "onnx_top1"}, "reading": {"estimate": 75.6, "lo": null, "hi": null, "n": 1, "unit": "seed", "unit_text": "%", "unit_said": "%"}}"#).unwrap();
-        assert!(plain_reading(&f).starts_with("ONNX top-1 is 75.60%"), "{}", plain_reading(&f));
+        assert!(plain_reading(&f).starts_with("onnx_top1 is 75.60%"), "{}", plain_reading(&f));
     }
 
     /// Fix 2, item 1: a unit is said, never used as a name. A percentage by any catalogue name is "%" for a level and
@@ -5495,11 +5550,11 @@ mod tests {
         assert_eq!(metric_title(&m), "Top-1 (%)");
         assert_eq!(metric_label("top1", "%"), "Top-1 (%)");
         // an acronym (C's list) and a precision code keep their capitals, as nodes.rs's metric_said says them (FIX6)
-        assert_eq!(metric_label("onnx_top1", ""), "ONNX top-1");
-        assert_eq!(metric_label("int8_top1", "%"), "INT8 top-1 (%)");
-        assert_eq!(metric_label("gpu_latency_ms", "ms"), "GPU latency (ms)");
+        assert_eq!(metric_label("onnx_top1", ""), "onnx_top1");
+        assert_eq!(metric_label("int8_top1", "%"), "int8_top1 (%)");
+        assert_eq!(metric_label("gpu_latency_ms", "ms"), "gpu_latency_ms");
         assert_eq!(metric_label("val.f1", ""), "Val F1");
-        assert_eq!(metric_label("share_under_2pt", ""), "Share under 2pt");
+        assert_eq!(metric_label("share_under_2pt", ""), "share_under_2pt");
         assert_eq!(metric_label("top1", "top1"), "Top-1");
         assert_eq!(setting_said("data.batch_size", "32", &[]), "Batch size: 32");
         assert_eq!(plain_key("optim.lr"), "Lr");

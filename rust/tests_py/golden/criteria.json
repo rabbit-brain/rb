@@ -549,6 +549,7 @@
     "   \"untested\": 11,",
     "   \"gate untested\": 1",
     "  },",
+    "  \"tally_on_estimate\": {},",
     "  \"results\": {",
     "   \"untested\": 12",
     "  },",

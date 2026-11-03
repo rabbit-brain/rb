@@ -148,6 +148,8 @@ pub struct NewRun {
     pub row: Option<FromRow>,
     /// the row of a CSV or TSV table among `files` its numbers were read from, as the receipt keeps it (`table_row`)
     pub table_row: Option<Dict>,
+    /// an SDK run block recorded it as the block ended: rb saw the numbers made then
+    pub block: bool,
 }
 
 /// The row of a SQLite database a run is read from (`rb run add --from <database> --table --where`): what the receipt
@@ -249,6 +251,7 @@ impl Default for NewRun {
             numbers_from: Vec::new(),
             row: None,
             table_row: None,
+            block: false,
         }
     }
 }
@@ -1753,6 +1756,14 @@ impl Ledger {
                 ));
             }
         }
+        // --commit @<column> is read from a row; left as given, it names no commit and is never stored as one
+        if let Some(c) = a.commit.as_deref().filter(|c| c.starts_with('@')) {
+            return Err(RBError::msg_fix(
+                "E_OBJECT_INVALID",
+                format!("--commit {c}: {c} names a column of the row --from reads, and this run reads no row."),
+                "Give the commit itself, --commit <sha>; a row is read with --from <table or database> --where <column>=<value>.",
+            ));
+        }
         let who = self.actor()?;
         // a row picked by the value of what the experiment varies names its variant (--where precision=int8)
         // only where the numbers would otherwise name no variant no criterion reads as given
@@ -1793,23 +1804,43 @@ impl Ledger {
                 if a.variant.is_none() {
                     let keys: Vec<String> = values.keys().cloned().collect();
                     if self.names_no_arm(&exp, &keys)? {
-                        {
-                            let first = keys.first().cloned().unwrap_or_default();
-                            return Err(RBError::msg_fix(
-                                "E_OBJECT_INVALID",
-                                format!(
-                                    "{} compares {}, and these numbers name no variant ({}), so no criterion could read them as any variant's. Nothing written.",
+                        // what is said of them: the metrics the project declares, never a per-run setting the file
+                        // also holds (a seed), which --set gives
+                        let declared = crate::journal::names(self)?;
+                        let metrics: Vec<String> = keys.iter().filter(|k| crate::journal::canon_of(k, &declared).is_some()).cloned().collect();
+                        let shown = if metrics.is_empty() { keys.clone() } else { metrics };
+                        let first = shown.first().cloned().unwrap_or_default();
+                        let python = if self.via == "sdk" { "variant=\"<variant>\"" } else { "--variant <variant>" };
+                        let rows = row_variants(&exp, &a);
+                        let (why, fix) = if rows.len() > 1 {
+                            (
+                                format!("; the row names {} by what {} varies, so rb cannot tell which variant they are for", crate::assess::first_few(&rows, 4, " and "), exp.id),
+                                format!("Name the variant they are for: {}, or add a --where column that tells the variants' rows apart.", python.replace("<variant>", &rows[0])),
+                            )
+                        } else {
+                            let by_config = config_variants(&exp, a.config.as_deref());
+                            let named = match by_config.as_slice() {
+                                [one] => format!(
+                                    "the run config beside them, {}, names {one} by what {} varies: {} takes them as {one}'s",
+                                    a.config.as_deref().unwrap_or(""),
                                     exp.id,
-                                    variants.join(", "),
-                                    crate::assess::first_few(&keys, 4, ", ")
+                                    python.replace("<variant>", one)
                                 ),
+                                _ => format!("{} takes one variant's numbers", python.replace("<variant>", &format!("<{}>", variants.join("|")))),
+                            };
+                            (
+                                ", so no criterion could read them as any variant's".to_string(),
                                 format!(
-                                    "Name the variant they are for: --variant <{}> takes one variant's numbers (variant= from Python), or give each as <variant>.{first}=<value> (a file as {{\"{}\": {{\"{first}\": ...}}}}).",
-                                    variants.join("|"),
-                                    variants[0]
+                                    "Name the variant they are for: {named}, or give each as <variant>.{first}=<value> (a file as {{\"{}\": {{\"{first}\": ...}}}}).",
+                                    by_config.first().unwrap_or(&variants[0])
                                 ),
-                            ));
-                        }
+                            )
+                        };
+                        return Err(RBError::msg_fix(
+                            "E_OBJECT_INVALID",
+                            format!("{} compares {}, and these numbers name no variant ({}){why}. Nothing written.", exp.id, variants.join(", "), crate::assess::first_few(&shown, 4, ", ")),
+                            fix,
+                        ));
                     }
                 }
                 let given = a.per_run.clone();
@@ -1997,11 +2028,20 @@ impl Ledger {
                 // numbers typed on the command line or over MCP, with no file, no row and no time given, could have been
                 // made at any time: when is unknown, unless rb's journal watched the command print them just now
                 let watched = seen.as_ref().map_or(false, |s| s.get_str("by") == Some("journal"));
-                let (produced, produced_basis) = if basis == "typed" && self.via != "sdk" && refs.is_empty() && a.row.is_none() && produced_basis == "recorded" && !watched {
+                // so are the SDK's numbers given outside a run block with no time: rb saw a run block end, and nothing else
+                let untimed_sdk = basis == "logged" && self.via == "sdk" && !a.block;
+                // an attached file (--artifact, the SDK's files) is no sign of when the numbers were made: only the file
+                // they were read from is
+                let no_time = a.produced_at.as_deref().map_or(true, str::is_empty) && from.is_empty();
+                let typed_untimed = basis == "typed" && self.via != "sdk" && refs.is_empty() && produced_basis == "recorded";
+                let (produced, produced_basis) = if (typed_untimed || (untimed_sdk && no_time)) && a.row.is_none() && a.table_row.is_none() && !watched {
                     (None, "unknown".to_string())
                 } else {
                     (produced, produced_basis)
                 };
+                if a.block {
+                    receipt.insert("block".into(), Value::Bool(true));
+                }
                 if let Some(seen) = seen {
                     receipt.insert("command_seen".into(), seen);
                 }
@@ -2070,6 +2110,14 @@ impl Ledger {
             for other in self.live::<Run>()?.iter().filter(|r| r.experiment != exp.id && r.retracted.is_none() && row.is_read_by(r)) {
                 let place = format!("{}, table {}{}", row.path, row.table, row.rowid.map(|r| format!(", rowid {r}")).unwrap_or_default());
                 notices.push(format!("{place} is also recorded as {} in {}: one row is one run, and it counts in both {} and {}", other.id, other.experiment, other.experiment, exp.id));
+            }
+        }
+        // so is a row of a CSV, TSV or JSON Lines table, told by its own cells
+        if a.row.is_none() {
+            if let Some((key, place)) = super::views::row_key(&run) {
+                for other in self.live::<Run>()?.iter().filter(|r| r.experiment != exp.id && r.retracted.is_none() && super::views::row_key(r).map_or(false, |(k, _)| k == key)) {
+                    notices.push(format!("{place} is also recorded as {} in {}: one row is one run, and it counts in both {} and {}", other.id, other.experiment, other.experiment, exp.id));
+                }
             }
         }
         let watched = !a.numbers_from.is_empty() && self.journal_wrote(&a.numbers_from);
@@ -2196,7 +2244,11 @@ impl Ledger {
     }
 
     fn metric_key_for(&self, exp: &Experiment, name: &str, variant: Option<&str>) -> String {
-        let Some(variant) = variant else { return name.to_string() };
+        // an experiment of one variant: a number that names none is that variant's
+        let live = exp.live_variants();
+        let only = (live.len() == 1).then(|| live[0].name.clone());
+        let Some(variant) = variant.map(str::to_string).or(only) else { return name.to_string() };
+        let variant = variant.as_str();
         if name.starts_with("change.") {
             return name.to_string();
         }
@@ -2793,6 +2845,7 @@ impl Ledger {
                 }
                 not_a_store_row(source.as_ref(), &self.root, "A reported analysis's source")?;
                 let mut comps: Vec<Comparison> = Vec::new();
+                let mut stated_lines: Vec<Value> = Vec::new();
                 for raw in &a.comparisons {
                     let mut c = raw.clone();
                     if !c.contains_key("unit") {
@@ -2817,7 +2870,20 @@ impl Ledger {
                     }
                     if let Some(s) = &source {
                         if !a.computed {
-                            comp.source = Some(self.stated(s, &comp)?);
+                            // one line that states them all, else the lines of one table or section that state them
+                            // between them (a statistics table, one figure a row): kept on the receipt as read
+                            match self.stated(s, &comp) {
+                                Ok(src) => comp.source = Some(src),
+                                Err(e) => match self.stated_across(s, &comp)? {
+                                    Some((src, entry)) => {
+                                        let mut entry = entry;
+                                        entry.insert("comparison".into(), Value::Int(comps.len() as i64));
+                                        stated_lines.push(Value::Dict(entry));
+                                        comp.source = Some(src);
+                                    }
+                                    None => return Err(e),
+                                },
+                            }
                         }
                     }
                     comps.push(comp);
@@ -2841,13 +2907,20 @@ impl Ledger {
                 let mut notices: Vec<String> = Vec::new();
                 let uses = self.uses(&a.inputs, "--input", &mut notices)?;
                 let (produced, produced_basis, _) = self.produced(a.produced_at.as_deref(), &refs, &[], &HashSet::new(), None)?;
-                let receipt = crate::obj! {
+                let mut receipt = crate::obj! {
                     "at" => now(), "actor" => who.id.clone(), "actor_via" => who.via.clone(), "via" => self.via.clone(), "rb_version" => crate::version(),
                     "command" => a.command.clone(), "session" => actor::session_for(&who), "agent" => self.agent_facts(&who, true).map(Value::Dict),
                     "attached" => self.attached_state(sources::git_state(&self.here, DIR)).map(Value::Dict),
                     "environment" => Value::Dict(crate::environment::fingerprint(Some(&self.dir.join("cache")))),
                     "run_record" => Value::Null, "config" => Value::Null
                 };
+                // the lines of a document that state a comparison's numbers between them, as rb read them: the receipt's
+                // own (a free-form part of format 1, which an earlier rb reads and leaves alone)
+                if !stated_lines.is_empty() {
+                    if let Value::Dict(d) = &mut receipt {
+                        d.insert("stated_lines".into(), Value::List(stated_lines.clone()));
+                    }
+                }
                 let an: Analysis = build(crate::dict! {
                     "id" => self.new_id("analysis", a.id.as_deref())?, "uid" => new_uid("ana"), "experiment" => exp.id.clone(), "title" => a.title.clone(),
                     "reads" => str_list(&read_ids), "inputs" => Value::List(uses.iter().map(|u| u.to_value()).collect()), "method" => a.method.clone(),
@@ -2876,6 +2949,33 @@ impl Ledger {
         }
         let warning = if notices.is_empty() { None } else { Some(notices.join("; ")) };
         Ok(Added { record: analysis, duplicate_of: None, warning })
+    }
+
+    /// Where no one line states a reported comparison's numbers, the lines of one table or section that state them
+    /// between them (a statistics table: the mean on one row, its interval on another): the section --locator names (a
+    /// heading's words, or a line range, 83-91), else the first section that holds them all. The source keeps the
+    /// first of those lines, with no `resolved` (one line does not state them all, and an earlier rb rechecks only
+    /// one); what rb read is the receipt's `stated_lines` entry. None where no section states them all.
+    fn stated_across(&self, src: &Source, comp: &Comparison) -> Res<Option<(Source, Dict)>> {
+        let numbers: Vec<f64> = [Some(comp.estimate), comp.lo, comp.hi].into_iter().flatten().collect();
+        if numbers.len() < 2 || src.line.is_some() || src.quote.as_ref().map_or(false, |q| !q.is_empty()) {
+            return Ok(None);
+        }
+        let path = src.path.clone().unwrap_or_else(|| "None".into());
+        let (data, commit) = sources::read_file(&self.root, &path, src.commit.as_deref()).map_err(|u| RBError::msg(&u.code, format!("{}: {}", src.label(), u.reason)))?;
+        let text = String::from_utf8_lossy(&data).into_owned();
+        let lines = sources::split_lines(&text);
+        let (comments, cut) = sources::stated_lines(&path, &lines);
+        let Some(lines_of) = sources::section_stating(&lines, &comments, &cut, src.locator.as_deref(), &numbers) else { return Ok(None) };
+        let texts: Vec<String> = lines_of.iter().map(|no| crate::rbyaml::py_strip(&lines[no - 1]).chars().take(400).collect()).collect();
+        let mut s = src.clone();
+        s.line = Some(lines_of[0] as i64);
+        s.resolved = None;
+        let entry = crate::dict! {
+            "path" => path, "lines" => Value::List(lines_of.iter().map(|n| Value::Int(*n as i64)).collect()), "texts" => Value::list_of_str(texts),
+            "sha256" => sha256_bytes(&data), "commit" => commit.map_or(Value::Null, Value::Str), "at" => now()
+        };
+        Ok(Some((s, entry)))
     }
 
     /// The source, pinned to the line that states a reported comparison's numbers, with what rb read there.
@@ -2942,7 +3042,7 @@ impl Ledger {
         Err(RBError::msg_fix(
             "E_SOURCE_UNRESOLVED",
             format!("{} has no line that states {what}.{also}", src.label()),
-            "Point --source at the document that states the numbers (a README, a report saved as text), with --quote for the exact row when it helps.",
+            "Point --source at the document that states the numbers (a README, a report saved as text), with --quote for the exact row when it helps; where the estimate and its bounds are on lines of their own (a statistics table, one figure a row), leave --quote out and give --locator the section's heading or the lines, 83-91.",
         ))
     }
 
@@ -3596,8 +3696,16 @@ fn not_a_store_row(src: Option<&Source>, root: &std::path::Path, what: &str) -> 
     match src.filter(|s| sources::is_store_row(s, root)) {
         Some(s) => Err(RBError::msg_fix(
             "E_OBJECT_INVALID",
-            format!("{what} is the text that states a number someone else gave; {} is a row of a database, a measurement.", s.label()),
-            "Read the row as a run (rb run add <experiment> --from <database> --table <table> --where <column>=<value>), or cite the document that states the number.",
+            format!(
+                "{what} is the text that states a number someone else gave; {} is a row of a {}, a measurement.",
+                s.label(),
+                if s.path.as_deref().map_or(false, crate::csvtable::is_table) { "table" } else { "database" }
+            ),
+            if s.path.as_deref().map_or(false, crate::csvtable::is_table) {
+                "Read the row as a run (rb run add <experiment> --from <table> --where <column>=<value>), or cite the document that states the number."
+            } else {
+                "Read the row as a run (rb run add <experiment> --from <database> --table <table> --where <column>=<value>), or cite the document that states the number."
+            },
         )),
         None => Ok(()),
     }
@@ -3606,11 +3714,41 @@ fn not_a_store_row(src: Option<&Source>, root: &std::path::Path, what: &str) -> 
 /// The variant a run's row names, read with no --variant: the row was picked by a value of a setting the experiment
 /// varies, and exactly one variant holds that value as its own or is named by it (--where precision=int8 names int8).
 fn row_variant(exp: &Experiment, a: &NewRun) -> Option<String> {
+    let mut hits = row_variants(exp, a);
+    (hits.len() == 1).then(|| hits.remove(0))
+}
+
+/// Every variant a run's row names by the value of what the experiment varies: more than one is a row rb cannot tell
+/// the variant of.
+fn row_variants(exp: &Experiment, a: &NewRun) -> Vec<String> {
     let picked: Dict = match (&a.row, &a.table_row) {
         (Some(r), _) => r.key.clone(),
-        (None, Some(t)) => t.get("where").and_then(Value::as_dict).cloned()?,
-        _ => return None,
+        (None, Some(t)) => t.get("where").and_then(Value::as_dict).cloned().unwrap_or_default(),
+        _ => return Vec::new(),
     };
+    variants_named(exp, &picked)
+}
+
+/// The variants a run config beside the run names, by its values of what the experiment varies (prompt: plain).
+fn config_variants(exp: &Experiment, config: Option<&str>) -> Vec<String> {
+    let Some(path) = config else { return Vec::new() };
+    let Some(kind) = crate::sources::structured_kind(path) else { return Vec::new() };
+    let Ok(bytes) = std::fs::read(crate::sys::typed(path)) else { return Vec::new() };
+    let Ok(doc) = crate::sources::parse_structured(&String::from_utf8_lossy(&bytes), kind, path) else { return Vec::new() };
+    let doc = crate::sources::unwrap_wandb(doc);
+    let flat = crate::sources::flatten(&doc, "");
+    // a value by its full key, else by its last part where exactly one key ends so
+    let mut picked = Dict::new();
+    for name in &exp.varies {
+        let ends: Vec<&Value> = flat.iter().filter(|(k, _)| k.rsplit('.').next() == Some(last_part(name))).map(|(_, v)| v).collect();
+        if let Some(v) = flat.get(name).or_else(|| (ends.len() == 1).then(|| ends[0])) {
+            picked.insert(name.clone(), v.clone());
+        }
+    }
+    variants_named(exp, &picked)
+}
+
+fn variants_named(exp: &Experiment, picked: &Dict) -> Vec<String> {
     let said = |v: &Value| crate::pyjson::py_str(v);
     let mut hits: Vec<String> = Vec::new();
     for name in &exp.varies {
@@ -3628,7 +3766,7 @@ fn row_variant(exp: &Experiment, a: &NewRun) -> Option<String> {
             }
         }
     }
-    (hits.len() == 1).then(|| hits.remove(0))
+    hits
 }
 
 impl Ledger {

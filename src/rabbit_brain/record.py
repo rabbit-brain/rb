@@ -1091,6 +1091,7 @@ class Reading(BaseModel):
     superseded: str = ""                 # on a history entry: why it stopped being the current reading
     why_no_interval: str = ""
     design: dict[str, Any] = Field(default_factory=dict)
+    pairing: dict[str, Any] = Field(default_factory=dict)   # a paired reading of arms recorded apart: what it pairs by, and the same runs unpaired
 
 
 class Observation(BaseModel):

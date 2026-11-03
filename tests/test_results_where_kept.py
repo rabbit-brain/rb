@@ -210,3 +210,24 @@ def test_loose_folders_at_the_top_are_each_named(tmp_path, monkeypatch, capsys):
     main(["reconcile"], typed=True)
     out = " ".join(capsys.readouterr().out.split())
     assert "./ (" not in out and all(f"{n}/" in out for n in ("eval", "evals", "reports", "benchmarks")), out
+
+
+def test_a_folder_that_holds_only_a_tool_s_config_is_no_results_folder(rb):
+    write(rb.root, "results/page/package.json", json.dumps({"name": "int8-page", "version": "1.0.0", "top1": 75.6}))
+    write(rb.root, "reports/site/pyproject.toml", "[project]\nname = \"int8-site\"\n")
+    rb("init", "INT8 ResNet-50", "--no-agents")
+    env = rb("reconcile")
+    folders = {f["folder"] for f in env.data["repository"]["folders"]}
+    assert folders == {"reports/stage1/eval/", "artifacts/sweep/metrics/"}
+    assert not any("package.json" in u or "pyproject.toml" in u for u in env.data["unplaced"])
+    code, out = rb("reconcile", text=True)
+    assert "results/page/" not in out and "reports/site/" not in out
+
+
+def test_a_run_s_file_named_for_a_lock_keeps_its_folder_a_results_folder(rb):
+    write(rb.root, "results/lock/eval_lock.json", json.dumps({"top1": 75.6, "top5": 92.6}))
+    write(rb.root, "results/site/package-lock.json", json.dumps({"lockfileVersion": 3, "top1": 75.6}))
+    rb("init", "INT8 ResNet-50", "--no-agents")
+    env = rb("reconcile")
+    folders = {f["folder"] for f in env.data["repository"]["folders"]}
+    assert "results/lock/" in folders and "results/site/" not in folders

@@ -967,7 +967,10 @@ impl Doc<'_> {
         // "ok" only on a card whose notes say nothing more: a card with notes leaves its checks to them
         if !integrity.is_empty() && !(integrity == "ok" && !strs(f, "says.notes").is_empty()) {
             let cls = if integrity == "ok" { " class=\"dim\"" } else { "" };
-            dl += &format!("<dt>{}</dt><dd{cls}>{}</dd>", term("integrity", "checks"), esc(integrity));
+            // every problem, one a line, never "(and 1 more)"
+            let all = strs(f, "says.problems");
+            let said = if all.len() > 1 { all.iter().map(|p| esc(p)).collect::<Vec<_>>().join("<br>") } else { esc(integrity) };
+            dl += &format!("<dt>{}</dt><dd{cls}>{said}</dd>", term("integrity", "checks"));
         }
         let history = s(f, "says.history");
         if !history.is_empty() {
@@ -1489,7 +1492,7 @@ impl Doc<'_> {
         format!("<section class=\"part\" id=\"{}:counts\"><h4>Counts toward <span class=\"n\">{}</span></h4>{body}</section>", esc(id), link(&format!("{id}:counts"), &n))
     }
 
-    /// The results rb rounded, a row for each number in the UI font, two decimals with rb's digits on hover (P4, P5):
+    /// The results, a row for each number in the UI font, in rb's own digits, as rb show gives them:
     /// from rb's results line ("fp32.top1=90.64 · int8.top1=90.61"), else its metrics line ("fp32: top1=0.7598
     /// onnx_top1=0.7569 · int8: ..."). The file they were read from, with its hash, is a source detail: the receipt's row.
     fn results(&self, id: &str, r: &Value) -> String {
@@ -1497,9 +1500,8 @@ impl Doc<'_> {
         if pairs.is_empty() {
             return format!("<section class=\"part\" id=\"{}:results\"><h4>Results</h4><p class=\"mets\">{}</p></section>", esc(id), esc(s(r, "metrics_text")));
         }
-        // in digits said alike across the run's numbers, so two that differ never read the same
-        let d = decimals(&pairs.iter().filter_map(|(_, v)| parsed(v)).collect::<Vec<_>>());
-        let rows: String = pairs.iter().map(|(k, v)| format!("<dt>{}</dt><dd>{}</dd>", esc(k), nb(v, Some(d), false))).collect();
+        // each number as rb show says it, rb's own digits: a card never rounds a run's number past the rules that read it
+        let rows: String = pairs.iter().map(|(k, v)| format!("<dt>{}</dt><dd>{}</dd>", esc(k), esc(v.trim()))).collect();
         format!("<section class=\"part\" id=\"{}:results\"><h4>Results</h4><dl class=\"ax mets\">{rows}</dl></section>", esc(id))
     }
 
@@ -2416,7 +2418,14 @@ impl Doc<'_> {
                 cols.iter().zip(&units).zip(&labels).map(|((m, u), l)| { let (title, unit) = metric_head(m, u); (if l.is_empty() { title } else { l.to_string() }, unit) }).collect();
             let head: String = heads.iter().map(|(title, _)| format!("<th>{}</th>", esc(title))).collect();
             // each column's means in the digits the page's grid says them in (FIX5)
-            let places: Vec<usize> = cols.iter().zip(&heads).map(|(m, (_, u))| grid_places(rows, m, u)).collect();
+            let places: Vec<usize> = cols
+                .iter()
+                .zip(&heads)
+                .map(|(m, (_, u))| {
+                    let xs: Vec<f64> = rows.iter().filter_map(|r| r.get("metrics").and_then(|ms| ms.get(*m)).and_then(|c| at(c, "mean")).and_then(Value::as_f64)).collect();
+                    places_for(&xs, grid_places(rows, m, u), rule_places_of(self.doc, eid, m))
+                })
+                .collect();
             let mut body = String::new();
             for r in &mine {
                 let cell: Vec<String> =
@@ -2585,6 +2594,7 @@ fn without_state(line: &str) -> &str {
 fn reading_word(rule: &str) -> String {
     match rule {
         "criterion met" | "estimate meets criterion" | "recorded values meet criterion" => "criteria met".into(),
+        "reproduced on the estimate" | "reproduced on the recorded values" => "reproduced".into(),
         "criterion not met" => "criteria not met".into(),
         "criterion undetermined" => "criteria undetermined".into(),
         "criterion untested" => "criteria untested".into(),
@@ -3068,7 +3078,45 @@ pub(crate) fn reading_digits(f: &Value) -> usize {
     let n = |k: &str| at(f, k).and_then(Value::as_f64).filter(|v| v.is_finite());
     let target = n("check_band.target");
     let vals: Vec<f64> = [n("reading.estimate"), n("reading.lo"), n("reading.hi"), target].into_iter().flatten().collect();
-    decimals(&vals).max(target.map_or(0, digits))
+    let own: Vec<f64> = [n("reading.estimate"), n("reading.lo"), n("reading.hi")].into_iter().flatten().collect();
+    // a percentage's difference is said in points, two decimals as every list says them
+    let pct = matches!(unit_of(f).to_ascii_lowercase().as_str(), "%" | "percent" | "points" | "pct" | "percentage");
+    decimals(&vals).max(target.map_or(0, digits)).max(if pct { 2 } else { sig_places(&own) })
+}
+
+/// The decimals a column of `xs` is said in: `base`, or more, as far as the rule's own (`rule`) tell its values apart,
+/// never a trailing 0 the rule's digits add (76.13, never 76.1300; 1.4635 beside a rule that reads +0.3289).
+pub(crate) fn places_for(xs: &[f64], base: usize, rule: usize) -> usize {
+    if rule <= base {
+        return base;
+    }
+    let need = xs.iter().filter(|x| x.is_finite()).map(|x| fixed(*x, rule, false).split('.').nth(1).unwrap_or("").trim_end_matches('0').len()).max().unwrap_or(0);
+    base.max(need)
+}
+
+/// The decimals the rules of experiment `eid` that read `metric` say their readings in (reading_digits): a grid or a
+/// table of that metric gives no fewer, so a mean never reads "1.00" beside a rule of 0.999349 ± 5e-07, nor "0.33
+/// lower" beside one that reads +0.3289. 0 where no rule of it reads the metric.
+pub(crate) fn rule_places_of(doc: &Value, eid: &str, metric: &str) -> usize {
+    let last = metric.rsplit('.').next().unwrap_or(metric);
+    at(doc, "findings")
+        .and_then(Value::as_dict)
+        .map_or(0, |fs| fs.values().filter(|f| s(f, "experiment") == eid && metric_name(f) == last && at(f, "reading.estimate").is_some()).map(reading_digits).max().unwrap_or(0))
+}
+
+/// The decimals that say two significant digits of the largest of a reading's numbers, where all are under 0.1 (2 at
+/// least, 6 at most): the page's lists, cards and grid say one reading in them alike.
+pub(crate) fn sig_places(xs: &[f64]) -> usize {
+    let m = xs.iter().map(|x| x.abs()).filter(|x| x.is_finite()).fold(0.0_f64, f64::max);
+    if m >= 0.1 || m == 0.0 {
+        return 2;
+    }
+    let mut p = ((1.0 - m.log10().floor()) as usize).clamp(2, 6);
+    // never a trailing 0 every number holds ("0.05", never "0.050")
+    while p > 2 && xs.iter().all(|x| fixed(*x, p, false) == format!("{}0", fixed(*x, p - 1, false))) {
+        p -= 1;
+    }
+    p
 }
 
 /// A call's verdict, said once (plain words pass 4): the rule's state word first ("Met", "Not met", "Reproduced",
@@ -3140,6 +3188,8 @@ fn verdict_said(f: &Value) -> String {
     // the rule's number as it was declared, with its unit ("the 5 points the rule asks for"); an amount from it in the
     // reading's digits, with its unit
     let the = |t: f64| with_unit(&mark_rule(&fixed(t, digits(t), false)), &unit_word(unit, compared, t.abs()));
+    // the tolerance, an amount either side of the number: a percentage's in points
+    let the_tolerance = |t: f64| with_unit(&mark_rule(&fixed(t, digits(t), false)), &unit_word(unit, true, t.abs()));
     // an amount's unit agrees with the number shown ("1.00 point"), never with digits it dropped
     let amount = |v: f64| {
         let shown = fixed(v.abs(), d, false);
@@ -3158,7 +3208,7 @@ fn verdict_said(f: &Value) -> String {
             ("at most", _) => (false, format!("over the {} the rule allows", the(t))),
             ("within" | "equals", Some(e)) => {
                 let inside = (v - t).abs() <= e.abs() + 1e-12;
-                (inside, format!("{}within {} of {of_it} {}", if inside { "" } else { "not " }, the(e.abs()), the(t)))
+                (inside, format!("{}within {} of {of_it} {}", if inside { "" } else { "not " }, the_tolerance(e.abs()), the(t)))
             }
             _ => return None,
         })
@@ -3171,7 +3221,7 @@ fn verdict_said(f: &Value) -> String {
         Kind::BothEnds => match (lo, hi) {
             (Some(lo), Some(hi)) => match (reach(lo), reach(hi)) {
                 (Some((a, _)), Some((b, r))) if a && b => Some((true, format!("; its whole interval is {r}"))),
-                (Some(_), Some(_)) => Some((false, format!("; its interval is not wholly within {} of {of_it} {}", tol.map_or(String::new(), |e| the(e.abs())), target.map_or(String::new(), the)))),
+                (Some(_), Some(_)) => Some((false, format!("; its interval is not wholly within {} of {of_it} {}", tol.map_or(String::new(), |e| the_tolerance(e.abs())), target.map_or(String::new(), the)))),
                 _ => None,
             },
             _ => None,
@@ -3198,10 +3248,13 @@ fn rule_passes(f: &Value) -> String {
     let cmp = s(f, "check_band.comparator");
     // each number in the digits it was declared with
     let said = |v: f64| with_unit(&fixed(v, digits(v), false), &unit_word(unit, compared, v.abs()));
+    // a tolerance is an amount either side of the number, so a percentage's reads in points ("within 0.05 points of
+    // 49.6%"), never "within 0.05%", which reads as relative
+    let tolerance = |v: f64| with_unit(&fixed(v, digits(v), false), &unit_word(unit, true, v.abs()));
     let against = if !reference.is_empty() && !reference.starts_with("cited ") { format!(" ({} against {})", said_arm(&subject), the_arm(reference)) } else { String::new() };
     let bound = |t: f64| match (cmp, tol) {
         ("at least", _) | ("at most", _) => format!("{cmp} {}", said(t)),
-        ("within", Some(e)) => format!("within {} of {}", said(e.abs()), said(t)),
+        ("within", Some(e)) => format!("within {} of {}", tolerance(e.abs()), said(t)),
         _ => String::new(),
     };
     // each kind of rule in the words of what it reads (record.rs's rule_with)
@@ -3276,6 +3329,10 @@ fn metric_name(f: &Value) -> &str {
 /// key: "top1" reads "Top-1", "share_under_2pt" "Share under 2pt"; an acronym keeps its case (FIX5): "onnx_top1" reads
 /// "ONNX top-1", "int8_top1" "INT8 top-1".
 fn metric_said(name: &str) -> String {
+    // a name that joins words with "_" is an identifier: said as declared, never split into words (val_bpb)
+    if name.contains('_') {
+        return name.to_string();
+    }
     let topn = |t: &str| t.strip_prefix("top").filter(|d| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit())).map(|d| format!("top-{d}"));
     let word = |w: &str| {
         let low = w.to_lowercase();
@@ -3327,8 +3384,11 @@ fn metric_head(name: &str, unit: &str) -> (String, String) {
     let unit = if matches!(unit.to_ascii_lowercase().as_str(), "percent" | "per cent" | "pct" | "percentage" | "percentages") { "%".to_string() } else { unit };
     let last = name.rsplit('.').next().unwrap_or(name);
     let unit = if unit == name || unit == last { String::new() } else { unit };
-    let base = name.strip_suffix(&format!("_{unit}")).filter(|b| !b.is_empty() && !unit.is_empty()).unwrap_or(name);
-    (metric_said(base), unit)
+    // a name that joins words with "_" heads its column as declared (val_bpb), its unit kept for the values
+    if name.contains('_') {
+        return (name.to_string(), unit);
+    }
+    (metric_said(name), unit)
 }
 
 /// A finding's unit as a sentence says it (FIX3, as the page says units): a percentage by any of its names is "%"
@@ -4024,7 +4084,7 @@ mod tests {
         assert!(text_of(s0).contains("This page holds the newest 50 receipts of e1; rb open loads this one in full."));
         assert!(s0.contains("<a class=\"mono\" href=\"#c-c1\">c1</a>") && text_of(s0).contains("Top-1, FP32 0.7598"), "{s0}");
         // its results by their titles, as the full card says them (FIX5)
-        assert!(!s0.contains("top1=") && !s0.contains("onnx_top1") && !s0.contains("fp32:"), "{s0}");
+        assert!(!s0.contains("top1=") && !s0.contains("fp32:"), "{s0}");
         assert!(!s0.contains("<details") && card(&page, "run-runx59").contains("<summary>Source details</summary>"));
         // its results keep their anchor: an analysis that read it drills there
         assert!(s0.contains(" id=\"run-runx00:results\""), "{s0}");
@@ -4093,7 +4153,7 @@ mod tests {
         let row = &mut dig(e1, &["table", "rows"]).as_list_mut().unwrap()[0];
         dig(row, &["metrics", "top1"]).as_dict_mut().unwrap().insert("mean".into(), Value::Float(6.0e20));
         let page = all(&doc, Surface::Page);
-        assert!(!page.contains("9223372036854775807") && card(&page, "x-e1:v:fp32").contains(">600000000000000000000.00<"), "{}", card(&page, "x-e1:v:fp32"));
+        assert!(!page.contains("9223372036854775807") && card(&page, "x-e1:v:fp32").contains(">600000000000000000000.0000<"), "{}", card(&page, "x-e1:v:fp32"));
     }
 
     /// The counts and values on the smaller cards drill too: an observation's per-run values to its run, a finding's
@@ -4499,8 +4559,8 @@ mod tests {
         assert!(counts.contains("<li><a class=\"ci\" href=\"#c-c1\"><span class=\"au\">int8 holds top1 within 1 point of fp32</span> <span class=\"mono id\">c1</span></a> \u{b7} <span class=\"sw good\">rule met</span></li>"), "{counts}");
         assert_eq!(text_of(counts).matches(why).count(), 1, "{counts}");
         assert!(text_of(counts).contains(&format!("Counted in 1 rule.")) && text_of(counts).contains(&format!("Not counted in 2 rules: {why}.")), "{}", text_of(counts));
-        // two numbers that differ never read alike: 0.7598 and 0.7569 take a third decimal, rb's digits on hover
-        assert!(run.contains("<dl class=\"ax mets\"><dt>Top-1, FP32</dt><dd><span class=\"nb\" title=\"0.7598\">0.760</span></dd><dt>Top-1, INT8</dt><dd><span class=\"nb\" title=\"0.7569\">0.757</span></dd></dl>"), "{run}");
+        // a run's numbers in rb's own digits, as rb show gives them
+        assert!(run.contains("<dl class=\"ax mets\"><dt>Top-1, FP32</dt><dd>0.7598</dd><dt>Top-1, INT8</dt><dd>0.7569</dd></dl>"), "{run}");
         // a rule card's table: the arm all its runs share and the values every run has, once above it
         let c1 = card(&page, "c-c1");
         let runs = &c1[c1.find("id=\"c-c1:runs\"").unwrap()..];
@@ -5348,14 +5408,15 @@ mod tests {
         b.insert("comparator".into(), Value::str("at most"));
         b.insert("target".into(), Value::Float(0.0));
         // M's margin comes in the verdict's digits and unit (FIX4), drawn as M words it (FIX5)
-        dig(&mut w, &["row"]).as_dict_mut().unwrap().insert("margin".into(), Value::str("margin 0.08 nats"));
-        assert!(sentence_text(&verdict(&w)).contains("is 0.08 nats lower than the plain baseline (no interval yet), 0.08 nats under the 0 nats it allows"), "{}", verdict(&w));
+        dig(&mut w, &["row"]).as_dict_mut().unwrap().insert("margin".into(), Value::str("margin 0.075 nats"));
+        assert!(sentence_text(&verdict(&w)).contains("is 0.075 nats lower than the plain baseline (no interval yet), 0.075 nats under the 0 nats it allows"), "{}", verdict(&w));
         dig(&mut doc, &["findings"]).as_dict_mut().unwrap().insert("c1".into(), w.clone());
         let page = all(&doc, Surface::Page);
         let c = card(&page, "c-c1");
-        assert!(c.contains("<span class=\"e\"><span class=\"nb\" title=\"-0.075\">-0.08</span></span>"), "{c}");
-        assert!(c.contains("<dt>margin</dt><dd><a href=\"#c-c1:reading\">0.08 nats</a></dd>"), "{c}");
-        assert!(!text_of(c).contains("0.07"), "{}", text_of(c));
+        // one reading, one way: two significant digits of a small difference, in the verdict, the number and the margin
+        assert!(c.contains(">-0.075</span></span>"), "{c}");
+        assert!(c.contains("<dt>margin</dt><dd><a href=\"#c-c1:reading\">0.075 nats</a></dd>"), "{c}");
+        assert!(!text_of(c).contains("0.08"), "{}", text_of(c));
         // the figure's rule label says its number with its unit, as the verdict does
         assert!(figure::draw(&w, false).contains(">the rule: 0 nats or less</text>"), "{}", figure::draw(&w, false));
         let m = step_by_step(3.6, 0.619, 6.581, "misses", "criterion not met \u{b7} gain");
@@ -5388,7 +5449,7 @@ mod tests {
         r.insert("hi".into(), Value::Null);
         let page = all(&doc, Surface::Page);
         let a1 = card(&page, &analysis_anchor("a1"));
-        assert!(a1.contains("<span class=\"e\"><span class=\"nb\" title=\"-0.075\">-0.08</span></span>") && text_of(a1).contains("0.08 nats lower"), "{a1}");
+        assert!(a1.contains("-0.075</span></span>") && text_of(a1).contains("0.075 nats lower"), "{a1}");
         // Runs it rests on: each arm by its plain name, as the verdict names it
         let obs = |arm: &str, run: &str, seed: &str| crate::obj! {"arm" => arm, "run" => run, "counted" => true, "value_text" => "75.1", "per_run" => crate::obj! {"seed" => seed}};
         let mut doc = example("owner");
@@ -5416,19 +5477,19 @@ mod tests {
         dig(&mut doc, &["runs", "runs1"]).as_dict_mut().unwrap().insert("results".into(), Value::str("step_by_step.val_loss=0.5 \u{b7} plain.val_loss=0.6"));
         let page = all(&doc, Surface::Page);
         let run = card(&page, "run-runs1");
-        assert!(run.contains("<dt>Val loss, step by step</dt>") && run.contains("<dt>Val loss, plain</dt>"), "{run}");
+        assert!(run.contains("<dt>val_loss, step by step</dt>") && run.contains("<dt>val_loss, plain</dt>"), "{run}");
     }
 
     /// FIX5: a variant's card heads its metrics by their titles and says its means in rb's digits with their units; a
     /// metric's title keeps an acronym's case; a rule's runs carry their unit; the margin is drawn as M words it.
     #[test]
     fn a_card_says_metrics_by_title_and_numbers_with_their_units() {
-        assert_eq!(metric_said("onnx_top1"), "ONNX top-1");
-        assert_eq!(metric_said("int8_top1"), "INT8 top-1");
+        assert_eq!(metric_said("onnx_top1"), "onnx_top1", "a name joined with _ is said as declared (round 4)");
+        assert_eq!(metric_said("int8_top1"), "int8_top1");
         assert_eq!(metric_said("top1"), "Top-1");
-        assert_eq!(metric_said("val_loss"), "Val loss");
+        assert_eq!(metric_said("val_loss"), "val_loss");
         assert_eq!(metric_said("auc"), "AUC");
-        assert_eq!(metric_said("share_under_2pt"), "Share under 2pt");
+        assert_eq!(metric_said("share_under_2pt"), "share_under_2pt");
         let mut doc = example("owner");
         let e1 = dig(&mut doc, &["experiments"]).as_list_mut().unwrap().iter_mut().find(|x| s(x, "id") == "e1").unwrap();
         for row in dig(e1, &["table", "rows"]).as_list_mut().unwrap() {
@@ -5441,11 +5502,13 @@ mod tests {
         let page = all(&doc, Surface::Page);
         let v = card(&page, &variant_anchor("e1", "fp32"));
         let text = text_of(v);
-        for want in ["<th>Top-1</th>", "<th>ONNX top-1</th>", "<th>Latency</th>"] {
+        // a name joined with _ heads its column as declared (round 4), its unit kept for the values
+        for want in ["<th>Top-1</th>", "<th>onnx_top1</th>", "<th>latency_ms</th>"] {
             assert!(v.contains(want), "{want}: {v}");
         }
-        assert!(text.contains("8.07 ms") && text.contains("75.69%"), "{text}");
-        for raw in ["latency_ms", "onnx_top1", "8.0666", "75.6866", ">top1<"] {
+        // top1's means in the digits its rules read it in (round 4: never fewer than a rule's)
+        assert!(text.contains("8.07 ms") && text.contains("75.6867%"), "{text}");
+        for raw in ["8.0666", "75.6866", ">top1<"] {
             assert!(!v.contains(raw), "{raw}: {v}");
         }
         // rb's label for a metric where it gives one, as the grid titles it

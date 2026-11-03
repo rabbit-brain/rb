@@ -113,20 +113,34 @@ fn finding_block_without(f: &Value, limit: Option<usize>, said: &[String]) -> Ve
     let noted = |codes: &[&str]| -> Vec<bool> {
         items(f, "caveats").iter().filter(|c| codes.contains(&gs(c, "code").as_str())).map(|c| said.contains(&gs(c, "text"))).collect()
     };
-    let (unverified, unchecked) = (noted(UNVERIFIED), noted(&["config_unchecked"]));
+    // nor beside a run it counts whose config says its code had uncommitted changes
+    let (unverified, unchecked, uncommitted) = (noted(UNVERIFIED), noted(&["config_unchecked"]), noted(&["uncommitted_code"]));
     let mut quiet = false;
     for (key, label) in AXES {
         let Some(mut text) = says.get(key).filter(|t| t.truthy()).map(pyjson::py_str) else { continue };
-        if *key == "integrity" && text == "ok" && !(unverified.is_empty() && unchecked.is_empty()) {
-            let at: Vec<bool> = unverified.iter().chain(&unchecked).copied().collect();
+        if *key == "integrity" && text == "ok" && !(unverified.is_empty() && unchecked.is_empty() && uncommitted.is_empty()) {
+            let at: Vec<bool> = unverified.iter().chain(&unchecked).chain(&uncommitted).copied().collect();
             let (above, below) = (at.contains(&true), at.contains(&false));
-            let what = match (unverified.is_empty(), unchecked.is_empty()) {
-                (false, true) => "settings it reads are not verified",
-                (true, false) => "no run config was compared",
-                _ => "settings it reads are not verified and no run config was compared",
+            let mut parts: Vec<&str> = Vec::new();
+            if !unverified.is_empty() {
+                parts.push("settings it reads are not verified");
+            }
+            if !uncommitted.is_empty() {
+                let many = items(f, "caveats").iter().any(|c| gs(c, "code") == "uncommitted_code" && gs(c, "text").contains("; "));
+                parts.push(if many { "runs it counts ran on code with uncommitted changes" } else { "a run it counts ran on code with uncommitted changes" });
+            }
+            if !unchecked.is_empty() {
+                parts.push("no run config was compared");
+            }
+            let what = match parts.len() {
+                1 => parts[0].to_string(),
+                _ => {
+                    let (last, rest) = parts.split_last().unwrap();
+                    format!("{} and {last}", rest.join(", "))
+                }
             };
             text = format!("{what}, as said {}", if above && below { "above and below" } else if above { "above" } else { "below" });
-            quiet = unverified.is_empty();
+            quiet = unverified.is_empty() && uncommitted.is_empty();
         }
         if (*key == "integrity" && (text == "ok" || quiet) && limit.is_some()) || ((*key == "review" || *key == "history") && (text == "no decision" || text.is_empty())) {
             continue;
@@ -150,11 +164,21 @@ fn finding_block_without(f: &Value, limit: Option<usize>, said: &[String]) -> Ve
         .filter(|c| c.get("code").and_then(|x| x.as_str()) != Some("single_unit") && !said.contains(&gs(c, "text")))
         .filter(|c| !(comparable_said && gs(c, "code") == "cited_differs"))
         .collect();
-    let shown = match limit {
-        None => notes.len(),
-        Some(l) => l.min(notes.len()),
+    // under a limit, the notes the integrity line points to ("as said below") stay in view beside the others it keeps
+    let pointed = |c: &Value| {
+        let code = gs(c, "code");
+        UNVERIFIED.contains(&code.as_str()) || code == "uncommitted_code" || code == "config_unchecked"
     };
-    for c in &notes[..shown] {
+    let mut budget = limit.unwrap_or(usize::MAX);
+    let mut shown = 0;
+    for c in &notes {
+        if !pointed(c) {
+            if budget == 0 {
+                continue;
+            }
+            budget -= 1;
+        }
+        shown += 1;
         lines.push(format!("          · {}", gs(c, "text")));
     }
     if shown < notes.len() {
@@ -455,7 +479,8 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
         _ => Vec::new(),
     };
     tally.sort_by_key(|(k, _)| tally_order(k));
-    let tally = tally.iter().map(|(k, n)| tally_word(k, n)).collect::<Vec<_>>().join(" · ");
+    let alone = |k: &str| stv.get("tally_on_estimate").and_then(|t| t.get(k)).and_then(Value::as_i64).unwrap_or(0);
+    let tally = tally.iter().map(|(k, n)| tally_word(k, n) + &on_estimate_said(alone(k), n)).collect::<Vec<_>>().join(" · ");
     let retracted = items(&stv, "retracted");
     // a title that is its id is said once
     let (title, pid) = (gs(&proj, "title"), gs(&proj, "id"));
@@ -989,7 +1014,7 @@ fn criteria_of(d: &Dict) -> Vec<Value> {
 
 /// How a run's numbers came, as a screen says it: a database row's are a row's, though the record keeps `file`.
 fn basis_said(r: &Run) -> &str {
-    if r.basis == "file" && r.receipt.row.is_some() { "row" } else { r.basis.as_str() }
+    if r.basis == "file" && (r.receipt.row.is_some() || r.receipt.extra.contains_key("table_row")) { "row" } else { r.basis.as_str() }
 }
 
 /// rb show <note id>: the note as its experiment's (or the project's) screen lists it, and whether it was taken back.
@@ -1336,7 +1361,8 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                 out.say(format!("  method: {}", parts.join(" · ")));
             }
             let mut now: Vec<Caveat> = Vec::new();
-            for c in &a.comparisons {
+            for (ci, c) in a.comparisons.iter().enumerate() {
+                let across = crate::ledger::Ledger::stated_across_of(&a, ci);
                 let [est, lo, hi] = led.comparison_said(&a.experiment, c)?;
                 let iv = match (c.lo, c.hi) {
                     // an interval is its two bounds: one bound alone is not one
@@ -1360,10 +1386,18 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                         Some(n) if !c.unit.is_empty() => format!(" · {n} {}", crate::assess::plural(&c.unit, n)),
                         _ => String::new(),
                     } + &match &c.source {
-                        Some(src) => {
-                            format!(" · stated in {}", src.label())
-                                + &src.resolved.as_ref().map(|r| format!(", read {}", pyjson::repr_str(&cut(&r.text, 80)))).unwrap_or_default()
-                        }
+                        Some(src) => match &across {
+                            // the lines of one section that state its numbers between them, each as rb read it
+                            Some(read) => format!(
+                                " · stated in {}, read {}",
+                                src.path.clone().unwrap_or_default(),
+                                read.iter().map(|(n, t)| format!(":{n} {}", pyjson::repr_str(&cut(t, 80)))).collect::<Vec<_>>().join(" and ")
+                            ),
+                            None => {
+                                format!(" · stated in {}", src.label())
+                                    + &src.resolved.as_ref().map(|r| format!(", read {}", pyjson::repr_str(&cut(&r.text, 80)))).unwrap_or_default()
+                            }
+                        },
                         None => String::new(),
                     },
                 );
@@ -1371,9 +1405,12 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                     out.say(format!("    note: {}", c.note));
                 }
                 // the document is re-read on every read, as each finding that reads this analysis does
-                if let Some(src) = c.source.as_ref().filter(|s| a.basis == "reported" && s.resolved.is_some()) {
+                if let Some(src) = c.source.as_ref().filter(|s| a.basis == "reported" && (s.resolved.is_some() || across.is_some())) {
                     let nums: Vec<f64> = [Some(c.estimate), c.lo, c.hi].into_iter().flatten().collect();
-                    let (state, why) = led.recheck_stated(src, &nums);
+                    let (state, why) = match &across {
+                        Some(read) => led.recheck_across(src, read, &nums),
+                        None => led.recheck_stated(src, &nums),
+                    };
                     if state == "stale" {
                         out.say(format!("    ✗ {why}"));
                         now.push(Caveat::problem("analysis_source_changed", &a.id, format!("{}'s numbers: {why}", a.id)));
@@ -1893,6 +1930,18 @@ const NEEDS_JUDGMENT_MD: &str = "## Needs judgment";
 /// A rule word of the tally as the page's tally says it: "1 met", "2 not met", "1 can't tell yet", "1 not tested", any
 /// other ("1 not reproduced", "1 gate missed") as rb gives it, in plain words (shell/views.rs short_rule, then
 /// strings.rs plain_word).
+/// What a tally adds of the rules it counts that are met on the estimate alone: "5 reproduced, 2 of them on the
+/// estimate alone", "1 met, on the estimate alone". A tally never hides a reading's outcome.
+pub fn on_estimate_said(alone: i64, n: &str) -> String {
+    match (alone, n.parse::<i64>().unwrap_or(0)) {
+        (0, _) => String::new(),
+        (a, t) if a == t && t == 1 => ", on the estimate alone".into(),
+        (a, t) if a == t && t == 2 => ", both on the estimate alone".into(),
+        (a, t) if a == t => format!(", all {t} on the estimate alone"),
+        (a, _) => format!(", {a} of them on the estimate alone"),
+    }
+}
+
 fn tally_word(key: &str, n: &str) -> String {
     crate::shell::strings::plain_word(&format!("{n} {}", crate::shell::strings::short_rule(key)))
 }

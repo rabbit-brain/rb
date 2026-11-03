@@ -846,8 +846,14 @@ pub fn rule_word(outcome: &str, role: &str, origin: &str) -> String {
 /// meet criterion' for an --each rule) when the reading has no interval or crosses the threshold.
 pub fn rule_said(c: &Criterion, outcome: &str, reading: Option<&Reading>) -> String {
     let word = rule_word(outcome, &c.role, &c.origin);
-    if word == "meets" && reading.map_or(false, |r| r.lo.is_none() || r.hi.is_none() || crossing(c, r).is_some()) {
+    let alone = reading.map_or(false, |r| r.lo.is_none() || r.hi.is_none() || crossing(c, r).is_some());
+    if word == "meets" && alone {
         return if c.over == "each" { "recorded values meet criterion" } else { "estimate meets criterion" }.into();
+    }
+    // a cited rule met on the estimate alone is qualified as an own rule is: never a bare "reproduced" beside a reading
+    // with no interval, or one that crosses the rule's line
+    if word == "reproduced" && alone {
+        return if c.over == "each" { "reproduced on the recorded values" } else { "reproduced on the estimate" }.into();
     }
     rule_label(&word, 1)
 }
@@ -1017,7 +1023,7 @@ pub fn plural(word: &str, n: i64) -> String {
     if word.ends_with('s') && !word.ends_with("ss") {
         return word.to_string(); // given in the plural already: images, docs
     }
-    if word.ends_with('s') || word.ends_with('x') || word.ends_with("ch") || word.ends_with("sh") {
+    if word.ends_with('s') || word.ends_with('x') || (word.ends_with("ch") && !word.ends_with("och")) || word.ends_with("sh") {
         return format!("{word}es");
     }
     if word.ends_with('y') {

@@ -99,6 +99,15 @@ tests/test_page_notes.py	I
 tests/test_readings_said.py	I
 tests/test_run_folders.py	I
 tests/test_small_things.py	I
+tests/test_counts_toward.py	I
+tests/test_dates_and_code.py	I
+tests/test_json_lines.py	I
+tests/test_page_said_once.py	I
+tests/test_pairs_said.py	I
+tests/test_sdk_time.py	I
+tests/test_offers_kept.py	I
+tests/test_one_reading_said.py	I
+tests/test_tables_said.py	I
 AGENTS.md	I
 README.md	I
 CHANGELOG.md	I

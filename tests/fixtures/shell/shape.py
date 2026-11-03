@@ -64,6 +64,8 @@ PHASE = [  # (path prefix, phase, where today's code computes it, or what builds
     ("project.parent", "M5", "project.yaml parent where http::is_address, as http::shareable says it; \"\" otherwise"),
     ("experiments[].relation_lines", "M5", "view::relation_lines, the card's line for each relation"),
     ("experiments[].settings_line", "M5", "view::settings_of, the card's settings line"),
+    ("findings.{id}.on_estimate", "today", "contract 1.12 (fix round 3): ledger/views.rs on_estimate_alone: a rule met on the estimate alone, which a tally says apart"),
+    ("home.tally_on_estimate", "today", "contract 1.12 (fix round 3): view::home (Home): rb status tally_on_estimate, the rules of each word met on the estimate alone"),
     ("experiments[].tally", "M5", "view::experiment_tally, the experiment's rule counts as home.tally"),
     ("experiments[].muted", "M5", "view::experiment_tally, the met rules' words drawn muted, as home.muted"),
     ("experiments[].table.rows[].metrics.{key}.delta", "M5", "rb compare's change against the baseline"),
@@ -93,7 +95,7 @@ PHASE = [  # (path prefix, phase, where today's code computes it, or what builds
     ("findings.{id}.reading_short", "M6", "the compact row's reading, arms labelled"), ("findings.{id}.verdict", "P4B", "model.rs verdict: the rule's one sentence (status word, reading, result class in words, distance from its number)"),
     ("findings.{id}.reading.unit_said", "P4B", "model.rs: the unit as a sentence says it (points for a difference of percentages)"), ("findings.{id}.tags", "M6", "at most two ontology tags"),
     ("findings.{id}.reads_baseline", "M6", "it reads the baseline or control arm alone"),
-    ("findings.{id}.pooled", "M6", "rb show's headline words for a reading that pools a per-run setting's values; empty where none"),
+    ("findings.{id}.pooled", "M6", "contract 1.12 (fix round 2): rb show's headline words for a reading that pools a per-run setting's values; empty where none"),
     ("experiments[].compares", "M6", "model.rs compares, arms labelled"),
     # CITE (CITE.md items 1 and 4): every file:line the text cites, resolved (ledger/cite.rs, M's CITE-FIELDS.md)
     # PIVOT (the experiment's comparison as a grid; a reader's queue rows say what stands): rb compare's cells, additive
@@ -129,6 +131,8 @@ ELEMENTS = [  # element shapes of lists every example leaves empty, as rb comput
     # contract 1.4 (M's requests.md lines 28 to 54)
     ("experiments[].relation_lines[]", "string"), ("experiments[].muted[]", "string"), ("experiments[].table.rows[].metrics.{key}.differs_in[]", "string"),
     ("unfiled.experiments[]", "string"),
+    # fix round 3: the rules of each word met on the estimate alone, keyed by the rule word
+    ("home.tally_on_estimate.{key}", "number"),
     # contract 1.5 (R7's request; the words given with a declaration are the user's, so Live only, as the tier table says)
     ("questions[].overview.relations[].declarations", "list"), ("questions[].overview.relations[].declarations[]", "object"),
     ("questions[].overview.relations[].declarations[].criterion", "string"),
@@ -143,7 +147,7 @@ ELEMENTS = [  # element shapes of lists every example leaves empty, as rb comput
     ("experiments[].table.rows[].metrics.{key}.criteria[]", "string"),
 ]
 TOP = {"findings", "runs", "resources", "analyses"}
-DYN = (".says", ".observations[].per_run", ".by_arm", ".by_question", ".table.rows[].varies", ".table.rows[].where", ".table.rows[].unvaried", ".table.rows[].metrics")
+DYN = (".tally_on_estimate", ".says", ".observations[].per_run", ".by_arm", ".by_question", ".table.rows[].varies", ".table.rows[].where", ".table.rows[].unvaried", ".table.rows[].metrics")
 
 
 def kind(v):

@@ -66,3 +66,31 @@ def test_rbs_section_in_a_file_git_keeps_with_other_line_endings_is_still_rbs(tm
     assert "uncommitted changes when recorded" not in out and "Only rb's own files are uncommitted" in out, out
     refs = subprocess.run(["git", "-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/rb/snapshots/"], capture_output=True, text=True).stdout.split()
     assert refs == [subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True).stdout.strip()]
+
+
+def test_rbs_own_page_and_export_make_no_tree_dirty(tmp_path, monkeypatch, capsys):
+    """rb page and rb export write beside .rb/: as rb wrote them, they are no code a run ran, so a run recorded after an
+    export reads the tree as its commit's, with no snapshot of them; an export changed since is the user's again."""
+    as_the_user(monkeypatch)
+    monkeypatch.setenv("RB_ACTOR", "human:ana")
+    root = tmp_path / "int8"
+    root.mkdir()
+    (root / "eval.py").write_text("print('top1')\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    monkeypatch.chdir(root)
+    assert main(["init", "INT8 ResNet-50", "--no-agents"], typed=True) == 0
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+    subprocess.run([*GIT, "-C", str(root), "commit", "-q", "-m", "code and record"], check=True)
+    main(["experiment", "add", "INT8 against FP32", "--id", "int8", "--purpose", "the runs", "--baseline", "fp32", "--candidate", "int8"], typed=True)
+    for argv in (["page"], ["export", "--out", "rb-export", "--no-repo"], ["export", "--zip", "--no-repo"]):
+        assert main(argv, typed=True) == 0, argv
+    capsys.readouterr()
+    assert (root / "rb-page.html").is_file() and (root / "rb-export").is_dir() and (root / "rb-export.zip").is_file()
+    assert main(["run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6"], typed=True) == 0
+    out = capsys.readouterr().out
+    assert "uncommitted changes when recorded" not in out, out
+    refs = subprocess.run(["git", "-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/rb/snapshots/"], capture_output=True, text=True).stdout.split()
+    assert refs == [subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True).stdout.strip()]
+    (root / "rb-export" / "page.html").write_text("my notes\n", encoding="utf-8")
+    assert main(["run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.5"], typed=True) == 0
+    assert "uncommitted changes when recorded" in capsys.readouterr().out

@@ -1,4 +1,4 @@
-"""The shell's model (SPRINT-OCT24.md section 1, track M): the document rb builds of a record, rb-shell-view/1.11, read
+"""The shell's model (SPRINT-OCT24.md section 1, track M): the document rb builds of a record, rb-shell-view/1.12, read
 through RB_TEST_SHELL_DUMP while rb page (the Owner tier) and rb open's `/` (the Live tier) draw it under RB_TEST_SHELL.
 Its fields are the contract's (tests/fixtures/shell/view-1.shape.tsv); here, those rb computes today (M0)."""
 import json
@@ -1830,7 +1830,8 @@ def test_the_demo_s_lines_read_plainly(int8_demo, tmp_path):
     # ("ONNX top-1")
     c4 = doc["findings"]["c4"]
     assert c4["row"]["metric"] == "onnx_top1", c4["row"]
-    assert c4["reading_short"] == f'ONNX top-1 is {c4["reading"]["estimate"]:.2f}%', c4["reading_short"]
+    # round 4: a name joined with _ is said as declared
+    assert c4["reading_short"] == f'onnx_top1 is {c4["reading"]["estimate"]:.2f}%', c4["reading_short"]
     # FIX4: the row's rule in the card's words, a level's percentage written onto its number
     assert c4["row"]["criterion"] == "≥ 75.5%" and c4["row"]["margin"] == f'margin {c4["reading"]["estimate"] - 75.5:.2f} points', c4["row"]
     assert not any(r["detail"].startswith(": ") or " · : " in r["detail"] for r in doc["home"]["queue"]), doc["home"]["queue"]
@@ -2882,12 +2883,13 @@ def test_a_design_change_says_a_rule_by_its_metrics_title(tmp_path):
     for tier, doc in both_tiers(rec.root, tmp_path / "dumps").items():
         [e1] = [e for e in doc["experiments"] if e["id"] == "e1"]
         lines = e1["design"]["lines"]
-        assert any(l.endswith("criterion c4 added: ONNX top-1 75.5% or more (primary)") for l in lines), (tier, lines)
+        # round 4: a name joined with _ is said as declared
+        assert any(l.endswith("criterion c4 added: onnx_top1 75.5% or more (primary)") for l in lines), (tier, lines)
         assert any(l.endswith("criterion c5 added: Top-1, INT8 against the FP32 baseline: 1 point or less (primary)") for l in lines), (tier, lines)
         # a rule with a scope keeps rb's words, which say it
         [c6] = [l for l in lines if "criterion c6 added: " in l]
         assert "seed=1" in c6 and "change.top1" in c6, (tier, c6)
-        assert not any("onnx_top1" in l or "change.top1" in l for l in lines if l is not c6), (tier, lines)
+        assert not any("change.top1" in l for l in lines if l is not c6), (tier, lines)
     # a rule changed keeps rb's words on both sides, its was being only text: c3, in the design confirmed, moves to -1.5
     crit = rec.root / ".rb" / "experiments" / "e1" / "criteria" / "c3.yaml"
     crit.write_text(re.sub(r"(?m)^target: -2(\.0)?$", "target: -1.5", crit.read_text(encoding="utf-8")), encoding="utf-8", newline="")
@@ -3208,8 +3210,8 @@ def test_rb_status_and_rb_context_say_rules_and_needs_judgment_as_the_page_does(
     page = (tmp_path / "page.html").read_text(encoding="utf-8")
     import html as _html
     tallies = {_html.unescape(re.sub(r"<[^>]+>", "", m)) for m in re.findall(r'<p class="stt"><span class="k">Rules: </span>(.*?)</p>', page)}
-    assert tallies == {"1 met · 1 not met · 1 not reproduced"}, tallies
-    assert "Rules: 1 met · 1 not met · 1 not reproduced" in status
+    assert tallies == {"1 met, on the estimate alone · 1 not met · 1 not reproduced"}, tallies
+    assert "Rules: 1 met, on the estimate alone · 1 not met · 1 not reproduced" in status
     assert "Needs judgment (2)" in status and "Rules" in status
     assert not [x for x in status if "Needs a human" in x or x.startswith("Criteria")]
     context = rb(you, "context").splitlines()

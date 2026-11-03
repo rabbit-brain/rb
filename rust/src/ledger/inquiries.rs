@@ -395,6 +395,9 @@ fn finding_basis(finding: &Dict) -> Dict {
     }
     if let Some(Value::Dict(comparison)) = out.get_mut("comparison") {
         if comparison.get("design").map_or(false, |v| !v.truthy()) { comparison.shift_remove("design"); }
+        // what a paired reading pairs by is said with it, never kept in a call's snapshot: its estimate, interval and
+        // units already move the call, and a format-1 snapshot an older rb reads holds no key it does not know
+        comparison.shift_remove("pairing");
     }
     out
 }

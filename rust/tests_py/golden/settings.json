@@ -558,6 +558,7 @@
     "   \"design_pending_count\": 0",
     "  },",
     "  \"tally\": {},",
+    "  \"tally_on_estimate\": {},",
     "  \"results\": {},",
     "  \"findings\": [],",
     "  \"experiments\": [",

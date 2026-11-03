@@ -90,7 +90,7 @@
    "exit": 0,
    "out": [
     "runrchyrp on e1: base.top1=0.7, wide.top1=0.72",
-    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers> --produced-at <when> --replaces runrchyrp --why \"<when they were made>\"",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runrchyrp --why \"<when they were made>\"",
     "  rb put the code in git at refs/rb/snapshots/35b95f3a047d080e331e4562ae1cc34c6f5b1426, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/35b95f3a047d080e331e4562ae1cc34c6f5b1426 removes it.",
     "",
     "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric base.top1 --at-most <x>   (write the criterion before the next run)",
@@ -249,6 +249,7 @@
     "   \"design_pending_count\": 0",
     "  },",
     "  \"tally\": {},",
+    "  \"tally_on_estimate\": {},",
     "  \"results\": {},",
     "  \"findings\": [],",
     "  \"experiments\": [",

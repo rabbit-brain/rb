@@ -50,7 +50,7 @@
    "exit": 0,
    "out": [
     "run5kjajj on e1: top1=0.7",
-    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers> --produced-at <when> --replaces run5kjajj --why \"<when they were made>\"",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces run5kjajj --why \"<when they were made>\"",
     "  rb put the code in git at refs/rb/snapshots/3d0073043f4eee3c981b7641066bbc495939d195, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/3d0073043f4eee3c981b7641066bbc495939d195 removes it.",
     "",
     "Next: rb criterion add \"<what it should show>\" -e e1 -q <question> --metric top1 --at-most <x>   (write the criterion before the next run)",
@@ -65,7 +65,7 @@
    "exit": 0,
    "out": [
     "run5kjajj on e2: top1=0.6",
-    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e2 <the same numbers> --produced-at <when> --replaces run5kjajj --why \"<when they were made>\"",
+    "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e2 <the same numbers and per-run values> --produced-at <when> --replaces run5kjajj --why \"<when they were made>\"",
     "",
     "Next: rb criterion add \"<what it should show>\" -e e2 -q <question> --metric top1 --at-most <x>   (write the criterion before the next run)",
     ""
@@ -173,6 +173,7 @@
     "   \"design_pending_count\": 0",
     "  },",
     "  \"tally\": {},",
+    "  \"tally_on_estimate\": {},",
     "  \"results\": {},",
     "  \"findings\": [],",
     "  \"experiments\": [",

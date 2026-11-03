@@ -621,9 +621,88 @@ fn head_line(plan: &repo::Plan) -> String {
     }
 }
 
-fn folders_line(plan: &repo::Plan) -> String {
-    format!("{} results folder{}", plan.folders.len(), if plan.folders.len() == 1 { "" } else { "s" })
+/// What the repository holds where results land, in rb's words: "2 results folders", "2 results files in results/",
+/// never "0 results folders" where a folder where results land holds results files of its own.
+fn folders_line(plan: &repo::Plan, loose: &[repo::LooseFile]) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if !plan.folders.is_empty() || loose.is_empty() {
+        parts.push(format!("{} results folder{}", plan.folders.len(), if plan.folders.len() == 1 { "" } else { "s" }));
+    }
+    let mut by_root: Vec<(String, usize)> = Vec::new();
+    for f in loose {
+        let root = f.path.rsplit_once('/').map(|(d, _)| format!("{d}/")).unwrap_or_else(|| "the top folder".to_string());
+        match by_root.iter_mut().find(|(r, _)| *r == root) {
+            Some((_, n)) => *n += 1,
+            None => by_root.push((root, 1)),
+        }
+    }
+    let shown = by_root.len().min(3);
+    let mut files: Vec<String> = by_root[..shown].iter().enumerate().map(|(i, (r, n))| if i == 0 { format!("{n} results file{} in {r}", if *n == 1 { "" } else { "s" }) } else { format!("{n} in {r}") }).collect();
+    if by_root.len() > shown {
+        files.push(format!("{} more in {} other folders", by_root[shown..].iter().map(|(_, n)| n).sum::<usize>(), by_root.len() - shown));
+    }
+    if !files.is_empty() {
+        parts.push(files.join(", "));
+    }
+    parts.join(", ")
         + &if plan.guides.is_empty() { String::new() } else { format!(", {} reproduction guide{}", plan.guides.len(), if plan.guides.len() == 1 { "" } else { "s" }) }
+}
+
+/// The results files that sit where results land and in no results folder: each table by its rows and the line that
+/// reads one, each file in a form rb does not read with why. A JSON, YAML or TOML file is said where the journal's own
+/// lines do not already name it. Lists them under `loose_files` in --json.
+fn loose_lines(
+    loose: &[repo::LooseFile],
+    said_elsewhere: &dyn Fn(&str) -> bool,
+    recorded: &std::collections::HashMap<String, usize>,
+    read_whole: &std::collections::HashSet<String>,
+    out: &mut Out,
+) {
+    let listed: Vec<&repo::LooseFile> = loose.iter().filter(|f| !(f.kind == "structured" && said_elsewhere(&f.path))).collect();
+    if !listed.is_empty() {
+        out.say("");
+        out.say(format!("Results files in no results folder ({}):", listed.len()));
+        for f in listed.iter().take(SHOWN_CHANGES) {
+            let rec = recorded.get(&f.path).copied().unwrap_or(0);
+            let rec_said = match f.rows {
+                _ if read_whole.contains(&f.path) => "; read by a recorded run".to_string(),
+                _ if rec == 0 => String::new(),
+                Some(rows) => format!("; {rec} of {rows} {} recorded as runs", if rows == 1 { "row" } else { "rows" }),
+                None => format!("; {rec} of its rows recorded as runs"),
+            };
+            out.say(format!("  {}: {}{rec_said}", f.path, f.said()));
+            match (f.kind, &f.why) {
+                ("table", None) if f.rows.unwrap_or(0) > 0 => out.say(format!("    a row is a run: rb run add <experiment> --from {} --where <column>=<value>,...", crate::cli::shlex_quote(&f.path))),
+                ("structured", _) => out.say(format!("    rb compile {} lists its numbers", crate::cli::shlex_quote(&f.path))),
+                ("database", _) => out.say(format!("    rb compile {} lists its tables; a row is a run: rb run add <experiment> --from {} --table <table> --where <column>=<value>", crate::cli::shlex_quote(&f.path), crate::cli::shlex_quote(&f.path))),
+                ("prose", _) => out.say(format!(
+                    "    a number it states is checked by a cited rule: rb criterion add \"<what it claims>\" -e <experiment> --metric <metric> --equals <the number> --tolerance <half its last digit> --source {} --quote \"<its words>\"",
+                    crate::cli::shlex_quote(&f.path)
+                )),
+                _ => {}
+            }
+        }
+        if listed.len() > SHOWN_CHANGES {
+            out.say(format!("  and {} more: rb reconcile --json lists every one", listed.len() - SHOWN_CHANGES));
+        }
+    }
+    if !loose.is_empty() {
+        out.data.insert(
+            "loose_files".into(),
+            Value::List(
+                loose
+                    .iter()
+                    .map(|f| {
+                        crate::obj! {
+                            "path" => f.path.clone(), "kind" => f.kind, "rows" => f.rows.map_or(Value::Null, |n| Value::Int(n as i64)),
+                            "numbers" => Value::list_of_str(f.numbers.clone()), "why" => f.why.clone().map_or(Value::Null, Value::Str),
+                            "recorded" => recorded.get(&f.path).copied().unwrap_or(0) as i64
+                        }
+                    })
+                    .collect(),
+            ),
+        );
+    }
 }
 
 /// Record each result reconcile placed without doubt, through the same rb run add anyone would type: (what was
@@ -696,7 +775,20 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
     }
     let jr::FoundAll { placed, unplaced, uncited, uncited_cut, uncited_from_head, .. } = all;
     let gv = repo::git_view(&led.root);
-    out.say(format!("{}: {}.", head_line(&plan), folders_line(&plan)));
+    let run_list = led.live::<Run>()?;
+    let read_files: Vec<String> = run_list.iter().flat_map(|r| r.files.iter().map(|f| f.path.clone())).collect();
+    let mut rows_recorded: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for r in &run_list {
+        if let Some(p) = r.receipt.extra.get("table_row").and_then(|t| t.get("path")).map(pyjson::py_str) {
+            *rows_recorded.entry(p).or_default() += 1;
+        }
+    }
+    let plan_folders: Vec<String> = plan.folders.iter().map(|fp| fp.folder.clone()).collect();
+    // every results file stays listed, a table with how many of its rows are runs ("93 of 93 rows recorded") and a
+    // file a recorded run read whole as read by it: never "0 results folders" once its runs are in
+    let loose_files: Vec<repo::LooseFile> = repo::loose_results(&led.root, &plan_folders);
+    let read_whole: std::collections::HashSet<String> = loose_files.iter().filter(|f| read_files.contains(&f.path) && !rows_recorded.contains_key(&f.path)).map(|f| f.path.clone()).collect();
+    out.say(format!("{}: {}.", head_line(&plan), folders_line(&plan, &loose_files)));
     if let Some(a) = &applied {
         // the runs it recorded count in its headline with what it indexed
         let line = get_s(a, "line");
@@ -859,12 +951,14 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
         })
         .filter(|w| !usual.iter().any(|u| w.starts_with(u.as_str())))
         .collect();
-    let read_files: Vec<String> = led.live::<Run>()?.iter().flat_map(|r| r.files.iter().map(|f| f.path.clone())).collect();
+    let said_elsewhere = |p: &str| unplaced.iter().any(|l| l.starts_with(&format!("{p} "))) || placed.iter().any(|it| it.path == p);
+    loose_lines(&loose_files, &said_elsewhere, &rows_recorded, &read_whole, out);
     not_read_lines(&led.root, &read_files, out);
-    if plan.folders.is_empty() && placed.is_empty() && unplaced.is_empty() && uncited.is_empty() {
-        let where_ = format!("the usual results folders ({})", usual.join(", ")) + &if others.is_empty() { String::new() } else { format!(" or {}", others.join(", ")) };
+    if plan.folders.is_empty() && loose_files.is_empty() && placed.is_empty() && unplaced.is_empty() && uncited.is_empty() {
+        let where_ = format!("where rb looks for results: {}", repo::where_rb_looks()) + &if others.is_empty() { String::new() } else { format!(", and {}", others.join(", ")) };
+        out.say("");
         out.say(
-            format!("Nothing to compile in {where_}.")
+            format!("Nothing to compile {where_}.")
                 + if s.get("truncated").map_or(false, |v| v.truthy()) { " The walk hit its cap; some places were not looked at." } else { "" },
         );
     }
@@ -1022,9 +1116,9 @@ fn not_read_lines(root: &std::path::Path, read: &[String], out: &mut Out) {
     if !d.not_read.is_empty() {
         out.say("");
         out.say(format!(
-            "Not read ({}): rb looks for results in folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), down to {} levels from the top:",
+            "Not read ({}): rb looks for results in {}:",
             d.not_read.len(),
-            repo::MAX_ROOT_DEPTH
+            repo::where_rb_looks()
         ));
         for n in d.not_read.iter().take(SHOWN_CHANGES) {
             let held = if n.folders > 0 {
@@ -1084,7 +1178,9 @@ fn reconcile_unrecorded(ns: &Namespace, out: &mut Out) -> R {
     let blank = repo::Unrecorded { root: root.clone() };
     let plan = repo::compile_repo(&blank)?;
     let gv = repo::git_view(&root);
-    out.say(format!("{}: {}. No record here yet.", head_line(&plan), folders_line(&plan)));
+    let plan_folders: Vec<String> = plan.folders.iter().map(|fp| fp.folder.clone()).collect();
+    let loose_files = repo::loose_results(&root, &plan_folders);
+    out.say(format!("{}: {}. No record here yet.", head_line(&plan), folders_line(&plan, &loose_files)));
     let mut reads = Dict::new();
     let loose: Vec<String> = plan.folders.iter().filter(|fp| !fp.adds()).map(|fp| fp.folder.clone()).collect();
     if !loose.is_empty() {
@@ -1126,6 +1222,7 @@ fn reconcile_unrecorded(ns: &Namespace, out: &mut Out) -> R {
             out.say(format!("  {} · not run under rb's watch", c.path) + &if c.command.is_empty() { String::new() } else { format!(" · run it: rb journal run -- {}", c.command) });
         }
     }
+    loose_lines(&loose_files, &|_: &str| false, &std::collections::HashMap::new(), &std::collections::HashSet::new(), out);
     not_read_lines(&root, &[], out);
     if let Some(there) = crate::elsewhere::record_elsewhere(&cwd) {
         // a worktree whose project's record is in another worktree: bring that record here, never start a second one
@@ -1138,16 +1235,13 @@ fn reconcile_unrecorded(ns: &Namespace, out: &mut Out) -> R {
         out.say("");
         out.say(format!("rb reconcile --apply starts the record here, titled {named}, and keeps this in it: {adds} experiment{} to add.", if adds == 1 { "" } else { "s" }));
         out.next = vec![format!("rb init \"{title}\""), "rb docs --start".into()];
-    } else if !plan.folders.is_empty() {
+    } else if !plan.folders.is_empty() || !loose_files.is_empty() {
         out.say("");
         out.say(format!("No results folder here holds a report, so rb reconcile --apply would add no experiment. Start the record: rb init \"{title}\""));
         out.next = vec![format!("rb init \"{title}\""), "rb docs --start".into()];
     } else {
-        let looked = repo::result_roots_of(&root);
-        out.say(format!(
-            "Nothing to compile: no results folder ({}) holds a report or a results file yet.",
-            if looked.is_empty() { result_roots().join(", ") } else { looked.join(", ") }
-        ));
+        out.say("");
+        out.say(format!("Nothing to compile where rb looks for results: {}. No folder there holds a report or a results file yet.", repo::where_rb_looks()));
         out.say("");
         out.say(format!("Start the record anyway: rb init \"{title}\""));
         out.next = vec![format!("rb init \"{title}\""), "rb docs --start".into()];

@@ -301,14 +301,13 @@ def against_stored(name: str, scenario, binary: str) -> list:
         cmd = g["run"]
         if w["run"] != cmd:
             problems.append(f"the step stored here is rb {w['run']}, and the scenario runs rb {cmd}: record it again")
+            break
         if w["exit"] != g["exit"]:
             problems.append(f"rb {cmd}: exit {w['exit']} (stored) vs {g['exit']} (now)")
         if w["out"] != g["out"]:
             problems.append(f"rb {cmd}: stdout differs\n{show_diff(bytes_of(w['out']), bytes_of(g['out']), 'stdout', names)}")
         if w["err"] != g["err"]:
             problems.append(f"rb {cmd}: stderr differs\n{show_diff(bytes_of(w['err']), bytes_of(g['err']), 'stderr', names)}")
-        if problems:
-            break
     wf, gf = want["files"], got["files"]
     for rel in sorted(set(wf) | set(gf)):
         if rel not in gf:
@@ -356,7 +355,7 @@ def main() -> int:
             if problems:
                 failed += 1
                 print(f"FAIL {name}")
-                for p in problems[:12]:
+                for p in problems:
                     print("  " + p.replace("\n", "\n  "))
             else:
                 print(f"{'kept' if mode == 'record' else 'ok  '} {name}", flush=True)

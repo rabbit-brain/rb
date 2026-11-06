@@ -6,7 +6,7 @@
    "out": [
     "The repository (no commit yet): 0 results folders. No record here yet.",
     "",
-    "Nothing to compile where rb looks for results: folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top. No folder there holds a report or a results file yet.",
+    "Nothing to compile where rb looks for results: folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top. No folder there holds a report or a results file yet.",
     "",
     "Start the record anyway: rb init \"The project's own title\"",
     "",
@@ -126,7 +126,7 @@
     "  - outputs/sweep/ holds results no recorded experiment reads yet",
     "      rb reconcile",
     "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "Next: rb docs --start   (how to record the work already done)  \u00b7  rb reconcile",
     ""

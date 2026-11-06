@@ -446,7 +446,7 @@ const RESULTISH: &[&str] = &[".json", ".jsonl", ".csv", ".tsv"];
 
 /// Where rb looks for results, as every read that says so words it.
 pub fn where_rb_looks() -> String {
-    format!("folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), down to {MAX_ROOT_DEPTH} levels from the top")
+    format!("folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to {MAX_ROOT_DEPTH} levels from the top")
 }
 
 /// Files that hold results in a form rb does not read, each with its kind's name.

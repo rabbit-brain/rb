@@ -25,12 +25,16 @@ pytestmark = pytest.mark.skipif(not HAS_GIT, reason="the repository is played in
 
 SCOPE_END = "It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run."
 USUAL = ["out/", "outputs/", "results/", "eval-out/", "metrics/"]
+# where rb looks, in the words reconcile says it (round 5: one account on every read)
+NAMED_FOR_RESULTS = "folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top"
 
 
 def looks_at(*folders: str) -> str:
     """The start of the scope line: where rb looks, as it lists it, the usual folders whether or not they are there."""
-    parts = [*USUAL, *folders]
-    return f"rb looks in {', '.join(parts[:-1])} and {parts[-1]}, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed."
+    usual = f"{', '.join(USUAL[:-1])} and {USUAL[-1]}"
+    here = "" if not folders else ", in " + (folders[0] if len(folders) == 1 else f"{', '.join(folders[:-1])} and {folders[-1]}")
+    return (f"rb looks in {usual} at the top, in {NAMED_FOR_RESULTS}{here}, at the files in the repository's top folder, and at .json, .yaml and .toml "
+            "files git shows as new or changed.")
 
 
 def _leave_git() -> None:
@@ -131,7 +135,7 @@ def test_the_scope_line_names_the_usual_folders_and_a_folder_a_run_named_and_out
     assert sc["folders"] == [*USUAL, "logs/eval/"] and sc["said"].startswith(looks_at("logs/eval/"))
     _leave_git()
     said = rec("status").data["scope"]["said"]
-    assert said.startswith("rb looks in out/, outputs/, results/, eval-out/, metrics/ and logs/eval/, and at the files in the project's top folder. It last looked at ")
+    assert said.startswith(f"rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in {NAMED_FOR_RESULTS}, in logs/eval/, and at the files in the project's top folder. It last looked at "), said
     assert "git" not in said.split(". It reads")[0]
 
 

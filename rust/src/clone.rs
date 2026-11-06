@@ -137,6 +137,14 @@ fn bundle_record(given: &str) -> Res<(PathBuf, Value, Option<Scratch>)> {
         };
         return Err(bundle_invalid(format!("{source} is {shown}, not an rb bundle.")));
     }
+    // the record's own format, as the manifest says it: a newer one this rb would read only in part
+    if let Some(f) = man.get("record_format").and_then(Value::as_i64).filter(|f| *f > crate::record::RB_FORMAT) {
+        return Err(RBError::msg_fix(
+            "E_STATE_NEWER",
+            format!("{source} holds a record in format {f}; this rb reads formats 1 to {}.", crate::record::RB_FORMAT),
+            "Upgrade: `pip install --upgrade rabbit-brain`, then clone the bundle again.",
+        ));
+    }
     let problems = verify(&src);
     crate::sys::go_on()?;
     if !problems.is_empty() {
@@ -978,6 +986,8 @@ pub fn clone(source: &str, dest: Option<&Path>, code: Option<&str>) -> Res<Dict>
                 "id" => c.id.clone(), "experiment" => c.experiment.clone(), "statement" => c.statement.clone(), "metric" => c.metric.clone(),
                 "subject" => c.subject.clone(), "reference" => c.reference.clone(), "estimand" => c.estimand.clone(), "comparator" => c.comparator.clone(),
                 "target" => c.target, "tolerance" => c.tolerance, "margin" => c.margin, "over" => c.over.clone(), "role" => c.role.clone(),
+                // format 2's rules travel whole: a count, the units it or a best is of, and what the reading measures
+                "count" => c.count, "of" => c.of, "measure" => c.measure.clone(),
                 "min_n" => c.min_n, "noise" => c.noise, "origin" => "inherited", "note" => note,
                 "question_links" => Value::List(c.question_links.iter().filter(|link| link.retracted.is_none() && qids.contains(&link.question)).map(|link| Value::Dict(link.dump(false))).collect()),
                 "relations" => Value::List(c.relations.iter().filter(|r| r.retracted.is_none()).map(|r| Value::Dict(r.dump(false))).collect())

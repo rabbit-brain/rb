@@ -317,6 +317,9 @@ findings.{id}.row.why	string	today	FindingLine	both
 findings.{id}.row.good	bool	today	FindingLine	both
 findings.{id}.row.negative	bool	today	FindingLine	both
 findings.{id}.reading	object	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
+findings.{id}.reading.places	null|number	1b	contract 1.13 (fix round 6): model.rs card_places: the decimals every part of the page says this reading in	both
+findings.{id}.reading.over	string	1b	contract 1.14 (fix round 6, format 2): how the rule's threshold is read (mean, each, bound, count, best)	both
+findings.{id}.reading.measure	string	1b	contract 1.14 (fix round 6, format 2): what rb's reading measures ("", relative, means)	both
 findings.{id}.reading.estimate	null|number	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
 findings.{id}.reading.lo	null|number	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
 findings.{id}.reading.hi	null|number	1b	reading text parts (assess.rs); numbers in finding.comparison today	both
@@ -395,7 +398,7 @@ findings.{id}.reading_short	string	M6	the compact row's reading, arms labelled	b
 findings.{id}.verdict	string	P4B	model.rs verdict: the rule's one sentence (status word, reading, result class in words, distance from its number)	both
 findings.{id}.tags	list	M6	at most two ontology tags	both
 findings.{id}.reads_baseline	bool	M6	it reads the baseline or control arm alone	both
-findings.{id}.pooled	string	M6	contract 1.12 (fix round 2): rb show's headline words for a reading that pools a per-run setting's values; empty where none	both
+findings.{id}.pooled	string	M6	added under 1.11 (fix round 2), marked at 1.12: rb show's headline words for a reading that pools a per-run setting's values; empty where none	both
 findings.{id}.cited.path	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
 findings.{id}.cited.line	number	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
 findings.{id}.cited.locator	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both

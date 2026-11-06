@@ -281,7 +281,7 @@ def test_a_linked_criterion_only_a_newer_rb_reads_is_not_read_as_moved(record):
     record("criterion", "add", "wide stays cheap", "-e", "e1", "--metric", "wide.cost", "--at-most", "5", "--id", "c2", "-q", "q1")
     seeds(record, "wide.cost=4")
     call(record)
-    rewrite(record, ".rb/experiments/e1/criteria/c2.yaml", "criterion", "c2", lambda doc: doc.update(rb=2))
+    rewrite(record, ".rb/experiments/e1/criteria/c2.yaml", "criterion", "c2", lambda doc: doc.update(rb=3))
     status = record("status")
     assert [i for i in status["open"] if i["code"] == "state_newer"] and all(status["gate"].values())
     assert not [i for i in status["open"] if i["code"] == "decision_outdated"]

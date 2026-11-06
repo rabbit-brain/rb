@@ -389,7 +389,7 @@
     "  - q2 is open and nothing is filed under it: And depth?",
     "      rb experiment add \"<what would test it>\" -q q2 --hypothesis \"<what you expect>\"",
     "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "Rules",
     "  On every e1 criterion:",
@@ -1117,7 +1117,7 @@
     "  - q2 is open and nothing is filed under it: And depth?",
     "      rb experiment add \"<what would test it>\" -q q2 --hypothesis \"<what you expect>\"",
     "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "Rules",
     "  On every e1 criterion:",
@@ -1161,8 +1161,8 @@
    "bytes": 17
   },
   "bundle.zip": {
-   "sha256": "f1dcfe9745e892b347c474e4d70b00fe9cff64ac7356af057d226f2777a78c21",
-   "bytes": 147660
+   "sha256": "91b69840cf872ae79fcb98c2e081221f9d778c40f0ab7d9fbd14f7ebfe6893e6",
+   "bytes": 147775
   },
   "bundle/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1235,10 +1235,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 143913,",
+   " \"bytes\": 144028,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7\",",
+   "  \"page.html\": \"95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -1272,8 +1272,8 @@
    ""
   ],
   "bundle/page.html": {
-   "sha256": "4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7",
-   "bytes": 125208
+   "sha256": "95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506",
+   "bytes": 125323
   },
   "bundle/record/.rb/.gitattributes": [
    "* -text",
@@ -3156,10 +3156,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 17,",
-   " \"bytes\": 105080,",
+   " \"bytes\": 105215,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"0a8bee07c4f9a20a0bdaf774223afd933ee12a2b5bfe64d55f35820315df66cc\",",
+   "  \"page.html\": \"ee507aa77dbfc014a85308f2d5e755b83ec8616827b288ee1cc53ecbb6d9fd06\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/criteria/c1.yaml\": \"347ab9bf0bee9c195eddc6be07c03ce47f697434aaa8a10837686fa77be310d5\",",
@@ -3190,8 +3190,8 @@
    ""
   ],
   "forked/page.html": {
-   "sha256": "0a8bee07c4f9a20a0bdaf774223afd933ee12a2b5bfe64d55f35820315df66cc",
-   "bytes": 94590
+   "sha256": "ee507aa77dbfc014a85308f2d5e755b83ec8616827b288ee1cc53ecbb6d9fd06",
+   "bytes": 94725
   },
   "forked/record/.rb/.gitattributes": [
    "* -text",
@@ -3504,10 +3504,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 143913,",
+   " \"bytes\": 144028,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7\",",
+   "  \"page.html\": \"95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -3541,8 +3541,8 @@
    ""
   ],
   "newer/page.html": {
-   "sha256": "4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7",
-   "bytes": 125208
+   "sha256": "95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506",
+   "bytes": 125323
   },
   "newer/record/.rb/.gitattributes": [
    "* -text",
@@ -4005,10 +4005,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 143913,",
+   " \"bytes\": 144028,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7\",",
+   "  \"page.html\": \"95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -4042,8 +4042,8 @@
    ""
   ],
   "other/page.html": {
-   "sha256": "4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7",
-   "bytes": 125208
+   "sha256": "95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506",
+   "bytes": 125323
   },
   "other/record/.rb/.gitattributes": [
    "* -text",
@@ -4463,17 +4463,17 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 125840,",
+   " \"bytes\": 125955,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"12266ebb31826a9bb6d89ff14a7e5a4ec8ce3f8611d8bd9a1bb984761a66c3b3\"",
+   "  \"page.html\": \"d66f874073c3154b7b339bfdc8c0ed07cf641848df47c19c26a23cdbcce493d5\"",
    " }",
    "}",
    ""
   ],
   "page/page.html": {
-   "sha256": "12266ebb31826a9bb6d89ff14a7e5a4ec8ce3f8611d8bd9a1bb984761a66c3b3",
-   "bytes": 125249
+   "sha256": "d66f874073c3154b7b339bfdc8c0ed07cf641848df47c19c26a23cdbcce493d5",
+   "bytes": 125364
   },
   "proj/.rb/.gitattributes": [
    "* -text",
@@ -5028,8 +5028,8 @@
    ""
   ],
   "pub/bundle.zip": {
-   "sha256": "e4c3f4dc3f79616a25c423b6258167485c06d2fc49296e0d9cbe5e83015ddf6f",
-   "bytes": 152219
+   "sha256": "e7c1a8b6ad2f8d96f4ff86a945630ba2624efbda3d53524fe00e970d8b761c65",
+   "bytes": 152334
   },
   "pub/manifest.json": [
    "{",
@@ -5044,10 +5044,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 148473,",
+   " \"bytes\": 148588,",
    " \"files\": {",
    "  \"README.md\": \"e6cf0e19d0322c60bbd65e4a17f823478f187a80608a68e49b6570badc9af542\",",
-   "  \"page.html\": \"0ebb66ada770c319bd755a951d4d5396df4b401bf50a1236998465c441c2104a\",",
+   "  \"page.html\": \"86098ca7c5f8fec45fe883ed05212b50fec41cf5dd25394da7ca7169e837b3b4\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -5082,8 +5082,8 @@
    ""
   ],
   "pub/page.html": {
-   "sha256": "0ebb66ada770c319bd755a951d4d5396df4b401bf50a1236998465c441c2104a",
-   "bytes": 129670
+   "sha256": "86098ca7c5f8fec45fe883ed05212b50fec41cf5dd25394da7ca7169e837b3b4",
+   "bytes": 129785
   },
   "pub/record/.rb/.gitattributes": [
    "* -text",
@@ -5547,10 +5547,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 143913,",
+   " \"bytes\": 144028,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7\",",
+   "  \"page.html\": \"95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -5584,8 +5584,8 @@
    ""
   ],
   "tampered/page.html": {
-   "sha256": "4ed7875852fde743e3c980934375caae96aab131925bccdc532ec548d437eff7",
-   "bytes": 125208
+   "sha256": "95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506",
+   "bytes": 125323
   },
   "tampered/record/.rb/.gitattributes": [
    "* -text",

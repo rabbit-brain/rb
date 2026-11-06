@@ -17,7 +17,7 @@ What an agent must pass on to the user, because a summary that drops it is misle
 - [AGENTS.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/AGENTS.md): the complete manual for agents and humans: the rules, the research-state commands, sources and what "verified" means, how a finding is read on its axes, the JSON output, exit codes, every error code with its fix, what to report to the user.
 - [README.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/README.md): what it does and what it does not do.
 - [CHANGELOG.md](https://raw.githubusercontent.com/rabbit-brain/rb/main/CHANGELOG.md): what each version added.
-- [rb-v1.schema.json](https://github.com/rabbit-brain/rb/blob/main/schema/rb-v1.schema.json): the record's format as one JSON Schema (`rb schema all`); every file in `.rb/` opens with `rb: 1` and its `kind`.
+- [rb-v2.schema.json](https://github.com/rabbit-brain/rb/blob/main/schema/rb-v2.schema.json): the record's formats 1 and 2 as one JSON Schema (`rb schema all`); every file in `.rb/` opens with `rb: 1` (`rb: 2` for a criterion that holds a count, a best of N, a relative change or a difference of means) and its `kind`.
 
 ## Package
 

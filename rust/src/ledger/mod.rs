@@ -582,16 +582,27 @@ impl Unreadable {
 fn body(data: &Value, kind: &str, rel: &str) -> Result<Dict, Unreadable> {
     let d = match data {
         Value::Dict(d) => d,
-        _ => return Err(Unreadable::Bad(format!("{rel} is not a record: a record file is a mapping that starts with {FORMAT_KEY}: {RB_FORMAT}"))),
+        _ => return Err(Unreadable::Bad(format!("{rel} is not a record: a record file is a mapping that starts with {FORMAT_KEY}: 1"))),
     };
     let fmt = d.get(FORMAT_KEY);
     if let Some(Value::Int(f)) = fmt {
         if *f > RB_FORMAT {
-            return Err(Unreadable::Newer(format!("{rel} is format {f}; this rb reads format {RB_FORMAT}: it was written by a newer rb")));
+            return Err(Unreadable::Newer(format!("{rel} is format {f}; this rb reads formats 1 to {RB_FORMAT}: it was written by a newer rb")));
         }
     }
-    if !matches!(fmt, Some(Value::Int(f)) if *f == RB_FORMAT) {
-        return Err(Unreadable::Bad(format!("{rel} does not start with {FORMAT_KEY}: {RB_FORMAT}")));
+    if !matches!(fmt, Some(Value::Int(f)) if (1..=RB_FORMAT).contains(f)) {
+        return Err(Unreadable::Bad(format!("{rel} does not start with {FORMAT_KEY}: 1")));
+    }
+    // format 1 is fixed: a format-1 file that holds what only format 2 has was not written by rb as it stands
+    if fmt == Some(&Value::Int(1)) && (kind == "criterion" || kind == "criteria") {
+        let holds = if kind == "criterion" {
+            crate::record::format_2_holds(d)
+        } else {
+            d.get("criteria").and_then(Value::as_list).and_then(|l| l.iter().filter_map(Value::as_dict).find_map(crate::record::format_2_holds))
+        };
+        if let Some(h) = holds {
+            return Err(Unreadable::Bad(format!("{rel} is format 1 and holds {h}, which only format 2 has: rb writes such a file as {FORMAT_KEY}: 2")));
+        }
     }
     if d.get("kind").and_then(|k| k.as_str()) != Some(kind) {
         let k = d.get("kind").map(pyjson::py_repr).unwrap_or_else(|| "None".into());
@@ -643,7 +654,7 @@ pub fn entries(kind: &str, data: &Value, rel: &str, path_id: Option<&str>, exper
     extra.sort();
     if !extra.is_empty() {
         return Err(Unreadable::Newer(format!(
-            "{rel} has {}, which a criteria file of format {RB_FORMAT} does not: it was written by a newer rb",
+            "{rel} has {}, which a criteria file does not: it was written by a newer rb",
             extra.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
         )));
     }
@@ -1717,6 +1728,21 @@ impl Ledger {
     }
 
     /// Every record on disk: (kind, id) -> its file.
+    /// The newest format any file of the record is written in: 2 where a criterion holds what format 1 cannot (a
+    /// bundle's manifest says it as `record_format`), else 1.
+    pub fn record_format(&self) -> Res<i64> {
+        let mut most = 1;
+        for ((kind, _), path) in self.where_()?.iter() {
+            if kind != "criterion" {
+                continue;
+            }
+            if let Ok(doc) = self.doc(path) {
+                most = most.max(doc.data.get(FORMAT_KEY).and_then(Value::as_i64).unwrap_or(1));
+            }
+        }
+        Ok(most)
+    }
+
     pub fn where_(&self) -> Res<Rc<Index>> {
         if let Some(i) = self.index.borrow().as_ref() {
             return Ok(i.clone());
@@ -2018,11 +2044,15 @@ impl Ledger {
                 None => items.push(Value::Dict(form)),
                 Some(at) => items[at] = Value::Dict(form),
             }
-            data = crate::obj! {FORMAT_KEY => RB_FORMAT, "kind" => "criteria", "experiment" => name_of(path.parent().unwrap()), "criteria" => Value::List(items)};
+            let mut d = crate::dict! {"kind" => "criteria", "experiment" => name_of(path.parent().unwrap()), "criteria" => Value::List(items)};
+            { let f = Value::Int(crate::record::format_of("criteria", &d)); d.shift_insert(0, FORMAT_KEY.to_string(), f); }
+            data = Value::Dict(d);
             comments = cm;
         } else {
             comments = if crate::dry::exists(path) { self.doc(path).ok().map(|d| d.comments.clone()) } else { None };
-            let mut d = crate::dict! {FORMAT_KEY => RB_FORMAT, "kind" => kind};
+            // the format the record needs: 2 only for a criterion that holds what format 1 cannot, so every other file
+            // is written as 0.7 wrote it, and goes back to format 1 when it no longer holds one
+            let mut d = crate::dict! {FORMAT_KEY => crate::record::format_of(kind, &form), "kind" => kind};
             for (k, v) in form {
                 d.insert(k, v);
             }
@@ -3369,7 +3399,9 @@ impl Ledger {
                 let _ = f.write_all(text.as_bytes());
             }
         }
-        let data = crate::obj! {FORMAT_KEY => RB_FORMAT, "kind" => "criteria", "experiment" => exp.unwrap_or_default(), "criteria" => Value::List(out)};
+        let mut d = crate::dict! {"kind" => "criteria", "experiment" => exp.unwrap_or_default(), "criteria" => Value::List(out)};
+        { let f = Value::Int(crate::record::format_of("criteria", &d)); d.shift_insert(0, FORMAT_KEY.to_string(), f); }
+        let data = Value::Dict(d);
         self.write(path, &rbyaml::dumps(&data, Some(&doc.comments)).unwrap_or_default())?;
         Ok(self.rel(&aside))
     }
@@ -3396,7 +3428,9 @@ impl Ledger {
                 .cmp(&(b.get("created_at").map(pyjson::py_str).unwrap_or_default(), b.get("id").map(pyjson::py_str).unwrap_or_default()))
         });
         let forms: Vec<Value> = forms.iter().map(|f| Value::Dict(ordered(&Criterion::META, f))).collect();
-        let data = crate::obj! {FORMAT_KEY => RB_FORMAT, "kind" => "criteria", "experiment" => name_of(path.parent().unwrap()), "criteria" => Value::List(forms)};
+        let mut d = crate::dict! {"kind" => "criteria", "experiment" => name_of(path.parent().unwrap()), "criteria" => Value::List(forms)};
+        { let f = Value::Int(crate::record::format_of("criteria", &d)); d.shift_insert(0, FORMAT_KEY.to_string(), f); }
+        let data = Value::Dict(d);
         self.write(&path, &rbyaml::dumps(&data, None).unwrap_or_default())?;
         Ok(missing)
     }

@@ -108,6 +108,9 @@ tests/test_sdk_time.py	I
 tests/test_offers_kept.py	I
 tests/test_one_reading_said.py	I
 tests/test_tables_said.py	I
+tests/test_said_as_declared.py	I
+tests/test_format_two.py	I
+tests/test_rules_four.py	I
 AGENTS.md	I
 README.md	I
 CHANGELOG.md	I

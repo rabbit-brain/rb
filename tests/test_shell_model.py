@@ -1,4 +1,4 @@
-"""The shell's model (SPRINT-OCT24.md section 1, track M): the document rb builds of a record, rb-shell-view/1.12, read
+"""The shell's model (SPRINT-OCT24.md section 1, track M): the document rb builds of a record, rb-shell-view/1.14, read
 through RB_TEST_SHELL_DUMP while rb page (the Owner tier) and rb open's `/` (the Live tier) draw it under RB_TEST_SHELL.
 Its fields are the contract's (tests/fixtures/shell/view-1.shape.tsv); here, those rb computes today (M0)."""
 import json
@@ -1279,7 +1279,7 @@ def test_metrics_say_each_number_as_recorded(m4_docs, m4):
     must not read 1234.57 beside a rule of 1234.5678)."""
     for tier in ("live", "owner"):
         r = m4_docs[tier]["runs"][m4.ids["r_given"]]
-        assert r["metrics_text"] == "fp32: top1=75.68666666666667 · int8: top1=75.53333333333333"
+        assert r["metrics_text"] == "fp32: top1=75.6866666666667 · int8: top1=75.5333333333333"
         assert r["label"] == "fp32 and int8 · seed 1" and re.fullmatch(r"\d{4}-\d\d-\d\d \d\d:\d\d UTC", r["at"])
 
 
@@ -2885,7 +2885,7 @@ def test_a_design_change_says_a_rule_by_its_metrics_title(tmp_path):
         lines = e1["design"]["lines"]
         # round 4: a name joined with _ is said as declared
         assert any(l.endswith("criterion c4 added: onnx_top1 75.5% or more (primary)") for l in lines), (tier, lines)
-        assert any(l.endswith("criterion c5 added: Top-1, INT8 against the FP32 baseline: 1 point or less (primary)") for l in lines), (tier, lines)
+        assert any(l.endswith("criterion c5 added: top1, INT8 against the FP32 baseline: 1 point or less (primary)") for l in lines), (tier, lines)
         # a rule with a scope keeps rb's words, which say it
         [c6] = [l for l in lines if "criterion c6 added: " in l]
         assert "seed=1" in c6 and "change.top1" in c6, (tier, c6)

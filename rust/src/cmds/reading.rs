@@ -622,7 +622,7 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
     }
     if !quiet.is_empty() {
         out.say("");
-        out.say(format!("Nothing to do ({})", quiet.len()));
+        out.say(format!("Facts that ask for nothing ({})", quiet.len()));
         out.say_all(items_text(&quiet));
     }
     let all = crate::journal::found_all(&led, crate::journal::Seen::User).ok();
@@ -928,9 +928,22 @@ fn show_file(subject: &str, out: &mut Out) -> R {
         _ => Value::Null,
     };
     let mut problems: Vec<String> = Vec::new();
-    let is_format_1 = matches!(&data, Value::Dict(d) if d.get(FORMAT_KEY).map_or(false, |v| *v == Value::Int(1)));
-    if !is_format_1 {
-        problems.push(format!("not a record of Rabbit Brain format 1: it does not start with {FORMAT_KEY}: 1"));
+    // the format as rb show has always compared it (equality, as Python's: a format given as true is 1)
+    let format = match &data {
+        Value::Dict(d) => d.get(FORMAT_KEY).and_then(|v| (1..=crate::record::RB_FORMAT).find(|f| *v == Value::Int(*f))),
+        _ => None,
+    };
+    // format 1 is fixed: a format-1 criterion that holds what only format 2 has is no valid record of either
+    let format_1_holds = match (&data, kind.as_str()) {
+        (Value::Dict(d), Some("criterion")) if format == Some(1) => crate::record::format_2_holds(d),
+        (Value::Dict(d), Some("criteria")) if format == Some(1) => criteria_of(d).iter().filter_map(Value::as_dict).find_map(crate::record::format_2_holds),
+        _ => None,
+    };
+    if let Some(h) = &format_1_holds {
+        problems.push(format!("format 1 holds no {h}: only format 2 does, and rb writes such a file as {FORMAT_KEY}: 2"));
+    }
+    if format.is_none() {
+        problems.push(format!("not a record of Rabbit Brain format 1 or 2: it does not start with {FORMAT_KEY}: 1 (or {FORMAT_KEY}: 2)"));
     } else if kind.as_str() == Some("criteria") {
         let d = data.as_dict().cloned().unwrap_or_default();
         if d.get("criteria").map_or(false, |v| v.truthy() && !matches!(v, Value::List(_))) {
@@ -954,7 +967,7 @@ fn show_file(subject: &str, out: &mut Out) -> R {
         match &kind {
             Value::Str(k) => match file_problems(k, Value::Dict(body)) {
                 Some(found) => problems.extend(found),
-                None => problems.push(format!("kind {} is not a kind format 1 has", pyjson::repr_str(k))),
+                None => problems.push(format!("kind {} is not a kind the format has", pyjson::repr_str(k))),
             },
             Value::Null => problems.push("kind: Field required".into()),
             _ => problems.push("kind: Input should be a valid string".into()),
@@ -1127,11 +1140,12 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                         + &if h.at.is_empty() { String::new() } else { format!(" · recorded {}", cut(&h.at, 10)) },
                 );
             }
-            let last_part = c.metric.rsplit('.').next().unwrap_or("").to_string();
+            // an arm's number is named as the rule reads it: m.acc's arm a reads a.m.acc, never a.acc
+            let read_as = base.clone();
             let rows: std::collections::HashSet<String> = led.all::<Run>()?.iter().filter(|r| basis_said(r) == "row").map(|r| r.id.clone()).collect();
             for ob in &f.observations {
                 let what = if !ob.arm.is_empty() {
-                    format!("{}.{last_part}", ob.arm)
+                    format!("{}.{read_as}", ob.arm)
                 } else if f.comparison.as_ref().map_or(false, |x| !x.reference.is_empty()) {
                     "difference".to_string()
                 } else {
@@ -1167,7 +1181,7 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             metrics.sort_by(|a, b| a.0.cmp(b.0));
             // a number read from a row under another name than its column's (a variant's) says the column
             let column = |k: &str| r.receipt.row.as_ref().and_then(|w| w.columns.get(k)).filter(|c| *c != k).map(|c| format!(" · column {c}")).unwrap_or_default();
-            out.say_all(metrics.iter().map(|(k, x)| format!("  {k} = {}{}", g(**x), column(k))));
+            out.say_all(metrics.iter().map(|(k, x)| format!("  {k} = {}{}", crate::pyfloat::run_number(**x), column(k))));
             if !r.per_run.is_empty() {
                 // a per-run value read from a column of another name says the column
                 let column = |k: &str| r.receipt.row.as_ref().and_then(|w| w.per_run.get(k)).filter(|c| *c != k).map(|c| format!(" (column {c})")).unwrap_or_default();
@@ -2562,8 +2576,8 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
     let open = items(&stv, "open");
     let human: Vec<&Value> = open.iter().filter(|i| gs(i, "who") == "human" && !pending_item(i)).collect();
     let (agent, quiet): (Vec<&Value>, Vec<&Value>) = open.iter().filter(|i| gs(i, "who") != "human").partition(|i| !gs(i, "do").is_empty());
-    for (title, its) in [(NEEDS_JUDGMENT_MD, &human), ("## Can be done now", &agent), ("## Nothing to do", &quiet)] {
-        if title == "## Nothing to do" && its.is_empty() {
+    for (title, its) in [(NEEDS_JUDGMENT_MD, &human), ("## Can be done now", &agent), ("## Facts that ask for nothing", &quiet)] {
+        if title == "## Facts that ask for nothing" && its.is_empty() {
             continue;
         }
         l.push(title.into());

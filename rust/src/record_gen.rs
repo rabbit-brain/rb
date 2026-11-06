@@ -1420,6 +1420,9 @@ pub struct Criterion {
     pub tolerance: Option<f64>,
     pub margin: Option<f64>,
     pub over: String,
+    pub count: Option<i64>,
+    pub of: Option<i64>,
+    pub measure: String,
     pub role: String,
     pub min_n: i64,
     pub noise: Option<f64>,
@@ -1452,6 +1455,9 @@ impl Criterion {
         FieldMeta { name: "tolerance", required: false, sub: None },
         FieldMeta { name: "margin", required: false, sub: None },
         FieldMeta { name: "over", required: false, sub: None },
+        FieldMeta { name: "count", required: false, sub: None },
+        FieldMeta { name: "of", required: false, sub: None },
+        FieldMeta { name: "measure", required: false, sub: None },
         FieldMeta { name: "role", required: false, sub: None },
         FieldMeta { name: "min_n", required: false, sub: None },
         FieldMeta { name: "noise", required: false, sub: None },
@@ -1487,7 +1493,10 @@ impl Criterion {
         if d.contains_key("tolerance") { if let Some(x) = f_tolerance.as_mut() { if let Err(msg) = hooks::criterion_tolerance(x) { errs.push(value_error(loc, Some("tolerance"), &msg)); f_tolerance = None; } } }
         let mut f_margin = f_opt_float(d, "margin", false, None, &[C::Gt(0.0, "0")], loc, errs);
         if d.contains_key("margin") { if let Some(x) = f_margin.as_mut() { if let Err(msg) = hooks::criterion_margin(x) { errs.push(value_error(loc, Some("margin"), &msg)); f_margin = None; } } }
-        let mut f_over = f_lit(d, "over", false, "mean".to_string(), &["mean", "each", "bound"], loc, errs);
+        let mut f_over = f_lit(d, "over", false, "mean".to_string(), &["mean", "each", "bound", "count", "best"], loc, errs);
+        let mut f_count = f_opt_int(d, "count", false, None, &[C::Ge(1.0, "1"), C::Le(100000.0, "100000")], loc, errs);
+        let mut f_of = f_opt_int(d, "of", false, None, &[C::Ge(1.0, "1"), C::Le(100000.0, "100000")], loc, errs);
+        let mut f_measure = f_lit(d, "measure", false, "".to_string(), &["", "relative", "means"], loc, errs);
         let mut f_role = f_lit(d, "role", false, "primary".to_string(), &["primary", "secondary", "exploratory", "gate"], loc, errs);
         let mut f_min_n = f_int(d, "min_n", false, 1, &[C::Ge(1.0, "1"), C::Le(100000.0, "100000")], loc, errs);
         let mut f_noise = f_opt_float(d, "noise", false, None, &[C::Ge(0.0, "0")], loc, errs);
@@ -1498,7 +1507,7 @@ impl Criterion {
         let mut f_note = f_str(d, "note", false, "".to_string(), &[C::MaxLen(1000)], loc, errs);
         let mut f_question_links = f_list_model::<QuestionLink>(d, "question_links", false, Vec::new(), &[], loc, errs, QuestionLink::validate);
         let mut f_relations = f_list_model::<CriterionRelation>(d, "relations", false, Vec::new(), &[], loc, errs, CriterionRelation::validate);
-        extra_forbidden(d, &["created_by", "created_at", "via", "retracted", "id", "experiment", "statement", "metric", "subject", "reference", "estimand", "where", "subject_where", "reference_where", "comparator", "target", "tolerance", "margin", "over", "role", "min_n", "noise", "origin", "source", "words", "note", "question_links", "relations"], loc, errs);
+        extra_forbidden(d, &["created_by", "created_at", "via", "retracted", "id", "experiment", "statement", "metric", "subject", "reference", "estimand", "where", "subject_where", "reference_where", "comparator", "target", "tolerance", "margin", "over", "count", "of", "measure", "role", "min_n", "noise", "origin", "source", "words", "note", "question_links", "relations"], loc, errs);
         if errs.len() > start {
             return None;
         }
@@ -1522,6 +1531,9 @@ impl Criterion {
             tolerance: f_tolerance.unwrap(),
             margin: f_margin.unwrap(),
             over: f_over.unwrap(),
+            count: f_count.unwrap(),
+            of: f_of.unwrap(),
+            measure: f_measure.unwrap(),
             role: f_role.unwrap(),
             min_n: f_min_n.unwrap(),
             noise: f_noise.unwrap(),
@@ -1558,6 +1570,9 @@ impl Criterion {
         match &self.tolerance { Some(x) => { d.insert("tolerance".into(), Value::Float(*x)); } None => { if !exclude_none { d.insert("tolerance".into(), Value::Null); } } }
         match &self.margin { Some(x) => { d.insert("margin".into(), Value::Float(*x)); } None => { if !exclude_none { d.insert("margin".into(), Value::Null); } } }
         d.insert("over".into(), Value::Str(self.over.clone()));
+        match &self.count { Some(x) => { d.insert("count".into(), Value::Int(*x)); } None => { if !exclude_none { d.insert("count".into(), Value::Null); } } }
+        match &self.of { Some(x) => { d.insert("of".into(), Value::Int(*x)); } None => { if !exclude_none { d.insert("of".into(), Value::Null); } } }
+        d.insert("measure".into(), Value::Str(self.measure.clone()));
         d.insert("role".into(), Value::Str(self.role.clone()));
         d.insert("min_n".into(), Value::Int(self.min_n));
         match &self.noise { Some(x) => { d.insert("noise".into(), Value::Float(*x)); } None => { if !exclude_none { d.insert("noise".into(), Value::Null); } } }

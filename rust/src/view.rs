@@ -2142,6 +2142,8 @@ pub fn briefs(led: &Ledger, st: &Dict) -> Res<Vec<QuestionBrief>> {
                     tolerance: obj.tolerance,
                     margin: obj.margin,
                     over: &obj.over,
+                    count: obj.count,
+                    of: obj.of,
                     direction,
                 },
                 f,
@@ -3413,7 +3415,8 @@ pub fn run_rows(led: &Ledger, limit: usize) -> Res<Vec<RunRow>> {
     let observed = observed_runs(led)?;
     let mut rows: Vec<RunRow> = Vec::new();
     for r in led.all::<Run>()?.iter() {
-        let pairs: Vec<String> = r.metrics.iter().map(|(k, v)| format!("{k}={}", show(&Value::Float(*v)))).collect();
+        // each number in rb's own digits, as rb show says it (49.69, never the stored 49.690000000000005)
+        let pairs: Vec<String> = r.metrics.iter().map(|(k, v)| format!("{k}={}", crate::pyfloat::run_number(*v))).collect();
         let results = pairs.iter().take(6).cloned().collect::<Vec<_>>().join(" · ") + &if pairs.len() > 6 { format!(" · +{} more", pairs.len() - 6) } else { String::new() };
         rows.push(RunRow {
             when: r.created_at.chars().take(10).collect(),

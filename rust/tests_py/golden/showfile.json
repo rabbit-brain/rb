@@ -324,10 +324,10 @@
     "  \"content_sha256\": \"414f6cf1445b32ccb6b1a71659c1d3e2009c0cc6826c06d367ff9e49be3eea23\",",
     "  \"valid\": false,",
     "  \"problems\": [",
-    "   \"not a record of Rabbit Brain format 1: it does not start with rb: 1\"",
+    "   \"not a record of Rabbit Brain format 1 or 2: it does not start with rb: 1 (or rb: 2)\"",
     "  ],",
     "  \"warnings\": [",
-    "   \"list.yaml reads, but is not a valid record: not a record of Rabbit Brain format 1: it does not start with rb: 1\"",
+    "   \"list.yaml reads, but is not a valid record: not a record of Rabbit Brain format 1 or 2: it does not start with rb: 1 (or rb: 2)\"",
     "  ]",
     " },",
     " \"errors\": [],",
@@ -337,7 +337,7 @@
     ""
    ],
    "err": [
-    "rb show: list.yaml reads, but is not a valid record: not a record of Rabbit Brain format 1: it does not start with rb: 1",
+    "rb show: list.yaml reads, but is not a valid record: not a record of Rabbit Brain format 1 or 2: it does not start with rb: 1 (or rb: 2)",
     ""
    ]
   },

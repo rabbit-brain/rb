@@ -1,4 +1,4 @@
-//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.12` of a record for one tier
+//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.14` of a record for one tier
 //! and place, from view::home and the per-object fields the build plan adds. It holds the fields rb computes today
 //! (M0), each object in the contract's shape and nothing outside it; the later phases add theirs. It names no writer:
 //! no actor, session, channel or "by <name>" enters it, and the Owner tier holds none of the Live tier's own values.
@@ -16,7 +16,7 @@ use crate::view::{self, ExperimentBrief, FindingLine, Home};
 use indexmap::IndexMap;
 
 /// The contract's version, as the document's `contract` names it.
-pub const CONTRACT: &str = "rb-shell-view/1.12";
+pub const CONTRACT: &str = "rb-shell-view/1.14";
 
 /// The document of `led` for `tier`, at `place` (rb open's chosen place and version; none on a page): drawn on rb open
 /// for the Live tier, on rb page for the Owner tier.
@@ -1234,6 +1234,11 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
 /// on a miss, what rb's rule sentence says after its rule word (`rule_detail`); the unit amended after the lock, where
 /// that changes how its runs pair (`unit_amended`); its receipt as rows of field, words and the ids they name, with no
 /// writer (`receipt_rows`); and a cited number's source (`cited`).
+/// A reading's estimate as rb's comparison text says it: its decimals are the reading's, its bounds' too.
+fn p_text(parts: &Option<crate::assess::ReadingParts>) -> String {
+    parts.as_ref().map_or(String::new(), |p| p.estimate.clone())
+}
+
 fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
     let exp: Experiment = led.load(&c.experiment)?;
     let (subject, reference, metric, _) = led.arms(&exp, c)?;
@@ -1244,7 +1249,29 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
     let num = |x: Option<f64>| x.map_or(Value::Null, Value::Float);
     let r = f.comparison.as_ref();
     let p = parts.clone().unwrap_or_default();
+    // the decimals every part of the page says this reading in (card_places): its card, its list sentence and its row
+    // read them here, so one reading is written one way (MP-1103-21: "0.740" beside "0.74")
+    let edges = rule_edges(&c.comparator, c.target, c.tolerance, c.margin);
+    let xs: Vec<f64> = r.and_then(|r| r.estimate.map(|e| [Some(e), r.lo.filter(|_| r.hi.is_some()), r.hi.filter(|_| r.lo.is_some())].into_iter().flatten().collect())).unwrap_or_default();
+    let places = (!xs.is_empty()).then(|| card_places(&xs, c.target, &edges, is_percent(&sentence_unit(&unit, &metric))));
+    // a variant's level is a mean the comparison grid writes too, in the digits its column's differences need
+    // (nodes::grid_places): the rule's card says it in no fewer, so one reading is one number on the page
+    let grid = if reference.is_empty() && !c.scoped() && exp.variant(&subject).is_some() && places.is_some() {
+        led.compare(&exp.id).ok().and_then(|t| t.get("rows").and_then(Value::as_list).map(|rows| super::nodes::grid_places(rows, &metric, if is_percent(&unit) { "%" } else { "" })))
+    } else {
+        None
+    };
+    // only as far as its own numbers need them: never a trailing 0 the grid's digits add ("0.74", never "0.740")
+    let places = places.map(|p| grid.map_or(p, |g| super::nodes::places_for(&xs, p, g)));
+    // a relative change and a difference of means are said in the digits rb show says their estimate in ("estimate
+    // -0.3821% ≥ -0.5%"): the card, its interval too, never in fewer
+    let said_places = |t: &str| t.split([' ', ',', '[', ']']).filter(|n| !n.contains('e')).filter_map(|n| n.split_once('.')).map(|(_, f)| f.chars().take_while(char::is_ascii_digit).count()).max().unwrap_or(0);
+    let places = match places {
+        Some(p) if !c.measure.is_empty() && parts.is_some() => Some(p.max(said_places(&p_text(&parts)))),
+        p => p,
+    };
     let reading = crate::obj! {
+        "places" => places.map_or(Value::Null, |p| Value::Int(p as i64)),
         "estimate" => num(r.and_then(|r| r.estimate)), "lo" => num(r.and_then(|r| r.lo)), "hi" => num(r.and_then(|r| r.hi)),
         "level" => num(r.and_then(|r| r.level)),
         "method" => r.map(|r| r.method.clone()).unwrap_or_default(), "n" => r.and_then(|r| r.n).unwrap_or(0), "unit" => r.map(|r| r.unit.clone()).unwrap_or_default(),
@@ -1252,7 +1279,9 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
         "result" => crate::assess::result_word(&f.result),
         // the unit as a sentence says it (PLAIN-WORDS-PASS-4): a difference of two percentages is in points, a
         // percentage on its own is "%"; unit_text stays rb's own
-        "unit_said" => if parts.is_none() || c.metric.starts_with("ratio.") { String::new() } else if is_percent(&unit) { if reference.is_empty() { "%".into() } else { "points".into() } } else { unit.clone() }
+        // format 2's rules: how the threshold is read (count, best) and what the reading measures (relative, means)
+        "over" => c.over.clone(), "measure" => c.measure.clone(),
+        "unit_said" => if parts.is_none() || c.metric.starts_with("ratio.") { String::new() } else if c.measure == "relative" { "relative".into() } else if is_percent(&unit) { if reference.is_empty() { "%".into() } else { "points".into() } } else { unit.clone() }
     };
     let (comparator, target, tolerance) = match c.comparator.as_str() {
         "at_least" => ("at least", c.target.unwrap_or(0.0), None),
@@ -1355,13 +1384,14 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
     // a variant's name in a sentence says its underscores as spaces ("step_by_step" reads "step by step"); the label
     // fields keep it as written
     // a unit that is the metric's own name ("top1" for top1) is none in a sentence, as the grid and the cards say it
-    let unit = sentence_unit(&unit, &metric);
+    // a relative change is in percent whatever the metric's unit (its sentences say "2.33% higher", never points)
+    let relative = c.measure == "relative";
+    let unit = if relative { "%".to_string() } else { sentence_unit(&unit, &metric) };
     let with_unit = |x: &str| if unit.is_empty() { x.to_string() } else { format!("{x} {unit}") };
     let level_unit = |x: &str| if is_percent(&unit) { format!("{x}%") } else { with_unit(x) };
     let cells = r.map_or(false, |r| r.method.contains("design cells"));
     // a level with no arm named is said by its metric's own name, never as an empty label (Look 3, also seen)
     let said_plain = if subject_label.is_empty() { metric_said(&metric) } else { plain(&subject_label) };
-    let edges = rule_edges(&c.comparator, c.target, c.tolerance, c.margin);
     let reading_short = match r.and_then(|r| r.estimate.map(|e| (e, r.lo.zip(r.hi)))) {
         Some((e, iv)) => {
             // 2 decimals, more where 2 would round a number onto or past the rule's own (the rule's digits)
@@ -1369,7 +1399,7 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
             xs.extend(iv.map(|(lo, hi)| [lo, hi]).into_iter().flatten());
             // and apart from each other and from the rule's number, as the verdict says them
             // and in the card's own digits (nodes::reading_digits): one reading is written one way on the page
-            let p = card_places(&xs, c.target, &edges, is_percent(&unit));
+            let p = places.unwrap_or_else(|| card_places(&xs, c.target, &edges, is_percent(&unit)));
             let decp = |x: f64, p: usize| super::nodes::fixed(x, p, false);
             let signedp = |x: f64, p: usize| super::nodes::fixed(x, p, true);
             // the interval in brackets after its number, as every view says it (FIX4): a difference's bounds in the
@@ -1396,6 +1426,19 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
         let first = crate::surface::reason(&p.code).map(str::to_string).unwrap_or_else(|| p.code.replace('_', " "));
         if f.integrity.len() > 1 { format!("{first} and {} more", f.integrity.len() - 1) } else { first }
     });
+    // a count rule and a best of N are said by their units, never by a mean: the words rb's rule sentence gives them
+    let rule_words: String = if c.over == "count" || c.over == "best" {
+        f.says.get("rule").and_then(|r| r.split_once(": ").map(|(_, w)| w.to_string())).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let reading_short = match () {
+        _ if !rule_words.is_empty() => format!("{said_plain}: {rule_words}"),
+        // a relative change in percent, never points; a cited difference of means says what it is
+        _ if relative => reading_short.replace(" points", "%").replace(" point", "%"),
+        _ if c.measure == "means" && r.and_then(|r| r.estimate).is_some() => format!("{reading_short}, a difference of means, as cited"),
+        _ => reading_short,
+    };
     let verdict = verdict(&Verdict {
         state: &state,
         rule_said: f.says.get("rule").map(String::as_str).unwrap_or(""),
@@ -1406,6 +1449,8 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
         estimate: r.and_then(|r| r.estimate),
         interval: r.and_then(|r| r.lo.zip(r.hi)),
         unit: &unit,
+        rule_words: &rule_words,
+        relative,
         cited: c.origin == "cited",
         comparator: &c.comparator,
         over: &c.over,
@@ -1418,6 +1463,7 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
         missed: f.missed_units.len(),
         n: f.units.n,
         problem: problem.as_deref().unwrap_or(""),
+        places,
     });
     // a rule met only where its runs pool a per-run setting's values says so in the sentence it opens with
     let verdict = match f.caveats.iter().find(|c| c.code == "pooled_misses") {
@@ -1431,12 +1477,12 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
     let level = reference.is_empty();
     let unit_after = |n: &str| match () {
         _ if ratio => String::new(),
-        _ if pct && level => "%".to_string(),
+        _ if pct && (level || relative) => "%".to_string(),
         _ if pct => format!(" {}", if n.trim_start_matches(['-', '+', '\u{b1}']) == "1" { "point" } else { "points" }),
         _ if unit.is_empty() => String::new(),
         _ => format!(" {unit}"),
     };
-    let rule_said = crate::surface::criterion_text(&c.comparator, c.target, c.tolerance, "", c.margin, &c.over);
+    let rule_said = crate::surface::criterion_text_of(&c.comparator, c.target, c.tolerance, "", c.margin, &c.over, c.count, c.of);
     let rule_said = match (c.comparator.as_str(), c.target, c.tolerance) {
         _ if rule_said == "better" => rule_said,
         // a band around a level's percentage: the % on its number, the band in points, as the verdict says it
@@ -1464,9 +1510,10 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
             let mut xs = vec![e];
             xs.extend(r.and_then(|r| r.lo.zip(r.hi)).map(|(lo, hi)| [lo, hi]).into_iter().flatten());
             // and as the reading's short sentence says it (card_places): one reading, one way
-            let said = decp(m, card_places(&xs, Some(t), &edges, pct));
+            let said = decp(m, places.unwrap_or_else(|| card_places(&xs, Some(t), &edges, pct)));
             let u = match () {
                 _ if ratio => String::new(),
+                _ if relative => "%".to_string(),
                 _ if pct => format!(" {}", if said.trim_start_matches('-') == "1.00" { "point" } else { "points" }),
                 _ if unit.is_empty() => String::new(),
                 _ => format!(" {unit}"),
@@ -1555,8 +1602,9 @@ fn the(exp: &Experiment, arm: &str) -> String {
 fn dec2(x: f64) -> String {
     let a = x.abs();
     let places = if a == 0.0 || a >= 0.01 { 2 } else { (2 - a.log10().floor() as i64 - 1).clamp(2, 12) as usize };
-    let said = format!("{x:.places$}");
-    if said.trim_start_matches('-').chars().all(|c| c == '0' || c == '.') { format!("{:.places$}", 0.0) } else { said }
+    // no trailing 0 past two decimals that the digits add ("margin 0.00005", never "0.000050")
+    let said = super::nodes::fixed(x, places, false);
+    if said.trim_start_matches('-').chars().all(|c| c == '0' || c == '.') { "0.00".to_string() } else { said }
 }
 
 /// `x` as dec2 says it, with `p` decimals at least.
@@ -1564,8 +1612,9 @@ fn decp(x: f64, p: usize) -> String {
     let a = x.abs();
     let own = if a == 0.0 || a >= 0.01 { 2 } else { (2 - a.log10().floor() as i64 - 1).clamp(2, 12) as usize };
     let places = own.max(p);
-    let said = format!("{x:.places$}");
-    if said.trim_start_matches('-').chars().all(|c| c == '0' || c == '.') { format!("{:.places$}", 0.0) } else { said }
+    // no trailing 0 past two decimals that the digits add ("margin 0.00005", never "0.000050")
+    let said = super::nodes::fixed(x, places, false);
+    if said.trim_start_matches('-').chars().all(|c| c == '0' || c == '.') { "0.00".to_string() } else { said }
 }
 
 /// The fewest decimals, 2 to 6, at which numbers that differ read apart.
@@ -1642,35 +1691,11 @@ fn plain(arm: &str) -> String {
     arm.split(' ').map(format).collect::<Vec<_>>().join(" ").replace('_', " ")
 }
 
-/// A metric as a sentence names it where no arm is given (FIX4): by its title, as the grid and the cards say it, never
-/// its key: "top1" reads "Top-1"; an acronym keeps its case (FIX6), by nodes.rs's rule and word list, so every view
-/// says one title: "onnx_top1" reads "ONNX top-1", "int8_top1" "INT8 top-1".
+/// A metric as a sentence names it: by its name as declared, never title-cased or split into words ("acc", "m.acc",
+/// "val_bpb", "top1"), as the page's grid and cards head it.
 fn metric_said(name: &str) -> String {
-    // a name that joins words with "_" is an identifier: said as declared, never split into words (val_bpb)
-    if name.contains('_') {
-        return name.to_string();
-    }
-    let topn = |t: &str| t.strip_prefix("top").filter(|d| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit())).map(|d| format!("top-{d}"));
-    let word = |w: &str| {
-        let low = w.to_lowercase();
-        if let Some(t) = topn(&low) {
-            return t;
-        }
-        // a format code (letters, then digits: fp32, int8, bf16) in capitals, as a variant's name reads
-        let letters = low.trim_end_matches(|c: char| c.is_ascii_digit());
-        let format = !letters.is_empty() && letters.len() < low.len() && letters.chars().all(|c| c.is_ascii_lowercase());
-        if format || ACRONYMS.contains(&low.as_str()) { low.to_uppercase() } else { w.to_string() }
-    };
-    let words = name.replace(['.', '_'], " ").split(' ').filter(|w| !w.is_empty()).map(word).collect::<Vec<_>>().join(" ");
-    let mut c = words.chars();
-    c.next().map_or(String::new(), |h| h.to_uppercase().chain(c).collect())
+    name.to_string()
 }
-
-/// The words a metric's name holds that prose writes in capitals (FIX6): nodes.rs's list (C, FIX5), word for word.
-const ACRONYMS: &[&str] = &[
-    "onnx", "gpu", "cpu", "tpu", "auc", "roc", "mse", "rmse", "mae", "iou", "bleu", "rouge", "wer", "cer", "ece", "fid", "psnr", "ssim", "nll", "kl", "ema",
-    "mfu", "flops", "f1", "ndcg", "mrr", "llm", "ttft", "qps", "rps",
-];
 
 /// A metric's unit as a sentence says it (FIX4): none where the catalogue gives the metric's own name as its unit
 /// ("top1" for top1), as the grid and the cards drop it; else the unit as recorded.
@@ -1699,6 +1724,13 @@ fn card_places(xs: &[f64], target: Option<f64>, edges: &[f64], pct: bool) -> usi
 
 /// What a finding's verdict sentence is made of (`verdict`).
 struct Verdict<'a> {
+    /// a count rule's or a best of N's own words for its reading ("9 of 20 seeds at most 0.89; the rule asks for 19"):
+    /// said in place of a mean, which such a rule does not read
+    rule_words: &'a str,
+    /// a relative change (measure: relative), said in percent
+    relative: bool,
+    /// the decimals the reading is said in on the page (reading.places); None in a verdict said on its own
+    places: Option<usize>,
     /// rb's rule word (assess::rule_word): meets, misses, undetermined, untested, reproduced, gate missed, ...
     state: &'a str,
     /// the finding's says.rule, which says when a met rule rests on its estimate alone
@@ -1732,6 +1764,12 @@ struct Verdict<'a> {
 /// words and, where the rule has a threshold, how far the reading is from it. "Not met: step by step is 3.60 points
 /// above plain (+0.62 to +6.58). A real gain, but 1.40 points short of the 5 points the rule asks for."
 fn verdict(v: &Verdict) -> String {
+    let said = verdict_said(v);
+    // a relative change is in percent: its distances too, never points
+    if v.unit == "%" && v.rule_words.is_empty() && v.relative { said.replace(" points", "%").replace(" point", "%") } else { said }
+}
+
+fn verdict_said(v: &Verdict) -> String {
     let status = match v.state {
         "meets" if v.rule_said.starts_with("estimate meets") => "Met on its estimate",
         "meets" if v.rule_said.starts_with("recorded values meet") => "Met on the recorded values",
@@ -1747,6 +1785,9 @@ fn verdict(v: &Verdict) -> String {
         _ => "Gate, not tested",
     };
     let trouble = if v.problem.is_empty() { String::new() } else { format!(" What it rests on has a problem: {}.", v.problem) };
+    if !v.rule_words.is_empty() {
+        return format!("{status}: {}: {}.{trouble}", v.subject, v.rule_words);
+    }
     let Some(e) = v.estimate else {
         let why = if v.why.is_empty() { "no runs are read yet".to_string() } else { rule_words(v.why) };
         return format!("{status}: {why}.{trouble}");
@@ -1762,6 +1803,8 @@ fn verdict(v: &Verdict) -> String {
     let p = apart(&xs);
     // and never rounded onto or past an edge of the rule (the rule's digits)
     let p = rule_places(&xs, &rule_edges(v.comparator, v.target, v.tolerance, v.margin), p);
+    // and in no fewer than its card says it in (reading.places): one reading, one way on the page
+    let p = p.max(v.places.unwrap_or(0));
     let n = |x: f64| decp(x, p);
     let sn = |x: f64| {
         let said = n(x);
@@ -2358,7 +2401,8 @@ fn experiments_value(led: &Ledger, h: &Home, st: &Value, recipes: &crate::reprod
 /// row never reads 1234.57 beside a rule of 1234.5678), each arm's together after its name in the experiment's order,
 /// the numbers no arm names first: "latency_ms=25.1 · fp32: top1=75.69 · int8: top1=75.53".
 fn metrics_text(exp: Option<&Experiment>, r: &Run) -> String {
-    let said = |x: f64| crate::ledger::show(&Value::Float(x));
+    // each number in rb's own digits, as rb show says it (49.69, never the stored 49.690000000000005)
+    let said = |x: f64| crate::pyfloat::run_number(x);
     let arms: Vec<String> = exp.map(|x| x.variants.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
     let mut plain: Vec<String> = Vec::new();
     let mut by: IndexMap<String, Vec<String>> = arms.iter().map(|a| (a.clone(), Vec::new())).collect();
@@ -2818,7 +2862,8 @@ mod tests {
         assert_eq!(metric_said("int8_top1"), "int8_top1");
         assert_eq!(metric_said("gpu_mfu"), "gpu_mfu");
         assert_eq!(metric_said("Calib_loss"), "Calib_loss");
-        assert_eq!(metric_said("top1"), "Top-1");
+        assert_eq!(metric_said("top1"), "top1", "a metric is named as declared (round 5)");
+        assert_eq!(metric_said("m.acc"), "m.acc");
         assert_eq!(metric_said("latency_ms"), "latency_ms");
     }
 
@@ -2878,7 +2923,7 @@ mod tests {
     fn base<'a>() -> Verdict<'a> {
         Verdict { state: "misses", rule_said: "criterion not met", why: "", result: "gain", subject: "step by step", reference: "plain",
             estimate: Some(3.6), interval: Some((0.619, 6.581)), unit: "percent", cited: false, comparator: "at_least", over: "mean",
-            target: Some(5.0), tolerance: None, margin: None, direction: "maximize", ratio: false, cells: false, missed: 0, n: 3, problem: "" }
+            target: Some(5.0), tolerance: None, margin: None, direction: "maximize", ratio: false, cells: false, missed: 0, n: 3, problem: "", places: None, rule_words: "", relative: false }
     }
 
     /// PLAIN-WORDS-PASS-4: a rule's verdict is one sentence: its status word first, the reading, rb's result class in

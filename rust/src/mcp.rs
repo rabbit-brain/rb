@@ -437,6 +437,7 @@ impl Server {
                     Some("rb://start") => Ok(content("text/markdown", Value::str(crate::skill::START_MD))),
                     Some("rb://schema") => Ok(content("application/json", Value::Str(text_of("schema_text")))),
                     Some("rb://format") => Ok(content("application/schema+json", Value::Str(text_of("format_text")))),
+                    Some("rb://format-2") => Ok(content("application/schema+json", Value::Str(text_of("format2_text")))),
                     Some(u @ ("rb://context" | "rb://status")) => {
                         let env = run_tool(&u[5..], &Value::empty_dict(), &self.agent(), &self.client)?;
                         let context = u == "rb://context";

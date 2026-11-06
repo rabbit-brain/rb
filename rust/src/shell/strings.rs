@@ -870,10 +870,3 @@ mod tests {
         }
     }
 }
-
-/// The words a metric's name holds that prose writes in capitals: C's list (nodes.rs, FIX5), one list for every view's
-/// title of a metric.
-pub const ACRONYMS: &[&str] = &[
-    "onnx", "gpu", "cpu", "tpu", "auc", "roc", "mse", "rmse", "mae", "iou", "bleu", "rouge", "wer", "cer", "ece", "fid", "psnr", "ssim", "nll", "kl", "ema",
-    "mfu", "flops", "f1", "ndcg", "mrr", "llm", "ttft", "qps", "rps",
-];

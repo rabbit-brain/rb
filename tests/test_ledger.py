@@ -1121,7 +1121,7 @@ def test_a_criterion_on_a_name_close_to_a_reported_one_warns_once_and_stands(lab
 
 def test_a_number_no_criterion_reads_is_said_unread_with_no_rule_to_declare(lab, capsys):
     """Round 7: the unread_metric item offered `rb criterion add ... --at-most <x>`, which pulls toward a threshold
-    nobody stated. It says the number is unread and suggests nothing, under Nothing to do; so does a comparison an
+    nobody stated. It says the number is unread and suggests nothing, under Facts that ask for nothing; so does a comparison an
     analysis reports that no criterion reads."""
     int8_experiment(capsys)
     ok(capsys, "criterion", "add", "INT8 validation loss under 1.5", "-e", "e1", "--metric", "int8.val_loss", "--at-most", "1.5")
@@ -1132,7 +1132,7 @@ def test_a_number_no_criterion_reads_is_said_unread_with_no_rule_to_declare(lab,
     assert items["unread_comparison"]["do"] == ""
     assert main(["status"]) in (0, 1)
     said = capsys.readouterr().out
-    quiet = said[said.index("Nothing to do ("):]
+    quiet = said[said.index("Facts that ask for nothing ("):]
     assert "  - e1: runs report int8.latency_ms, which no recorded criterion reads" in quiet
     assert "--at-most <x>" not in said and "--better" not in said
     # an item that asks for nothing offers no next step
@@ -1571,7 +1571,7 @@ def test_a_variant_run_in_two_cells_has_a_row_per_cell_never_a_mean_pooled_acros
     capsys.readouterr()
     page = " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", Path("page.html").read_text(encoding="utf-8"))).split())
     # a row per cell (the grid on its side, PIVOT), its condition named on the row (Calib: 512), the change within it
-    assert re.search(r"Calib: 512 0\.754 · 3 \w+ 0\.740 · 1 run 0\.014 lower than FP32 · [^.]*so no interval", page), page
+    assert re.search(r"Calib: 512 0\.754 · 3 \w+ 0\.74 · 1 run 0\.014 lower than FP32 · [^.]*so no interval", page), page
     # one cell: no condition and one row per variant, as before
     ok(capsys, "experiment", "add", "INT8 at one size", "--id", "e2", "--baseline", "fp32", "--candidate", "int8")
     ok(capsys, "spec", "set", "e2", "calib", "--per-run", "--design-factor")
@@ -1634,9 +1634,9 @@ def test_a_change_vs_baseline_says_one_run_unpaired_units_and_a_second_factor(la
     assert main(["page", "--out", "page.html"]) == 0
     capsys.readouterr()
     page = " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", Path("page.html").read_text(encoding="utf-8"))).split())
-    assert re.search(r"INT8 0\.7550 · 1 run 0\.0080 lower than FP32 · [^.]*so no interval", page), page
+    assert re.search(r"INT8 0\.755 · 1 run 0\.0080 lower than FP32 · [^.]*so no interval", page), page
     assert re.search(r"INT8 · Calib: 512 0\.745 · 1 run 0\.017 lower than the baseline · [^·]*so no interval · also differs in precision and calib", page), page
-    assert re.search(r"FP32 · Calib: 512 0\.760 · 1 run 0\.0020 lower than the baseline · [^·]*so no interval", page), page
+    assert re.search(r"FP32 · Calib: 512 0\.76 · 1 run 0\.0020 lower than the baseline · [^·]*so no interval", page), page
 
 
 def test_a_per_run_setting_a_variant_holds_two_values_of_splits_the_table_and_the_reading_says_it_pools(lab, capsys):
@@ -1939,7 +1939,7 @@ def test_schema_prints_each_research_objects_json_schema(lab, capsys):
         wanted = {"result", "rule_outcome", "timing", "units", "integrity", "review", "history"} if name == "finding" else {"id"}
         assert data["title"] and wanted <= set(data["properties"]), name
     whole = ok(capsys, "schema", "all")          # the whole format, one JSON Schema: a file's kind picks its shape
-    assert whole["$id"].endswith("rb-v1.schema.json") and whole["oneOf"]
+    assert whole["$id"].endswith("rb-v2.schema.json") and whole["oneOf"]
 
 
 # ---------------------------------------------------------------- every suggested command exists

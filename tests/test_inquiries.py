@@ -869,7 +869,7 @@ def test_an_identical_link_cannot_bypass_edited_or_newer_state_guards(record, mu
     if mutation == "criterion":
         doc["note"] = "a change made outside rb"
     else:
-        doc["rb"] = 2
+        doc["rb"] = 3
     path.write_text(rbyaml.dumps(doc), encoding="utf-8")
     before = written(record.root)
     record("criterion", "file", "c1", "q1", "--why", "confirm the existing scope", error=error)

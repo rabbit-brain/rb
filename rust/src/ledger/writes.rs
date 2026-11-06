@@ -70,6 +70,11 @@ pub struct NewCriterion {
     pub tolerance: Option<f64>,
     pub source: Option<Source>,
     pub over: String,
+    /// a count rule's K, and the units a count or a best of N is of (format 2)
+    pub count: Option<i64>,
+    pub of: Option<i64>,
+    /// what rb's own reading measures: "", relative, means (format 2)
+    pub measure: String,
     pub min_n: Value,
     pub noise: Option<f64>,
     pub note: String,
@@ -99,6 +104,9 @@ impl Default for NewCriterion {
             tolerance: None,
             source: None,
             over: "mean".into(),
+            count: None,
+            of: None,
+            measure: String::new(),
             min_n: Value::Int(1),
             noise: None,
             note: String::new(),
@@ -170,6 +178,8 @@ pub struct FromRow {
     pub produced_at: Option<String>,
     /// the row: its table, its rowid and every value it holds
     pub identity: Value,
+    /// a table with no rowid: its primary key columns
+    pub primary_key: Vec<String>,
     /// the database's size and time when it was read; a database that changed since is not recorded
     pub stamp: crate::sqlite::Stamp,
 }
@@ -190,7 +200,15 @@ impl FromRow {
             Some(now) => now == v,
             None => ["rowid", "_rowid_", "oid"].iter().any(|r| r.eq_ignore_ascii_case(k)) && self.rowid.map(Value::Int).as_ref() == Some(v),
         };
-        was.rowid.is_some() && was.rowid == self.rowid && was.r#where.iter().all(|(k, v)| holds(k, v))
+        if was.rowid.is_some() {
+            return was.rowid == self.rowid && was.r#where.iter().all(|(k, v)| holds(k, v));
+        }
+        // a table with no rowid: the same primary key, where the run was keyed by it; else (a run an earlier rb keyed by
+        // the --where columns alone) the columns it was read by, every one among this read's and holding the same value
+        if !self.primary_key.is_empty() && self.primary_key.iter().all(|k| was.r#where.contains_key(k)) {
+            return self.primary_key.iter().all(|k| was.r#where.get(k).map_or(false, |v| holds(k, v)));
+        }
+        self.rowid.is_none() && !was.r#where.is_empty() && was.r#where.keys().all(|k| self.key.contains_key(k)) && was.r#where.iter().all(|(k, v)| holds(k, v))
     }
 }
 
@@ -1453,6 +1471,7 @@ impl Ledger {
                 "metric" => a.metric.clone(), "subject" => a.subject.clone(), "reference" => a.reference.clone(), "estimand" => a.estimand.clone(),
                 "where" => Value::Dict(a.r#where.clone()), "subject_where" => Value::Dict(a.subject_where.clone()), "reference_where" => Value::Dict(a.reference_where.clone()),
                 "comparator" => a.comparator.clone(), "target" => a.target, "tolerance" => a.tolerance, "margin" => a.margin, "over" => a.over.clone(),
+                "count" => a.count, "of" => a.of, "measure" => a.measure.clone(),
                 "role" => a.role.clone(), "min_n" => a.min_n.clone(), "noise" => a.noise,
                 "origin" => if source.is_some() { "cited" } else { "own" }, "source" => source.as_ref().map(|s| s.to_value()),
                 "words" => self.words.clone(), "note" => a.note.clone(), "created_by" => who.id.clone(), "created_at" => now(), "via" => self.via.clone(),

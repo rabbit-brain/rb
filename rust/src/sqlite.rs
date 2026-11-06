@@ -127,6 +127,8 @@ pub struct Row {
     pub rowid: Option<i64>,
     pub cells: Vec<(String, Cell)>,
     pub key: Vec<String>,
+    /// a table with no rowid: its primary key columns, which tell its rows apart
+    pub primary_key: Vec<String>,
 }
 
 impl Row {
@@ -365,6 +367,20 @@ fn columns_of(conn: &Connection, table: &str, shown: &Named) -> Res<Vec<String>>
     Ok(st.column_names().into_iter().map(String::from).collect())
 }
 
+/// A table's primary key columns, in key order: what tells its rows apart where it has no rowid (a WITHOUT ROWID table
+/// always declares one).
+fn primary_key(conn: &Connection, table: &str, shown: &Named) -> Res<Vec<String>> {
+    let mut st = conn.prepare(&format!("PRAGMA table_info({})", quoted(table))).map_err(|e| said(&e, shown))?;
+    let mut keyed: Vec<(i64, String)> = st
+        .query_map([], |r| Ok((r.get::<_, i64>(5)?, r.get::<_, String>(1)?)))
+        .map_err(|e| said(&e, shown))?
+        .filter_map(Result::ok)
+        .filter(|(pk, _)| *pk > 0)
+        .collect();
+    keyed.sort();
+    Ok(keyed.into_iter().map(|(_, c)| c).collect())
+}
+
 fn count(conn: &Connection, sql: &str, params: &[rusqlite::types::Value], shown: &Named) -> Res<i64> {
     conn.query_row(sql, rusqlite::params_from_iter(params.iter()), |r| r.get::<_, i64>(0)).map_err(|e| said(&e, shown))
 }
@@ -470,6 +486,23 @@ pub fn pairs_said<'a>(pairs: impl IntoIterator<Item = (&'a String, &'a Value)>) 
 /// The one row of `table` whose columns hold what `where_` gives (all of the table's rows when it gives nothing). No
 /// row, or several, is refused: said with how many, and the first of them.
 pub fn read_row(path: &Path, shown: &str, table: &str, where_: &[(String, Value)]) -> Res<(Row, Stamp)> {
+    read_row_at(path, shown, table, where_, None)
+}
+
+/// How many rows of a table `where_` picks: read_row's own count, said where it picks none or several.
+pub fn rows_picked(path: &Path, shown: &str, table: &str, where_: &[(String, Value)]) -> Res<usize> {
+    match read_row(path, shown, table, where_) {
+        Ok(_) => Ok(1),
+        Err(e) => match e.extra.get("matched").and_then(Value::as_i64) {
+            Some(n) => Ok(n.max(0) as usize),
+            None => Err(e),
+        },
+    }
+}
+
+/// read_row, the `nth` of the rows `where_` picks, in the table's own order (by rowid where it has one): each row
+/// --every-row records in turn.
+pub fn read_row_at(path: &Path, shown: &str, table: &str, where_: &[(String, Value)], nth: Option<usize>) -> Res<(Row, Stamp)> {
     reading(path, shown, |conn, shown| {
         let tables = table_names(conn, shown)?;
         let names: Vec<String> = tables.iter().map(|(n, _)| n.clone()).collect();
@@ -513,11 +546,36 @@ pub fn read_row(path: &Path, shown: &str, table: &str, where_: &[(String, Value)
             rowid: *id,
             cells: columns.iter().cloned().zip(cells.iter().cloned()).collect(),
             key: key.clone(),
+            primary_key: Vec::new(),
         };
         let asked = pairs_said(where_.iter().map(|(k, v)| (k, v)));
+        // a table with no rowid keeps a row by its primary key beside the --where columns: never by a measurement, which
+        // a later write may change, so a row written again reads as that row, changed, read alone or with --every-row
+        let pk = if rowid.is_none() { primary_key(conn, &name, shown)? } else { Vec::new() };
+        let keyed = |mut row: Row| -> Row {
+            row.key.extend(pk.iter().filter(|c| !key.contains(c)).cloned());
+            row.primary_key = pk.clone();
+            row
+        };
+        if let Some(i) = nth.filter(|i| (*i as i64) < n && n > 1) {
+            let order = rowid.map(|r| format!(" ORDER BY {r}")).unwrap_or_default();
+            let at = fetch(conn, &format!("SELECT {head}* FROM {}{filter}{order} LIMIT 1 OFFSET {i}", quoted(&name)), &params, rowid.is_some(), shown)?;
+            // the rows --where picks share its key: each is kept by its rowid beside it (a table with no rowid keeps every
+            // row by its primary key), so two of them never read as one row read again
+            return match at.first() {
+                Some(one) => {
+                    let mut row = keyed(row_of(one));
+                    if let Some(r) = rowid {
+                        row.key.push(r.to_string());
+                    }
+                    Ok(row)
+                }
+                None => Err(RBError::msg_fix("E_OBJECT_INVALID", format!("{shown} changed while rb read it."), "Read it again.")),
+            };
+        }
         if n == 1 {
             return match found.first() {
-                Some(only) => Ok(row_of(only)),
+                Some(only) => Ok(keyed(row_of(only))),
                 None => Err(RBError::msg_fix("E_OBJECT_INVALID", format!("{shown} changed while rb read it."), "Read it again.")),
             };
         }
@@ -564,10 +622,11 @@ pub fn read_row(path: &Path, shown: &str, table: &str, where_: &[(String, Value)
             (false, false) => format!("; they differ in {}.", differ.join(", ")),
             (false, true) => format!("; the first {} differ in {}.", rows.len(), differ.join(", ")),
         };
+        // each of them as its own run is one flag away, as for a CSV, TSV or JSON Lines table's rows
         let fix = if differ.is_empty() && rowid.is_some() {
-            "Name one by its rowid: --where rowid=<n>.".to_string()
+            format!("Name one by its rowid: --where rowid=<n>; or record each of the {n} as its own run: the same rb run add with --every-row.")
         } else {
-            "Add to --where the columns that tell the rows apart, until one row has them all.".to_string()
+            format!("Add to --where the columns that tell the rows apart, until one row has them all; or record each of the {n} as its own run: the same rb run add with --every-row.")
         };
         Err(RBError::msg_fix("E_OBJECT_INVALID", message, fix).with_extra("matched", Value::Int(n)))
     })
@@ -614,7 +673,7 @@ mod tests {
     /// A row is named by its table and rowid, and its key by the row's own values; a name is quoted whatever it holds.
     #[test]
     fn a_row_is_named_by_its_table_and_rowid() {
-        let row = Row { table: "evals".into(), rowid: Some(3), cells: vec![("seed".into(), Cell::Int(1))], key: vec!["seed".into()] };
+        let row = Row { table: "evals".into(), rowid: Some(3), cells: vec![("seed".into(), Cell::Int(1))], key: vec!["seed".into()], primary_key: Vec::new() };
         assert_eq!(row.place(), "table evals, rowid 3");
         assert_eq!(row.key_values().get("seed"), Some(&Value::Int(1)));
         assert_eq!(Cell::Real(0.5).said(), "0.5");

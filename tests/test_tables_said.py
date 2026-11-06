@@ -84,6 +84,18 @@ def test_a_table_with_no_header_line_is_said_so(rb):
     assert "--alias" not in env.errors[0].fix
 
 
+def test_compile_names_no_column_from_a_headerless_table_s_data_line(rb):
+    """rb compile says what rb reconcile says: every row counted, no column named from the first line (round 5)."""
+    Path("results").mkdir()
+    Path("results/sweep.tsv").write_text("r1\tbatch=64\t75.61\t1620\nr2\tbatch=128\t75.12\t1610\nr3\tbatch=256\t74.90\t1600\n", encoding="utf-8")
+    code, out = rb("compile", "results/", text=True)
+    line = next(l for l in out.splitlines() if "results/sweep.tsv" in l and "table" in l)
+    assert "columns" not in line.split("seems to have no header line")[0] and "75.61," not in line, line
+    assert "3 rows" in line and "seems to have no header line" in line, line
+    source = next(s for s in rb("compile", "results/").data["sources"] if s["path"] == "results/sweep.tsv")
+    assert "columns" not in source and source["rows"] == 3 and not source.get("number_columns"), source
+
+
 def two_experiments_on_one_ledger(rb):
     rb("init", "INT8 ResNet-50", "--no-agents")
     rb("metric", "add", "top1", "--maximize")
@@ -247,3 +259,116 @@ def test_two_rows_that_differ_in_numbers_alone_are_not_one_row_across_experiment
     rb("run", "add", "e1", "--from", "results.tsv", "--where", "arm=int8,top1=75.6", "--produced-at", "2026-05-01")
     env = rb("run", "add", "e2", "--from", "results.tsv", "--where", "arm=int8,top1=75.65", "--produced-at", "2026-05-01")
     assert not any("is also recorded as" in w for w in env.data.get("warnings", [])), env.data.get("warnings")
+
+
+def test_every_row_records_each_row_of_a_sqlite_table_where_picks(rb):
+    """--every-row over a SQLite table, as for CSV, TSV and JSON Lines (round 5): each row its own run, its values from
+    its own row; read again, every row is already recorded; without the flag the refusal offers it."""
+    import sqlite3
+    rb("init", "INT8 ResNet-50", "--no-agents")
+    rb("metric", "add", "top1", "--maximize")
+    rb("experiment", "add", "INT8 alone", "--id", "e15", "--purpose", "the ledger", "--baseline", "int8")
+    rb("spec", "set", "e15", "seed", "--per-run")
+    con = sqlite3.connect("results.db")
+    con.execute("create table evals (precision text, seed integer, top1 real, finished_at text)")
+    con.executemany("insert into evals values (?, ?, ?, ?)", [("int8", s, 75.0 + s / 10, f"2026-05-0{s}T10:00:00Z") for s in (1, 2, 3)] + [("fp32", 1, 76.1, "2026-05-01T10:00:00Z")])
+    con.commit()
+    con.close()
+    args = ["run", "add", "e15", "--from", "results.db", "--table", "evals", "--where", "precision=int8", "--set", "seed=@seed", "--produced-at", "@finished_at"]
+    env = rb(*args, ok=False)
+    assert not env.ok and "--every-row" in env.errors[0].fix, env.errors[0]
+    env = rb(*args, "--every-row")
+    assert env.data["recorded_count"] == 3 and len(env.data["runs"]) == 3, env.data
+    seeds = sorted(rb("show", r).data["object"]["per_run"]["seed"] for r in env.data["runs"])
+    assert seeds == [1, 2, 3], seeds
+    times = sorted(rb("show", r).data["object"]["produced_at"][:10] for r in env.data["runs"])
+    assert times == ["2026-05-01", "2026-05-02", "2026-05-03"], times
+    env = rb(*args, "--every-row")
+    assert env.data["recorded_count"] == 0 and env.data["already_count"] == 3, env.data
+    env = rb("run", "add", "e15", "--from", "results.db", "--where", "precision=int8", "--every-row", ok=False)
+    assert not env.ok and "--table" in env.errors[0].message
+
+
+def test_an_each_rule_keeps_reading_the_runs_beside_an_analysis_of_its_comparison(rb):
+    """An --each rule is about every unit; an analysis that reports the difference of means does not say that, so the
+    rule keeps reading the runs, and the analysis is said beside it (round 5)."""
+    rb("init", "INT8 ResNet-50", "--no-agents")
+    rb("metric", "add", "top1", "--maximize")
+    rb("experiment", "add", "INT8 against FP32", "--id", "e16", "--purpose", "the cost", "--baseline", "fp32", "--candidate", "int8")
+    rb("spec", "set", "e16", "seed", "--per-run")
+    rb("criterion", "add", "INT8 loses at most a point on every seed", "-e", "e16", "--metric", "change.top1", "--at-least", "-1", "--each", "--id", "c16")
+    for seed, (a, b) in enumerate([(76.1, 75.6), (75.2, 75.1), (76.4, 75.2)], start=1):
+        rb("run", "add", "e16", f"fp32.top1={a}", f"int8.top1={b}", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
+    before = rb("show", "c16").data["finding"]
+    rb("analysis", "add", "e16", "--compare", "int8/fp32:top1=-0.6[-1.4,0.2]", "--method", "bootstrap", "--unit", "image", "--units", "500", "--id", "boot")
+    f = rb("show", "c16").data["finding"]
+    assert f["rule_outcome"] == before["rule_outcome"] == "misses", (f["rule_outcome"], before["rule_outcome"])
+    assert f["comparison"]["source"] == before["comparison"]["source"], f["comparison"]
+    notes = [c for c in f["caveats"] if c["code"] == "analysis_beside"]
+    assert notes and notes[0]["text"].startswith("boot reports change.top1: ") and "an --each rule reads each unit" in notes[0]["text"], f["caveats"]
+
+
+def test_step_one_quotes_the_prose_a_folder_of_results_holds(rb):
+    """A folder of results files whose prose is no report by name (pilot_table.md) is quoted at the first look, as it is
+    once a run reads the folder, never only then (round 2's edge 5, round 5)."""
+    Path("results/eval").mkdir(parents=True)
+    Path("results/eval/pilot_table.md").write_text("# Pilot table\n\n## Results\n\nINT8 keeps 75.6 top-1 on every set.\n", encoding="utf-8")
+    for seed in (1, 2):
+        Path(f"results/eval/seed{seed}.json").write_text(json.dumps({"top1": 75 + seed / 10}), encoding="utf-8")
+    code, out = rb("reconcile", text=True)
+    assert 'result: "INT8 keeps 75.6 top-1 on every set." (pilot_table.md:5)' in out, out
+    rb("init", "INT8 ResNet-50", "--no-agents")
+    code, out = rb("reconcile", text=True)
+    assert 'result: "INT8 keeps 75.6 top-1 on every set." (pilot_table.md:5)' in out, out
+
+
+def test_every_row_keeps_a_without_rowid_table_s_rows_by_their_primary_key(rb):
+    """A row of a table with no rowid is kept by its primary key, never by its measurements: written again with another
+    number, it reads as that row changed, refused, never a second run averaged with the first (round 5 review)."""
+    import sqlite3
+    rb("init", "INT8 ResNet-50", "--no-agents")
+    rb("metric", "add", "top1", "--maximize")
+    rb("experiment", "add", "INT8 alone", "--id", "e17", "--purpose", "the ledger", "--baseline", "int8")
+    rb("spec", "set", "e17", "seed", "--per-run")
+    con = sqlite3.connect("keyed.db")
+    con.execute("create table evals (seed integer primary key, precision text, top1 real) without rowid")
+    con.executemany("insert into evals values (?, ?, ?)", [(21, "int8", 75.1), (22, "int8", 75.2)])
+    con.commit()
+    args = ["run", "add", "e17", "--from", "keyed.db", "--table", "evals", "--where", "precision=int8", "--set", "seed=@seed", "--produced-at", "2026-05-01", "--every-row"]
+    assert rb(*args).data["recorded_count"] == 2
+    con.execute("update evals set top1 = 79.9 where seed = 21")
+    con.commit()
+    con.close()
+    env = rb(*args, ok=False)
+    assert not env.ok and "--replaces" in env.errors[0].fix, env.errors
+    assert len(list(Path(".rb/experiments/e17/runs").glob("*.yaml"))) == 2
+
+
+def test_rb_show_lists_every_run_outside_a_shared_where(rb):
+    rb("init", "INT8 ResNet-50", "--no-agents")
+    rb("metric", "add", "top1", "--maximize")
+    rb("experiment", "add", "INT8 alone", "--id", "e18", "--purpose", "the seeds", "--baseline", "int8")
+    rb("spec", "set", "e18", "seed", "--per-run")
+    rb("criterion", "add", "seed 1 holds 75", "-e", "e18", "--metric", "top1", "--at-least", "75", "--where", "seed=1", "--id", "c18")
+    for seed in range(1, 10):
+        rb("run", "add", "e18", "top1=75.5", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
+    note = next(c["text"] for c in rb("show", "c18").data["finding"]["caveats"] if c["code"] == "run_scope")
+    assert all(f"(seed={s})" in note for s in range(2, 10)) and "more" not in note, note
+
+
+def test_a_keyless_row_read_alone_after_every_row_reads_as_that_row_changed(rb):
+    import sqlite3
+    rb("init", "INT8 ResNet-50", "--no-agents")
+    rb("metric", "add", "top1", "--maximize")
+    rb("experiment", "add", "INT8 alone", "--id", "e19", "--purpose", "the ledger", "--baseline", "int8")
+    rb("spec", "set", "e19", "seed", "--per-run")
+    con = sqlite3.connect("keyed.db")
+    con.execute("create table evals (seed integer primary key, precision text, top1 real) without rowid")
+    con.executemany("insert into evals values (?, ?, ?)", [(21, "int8", 75.1), (22, "int8", 75.2)])
+    con.commit()
+    rb("run", "add", "e19", "--from", "keyed.db", "--table", "evals", "--where", "precision=int8", "--set", "seed=@seed", "--produced-at", "2026-05-01", "--every-row")
+    con.execute("update evals set top1 = 79.9 where seed = 22")
+    con.commit()
+    con.close()
+    env = rb("run", "add", "e19", "--from", "keyed.db", "--table", "evals", "--where", "seed=22", "--set", "seed=@seed", "--produced-at", "2026-05-01", ok=False)
+    assert not env.ok and "--replaces" in env.errors[0].fix, env.errors

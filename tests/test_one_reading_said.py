@@ -114,3 +114,54 @@ def test_the_page_names_a_metric_as_declared_and_gives_its_grid_the_rule_s_digit
     assert "val_bpb" in text
     # the grid's means in the rule's digits (it reads -0.3289): never 1.46 and 1.13
     assert "1.4635" in text and "1.1346" in text, re.findall(r"1\.[0-9]+", text)
+
+
+def test_the_page_names_every_metric_as_declared_and_its_runs_in_rb_s_digits(rb):
+    """acc heads "acc", m.acc "m.acc", never "Acc" or "M acc"; a run's card and its runs table row give rb show's
+    digits (49.69), never the stored float (round 5)."""
+    rb("metric", "add", "acc", "--maximize")
+    rb("metric", "add", "m.acc", "--maximize")
+    rb("experiment", "add", "INT8 against FP32", "--id", "e1", "--purpose", "the table", "--baseline", "fp32", "--candidate", "int8")
+    rb("criterion", "add", "INT8 keeps m.acc", "-e", "e1", "--metric", "change.m.acc", "--at-least", "-1", "--id", "c1")
+    rb("criterion", "add", "INT8 keeps acc", "-e", "e1", "--metric", "change.acc", "--at-least", "-1", "--id", "c2")
+    rid = rb("run", "add", "e1", "fp32.acc=49.59", "int8.acc=49.690000000000005", "fp32.m.acc=0.5", "int8.m.acc=0.51", "--produced-at", "2026-05-01").data["object"]["id"]
+    rb("page", "--out", "page.html")
+    raw = Path("page.html").read_text(encoding="utf-8")
+    text = html.unescape(re.sub(r"<[^>]+>", " ", raw))
+    assert "49.690000000000005" not in raw and "49.69" in text, re.findall(r"49\.69\d*", raw)
+    assert "M acc" not in text and "Acc," not in text and " Acc " not in text, re.findall(r".{20}\b[AM] ?acc.{20}", text)
+    assert "<dt>m.acc, INT8</dt><dd>0.51</dd>" in raw and "<dt>acc, INT8</dt><dd>49.69</dd>" in raw, raw[raw.find(f"run-{rid}:results"):][:400]
+    assert "<th>m.acc</th>" in raw and "<th>acc</th>" in raw
+
+
+def test_the_page_s_experiment_rows_count_rules_met_on_the_estimate_alone(rb):
+    rb("experiment", "add", "INT8 against FP32", "--id", "e1", "--purpose", "the table", "--baseline", "fp32", "--candidate", "int8")
+    rb("criterion", "add", "INT8 loses at most a point", "-e", "e1", "--metric", "change.top1", "--at-least", "-1", "--id", "c1")
+    rb("run", "add", "e1", "fp32.top1=76.1", "int8.top1=75.6", "--produced-at", "2026-05-01")
+    rb("page", "--out", "page.html")
+    raw = Path("page.html").read_text(encoding="utf-8")
+    rows = raw[raw.find('id="experiments"'):]
+    row = html.unescape(re.sub(r"<[^>]+>", "", rows[:rows.find("</li>")]))
+    assert "Rules: 1 rule met, on the estimate alone" in row, row
+
+
+def test_a_rule_s_tolerance_reads_in_digits_on_the_terminal_and_the_page(rb):
+    rb("experiment", "add", "INT8 alone", "--id", "e1", "--purpose", "a level", "--baseline", "int8")
+    rb("criterion", "add", "INT8 matches the stated 0.999349", "-e", "e1", "--metric", "top1", "--equals", "0.999349", "--tolerance", "0.0000005", "--id", "c1")
+    rb("run", "add", "e1", "top1=0.9993492", "--produced-at", "2026-05-01")
+    code, out = rb("status", text=True)
+    assert "± 0.0000005" in out and "5e-07" not in out, out
+    text = page_text(rb)
+    assert "5e-07" not in text and "± 0.0000005" in text
+
+
+def test_a_run_s_number_keeps_every_digit_it_was_given_on_rb_show_and_the_page(rb):
+    """15 significant digits: float noise left out, never a digit given cut (1234.5679, never 1234.57)."""
+    rb("experiment", "add", "INT8 alone", "--id", "e1", "--purpose", "a level", "--baseline", "int8")
+    rb("criterion", "add", "INT8 holds 1234.5678", "-e", "e1", "--metric", "top1", "--at-least", "1234.5678", "--id", "c1")
+    rid = rb("run", "add", "e1", "top1=1234.5679", "big=123456789.123", "--produced-at", "2026-05-01").data["object"]["id"]
+    code, out = rb("show", rid, text=True)
+    assert "int8.top1 = 1234.5679" in out and "int8.big = 123456789.123" in out, out
+    rb("page", "--out", "page.html")
+    raw = Path("page.html").read_text(encoding="utf-8")
+    assert "1234.5679" in raw and "1234.57<" not in raw and "1.23457e+08" not in raw and "123456789.123" in raw

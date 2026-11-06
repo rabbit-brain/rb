@@ -49,6 +49,8 @@ pub struct Pairing {
     pub counters: Vec<String>,
     /// the unpaired reading reads runs the paired one leaves out (a unit one arm alone ran): all the arms' runs
     pub all_runs: bool,
+    /// a run gives only the difference (change.<metric>), so no arm's mean is over all its runs: no unpaired figure
+    pub diff_only: bool,
 }
 
 /// Values a counter could hold (a seed, an epoch, a repeat's number): whole numbers, every one. A setting whose values
@@ -547,6 +549,20 @@ impl Ledger {
                 }
             }
         }
+        // an experiment of one variant reads a number that names no variant as that variant's, and a rule on the
+        // variant's name reads one recorded without it (findings.rs value_of): base.acc and acc are the same number
+        let live = exp.live_variants();
+        if live.len() == 1 {
+            let only = live[0].name.clone();
+            for name in read.clone() {
+                let (head, sep, rest) = partition(&name, ".");
+                if head == only && sep && !rest.is_empty() {
+                    read.insert(rest.to_string());
+                } else if head != "change" && head != "ratio" && exp.variant(head).is_none() && !ROLES.contains(&head) {
+                    read.insert(format!("{only}.{name}"));
+                }
+            }
+        }
         Ok(read)
     }
 
@@ -872,7 +888,16 @@ impl Ledger {
             Some(unit) => design_factors.iter().any(|name| name == unit),
             None => !design_factors.is_empty() && exp.all_settings().iter().filter(|(_, s)| s.per_run).all(|(name, s)| s.design_factor == Some(true) || separating(crit, name)),
         };
-        let read = |observations: &[Observation]| design_reading_of(observations, subject, reference, metric, &crit.estimand, unit_setting.as_deref(), &design_factors, only_design_units);
+        // format 2's rules read the same runs their own way: the best unit, a relative change, a difference of means
+        // A selected cell (--where on a design factor) is one cell: the rule's own estimand is read on its replications.
+        // Across several cells, each cell is read on that estimand too, and the rule says it reads none across them.
+        let read = |observations: &[Observation]| {
+            let across = observations.iter().map(|o| cell_key(&o.per_run, &design_factors)).collect::<HashSet<_>>().len() > 1;
+            let own = |cell: &[Observation]| rule_reading(crit, reading_of(cell, subject, reference, metric, &crit.estimand, unit_setting.as_deref()), cell, subject, reference, metric, unit_setting.as_deref(), false);
+            let per_cell: Option<&dyn Fn(&[Observation]) -> ReadOut> = if crit.measure.is_empty() { None } else { Some(&own) };
+            let out = design_reading_of(observations, subject, reference, metric, &crit.estimand, unit_setting.as_deref(), &design_factors, only_design_units, per_cell);
+            rule_reading(crit, out, observations, subject, reference, metric, unit_setting.as_deref(), across)
+        };
         let in_cell = |unit: String, per_run: &Dict| unit_within(unit, per_run, unit_setting.as_deref(), &design_factors);
         let mut runs: Vec<Run> = self.all::<Run>()?.iter().filter(|r| r.experiment == exp.id).cloned().collect();
         runs.sort_by(|a, b| (&a.created_at, &a.id).cmp(&(&b.created_at, &b.id)));
@@ -1000,18 +1025,27 @@ impl Ledger {
                     }
                 }
             }
-            let mut o = Observation::of(&r.id, value, reason.is_empty(), &r.basis);
-            o.unit = in_cell(unit, &r.per_run);
-            o.arm = arm;
+            // a relative change and a difference of means read each arm's own number: a run that gives both is two
+            // observations, one of each arm, in its unit
+            let parts: Vec<(f64, String)> = match (sv, rv) {
+                (Some(s), Some(v)) if !crit.measure.is_empty() => vec![(s, subject.to_string()), (v, reference_observation(subject, reference))],
+                _ => vec![(value, arm)],
+            };
             // nobody knowing when it was produced, it was by the time it was recorded
             let produced = produced.map(|p| by_record(&p, &r.created_at));
-            o.before_declared = crate::pytime::before(Some(produced.as_deref().unwrap_or(&r.created_at)), Some(declared_at));
-            o.reason = reason;
-            o.per_run = r.per_run.clone();
-            o.produced_at = produced;
-            o.produced_basis = super::support::run_basis(r).to_string();
-            o.repeats = r.repeats.clone();
-            obs.push(o);
+            let unit = in_cell(unit, &r.per_run);
+            for (value, arm) in parts {
+                let mut o = Observation::of(&r.id, value, reason.is_empty(), &r.basis);
+                o.unit = unit.clone();
+                o.arm = arm;
+                o.before_declared = crate::pytime::before(Some(produced.as_deref().unwrap_or(&r.created_at)), Some(declared_at));
+                o.reason = reason.clone();
+                o.per_run = r.per_run.clone();
+                o.produced_at = produced.clone();
+                o.produced_basis = super::support::run_basis(r).to_string();
+                o.repeats = r.repeats.clone();
+                obs.push(o);
+            }
         }
         for (rid, entry) in self.deleted_runs(&exp.id)? {
             let sha = entry.get("sha256").filter(|v| v.truthy()).map(pyjson::py_str).unwrap_or_default();
@@ -1224,17 +1258,34 @@ impl Ledger {
                     // every run of the two arms, those the paired reading leaves out (a unit one arm alone ran) too: the
                     // arms' own means, never a second reading of the paired runs alone
                     let all_runs = counted.iter().any(|o| !o.arm.is_empty() && !read_units.contains(&o.unit));
-                    let split: Vec<Observation> = counted
-                        .iter()
-                        .filter(|o| read_units.contains(&o.unit) || !o.arm.is_empty())
-                        .map(|o| {
-                            let mut x = o.clone();
-                            if !x.arm.is_empty() {
-                                x.unit = format!("{}\u{0}{}", x.unit, of_subject(subject, reference, &x.arm));
+                    // a run that gives both arms is read as each arm's number, so the arms' means are over every run
+                    // of theirs; one that gives only the difference (change.<metric>) has no arm to read apart
+                    let mut split: Vec<Observation> = Vec::new();
+                    let mut diff_only = false;
+                    // a run read as both arms' numbers is two of the figure's values, not two runs
+                    let mut both_split = false;
+                    for o in counted.iter().filter(|o| read_units.contains(&o.unit) || !o.arm.is_empty()) {
+                        let mut x = o.clone();
+                        if !x.arm.is_empty() {
+                            x.unit = format!("{}\u{0}{}", x.unit, of_subject(subject, reference, &x.arm));
+                            split.push(x);
+                            continue;
+                        }
+                        let both = runs.iter().find(|r| r.id == o.run).map(|r| self.pair(exp, subject, reference, metric, crit, r, &aliases));
+                        match both {
+                            Some((Some(sv), Some(rv), _, None)) if subject != reference => {
+                                both_split = true;
+                                for (arm, value) in [(subject, sv), (reference, rv)] {
+                                    let mut y = x.clone();
+                                    y.arm = arm.to_string();
+                                    y.value = value;
+                                    y.unit = format!("{}\u{0}{}", x.unit, of_subject(subject, reference, arm));
+                                    split.push(y);
+                                }
                             }
-                            x
-                        })
-                        .collect();
+                            _ => diff_only = true,
+                        }
+                    }
                     // its units are runs where each holds one run, else units of each arm
                     let one_run_each = {
                         let mut per: HashMap<&str, HashSet<&str>> = HashMap::new();
@@ -1243,17 +1294,19 @@ impl Ledger {
                         }
                         per.values().all(|runs| runs.len() == 1)
                     };
-                    let unpaired = reading_of(&split, subject, reference, metric, &crit.estimand, unit_setting.as_deref()).0.map(|mut u| {
+                    let unpaired = (!diff_only).then(|| reading_of(&split, subject, reference, metric, &crit.estimand, unit_setting.as_deref()).0).flatten().map(|mut u| {
                         // an arm's unit apart from the other arm's: never counted as the declared unit's values, of which there are half as many
-                        u.unit = if one_run_each && !declared { "run".into() } else { "unit".into() };
+                        u.unit = if one_run_each && !declared && !both_split { "run".into() } else { "unit".into() };
                         u
                     });
                     // the units are counted by what pairs them, where rb has no other name for them
                     if by.len() == 1 && !declared && rd.unit == "unit" {
                         rd.unit = by[0].clone();
                     }
-                    let counters = by.iter().filter(|k| values.get(*k).map_or(false, |v| counter_values(v.iter().map(String::as_str)))).cloned().collect();
-                    pairing = Some(Pairing { by, declared, unpaired, counters, all_runs });
+                    // a setting the rule selects on is a condition of that rule, never offered as a repeat
+                    let selects = |k: &str| [&crit.r#where, &crit.subject_where, &crit.reference_where].iter().any(|w| w.contains_key(k));
+                    let counters = by.iter().filter(|k| !selects(k) && values.get(*k).map_or(false, |v| counter_values(v.iter().map(String::as_str)))).cloned().collect();
+                    pairing = Some(Pairing { by, declared, unpaired, counters, all_runs, diff_only });
                 }
             }
         }
@@ -1263,8 +1316,25 @@ impl Ledger {
             }
         }
         if crit.scoped() {
-            let skipped = runs.iter().filter(|r| r.retracted.is_none() && !selected(crit, r)).count();
-            if skipped > 0 { notes.push(Caveat::note("run_scope", &crit.id, if skipped == 1 { "1 run outside this criterion's per-run selectors is not read".to_string() } else { format!("{skipped} runs outside this criterion's per-run selectors are not read") })); }
+            // each run named, with its values of what the rule selects by, so rb show lists the runs it leaves out
+            let keys: Vec<&String> = crit.r#where.keys().chain(crit.subject_where.keys()).chain(crit.reference_where.keys()).fold(Vec::new(), |mut v, k| {
+                if !v.contains(&k) {
+                    v.push(k);
+                }
+                v
+            });
+            let skipped: Vec<String> = runs
+                .iter()
+                .filter(|r| r.retracted.is_none() && !selected(crit, r))
+                .map(|r| {
+                    let at: Vec<String> = keys.iter().map(|k| format!("{k}={}", r.per_run.get(*k).map(show).unwrap_or_else(|| "none".into()))).collect();
+                    format!("{} ({})", r.id, at.join(", "))
+                })
+                .collect();
+            if !skipped.is_empty() {
+                let head = if skipped.len() == 1 { "1 run outside this criterion's per-run selectors is not read".to_string() } else { format!("{} runs outside this criterion's per-run selectors are not read", skipped.len()) };
+                notes.push(Caveat::note("run_scope", &crit.id, format!("{head}: {}", skipped.join(", "))));
+            }
         }
         // a paired reading leaves out a run whose unit has one arm only, and one arm's run in a unit where a run gives
         // the difference by itself: it is shown, not counted; across design cells, as each cell's reading does
@@ -1614,7 +1684,8 @@ impl Ledger {
         let mut out: Vec<(String, Option<f64>, bool, Vec<String>)> = listed
             .into_iter()
             .map(|(key, x, runs)| {
-                let outside = thresholds && if crit.over == "each" { missed.iter().any(|u| of_cell(u, &key)) } else { missed.contains(&key) };
+                // a count and a best judge units, not cells: no cell is said to miss them
+                let outside = thresholds && crit.over != "count" && crit.over != "best" && if crit.over == "each" { missed.iter().any(|u| of_cell(u, &key)) } else { missed.contains(&key) };
                 (key, Some(x), outside, runs)
             })
             .collect();
@@ -1785,6 +1856,29 @@ impl Ledger {
             notes.push(Caveat::note("analysis_scope", &crit.id, "Existing analyses do not declare these per-run selectors or fixed design cells; this criterion reads the scoped runs only."));
             readings.clear();
         }
+        // an --each rule is about every unit, and an analysis that reports a difference of means does not say that: the
+        // rule keeps reading the runs, and the analysis is said beside it, as a cited figure is
+        // so are a count and a best of N; and a relative change and a difference of means are their own estimands,
+        // which an analysis's difference is not
+        let own_reading = match (crit.over.as_str(), crit.measure.as_str()) {
+            ("each", _) => Some("an --each rule reads each unit"),
+            ("count", _) => Some("a count rule reads each unit"),
+            ("best", _) => Some("a best of N reads each unit"),
+            (_, "relative") => Some("a relative change reads each arm's own numbers"),
+            (_, "means") => Some("a difference of means reads each arm's own numbers"),
+            _ => None,
+        };
+        if let Some(why) = own_reading.filter(|_| !readings.is_empty()) {
+            let replaced: HashSet<String> = self.live::<Analysis>()?.iter().flat_map(|a| a.supersedes.iter().cloned()).collect();
+            for (rd, a) in readings.iter().filter(|(_, a)| a.retracted.is_none() && !replaced.contains(&a.id)) {
+                notes.push(Caveat::note(
+                    "analysis_beside",
+                    &a.id,
+                    format!("{} reports {}: {}; {why}, so rb reads the runs, with the analysis beside them", a.id, crit.metric, assess::reading_for(crit, rd, &metric_unit, &direction)),
+                ));
+            }
+            readings.clear();
+        }
         // a cited difference read against rb's paired reading, which leaves out runs whose unit one arm alone ran: the
         // two are different estimands (with every unit paired, the mean of the differences is the difference of the
         // means), so the cited number is not compared with it, and rb says the difference of the arms' means it reads
@@ -1796,14 +1890,18 @@ impl Ledger {
         // a 0 the cited words state ("at least 0 points") is a number too; an ordering cited by its words states none
         let stated = |t: f64| crit.source.as_ref().and_then(|src| src.quote.as_deref()).map_or(false, |q| crate::sources::states(q, &Value::Float(t)));
         let numbered = crit.comparator == "equals" || (crate::record::THRESHOLDS.contains(&crit.comparator.as_str()) && crit.target.map_or(false, |t| t != 0.0 || stated(t)));
-        if reads_number && readings.is_empty() && numbered {
+        // a cited difference of means is read as one (measure: means), and a relative change is no difference: neither is
+        // set against rb's paired reading
+        if reads_number && readings.is_empty() && numbered && crit.measure.is_empty() {
             if let Some((cav, means)) = paired_against_means(&rr_, crit, &subject, &reference) {
                 notes.push(cav.clone());
                 let est = rr_.reading.as_ref().and_then(|r| r.estimate);
                 // a mean that meets the rule but for float noise (1.885 of 1.89 ± 0.005) meets it
                 let meets = |x: f64| [x, x + x.abs() * 1e-9 + 1e-12, x - x.abs() * 1e-9 - 1e-12].iter().any(|y| assess::threshold(crit, *y).0);
                 let agree = crit.over != "each" && matches!((est, means), (Some(e), Some(m)) if meets(e) == meets(m));
-                if !agree {
+                // a count and a best of N read units, never a mean: the arms' means are no estimand of theirs, and the
+                // units the paired reading leaves out are said in the note above, never a reason to read them otherwise
+                if !agree && crit.over != "count" && crit.over != "best" {
                     cited_differs.push(cav);
                 }
             }
@@ -2067,7 +2165,10 @@ impl Ledger {
             let read = |o: &&Observation| read_units.is_empty() || read_units.contains(&o.unit);
             // numbers rb's journal watched a command print were not typed in
             let watched = |id: &String| self.load::<Run>(id).ok().and_then(|r| super::support::run_command(&r)).map_or(false, |g| g.given == "observed");
-            let typed: Vec<String> = rr_.counted.iter().filter(read).filter(|o| o.basis == "typed").map(|o| o.run.clone()).filter(|id| !watched(id)).collect();
+            let mut typed: Vec<String> = rr_.counted.iter().filter(read).filter(|o| o.basis == "typed").map(|o| o.run.clone()).filter(|id| !watched(id)).collect();
+            // a run read as both arms' numbers (a relative change, a difference of means) is one run
+            let mut seen = HashSet::new();
+            typed.retain(|id| seen.insert(id.clone()));
             if !typed.is_empty() {
                 notes.push(Caveat::note("typed", &crit.id, format!("typed in, not read from a file or run: {}", crate::assess::first_few(&typed, RUNS_NAMED, ", "))));
             }
@@ -2135,6 +2236,8 @@ impl Ledger {
                 cells.iter().filter_map(|c| Some((c.get_str("key")?.to_string(), c.get("estimate")?.as_f64()?))).collect()
             }).unwrap_or_default();
             let meets = match (crit.over == "each", &unit_values) {
+                // a count and a best judge units, not cells: no cell is said to meet them
+                _ if crit.over == "count" || crit.over == "best" => None,
                 (false, _) => Some(cells.len() - assess::missed_units(crit, &cells).len()),
                 (true, Some(values)) => {
                     let missed = assess::missed_units(crit, values);
@@ -2145,7 +2248,13 @@ impl Ledger {
             if let Some(meets) = meets.filter(|_| THRESHOLDS.contains(&crit.comparator.as_str())) {
                 cur.design.insert("meets".into(), Value::Int(meets as i64));
             }
-            if crit.min_n > 1 {
+            if !crit.measure.is_empty() {
+                outcome = "undetermined".into();
+                why_rule = format!(
+                    "{} is not read across fixed design cells, which are not independent samples; select one cell (--where) to read its replications",
+                    if crit.measure == "relative" { "a relative change" } else { "a difference of means" }
+                );
+            } else if crit.min_n > 1 {
                 outcome = "undetermined".into();
                 why_rule = format!("{} fixed design cells cannot satisfy n ≥ {} independent samples; select one cell to read its replications", cur.n.unwrap_or(0), crit.min_n);
             } else if cur.design.get("incomplete").map_or(false, Value::truthy) {
@@ -2332,7 +2441,7 @@ impl Ledger {
             unit: current.as_ref().map(|c| c.unit.clone()).unwrap_or_default(),
             population,
             // the runs the units it rests on came from, never a run the reading leaves out
-            runs: run_units.as_ref().map(|u| u.iter().filter(|o| read_units.contains(&o.unit)).count() as i64).unwrap_or(0),
+            runs: run_units.as_ref().map(|u| u.iter().filter(|o| read_units.contains(&o.unit)).map(|o| o.run.as_str()).collect::<HashSet<_>>().len() as i64).unwrap_or(0),
             repeats: run_units
                 .as_ref()
                 .map(|u| u.iter().filter(|o| read_units.contains(&o.unit) && o.repeats.as_ref().map_or(false, |r| !r.is_empty())).count() as i64)
@@ -2372,12 +2481,12 @@ impl Ledger {
         }
         let problems = unique(problems);
         let missed_units = match &unit_values {
-            Some(v) if outcome == "misses" && crit.over == "each" => assess::missed_units(crit, v),
+            Some(v) if outcome == "misses" && (crit.over == "each" || crit.over == "count") => assess::missed_units(crit, v),
             _ => Vec::new(),
         };
         // a reading that pools several values of a per-run setting says so in its headline, and names each value whose
         // runs alone would not meet the rule
-        let pooled = if current.as_ref().map_or(false, |c| c.source == "runs") { pooled_values(crit, &notes, &rr_.counted, &subject, &reference, &direction) } else { Vec::new() };
+        let pooled = if current.as_ref().map_or(false, |c| c.source == "runs") { pooled_values(crit, &notes, &rr_.counted, &subject, &reference, &metric, self.unit_setting(&exp).as_deref(), &direction) } else { Vec::new() };
         let mut notes = notes;
         // never an offer that would fold away a miss rb names: where the rule misses, no note offers a command that changes
         // how its runs are counted (the repeat form, a unit, a pairing's repeat), whichever reading that would give; the
@@ -2949,7 +3058,13 @@ pub(crate) fn of_cell(unit: &str, cell: &str) -> bool {
 /// ones when any unit pairs (a unit with one arm only is then left out), else every unit. Across fixed design cells
 /// the values are every unit's within its cell, and none when a cell's arms never share a unit.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-fn design_reading_of(counted: &[Observation], subject: &str, reference: &str, metric: &str, estimand: &str, unit_setting: Option<&str>, factors: &[String], only_design_units: bool) -> (Option<Reading>, Option<Vec<(String, f64)>>, Vec<String>) {
+/// A reading of a criterion's runs: the reading, each unit's value, the units read.
+type ReadOut = (Option<Reading>, Option<Vec<(String, f64)>>, Vec<String>);
+
+/// rb's reading across fixed design cells: each cell read by `per_cell` where a rule reads its own estimand (a relative
+/// change, a difference of means), else as a difference or a level, and the cells' estimates said descriptively.
+#[allow(clippy::too_many_arguments)]
+fn design_reading_of(counted: &[Observation], subject: &str, reference: &str, metric: &str, estimand: &str, unit_setting: Option<&str>, factors: &[String], only_design_units: bool, per_cell: Option<&dyn Fn(&[Observation]) -> ReadOut>) -> ReadOut {
     if factors.is_empty() {
         return reading_of(counted, subject, reference, metric, estimand, unit_setting);
     }
@@ -2971,9 +3086,16 @@ fn design_reading_of(counted: &[Observation], subject: &str, reference: &str, me
     let mut details = Vec::new();
     let mut read_units = Vec::new();
     let mut missing = Vec::new();
+    let mut own_method: Option<String> = None;
     for (key, observations) in cells {
-        let (reading, values, units) = reading_of(&observations, subject, reference, metric, estimand, unit_setting);
+        let (reading, values, units) = match per_cell {
+            Some(read) => read(&observations),
+            None => reading_of(&observations, subject, reference, metric, estimand, unit_setting),
+        };
         let Some(reading) = reading.filter(|r| r.estimate.is_some()) else { missing.push(key); continue; };
+        if per_cell.is_some() && own_method.is_none() {
+            own_method = Some(reading.method.clone());
+        }
         let estimate = reading.estimate.unwrap();
         estimates.push(estimate);
         each = each.zip(values).map(|(mut each, values)| {
@@ -2992,7 +3114,12 @@ fn design_reading_of(counted: &[Observation], subject: &str, reference: &str, me
     reading.estimate = Some(assess::fmean(&estimates));
     reading.n = Some(estimates.len() as i64);
     reading.unit = "design cell".into();
-    reading.method = "descriptive mean across fixed design cells".into();
+    // cells read on a rule's own estimand say it first: a relative change (in percent), a difference of means
+    reading.method = match own_method.as_deref() {
+        Some(m) if m.starts_with("relative change") => "relative change of the means, descriptive mean across fixed design cells".into(),
+        Some(m) if m.starts_with("difference of means") => "difference of means, as cited, descriptive mean across fixed design cells".into(),
+        _ => "descriptive mean across fixed design cells".into(),
+    };
     reading.why_no_interval = "fixed design cells are not independent samples; their range is descriptive, not a sampling interval".into();
     reading.produced_at = counted.iter().filter(|o| read_units.contains(&o.unit)).filter_map(|o| o.produced_at.clone()).min();
     reading.design = crate::dict! {"factors" => Value::list_of_str(factors.iter().cloned()), "cells" => Value::List(details), "count" => estimates.len(),
@@ -3135,8 +3262,15 @@ fn days_apart(later: &str, earlier: &str) -> (String, String) {
 /// run's own difference, or a unit's subject minus its reference, or where no unit holds both, the subject's mean
 /// minus the reference's), or the subject's level. A threshold rule judges the mean over that value's units, or for an
 /// --each rule each unit; an interval rule its estimate there, on the side its rule asks for.
-pub fn pooled_values(crit: &Criterion, notes: &[Caveat], counted: &[Observation], subject: &str, reference: &str, direction: &str) -> Vec<(String, Vec<String>, Vec<(String, String)>)> {
+///
+/// A best of N, a relative change and a difference of means are read at each value as their rule reads them: the best
+/// unit there, the relative change there (in percent), the difference of the arms' means there. A count's K is of every
+/// unit it reads, so no value's units alone are held to it: a count names no value.
+#[allow(clippy::too_many_arguments)]
+pub fn pooled_values(crit: &Criterion, notes: &[Caveat], counted: &[Observation], subject: &str, reference: &str, metric: &str, unit_setting: Option<&str>, direction: &str) -> Vec<(String, Vec<String>, Vec<(String, String)>)> {
     let mut out = Vec::new();
+    let own = crit.over == "best" || !crit.measure.is_empty();
+    let pct = if crit.measure == "relative" { "%" } else { "" };
     for n in notes.iter().filter(|n| n.code == "pooled_setting") {
         let Some(name) = n.subject.split_once('/').map(|(_, s)| s.to_string()) else { continue };
         let mut groups: IndexMap<String, Vec<&Observation>> = IndexMap::new();
@@ -3146,21 +3280,34 @@ pub fn pooled_values(crit: &Criterion, notes: &[Caveat], counted: &[Observation]
         let mut missed = Vec::new();
         for (v, obs) in &groups {
             // each unit's value there: a run's own difference or level, or a unit's subject minus its reference
-            let mut own: IndexMap<String, Vec<f64>> = IndexMap::new();
+            let mut mine: IndexMap<String, Vec<f64>> = IndexMap::new();
             let (mut subj, mut refr): (IndexMap<String, Vec<f64>>, IndexMap<String, Vec<f64>>) = (IndexMap::new(), IndexMap::new());
             for o in obs {
                 if reference.is_empty() || o.arm.is_empty() {
-                    own.entry(o.unit.clone()).or_default().push(o.value);
+                    mine.entry(o.unit.clone()).or_default().push(o.value);
                 } else if of_subject(subject, reference, &o.arm) {
                     subj.entry(o.unit.clone()).or_default().push(o.value);
                 } else {
                     refr.entry(o.unit.clone()).or_default().push(o.value);
                 }
             }
-            let mut units: Vec<f64> = own.values().map(|xs| assess::fmean(xs)).collect();
+            let mut units: Vec<f64> = mine.values().map(|xs| assess::fmean(xs)).collect();
             let paired: Vec<f64> = subj.iter().filter_map(|(u, xs)| refr.get(u).map(|ys| assess::fmean(xs) - assess::fmean(ys))).collect();
             units.extend(paired.iter().copied());
-            let estimate = if !units.is_empty() {
+            if crit.over == "count" {
+                continue;
+            }
+            // the rule's own reading there: the best unit, a relative change, a difference of means
+            let reading_there = own.then(|| {
+                let group: Vec<Observation> = obs.iter().map(|o| (*o).clone()).collect();
+                rule_reading(crit, reading_of(&group, subject, reference, metric, &crit.estimand, unit_setting), &group, subject, reference, metric, unit_setting, false).0
+            });
+            let estimate = if let Some(r) = &reading_there {
+                match r.as_ref().and_then(|r| r.estimate) {
+                    Some(e) => e,
+                    None => continue,
+                }
+            } else if !units.is_empty() {
                 assess::fmean(&units)
             } else if !subj.is_empty() && !refr.is_empty() {
                 let mean = |m: &IndexMap<String, Vec<f64>>| assess::fmean(&m.values().map(|xs| assess::fmean(xs)).collect::<Vec<_>>());
@@ -3178,7 +3325,7 @@ pub fn pooled_values(crit: &Criterion, notes: &[Caveat], counted: &[Observation]
             let n = units.len();
             let rests = if n > 0 { format!(", {n} {}", if n == 1 { "unit" } else { "units" }) } else { String::new() };
             let miss = if crate::record::THRESHOLDS.contains(&crit.comparator.as_str()) {
-                if crit.over == "each" && !units.is_empty() {
+                if crit.over == "each" && !units.is_empty() && !own {
                     let out: Vec<f64> = units.iter().copied().filter(|x| !assess::threshold(crit, *x).0).collect();
                     let side = match crit.comparator.as_str() {
                         "at_least" => "below",
@@ -3206,7 +3353,8 @@ pub fn pooled_values(crit: &Criterion, notes: &[Caveat], counted: &[Observation]
                         }
                     })
                 } else {
-                    (!assess::threshold(crit, estimate).0).then(|| format!("{}{rests}", assess::g(estimate)))
+                    let best = if crit.over == "best" { "best unit " } else { "" };
+                    (!assess::threshold(crit, estimate).0).then(|| format!("{best}{}{pct}{rests}", assess::g(estimate)))
                 }
             } else {
                 // an interval rule, judged on its estimate there: on the better side, inside its margin
@@ -3217,7 +3365,7 @@ pub fn pooled_values(crit: &Criterion, notes: &[Caveat], counted: &[Observation]
                     "equivalent" => estimate.abs() > margin,
                     _ => false,
                 };
-                off.then(|| format!("{}{rests}", assess::g(estimate)))
+                off.then(|| format!("{}{pct}{rests}", assess::g(estimate)))
             };
             // a value says a reading of its own only where it holds one: the rule's least number of units, two at the
             // least, never one unit (a repeat's number takes another value in every unit)
@@ -3283,6 +3431,7 @@ fn pairing_said(p: &Pairing, exp: &Experiment, crit: &Criterion, subject: &str, 
             _ => false,
         }) => String::new(),
         Some(u) if u.estimate.is_some() => format!("unpaired, {runs} read {}", assess::reading_for(crit, u, metric_unit, direction)),
+        _ if p.diff_only => String::new(),
         _ => format!("unpaired, {runs} give no reading: each arm needs a unit of its own"),
     };
     let (tail, command) = if p.declared {
@@ -3387,4 +3536,141 @@ fn paired_against_means(rr: &RunReading, crit: &Criterion, subject: &str, refere
         said
     );
     Some((Caveat::note("cited_differs", subject, text), Some(sm - rm)))
+}
+
+
+/// A unit as a sentence names it: "seed 3", "width 512, seed 2".
+pub fn unit_named(unit: &str) -> String {
+    unit.split(" · ").map(|p| p.replacen('=', " ", 1)).collect::<Vec<_>>().join(", ")
+}
+
+/// The unit best in a threshold's direction (the highest for --at-least, the lowest for --at-most) and its value.
+pub fn best_unit<'a>(c: &Criterion, values: &'a [(String, f64)]) -> Option<&'a (String, f64)> {
+    let high = c.comparator == "at_least";
+    values.iter().filter(|(_, v)| v.is_finite()).fold(None, |best: Option<&(String, f64)>, x| match best {
+        Some(b) if (high && b.1 >= x.1) || (!high && b.1 <= x.1) => Some(b),
+        _ => Some(x),
+    })
+}
+
+/// A run reading as format 2's rules read it (`over: best`, `measure: relative`, `measure: means`); any other rule's
+/// as rb reads it. A best of N is the best unit's own value, never a mean, and has no interval. A relative change is
+/// the difference of the arms' means over the reference's mean, in percent, with a delta-method t interval from 3
+/// units (paired where the units pair). A difference of means is each arm's mean over all its units, with Welch's
+/// interval, the estimand a cited difference of means states.
+pub fn rule_reading(
+    c: &Criterion,
+    out: (Option<Reading>, Option<Vec<(String, f64)>>, Vec<String>),
+    counted: &[Observation],
+    subject: &str,
+    reference: &str,
+    metric: &str,
+    unit_setting: Option<&str>,
+    design: bool,
+) -> (Option<Reading>, Option<Vec<(String, f64)>>, Vec<String>) {
+    if c.over == "best" {
+        let (mut reading, values, units) = out;
+        if let (Some(r), Some((label, v))) = (reading.as_mut(), values.as_deref().and_then(|vs| best_unit(c, vs)).cloned()) {
+            let n = values.as_ref().map_or(0, |v| v.len()) as i64;
+            r.estimate = Some(v);
+            (r.lo, r.hi, r.level) = (None, None, None);
+            let _ = n;
+            r.method = format!("best unit {}", unit_named(&label));
+            r.why_no_interval = "a best of N is one unit's own value, with no interval".into();
+        }
+        return (reading, values, units);
+    }
+    // across fixed design cells (declared, and not selected away) the cells' own reading stands, with its guards: no
+    // relative change or difference of means is read across them, and the rule says so (undetermined)
+    if (c.measure != "relative" && c.measure != "means") || design {
+        return out;
+    }
+    let base = out.0.clone();
+
+    // each unit's mean of each arm: a case is a run with its repeats, a unit's cases averaged
+    let mut case_of: HashMap<String, String> = HashMap::new();
+    for o in counted {
+        let k = o.repeats.as_ref().filter(|r| !r.is_empty()).map(|rep| case_of.get(rep).cloned().unwrap_or_else(|| rep.clone())).unwrap_or_else(|| o.run.clone());
+        case_of.insert(o.run.clone(), k);
+    }
+    let mut arms: IndexMap<String, [IndexMap<String, Vec<f64>>; 2]> = IndexMap::new();
+    let mut diff_only = false;
+    for o in counted {
+        if o.arm.is_empty() {
+            diff_only = true;
+            continue;
+        }
+        let slot = if o.arm == subject { 0 } else { 1 };
+        arms.entry(o.unit.clone()).or_insert_with(|| [IndexMap::new(), IndexMap::new()])[slot].entry(case_of[&o.run].clone()).or_default().push(o.value);
+    }
+    let mean_of = |cases: &IndexMap<String, Vec<f64>>| (!cases.is_empty()).then(|| assess::fmean(&cases.values().map(|v| assess::fmean(v)).collect::<Vec<_>>()));
+    let mut r = base.clone().unwrap_or_else(|| {
+        let mut r = Reading::of(metric);
+        (r.subject, r.reference) = (subject.to_string(), reference.to_string());
+        r.unit = unit_setting.unwrap_or("unit").to_string();
+        r
+    });
+    (r.lo, r.hi, r.level, r.estimate) = (None, None, None, None);
+    // a run that gives only the difference holds neither arm's own number, which both readings need
+    if diff_only {
+        return (None, None, Vec::new());
+    }
+    let (s_units, r_units): (Vec<(String, f64)>, Vec<(String, f64)>) = (
+        arms.iter().filter_map(|(u, a)| mean_of(&a[0]).map(|m| (u.clone(), m))).collect(),
+        arms.iter().filter_map(|(u, a)| mean_of(&a[1]).map(|m| (u.clone(), m))).collect(),
+    );
+    if s_units.is_empty() || r_units.is_empty() {
+        return (None, None, Vec::new());
+    }
+    let read_units: Vec<String> = arms.keys().cloned().collect();
+    let xs: Vec<f64> = s_units.iter().map(|(_, v)| *v).collect();
+    let ys: Vec<f64> = r_units.iter().map(|(_, v)| *v).collect();
+    if c.measure == "means" {
+        let (est, lo, hi, why) = assess::welch_interval(&xs, &ys, 0.95);
+        r.estimate = Some(est);
+        (r.lo, r.hi) = (lo, hi);
+        r.level = lo.map(|_| 0.95);
+        r.method = format!("difference of means, as cited{}", if lo.is_some() { ", Welch interval" } else { "" });
+        // its units are the units the arms were read on, each counted once
+        r.n = Some(read_units.len() as i64);
+        r.why_no_interval = why;
+        return (Some(r), None, read_units);
+    }
+    // a relative change: paired where every unit holds both arms, else each arm's units apart
+    let paired: Vec<(f64, f64)> = s_units.iter().filter_map(|(u, x)| r_units.iter().find(|(v, _)| v == u).map(|(_, y)| (*x, *y))).collect();
+    let all_pair = paired.len() == s_units.len() && paired.len() == r_units.len();
+    let (sm, rm) = if all_pair {
+        (assess::fmean(&paired.iter().map(|p| p.0).collect::<Vec<_>>()), assess::fmean(&paired.iter().map(|p| p.1).collect::<Vec<_>>()))
+    } else {
+        (assess::fmean(&xs), assess::fmean(&ys))
+    };
+    if rm == 0.0 || !rm.is_finite() {
+        return (None, None, Vec::new());
+    }
+    let q = sm / rm;
+    r.estimate = Some((q - 1.0) * 100.0);
+    let n = if all_pair { paired.len() } else { xs.len().min(ys.len()) };
+    let (var_q, df) = if all_pair {
+        // the ratio estimator's variance from each unit's residual, subject - q x reference: centred, so arms that move
+        // together lose no variance to cancellation
+        let k = paired.len() as f64;
+        let residuals: Vec<f64> = paired.iter().map(|(x, y)| x - q * y).collect();
+        let var = if paired.len() > 1 { assess::variance(&residuals) } else { 0.0 };
+        (var / (k * rm * rm), k - 1.0)
+    } else {
+        (assess::variance(&xs) / xs.len() as f64 / (rm * rm) + q * q * assess::variance(&ys) / ys.len() as f64 / (rm * rm), (xs.len().min(ys.len()) as f64) - 1.0)
+    };
+    let how = if all_pair { "relative change of the means, paired" } else { "relative change of the means, unpaired" };
+    if n >= assess::MIN_UNITS_FOR_INTERVAL && var_q.is_finite() && var_q >= 0.0 {
+        let half = if var_q == 0.0 { 0.0 } else { assess::t_ppf(0.975, df) * var_q.sqrt() * 100.0 };
+        let e = r.estimate.unwrap();
+        (r.lo, r.hi, r.level) = (Some(e - half), Some(e + half), Some(0.95));
+        r.method = format!("{how}, delta-method t interval");
+        r.why_no_interval = String::new();
+    } else {
+        r.method = how.to_string();
+        r.why_no_interval = format!("{n} unit{}: rb gives an interval from {}", if n == 1 { "" } else { "s" }, assess::MIN_UNITS_FOR_INTERVAL);
+    }
+    r.n = Some(read_units.len() as i64);
+    (Some(r), None, read_units)
 }

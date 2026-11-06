@@ -406,6 +406,12 @@ pub fn g(x: f64) -> String {
     fmt_float(x, "g")
 }
 
+/// A run's number as rb show and the page say it: to 15 significant digits, so the noise of a float's last bits is left
+/// out (49.69, never 49.690000000000005) and no digit given is cut (1234.5679, 123456789.123, never 1234.57).
+pub fn run_number(x: f64) -> String {
+    fmt_float(x, ".15g")
+}
+
 /// Python's round(x) (to an int, ties to even), as a float.
 pub fn round0(x: f64) -> f64 {
     x.round_ties_even()

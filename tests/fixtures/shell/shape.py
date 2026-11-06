@@ -32,7 +32,7 @@ PHASE = [  # (path prefix, phase, where today's code computes it, or what builds
     ("questions[].overview.limits[].relations", "1b", "new: indexes into overview.relations of the relations that raise the limit"),
     ("unfiled", "1a", "new: unfiled group (calls at ':unfiled' today)"),
     ("findings", "today", "FindingLine"), ("findings.{id}.experiment", "today", "status findings[]"),
-    ("findings.{id}.reading", "1b", "reading text parts (assess.rs); numbers in finding.comparison today"),
+    ("findings.{id}.reading", "1b", "reading text parts (assess.rs); numbers in finding.comparison today"), ("findings.{id}.reading.places", "1b", "contract 1.13 (fix round 6): model.rs card_places: the decimals every part of the page says this reading in"), ("findings.{id}.reading.over", "1b", "contract 1.14 (fix round 6, format 2): how the rule's threshold is read (mean, each, bound, count, best)"), ("findings.{id}.reading.measure", "1b", "contract 1.14 (fix round 6, format 2): what rb's reading measures (\"\", relative, means)"),
     ("findings.{id}.check_band", "1b", "the criterion's rule (status), for the figure (2b)"),
     ("findings.{id}.units_line", "1b", "new"), ("findings.{id}.rule_detail", "1b", "why_rule (ledger/findings.rs)"),
     ("findings.{id}.unit_amended", "1b", "new: amendments after the lock"),
@@ -95,7 +95,7 @@ PHASE = [  # (path prefix, phase, where today's code computes it, or what builds
     ("findings.{id}.reading_short", "M6", "the compact row's reading, arms labelled"), ("findings.{id}.verdict", "P4B", "model.rs verdict: the rule's one sentence (status word, reading, result class in words, distance from its number)"),
     ("findings.{id}.reading.unit_said", "P4B", "model.rs: the unit as a sentence says it (points for a difference of percentages)"), ("findings.{id}.tags", "M6", "at most two ontology tags"),
     ("findings.{id}.reads_baseline", "M6", "it reads the baseline or control arm alone"),
-    ("findings.{id}.pooled", "M6", "contract 1.12 (fix round 2): rb show's headline words for a reading that pools a per-run setting's values; empty where none"),
+    ("findings.{id}.pooled", "M6", "added under 1.11 (fix round 2), marked at 1.12: rb show's headline words for a reading that pools a per-run setting's values; empty where none"),
     ("experiments[].compares", "M6", "model.rs compares, arms labelled"),
     # CITE (CITE.md items 1 and 4): every file:line the text cites, resolved (ledger/cite.rs, M's CITE-FIELDS.md)
     # PIVOT (the experiment's comparison as a grid; a reader's queue rows say what stands): rb compare's cells, additive

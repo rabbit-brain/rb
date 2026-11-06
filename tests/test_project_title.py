@@ -129,7 +129,7 @@ def test_an_identical_title_does_not_write_over_a_newer_record(project):
     project("question", "add", "A future inquiry", "--id", "q1")
     file = project.root / ".rb/questions/q1.yaml"
     doc = rbyaml.load(file.read_text(encoding="utf-8"))
-    doc.data["rb"] = 2
+    doc.data["rb"] = 3
     file.write_text(rbyaml.dumps(doc.data), encoding="utf-8")
     before = record_bytes(project.root)
     env = project("project", "title", "Original theme", "--why", "confirm the title", ok=False)

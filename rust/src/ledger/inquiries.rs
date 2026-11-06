@@ -52,6 +52,8 @@ impl Ledger {
         // qualifications its summary leaves out: what the finding's line says already, or the line it is listed under
         let mut said_elsewhere = Vec::new();
         let mut link_timing = "unmapped".to_string();
+        // the rule's timing and its question link's, each named; where they read alike, said once for both
+        let mut rule_timing_named = String::new();
         if let Some(link) = link {
             if link.retracted.is_some() {
                 integrity.push(Caveat::problem("question_link_retracted", &c.id, "this question link was withdrawn"));
@@ -69,8 +71,15 @@ impl Ledger {
                 let timed = self.finding(&at_link)?;
                 link_timing = timed.timing;
                 let said = timed.says.get("timing").cloned().unwrap_or_default();
+                let rule = finding.as_ref().and_then(|f| f.says.get("timing").cloned()).unwrap_or_default();
                 if !said.is_empty() {
                     qualifications.push(format!("question link {said}"));
+                    if said == rule {
+                        rule_timing_named = format!("rule and question link {rule}");
+                        said_elsewhere.extend(qualifications.last().cloned());
+                    } else if !rule.is_empty() {
+                        rule_timing_named = format!("rule {rule}");
+                    }
                 }
             } else {
                 link_timing = "unknown".into();
@@ -151,6 +160,11 @@ impl Ledger {
                 // its problems are said once, with the inquiry's
                 let mut f = f.dump(false);
                 f.insert("integrity".into(), Value::List(Vec::new()));
+                if !rule_timing_named.is_empty() {
+                    if let Some(Value::Dict(says)) = f.get_mut("says") {
+                        says.insert("timing".into(), Value::Str(rule_timing_named.clone()));
+                    }
+                }
                 let f = Value::Dict(f);
                 crate::view::finding_line(&f, &self.call_words(&f)).sentence
             }
@@ -730,7 +744,9 @@ fn inquiry_summary(rows: &[Value], calls: &HashMap<String, String>, ranges: &Has
                 readings.push(format!("{id}: {comparison}; {}", said("rule")));
                 let timing = said("timing");
                 if !timing.is_empty() {
-                    qualifications.entry(format!("criterion {timing}")).or_default().push(id.clone());
+                    let both = row.get("qualifications").and_then(Value::as_list).map_or(false, |l| l.iter().any(|q| q.as_str() == Some(format!("question link {timing}").as_str())));
+                    let named = if both { "criterion and question link" } else { "criterion" };
+                    qualifications.entry(format!("{named} {timing}")).or_default().push(id.clone());
                 }
             } else {
                 readings.push(format!("{id}: no finding can be read"));
@@ -743,8 +759,9 @@ fn inquiry_summary(rows: &[Value], calls: &HashMap<String, String>, ranges: &Has
                 }
             }
             if let Some(Value::List(items)) = row.get("qualifications") {
+                let timing = row.get("finding").and_then(|f| f.get("says")).and_then(|s| s.get_str("timing")).unwrap_or("").to_string();
                 for item in items {
-                    if let Some(text) = item.as_str() {
+                    if let Some(text) = item.as_str().filter(|t| timing.is_empty() || *t != format!("question link {timing}")) {
                         qualifications.entry(text.to_string()).or_default().push(id.clone());
                     }
                 }

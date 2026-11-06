@@ -256,7 +256,9 @@ def test_one_run_outside_a_rules_selectors_is_said_in_the_singular(rb):
     for batch in (64, 32):
         rb("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6", "--set", f"batch={batch}", "--produced-at", "2030-01-01T00:00:00Z")
     notes = {c["code"]: c["text"] for c in rb("show", crit).data["finding"]["caveats"]}
-    assert notes["run_scope"] == "1 run outside this criterion's per-run selectors is not read"
+    assert notes["run_scope"].startswith("1 run outside this criterion's per-run selectors is not read: run"), notes["run_scope"]
+    # the run it leaves out is named, with its value of what the rule selects by (round 5)
+    assert notes["run_scope"].endswith(" (batch=32)"), notes["run_scope"]
 
 
 def cited_minus_half(rb, *design: str) -> str:
@@ -330,7 +332,7 @@ def test_the_arms_means_average_a_units_cases_as_rbs_reading_does(rb):
     f = rb("show", crit).data["finding"]
     assert f["rule_outcome"] == "misses" and not [p for p in f["integrity"] if p["code"] == "not_comparable"]
     [said] = [c["text"] for c in f["caveats"] if c["code"] == "cited_differs"]
-    assert "(int8 over 2, fp32 over 3), which is -0.6000 here" in said
+    assert "(int8 over 2, fp32 over 3), which is -0.6 here" in said
 
 
 def test_a_cited_difference_a_clone_brought_is_not_comparable_either(rb, tmp_path):

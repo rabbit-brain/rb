@@ -438,9 +438,24 @@ pub fn declared_digits(x: f64) -> usize {
     (6..=15).find(|k| fmt_float(x, &format!(".{k}g")).parse::<f64>() == Ok(x)).unwrap_or(15)
 }
 
-/// A rule's own number as it was declared: 1234.5678, never 1234.57.
+/// A rule's own number as it was declared: 1234.5678, never 1234.57; and in digits, as rb's other words say it
+/// ("within 0.0000005"), never "5e-07".
 pub fn declared(x: f64) -> String {
-    fmt_float(x, &format!(".{}g", declared_digits(x)))
+    let k = declared_digits(x);
+    positional(&fmt_float(x, &format!(".{k}g")), x, k)
+}
+
+/// A number %g wrote with an exponent, in digits instead, where that is no longer than a reader can follow (an exponent
+/// from -12 to 15); the same significant digits, never more.
+fn positional(said: &str, x: f64, digits: usize) -> String {
+    let Some((_, exp)) = said.split_once('e') else { return said.to_string() };
+    let Ok(exp) = exp.parse::<i32>() else { return said.to_string() };
+    if !(-12..=15).contains(&exp) || !x.is_finite() {
+        return said.to_string();
+    }
+    let places = (digits as i32 - 1 - exp).max(0) as usize;
+    let fixed = format!("{x:.places$}");
+    if fixed.contains('.') { fixed.trim_end_matches('0').trim_end_matches('.').to_string() } else { fixed }
 }
 
 /// A rule's number as `declared` says it, with the 16th and 17th digits it leaves out where they are needed to read back
@@ -462,10 +477,12 @@ fn rule_number(x: Option<f64>) -> String {
 
 fn rule_value(c: &Criterion) -> String {
     let t = rule_number(c.target);
+    // a relative change's threshold is a percent
+    let pct = if c.measure == "relative" { "%" } else { "" };
     if c.comparator == "equals" {
-        return format!("{t} ± {}", rule_number(c.tolerance));
+        return format!("{t} ± {}{pct}", rule_number(c.tolerance));
     }
-    t
+    format!("{t}{pct}")
 }
 
 fn versus(c: &Criterion, ok: bool) -> String {
@@ -482,7 +499,9 @@ fn versus(c: &Criterion, ok: bool) -> String {
 /// half a unit of its last digit either side.
 fn stands_for(said: &str, x: f64) -> (f64, f64) {
     let Ok(v) = said.parse::<f64>() else { return (x, x) };
-    if v == x || !x.is_finite() {
+    // a float's last-bit noise is no digit: 0.6600000000000108 said as 0.66 is said exactly, as 0.66 itself is, so one
+    // reading read two ways (paired, unpaired) takes the same digits
+    if (v - x).abs() <= close(v, x) || !x.is_finite() {
         return (v, v);
     }
     let body = said.trim_start_matches(['+', '-']);
@@ -558,7 +577,7 @@ pub fn rule_numbers_of(comparator: &str, over: &str, target: Option<f64>, tolera
         let (rule, edges): (Vec<f64>, Edges) = if tol != 0.0 { (vec![t, tol], |n| vec![n[0] - n[1], n[0] + n[1]]) } else { (vec![t], |n| n.to_vec()) };
         let signed = !r.reference.is_empty();
         match (over, lo, hi) {
-            ("each", _, _) => return none,
+            ("each" | "count", _, _) => return none,
             ("bound", Some(_), Some(hi)) if comparator == "at_most" => (vec![hi], vec![2], rule, edges, signed),
             ("bound", Some(lo), Some(_)) if comparator == "at_least" => (vec![lo], vec![1], rule, edges, signed),
             ("bound", Some(lo), Some(hi)) => (vec![lo, hi], vec![1, 2], rule, edges, signed),
@@ -603,7 +622,7 @@ pub fn observation_said(c: &Criterion, o: &crate::record::Observation) -> String
 /// with the digits that keep it on its own side of the rule's edges where `g` would not (21.0000004, never 21).
 pub fn observed(c: &Criterion, x: f64, signed: bool) -> String {
     let plain = fmt_float(x, if signed { "+g" } else { "g" });
-    if c.over != "each" || !THRESHOLDS.contains(&c.comparator.as_str()) {
+    if !matches!(c.over.as_str(), "each" | "count" | "best") || !THRESHOLDS.contains(&c.comparator.as_str()) {
         return plain;
     }
     let t = c.target.unwrap_or(0.0);
@@ -640,6 +659,43 @@ pub fn judge(c: &Criterion, r: Option<&Reading>, direction: &str, unit_values: O
     let said = rule_numbers(c, r, direction);
     let say = |i: usize, x: f64, sign: bool| said[i].clone().unwrap_or_else(|| n4(Some(x), sign));
     if THRESHOLDS.contains(&c.comparator.as_str()) {
+        if c.over == "count" || c.over == "best" {
+            let Some(values) = unit_values.filter(|v| !v.is_empty()) else {
+                let why = if r.source == "runs" { "the arms never share a unit, so no unit has a difference to judge" } else { "each unit's value is read from runs; an analysis reports none" };
+                return ("undetermined", why.into(), None);
+            };
+            // across fixed design cells the reading counts cells, and the rule judges the units within them
+            let units = if r.unit.is_empty() || !r.design.is_empty() { "unit".to_string() } else { r.unit.clone() };
+            let n = values.len();
+            // a rule of N units read on another number of them is not the rule as declared
+            if let Some(of) = c.of.filter(|of| *of as usize != n) {
+                return ("undetermined", format!("the rule is of {of} {}; the runs hold {n}", plural(&units, of)), None);
+            }
+            let words = match c.comparator.as_str() {
+                "at_most" => format!("at most {}", rule_value(c)),
+                "at_least" => format!("at least {}", rule_value(c)),
+                _ => format!("within {}", rule_value(c)),
+            };
+            if c.over == "best" {
+                let (label, v) = crate::ledger::findings::best_unit(c, values).cloned().unwrap_or_default();
+                let (ok, m) = threshold(c, v);
+                // the best unit's value is the reading's estimate: said in the digits its comparison says it in
+                let said = say(0, v, !r.reference.is_empty());
+                return (if ok { "meets" } else { "misses" }, format!("best of {n} {}, {}: {said} {}", plural(&units, n as i64), crate::ledger::findings::unit_named(&label), versus(c, ok)), Some(m));
+            }
+            let k = c.count.unwrap_or(1) as usize;
+            let judged: Vec<(bool, f64)> = values.iter().map(|(_, v)| threshold(c, *v)).collect();
+            let held = judged.iter().filter(|(ok, _)| *ok).count();
+            // the margin of the k-th best unit: how far the rule is from turning
+            let mut margins: Vec<f64> = judged.iter().map(|(_, m)| *m).collect();
+            margins.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+            let margin = margins.get(k.saturating_sub(1)).copied();
+            let said = format!("{held} of {n} {} {words}", plural(&units, n as i64));
+            if n < k {
+                return ("undetermined", format!("{said}; the rule needs {k} of them, and the runs hold {n}"), None);
+            }
+            return (if held >= k { "meets" } else { "misses" }, format!("{said}; the rule asks for {k}"), margin);
+        }
         if c.over == "each" {
             // across fixed design cells it judges every unit within its cell, never a cell's mean
             let cells = r.design.get("count").and_then(Value::as_i64);
@@ -703,7 +759,8 @@ pub fn judge(c: &Criterion, r: Option<&Reading>, direction: &str, unit_values: O
             return (if ok { "meets" } else { "misses" }, format!("{shown} {}", versus(c, ok)), Some(m));
         }
         let (ok, m) = threshold(c, r.estimate.unwrap());
-        return (if ok { "meets" } else { "misses" }, format!("estimate {} {}", say(0, r.estimate.unwrap(), signed), versus(c, ok)), Some(m));
+        let pct = if c.measure == "relative" { "%" } else { "" };
+        return (if ok { "meets" } else { "misses" }, format!("estimate {}{pct} {}", say(0, r.estimate.unwrap(), signed), versus(c, ok)), Some(m));
     }
     if !iv {
         return ("undetermined", format!("a {} rule reads the interval: {no_iv}", c.comparator), None);
@@ -752,7 +809,7 @@ pub fn judge(c: &Criterion, r: Option<&Reading>, direction: &str, unit_values: O
 /// The reading's interval and the thresholds a rule read on the estimate has strictly inside it, as a note says them:
 /// [20.01, 21.26] and 21, each with the digits that keep them in order (in_order).
 pub fn crossing(c: &Criterion, r: &Reading) -> Option<(String, String, Vec<String>)> {
-    if !THRESHOLDS.contains(&c.comparator.as_str()) || c.over == "each" || c.over == "bound" {
+    if !THRESHOLDS.contains(&c.comparator.as_str()) || c.over != "mean" {
         return None;
     }
     let (Some(lo), Some(hi), Some(t)) = (r.lo, r.hi, c.target) else {
@@ -843,17 +900,18 @@ pub fn rule_word(outcome: &str, role: &str, origin: &str) -> String {
 }
 
 /// The rule axis as a criterion's finding says it: 'criterion met', or 'estimate meets criterion' ('recorded values
-/// meet criterion' for an --each rule) when the reading has no interval or crosses the threshold.
+/// meet criterion' for an --each rule) when the reading has no interval or crosses the threshold. A count and a best
+/// of N are met by the recorded units themselves, whatever the mean's interval: always 'recorded values meet criterion'.
 pub fn rule_said(c: &Criterion, outcome: &str, reading: Option<&Reading>) -> String {
     let word = rule_word(outcome, &c.role, &c.origin);
-    let alone = reading.map_or(false, |r| r.lo.is_none() || r.hi.is_none() || crossing(c, r).is_some());
+    let alone = matches!(c.over.as_str(), "count" | "best") || reading.map_or(false, |r| r.lo.is_none() || r.hi.is_none() || crossing(c, r).is_some());
     if word == "meets" && alone {
-        return if c.over == "each" { "recorded values meet criterion" } else { "estimate meets criterion" }.into();
+        return if matches!(c.over.as_str(), "each" | "count" | "best") { "recorded values meet criterion" } else { "estimate meets criterion" }.into();
     }
     // a cited rule met on the estimate alone is qualified as an own rule is: never a bare "reproduced" beside a reading
     // with no interval, or one that crosses the rule's line
     if word == "reproduced" && alone {
-        return if c.over == "each" { "reproduced on the recorded values" } else { "reproduced on the estimate" }.into();
+        return if matches!(c.over.as_str(), "each" | "count" | "best") { "reproduced on the recorded values" } else { "reproduced on the estimate" }.into();
     }
     rule_label(&word, 1)
 }
@@ -885,7 +943,9 @@ pub fn reading_for(c: &Criterion, r: &Reading, unit_of_metric: &str, direction: 
 pub fn range_said(c: Option<&Criterion>, r: &Reading) -> Option<String> {
     let (min, max) = (r.design.get("min")?.as_f64()?, r.design.get("max")?.as_f64()?);
     let ends = cells_said(c, r, &[min, max]);
-    Some(format!("{} to {}", ends[0], ends[1]))
+    // a relative change's cells are in percent, as its rule is
+    let pct = if c.map_or(false, |c| c.measure == "relative") { "%" } else { "" };
+    Some(format!("{}{pct} to {}{pct}", ends[0], ends[1]))
 }
 
 /// Estimates of a reading's fixed design cells (`xs`), each said as a cell's estimate is: to 6 significant digits, with
@@ -930,7 +990,8 @@ pub fn said_all(xs: [Option<f64>; 3], said: &[Option<String>; 3], signed: bool) 
     let fill = |x: f64| match said.iter().flatten().map(digits).max().filter(|k| *k > 4) {
         Some(k) => {
             let plain = fmt_float(x, &format!("{sign}.{k}g"));
-            if plain.parse::<f64>() == Ok(x) {
+            // a float's last-bit noise is no digit, as stands_for reads it: 0.6600000000000108 is +0.66, never +0.660000
+            if plain.parse::<f64>().map_or(false, |v| (v - x).abs() <= close(v, x)) {
                 plain
             } else {
                 fmt_float(x, &format!("{sign}#.{k}g")).trim_end_matches('.').to_string()
@@ -979,7 +1040,9 @@ pub fn reading_parts(r: Option<&Reading>, unit_of_metric: &str, said: &[Option<S
         how.push(format!("{}%", g(crate::pyfloat::round0(level * 100.0))));
     }
     let source = if r.source == "runs" { "rb".to_string() } else { r.source.clone() };
-    Some(ReadingParts { estimate: est, interval, unit: unit_of_metric.to_string(), how: how.join(", "), source })
+    // a relative change is in percent, whatever the metric's own unit
+    let unit = if r.method.starts_with("relative change") { "%" } else { unit_of_metric };
+    Some(ReadingParts { estimate: est, interval, unit: unit.to_string(), how: how.join(", "), source })
 }
 
 /// reading_text, its estimate, lo and hi said as `said` gives them where it does (rule_numbers).

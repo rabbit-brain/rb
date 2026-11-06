@@ -102,9 +102,14 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser) -> None:
         s.add_argument("--better", action="store_true", help="the subject is better than the reference: the interval clear of 0 on the better side")
         s.add_argument("--noninferior", type=float, default=None, metavar="MARGIN", help="the subject is no worse than the reference by more than MARGIN, read on the interval")
         s.add_argument("--equivalent", type=float, default=None, metavar="MARGIN", help="the difference lies inside ±MARGIN, read on the interval")
-        s.add_argument("--over", choices=["mean", "each", "bound"], default=None, help=argparse.SUPPRESS)
+        s.add_argument("--over", choices=["mean", "each", "bound", "count", "best"], default=None, help=argparse.SUPPRESS)
         s.add_argument("--each", action="store_true", help="a threshold every independent unit must meet, not only the estimate")
         s.add_argument("--bound", action="store_true", help="a threshold on the interval's bound (the upper for --at-most, the lower for --at-least)")
+        s.add_argument("--count", type=int, default=None, metavar="K", help="a threshold at least K independent units must meet (\"19 of 20 runs below 0.890\"; with --of N)")
+        s.add_argument("--best", action="store_true", help="a threshold the best unit must meet, best in the threshold's direction (\"best of 5 runs reaches 0.889\"; with --of N)")
+        s.add_argument("--of", type=int, default=None, metavar="N", help="with --count or --best: how many units the rule is of; runs that hold another number leave it undetermined")
+        s.add_argument("--relative", action="store_true", help="read the relative change, (subject - reference) / reference, its threshold a percent (\"improves val_bpb by 22.5%%\": --at-most -22.5)")
+        s.add_argument("--means", action="store_true", help="with --source: the cited number is a difference of the arms' means over all their units, and rb reads that")
         s.add_argument("--role", choices=["primary", "secondary", "exploratory", "gate"], default="primary",
                        help="primary (what the work claims), secondary, exploratory, or gate (a priority policy: a miss parks a line, it never refutes it)")
         s.add_argument("--min-n", type=int, default=1, help="independent units it takes (default 1)")
@@ -547,7 +552,7 @@ def build_parser(version: str = VERSION) -> argparse.ArgumentParser:
                    help="with --agents-md: add rb's section to an AGENTS.md that is here without asking (default: asked once in your terminal; elsewhere left as it is, with what to add)")
     s.set_defaults(func="cmd_skill")
 
-    s = sub.add_parser("schema", parents=[common], help="print a JSON Schema: `rb schema all` is Rabbit Brain format 1 (rb-v1.schema.json), `rb schema <kind>` one record's shape")
+    s = sub.add_parser("schema", parents=[common], help="print a JSON Schema: `rb schema all` is Rabbit Brain formats 1 and 2 (rb-v2.schema.json), `rb schema <kind>` one record's shape")
     s.add_argument("name", choices=["all", *SCHEMA_NAMES, "ir"])
     s.set_defaults(func="cmd_schema")
 

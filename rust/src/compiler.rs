@@ -249,6 +249,11 @@ fn source_entry(root: &Path, f: &Path, names: &IndexMap<String, String>) -> Dict
                             entry.insert("metrics".into(), Value::Dict(metrics));
                         }
                         Err(e) => {
+                            // a table whose first line is a data row: every row counted, no column named from that line
+                            if let Some(rows) = crate::csvtable::rows_without_header(&text, &rel) {
+                                entry.shift_remove("columns");
+                                entry.insert("rows".into(), Value::Int(rows as i64));
+                            }
                             entry.insert("note".into(), Value::Str(e));
                         }
                     }

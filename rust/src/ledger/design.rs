@@ -595,7 +595,7 @@ fn source_form(s: &Source) -> Value {
 }
 
 /// What a criterion's rule is made of, structured: what it reads, how it compares, and how many units it needs.
-const RULE_FIELDS: &[&str] = &["metric", "subject", "reference", "estimand", "where", "subject_where", "reference_where", "comparator", "target", "tolerance", "margin", "over", "min_n", "noise"];
+const RULE_FIELDS: &[&str] = &["metric", "subject", "reference", "estimand", "where", "subject_where", "reference_where", "comparator", "target", "tolerance", "margin", "over", "count", "of", "measure", "min_n", "noise"];
 
 fn rule_form(c: &Criterion) -> Value {
     let all = c.dump(true);

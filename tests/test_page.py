@@ -353,7 +353,8 @@ def test_a_rule_met_only_on_its_estimate_is_never_drawn_green(repo, capsys):
         said = re.findall(r'<(?:span|a)((?: [\w-]+="[^"]*")*)>2 (?:rules )?met(?:, [^<]*on the estimate alone)?</', text)
         assert len(said) >= 4 and not [a for a in said if "good" in a], said
         assert re.search(r'class="sw mute"[^>]*>2 met[,<]', text) and not re.search(r'class="sw good"[^>]*>2 met[,<]', text)
-        assert '<span class="tl"><span class="k">Rules: </span><span>2 rules met</span>' in text.split('<div class="srow" data-go="x-e1">', 1)[1].split("</div></div>", 1)[0]
+        row = text.split('<div class="srow" data-go="x-e1">', 1)[1].split("</div></div>", 1)[0]
+        assert re.search(r'<span class="tl"><span class="k">Rules: </span><span>2 rules met, [^<]*on the estimate alone</span>', row), row
 
     text = page()
     finding_card = lambda cid: text[text[:text.index(f'id="c-{cid}"')].rindex("<div"):].split('<div class="card', 2)[1].join(['<div class="card', ""])

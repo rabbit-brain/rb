@@ -807,6 +807,7 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
     if !loose.is_empty() {
         out.say("");
         out.say(loose_line(&loose, "no recorded run named"));
+        loose_quotes(&plan.folders.iter().filter(|fp| fp.unplaced()).collect::<Vec<_>>(), out);
     }
     let exps = led.live::<Experiment>()?;
     let criteria = led.live::<Criterion>()?;
@@ -1005,6 +1006,18 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
     Ok(0)
 }
 
+/// The prose a folder of results files holds, quoted as reconcile quotes a report's, though its name is no report's
+/// (pilot_table.md): what the next step needs, said at the first look, never only once a run reads the folder.
+fn loose_quotes(plans: &[&repo::FolderPlan], out: &mut Out) {
+    for fp in plans.iter().filter(|fp| fp.quotes.iter().any(|q| q.kind != "command")).take(SHOWN_CHANGES) {
+        out.say("");
+        out.say(format!("{}  prose in it, quoted (no report by name, so no experiment of its own):", fp.folder));
+        for q in fp.quotes.iter().filter(|q| q.kind != "command") {
+            out.say(quote_line(q, &fp.folder));
+        }
+    }
+}
+
 /// The results folders of results files alone, in one line: the first three by path and how many more, and the rule once.
 fn loose_line(folders: &[String], what: &str) -> String {
     let rule = "rb run add <experiment> --from <its file> records a run from";
@@ -1186,6 +1199,7 @@ fn reconcile_unrecorded(ns: &Namespace, out: &mut Out) -> R {
     if !loose.is_empty() {
         out.say("");
         out.say(loose_line(&loose, "nothing records yet"));
+        loose_quotes(&plan.folders.iter().filter(|fp| !fp.adds()).collect::<Vec<_>>(), out);
     }
     run_folder_lines(&root, &plan, &[], &|_: &str| None, &std::collections::HashMap::new(), out);
     let mut blocks = 0usize;

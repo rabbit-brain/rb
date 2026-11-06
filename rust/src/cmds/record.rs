@@ -1028,13 +1028,25 @@ pub fn cmd_criterion_add(ns: &Namespace, out: &mut Out) -> R {
     let (comparator, value) = given[0];
     let target = if matches!(comparator, "at_most" | "at_least" | "equals") { value } else { None };
     let margin = if matches!(comparator, "noninferior" | "equivalent") { value } else { None };
-    let over = if flag(ns, "each") {
-        "each".to_string()
-    } else if flag(ns, "bound") {
-        "bound".to_string()
-    } else {
-        s(ns, "over").filter(|o| !o.is_empty()).unwrap_or_else(|| "mean".into())
+    // what the threshold is read on: the estimate, every unit, the interval's bound, at least K units, or the best unit
+    let count = arg(ns, "count").as_i64();
+    let ways: Vec<&str> = [("each", flag(ns, "each")), ("bound", flag(ns, "bound")), ("count", count.is_some()), ("best", flag(ns, "best"))]
+        .into_iter().filter(|(_, on)| *on).map(|(w, _)| w).collect();
+    if ways.len() > 1 {
+        return Err(RBError::msg_fix(
+            "E_OBJECT_INVALID",
+            format!("A threshold is read one way: {} each say a different one.", ways.iter().map(|w| format!("--{w}")).collect::<Vec<_>>().join(" and ")),
+            "Give one of --each, --bound, --count K or --best.",
+        ));
+    }
+    let over = match ways.first() {
+        Some(w) => w.to_string(),
+        None => s(ns, "over").filter(|o| !o.is_empty()).unwrap_or_else(|| "mean".into()),
     };
+    if flag(ns, "relative") && flag(ns, "means") {
+        return Err(RBError::msg_fix("E_OBJECT_INVALID", "--relative and --means each say what the reading measures.", "Give one: --relative (a relative change) or --means (a cited difference of the arms' means)."));
+    }
+    let measure = if flag(ns, "relative") { "relative" } else if flag(ns, "means") { "means" } else { "" };
     let source = parse_source(s(ns, "source").as_deref(), s(ns, "quote").as_deref(), s(ns, "commit").as_deref(), s(ns, "locator").as_deref(), s(ns, "term").as_deref(), &led.root)?;
     let a = NewCriterion {
         statement: s_or(ns, "statement"),
@@ -1045,6 +1057,9 @@ pub fn cmd_criterion_add(ns: &Namespace, out: &mut Out) -> R {
         tolerance: f(ns, "tolerance"),
         source,
         over,
+        count,
+        of: arg(ns, "of").as_i64(),
+        measure: measure.into(),
         min_n: arg(ns, "min_n").clone(),
         noise: f(ns, "noise"),
         note: s_or(ns, "note"),
@@ -1445,7 +1460,8 @@ pub fn read_from(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
     read_from_row(led, path, keys, table, where_, select, per_run, produced_at, commit, None)
 }
 
-/// read_from, the `pick`th of the rows `--where` picks in a CSV, TSV or JSON Lines table (--every-row).
+/// read_from, the `pick`th of the rows `--where` picks in a CSV, TSV or JSON Lines table, or a SQLite database's table
+/// (--every-row).
 #[allow(clippy::too_many_arguments)]
 fn read_from_row(led: &Ledger, path: &str, keys: &[String], table: Option<&str>, where_: &Dict, select: &[String], per_run: Dict, produced_at: Option<String>, commit: Option<String>, pick: Option<usize>) -> Res<FromFile> {
     let shown = pathlib_str(path);
@@ -1503,7 +1519,7 @@ fn read_from_row(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
         ));
     };
     let pairs: Vec<(String, Value)> = where_.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-    let (row, stamp) = crate::sqlite::read_row(&file, &shown, table, &pairs)?;
+    let (row, stamp) = crate::sqlite::read_row_at(&file, &shown, table, &pairs, pick)?;
     let names = crate::journal::names(led)?;
     let all_columns = || row.cells.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ");
     let declared = |c: &str| crate::journal::canon_of(c, &names).is_some();
@@ -1625,6 +1641,7 @@ fn read_from_row(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
         per_run: per_run_columns,
         produced_at: produced_column,
         identity: row.identity(),
+        primary_key: row.primary_key.clone(),
         stamp,
     };
     Ok(FromFile { metrics, skipped, shown: shown_row, per_run: resolved, produced_at, row: Some(from), table_row: None, commit })
@@ -1714,19 +1731,23 @@ pub fn cmd_run_add(ns: &Namespace, out: &mut Out) -> R {
     run_add_one(ns, out, None)
 }
 
-/// rb run add --every-row: every row of a CSV, TSV or JSON Lines table that --where picks, each recorded as its own run
-/// through the same rb run add, its @<column> values from its own row. A row already recorded is said so and passed.
+/// rb run add --every-row: every row of a CSV, TSV or JSON Lines table, or of a SQLite database's table, that --where
+/// picks, each recorded as its own run through the same rb run add, its @<column> values from its own row. A row
+/// already recorded is said so and passed.
 fn run_add_every_row(ns: &Namespace, out: &mut Out) -> R {
     let led = Ledger::open(None)?;
     let Some(ff) = s(ns, "from_file") else {
         return Err(RBError::msg("E_OBJECT_INVALID", "--every-row records every row --where picks of the table --from reads; give --from <table> --where <column>=<value>."));
     };
     let where_ = parse_pairs(&where_items(&list(ns, "where"))?, "--where", false)?;
-    if !crate::csvtable::is_table(&ff) || where_.is_empty() || s(ns, "table").is_some() {
+    let shown = pathlib_str(&ff);
+    let database = crate::sqlite::header(&PathBuf::from(crate::sys::typed(&ff))).map_err(|e| RBError::could_not_read(&e, &shown))?;
+    let table_name = s(ns, "table").filter(|t| !t.is_empty());
+    if where_.is_empty() || (database && table_name.is_none()) || (!database && (!crate::csvtable::is_table(&ff) || table_name.is_some())) {
         return Err(RBError::msg_fix(
             "E_OBJECT_INVALID",
-            "--every-row reads the rows --where picks of a CSV, TSV or JSON Lines table (.csv, .tsv, .jsonl).",
-            "rb run add <experiment> --from <table> --where <column>=<value> --every-row",
+            "--every-row reads the rows --where picks of a CSV, TSV or JSON Lines table (.csv, .tsv, .jsonl), or of a SQLite database's table (--table).",
+            "rb run add <experiment> --from <table> --where <column>=<value> --every-row, or --from <database> --table <table> --where <column>=<value> --every-row",
         ));
     }
     if s(ns, "replaces").is_some() || s(ns, "repeats").is_some() {
@@ -1736,24 +1757,29 @@ fn run_add_every_row(ns: &Namespace, out: &mut Out) -> R {
             "Record the row that replaces or repeats a run on its own: --where picking it alone, without --every-row.",
         ));
     }
-    let shown = pathlib_str(&ff);
-    let bytes = std::fs::read(crate::sys::typed(&ff)).map_err(|e| RBError::could_not_read(&e, &shown))?;
-    let table = crate::csvtable::read(&String::from_utf8_lossy(&bytes), &shown).map_err(|e| RBError::msg("E_OBJECT_INVALID", format!("{e}.")))?;
-    let hits: Vec<&crate::csvtable::CsvRow> = table.rows.iter().filter(|r| where_.iter().all(|(k, v)| r.column(k).map_or(false, |(_, cell)| crate::csvtable::matches(cell, v)))).collect();
-    let n = hits.len();
-    // a row is told by its own cells but the numbers it gives: two rows told apart by their numbers alone are one run
-    // to rb, so none is recorded and the lines are said, never one of them passed as recorded already
-    let names = crate::journal::names(&led)?;
-    let told = |r: &crate::csvtable::CsvRow| -> Vec<String> { r.cells.iter().filter(|(c, _)| crate::journal::canon_of(c, &names).is_none()).map(|(c, v)| format!("{c}={v}")).collect() };
-    for (i, a) in hits.iter().enumerate() {
-        if let Some(b) = hits[..i].iter().find(|b| told(b) == told(a)) {
-            return Err(RBError::msg_fix(
-                "E_OBJECT_INVALID",
-                format!("{shown}, lines {} and {}, hold the same cells but their numbers, so rb would read them as one run. Nothing written.", b.line, a.line),
-                "Give each row a column that tells it apart (a run id, a seed), or record one of them with --where picking it alone.",
-            ));
+    let n = if database {
+        // a database's rows are told apart by their rowid, which the receipt keeps with the row
+        let pairs: Vec<(String, Value)> = where_.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        crate::sqlite::rows_picked(&PathBuf::from(crate::sys::typed(&ff)), &shown, table_name.as_deref().unwrap_or(""), &pairs)?
+    } else {
+        let bytes = std::fs::read(crate::sys::typed(&ff)).map_err(|e| RBError::could_not_read(&e, &shown))?;
+        let table = crate::csvtable::read(&String::from_utf8_lossy(&bytes), &shown).map_err(|e| RBError::msg("E_OBJECT_INVALID", format!("{e}.")))?;
+        let hits: Vec<&crate::csvtable::CsvRow> = table.rows.iter().filter(|r| where_.iter().all(|(k, v)| r.column(k).map_or(false, |(_, cell)| crate::csvtable::matches(cell, v)))).collect();
+        // a row is told by its own cells but the numbers it gives: two rows told apart by their numbers alone are one run
+        // to rb, so none is recorded and the lines are said, never one of them passed as recorded already
+        let names = crate::journal::names(&led)?;
+        let told = |r: &crate::csvtable::CsvRow| -> Vec<String> { r.cells.iter().filter(|(c, _)| crate::journal::canon_of(c, &names).is_none()).map(|(c, v)| format!("{c}={v}")).collect() };
+        for (i, a) in hits.iter().enumerate() {
+            if let Some(b) = hits[..i].iter().find(|b| told(b) == told(a)) {
+                return Err(RBError::msg_fix(
+                    "E_OBJECT_INVALID",
+                    format!("{shown}, lines {} and {}, hold the same cells but their numbers, so rb would read them as one run. Nothing written.", b.line, a.line),
+                    "Give each row a column that tells it apart (a run id, a seed), or record one of them with --where picking it alone.",
+                ));
+            }
         }
-    }
+        hits.len()
+    };
     if n == 0 {
         // said as one row's read says it: what the rows hold
         return run_add_one(ns, out, None);
@@ -1762,7 +1788,7 @@ fn run_add_every_row(ns: &Namespace, out: &mut Out) -> R {
     // read is said before any run is written
     let per_run = parse_pairs(&list(ns, "set"), "--set", false)?;
     for i in 0..n {
-        read_from_row(&led, &ff, &list(ns, "keys"), None, &where_, &list(ns, "select"), per_run.clone(), s(ns, "produced_at"), s(ns, "commit"), Some(i))
+        read_from_row(&led, &ff, &list(ns, "keys"), table_name.as_deref(), &where_, &list(ns, "select"), per_run.clone(), s(ns, "produced_at"), s(ns, "commit"), Some(i))
             .map_err(|e| RBError::msg_fix(&e.code, format!("row {} of the {n} --where picks: {} Nothing written.", i + 1, e.message), e.fix.clone()))?;
     }
     let (mut recorded, mut already, mut ids) = (Vec::new(), Vec::new(), Vec::new());
@@ -2065,7 +2091,25 @@ pub fn nothing_counts(led: &Ledger, run: &Run, shape: Shape) -> Res<Option<Strin
 /// One line for a run none of whose numbers a criterion of its experiment reads: the names its criteria read, in the
 /// shape a run gives them (a variant's numbers, never the change between them, which rb computes).
 fn counts_toward_nothing(led: &Ledger, exp: &Experiment, unread: &[String], criteria: &[Criterion], shape_of: Shape) -> Res<String> {
-    let read = led.read_metrics(exp, criteria)?;
+    let mut read = led.read_metrics(exp, criteria)?;
+    // one variant: its number is said once, as the rule names it (base.acc where it says base.acc, acc where it says
+    // acc, as rb show <criterion> says it), not again under the other spelling, which reads the same number
+    if let [only] = exp.live_variants().as_slice() {
+        let mut named: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        for c in criteria.iter().filter(|c| c.retracted.is_none()) {
+            let (subject, reference, metric, _) = led.arms(exp, c)?;
+            if !reference.is_empty() {
+                named.insert(format!("{reference}.{metric}"));
+            }
+            named.insert(if subject.is_empty() { metric } else { format!("{subject}.{metric}") });
+        }
+        let prefix = format!("{}.", only.name);
+        let doubled: Vec<(String, String)> = read.iter().filter_map(|m| m.strip_prefix(&prefix).filter(|rest| read.contains(*rest)).map(|rest| (m.clone(), rest.to_string()))).collect();
+        for (full, bare) in doubled {
+            // the bare name where both spellings are a rule's, or neither is
+            read.remove(if named.contains(&full) && !named.contains(&bare) { &bare } else { &full });
+        }
+    }
     let given: Vec<&String> = read.iter().filter(|m| !m.starts_with("change.")).collect();
     let wanted: Vec<&String> = if given.is_empty() { read.iter().collect() } else { given };
     let shown = &wanted[..wanted.len().min(4)];

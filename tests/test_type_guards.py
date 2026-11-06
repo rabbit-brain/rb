@@ -292,6 +292,11 @@ def test_a_recipe_rb_watched_today_is_not_the_command_of_a_may_run(rec, monkeypa
 # ---------------------------------------------------------------- a file written after its run
 
 
+def written_day(path: Path) -> str:
+    """The UTC day a file was last written, as rb says it: the test's own clock may be past midnight by then."""
+    return time.strftime("%Y-%m-%d", time.gmtime(os.stat(path).st_mtime))
+
+
 def test_a_file_written_after_its_run_is_not_its_own_output(rec, monkeypatch, tmp_path):
     """An export written today for a run made in May reads as a file written after the run: rb run add says so, rb
     show, the card and the page say it, the criterion that reads it says so, and rb status counts it with the way to
@@ -301,7 +306,7 @@ def test_a_file_written_after_its_run_is_not_its_own_output(rec, monkeypatch, tm
     export = rec.run_id(env)
     [said] = [w for w in env["data"]["warnings"] if w.startswith("exports/seed1.json was written ")]
     assert ", after the run (produced 2026-05-07): it is not the run's own output" in said
-    day = time.strftime("%Y-%m-%d", time.gmtime())
+    day = written_day(rec.root / "exports/seed1.json")
     assert f"  file written {day}, after the run: the file its numbers were read from is not the run's own output" in rec.text("show", export).splitlines()
     assert rec.ok("show", export)["data"]["file_written_after"].startswith(day)
     may = time.mktime((2026, 5, 7, 20, 0, 0, 0, 0, -1))
@@ -330,7 +335,7 @@ def test_a_file_for_a_run_whose_time_is_unknown_is_not_shown_to_be_its_own(rec, 
     rec.write("export.json", '{"fp32.top1": 76.1, "int8.top1": 75.9}')
     env = rec.ok("run", "add", "int8", "--from", "export.json", "--set", "seed=4", "--produced-at", "unknown", "--command", "python eval.py")
     run = rec.run_id(env)
-    day = time.strftime("%Y-%m-%d", time.gmtime())
+    day = written_day(rec.root / "export.json")
     assert [w for w in env["data"]["warnings"] if w.startswith(f"export.json was written {day}, and when the run was made is unknown")]
     [later] = [w for w in env["data"]["warnings"] if w.startswith(LATER)]
     assert "when it was made is unknown" in later and "made before it was recorded" not in later
@@ -594,7 +599,7 @@ def test_words_that_name_the_user_or_the_chat_clear_once_taken_back_or_replaced(
         rec.ok("retract", nid, "--why", "written in the wrong voice", agent=AGENT)
     [item] = rec.open_items("attributed_words")
     assert item["what"] == "1 text names the user or the chat as its source (int8 gate why)" and item["do"] == "", item
-    assert "  - 1 text names the user or the chat as its source (int8 gate why)" in rec.text("status").split("Nothing to do")[1]
+    assert "  - 1 text names the user or the chat as its source (int8 gate why)" in rec.text("status").split("Facts that ask for nothing")[1]
     rec.ok("experiment", "gate", "int8", "--if-holds", "INT8 ships next week.", "--why", "docs/plan.md:6 states the rule", agent=AGENT)
     assert not rec.open_items("attributed_words")
     assert rec.open_items("writer_words")
@@ -624,9 +629,9 @@ def test_late_criteria_ask_for_no_run_where_none_is_expected(rec):
     at = lines.index("  - int8: 2 criteria were declared after their evidence existed")
     assert not lines[at + 1].startswith("      ")
     # it asks for nothing, so it is listed apart from the work
-    assert lines[at - 1] == "Nothing to do (1)" and not [x for x in lines if x.startswith("Can be done now")]
+    assert lines[at - 1] == "Facts that ask for nothing (1)" and not [x for x in lines if x.startswith("Can be done now")]
     context = rec.text("context")
-    assert "## Nothing to do\n\n  - int8: 2 criteria were declared after their evidence existed" in context
+    assert "## Facts that ask for nothing\n\n  - int8: 2 criteria were declared after their evidence existed" in context
     [answer] = mcp(rec, ("status", {}))
     assert [o["do"] for o in answer["data"]["open"] if o["code"] == "late"] == [""]
 

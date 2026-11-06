@@ -474,7 +474,7 @@ def test_the_tab_says_what_rb_looks_at(served, tmp_path_factory):
     rb, url, _ = served
     st = rb("status")[1].data
     home = json.loads(_get(url + "/state.json")[1])["home"]
-    assert home["scope"].startswith("rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder") and home["scope"].endswith(st["scope"]["said"].split(" UTC. ", 1)[1])
+    assert home["scope"].startswith("rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder") and home["scope"].endswith(st["scope"]["said"].split(" UTC. ", 1)[1])
     node = shutil.which("node")
     if not node or subprocess.run([node, "-e", "fetch"], capture_output=True, timeout=30).returncode:
         pytest.skip("rb open serves the line; drawing it takes the tab's script, which runs in node 18 or later")
@@ -485,7 +485,7 @@ def test_the_tab_says_what_rb_looks_at(served, tmp_path_factory):
                          capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert tab.returncode == 0, tab.stderr
     overview, findings = [json.loads(line) for line in tab.stdout.splitlines() if '"looked"' in line]
-    assert overview["looked"].startswith("rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder")
+    assert overview["looked"].startswith("rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder")
     assert re.search(r'<span class="nowrap">\d{4}-\d\d-\d\d \d\d:\d\d UTC</span>', overview["looked"])     # the time, on one line
     assert findings["looked"] == ""
 
@@ -1580,7 +1580,7 @@ def test_shell_scope_and_uncited_files_stay_on_the_overview(shell_served):
     assert home["uncited"] == 1
     doc = _shell(url)
     [scope] = doc.at("overview").all("p", **{"data-live": "scope"})
-    assert scope.text.startswith("rb looks in out/, outputs/, results/, eval-out/ and metrics/")
+    assert scope.text.startswith("rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results")
     assert scope.text.split(" UTC. ")[1] == home["scope"].split(" UTC. ")[1]
     assert home["uncited_line"] in doc.at("overview").text
     assert home["uncited_line"] not in doc.at("criteria").text

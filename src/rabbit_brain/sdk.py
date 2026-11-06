@@ -382,14 +382,17 @@ class Experiment:
     def criterion(self, statement: str, *, metric: str, at_most: Optional[float] = None, at_least: Optional[float] = None,
                   equals: Optional[float] = None, tolerance: Optional[float] = None, better: bool = False,
                   noninferior: Optional[float] = None, equivalent: Optional[float] = None, subject: str = "", reference: str = "",
-                  estimand: str = "", over: str = "mean", role: str = "primary", min_n: int = 1, noise: Optional[float] = None,
+                  estimand: str = "", over: str = "mean", count: Optional[int] = None, of: Optional[int] = None, measure: str = "",
+                  role: str = "primary", min_n: int = 1, noise: Optional[float] = None,
                   source: Optional[str] = None, quote: Optional[str] = None, locator: Optional[str] = None, note: str = "",
                   amend: Optional[str] = None, id: Optional[str] = None, questions: Iterable[str] = (),
                   when_met: Optional[str] = None, why: str = "", words: Optional[str] = None,
                   where: Optional[Mapping[str, Any]] = None, subject_where: Optional[Mapping[str, Any]] = None,
                   reference_where: Optional[Mapping[str, Any]] = None, dry_run: bool = False) -> "Criterion":
         """Exactly one rule, over one comparison. Declare it before the evidence that tests it: evidence that already
-        existed is labelled so on its timing. A dry run gives back a DryRun whose value is the id given, or with none
+        existed is labelled so on its timing. `over`: mean, each, bound, count (at least `count` units, of `of`) or best (the
+        best unit, of `of`); `measure`: relative (a relative change, its threshold a percent) or means (a cited
+        difference of the arms' means). A dry run gives back a DryRun whose value is the id given, or with none
         given an id drawn for the preview only."""
         given = [(c, v) for c, v in (("at_most", at_most), ("at_least", at_least), ("equals", equals)) if v is not None]
         given += [("better", None)] if better else []
@@ -400,8 +403,9 @@ class Experiment:
         comparator, value = given[0]
         target = value if comparator in ("at_most", "at_least", "equals") else None
         margin = value if comparator in ("noninferior", "equivalent") else None
+        over = "count" if count is not None and over == "mean" else over   # as --count K is on the command line
         cid = self.state._call("add_criterion", words, dry_run, statement=statement, experiment=self.id, metric=metric, comparator=comparator, target=target,
-                               tolerance=tolerance, source=source, quote=quote, locator=locator, over=over, min_n=min_n, noise=noise,
+                               tolerance=tolerance, source=source, quote=quote, locator=locator, over=over, count=count, of=of, measure=measure, min_n=min_n, noise=noise,
                                note=note, amend=amend, id=id, subject=subject, reference=reference, estimand=estimand, margin=margin,
                                role=role, questions=list(questions), when_met=when_met, why=why,
                                where=dict(where or {}), subject_where=dict(subject_where or {}), reference_where=dict(reference_where or {}))

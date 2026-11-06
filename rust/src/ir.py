@@ -12,7 +12,7 @@ resources are what runs read and make; findings are computed on axes; decisions 
 made it.
 
 `rb schema ir` prints this table; the rb://schema MCP resource serves it; the compile contract cites it; the surfaces
-render from it. `rb schema all` prints the whole file format (rb-v1.schema.json) and `rb schema <kind>` each record's
+render from it. `rb schema all` prints the whole file format (rb-v2.schema.json) and `rb schema <kind>` each record's
 shape; rb checks the provenance column on every write.
 
 This file is where the table is changed. The binary carries it in schemas.json (what `rb schema ir` prints) and in

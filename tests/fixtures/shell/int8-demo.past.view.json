@@ -1,5 +1,5 @@
 {
- "contract": "rb-shell-view/1.12",
+ "contract": "rb-shell-view/1.14",
  "surface": "open",
  "tier": "live",
  "rb_version": "0.6.0",
@@ -715,6 +715,9 @@
     "negative": false
    },
    "reading": {
+    "places": null,
+    "over": "mean",
+    "measure": "",
     "estimate": -0.0029,
     "lo": -0.0046,
     "hi": -0.0012,
@@ -887,6 +890,9 @@
     "negative": true
    },
    "reading": {
+    "places": null,
+    "over": "mean",
+    "measure": "",
     "estimate": 0.7597,
     "lo": 0.7591,
     "hi": 0.7603,
@@ -1072,6 +1078,9 @@
     "negative": false
    },
    "reading": {
+    "places": null,
+    "over": "mean",
+    "measure": "",
     "estimate": -0.0003,
     "lo": null,
     "hi": null,
@@ -1213,6 +1222,9 @@
     "negative": false
    },
    "reading": {
+    "places": null,
+    "over": "mean",
+    "measure": "",
     "estimate": 0.994,
     "lo": null,
     "hi": null,
@@ -1345,6 +1357,9 @@
     "negative": true
    },
    "reading": {
+    "places": null,
+    "over": "mean",
+    "measure": "",
     "estimate": null,
     "lo": null,
     "hi": null,
@@ -1580,6 +1595,9 @@
     "negative": true
    },
    "reading": {
+    "places": 2,
+    "over": "mean",
+    "measure": "",
     "estimate": 0.64,
     "lo": null,
     "hi": null,
@@ -1605,7 +1623,12 @@
     "timing": "declared after the evidence existed: 1 of 1 unit",
     "rule": "criterion not met: estimate 0.64 outside at most 0.6",
     "units": "1 run",
-    "comparison": "int8 against fp32"
+    "comparison": "int8 against fp32",
+    "integrity": "undeclared difference: data.batch_size 64 (fp32) vs 32 (int8); e1 varies only precision (and 1 more: rb show c6)",
+    "problems": [
+     "undeclared difference: data.batch_size 64 (fp32) vs 32 (int8); e1 varies only precision",
+     "e1/eval.crop: the source states resize, not center"
+    ]
    },
    "observations": [
     {

@@ -1949,10 +1949,10 @@ def test_a_runs_row_says_its_values_once(record):
     heads = [said(t.text(e)) for e in t.all(table) if e["tag"] == "th"]
     assert doc["runs"]["runsql7"]["per_run_text"] == ""
     # fix 3: each metric's title once, over its arms by their plain names and the difference, as the grid says them
-    assert heads == ["Seed", "One cycle", "Top-1", "onnx_top1", "latency_ms", "Produced", "Recorded", "run",
+    assert heads == ["Seed", "One cycle", "top1", "onnx_top1", "latency_ms", "Produced", "Recorded", "run",
                      "FP32", "INT8", "Difference", "FP32", "INT8", "Difference", "FP32", "INT8", "Difference"], heads
     groups = [e for e in t.all(table) if e["tag"] == "th" and e["attrs"].get("scope") == "colgroup"]
-    assert [(said(t.text(e)), e["attrs"]["colspan"]) for e in groups] == [("Top-1", "3"), ("onnx_top1", "3"), ("latency_ms", "3")]
+    assert [(said(t.text(e)), e["attrs"]["colspan"]) for e in groups] == [("top1", "3"), ("onnx_top1", "3"), ("latency_ms", "3")]
     assert not t.of_class("rq", sec)
     row = next(r for r in t.all(table) if r["tag"] == "tr" and r["attrs"].get("data-go") == "run-runs1")
     cells = [c for c in row["kids"] if isinstance(c, dict)]
@@ -1970,7 +1970,7 @@ def test_a_runs_row_says_its_values_once(record):
     t = Html(page_of(record, doc))
     sec = t.by_id(f"x-{x['id']}:runs")
     assert said(t.text(t.of_class("rq", sec)[0])) == "Every run: one cycle 1"
-    assert [said(t.text(e)) for e in t.all(t.of_class("runs2", sec)[0]) if e["tag"] == "th"][:2] == ["Seed", "Top-1"]
+    assert [said(t.text(e)) for e in t.all(t.of_class("runs2", sec)[0]) if e["tag"] == "th"][:2] == ["Seed", "top1"]
     # a variant's key is said in plain words under its metric, never as recorded ("step_by_step")
     for r in x["run_ids"]:
         doc["runs"][r]["metrics_text"] = doc["runs"][r]["metrics_text"].replace("int8", "step_by_step")
@@ -2706,7 +2706,7 @@ def test_question_rows_meaning_first(record):
     assert t.has(head, "evh") and said(t.text(head)) == f"{f['statement']} {f['standing'].replace('criterion met', 'rule met')}"
     assert said(t.text(t.of_class("au", head)[0])) == f["statement"]
     assert f["reading"] == {**f["reading"], "estimate": -0.0029, "lo": -0.0046, "hi": -0.0012, "n": 3, "unit": "seed", "unit_text": "top1"}
-    assert said(t.text(value)) == "INT8 is 0.0029 lower than the FP32 baseline (-0.0046 to -0.0012) on Top-1, 3 seeds. c1"
+    assert said(t.text(value)) == "INT8 is 0.0029 lower than the FP32 baseline (-0.0046 to -0.0012) on top1, 3 seeds. c1"
     ids = t.of_class("cid", value)
     assert [said(t.text(e)) for e in ids] == ["c1"] and value["kids"][-1] is ids[0]
     assert said(t.text(units)).startswith(f["units_line"])
@@ -3421,8 +3421,8 @@ def test_an_experiment_draws_rbs_digits_and_no_mark_on_a_design_the_user_owns(re
     # a mean in a screen's digits (P5, PIVOT: two decimals, more where its column's values need them), never a float's
     # whole form; one unit is one run
     cells = [said(t.text(e)) for e in t.all(t.by_id("x-e1:cmp")) if e["tag"] == "td"]
-    # the column holds 0.7568, which its rule reads to 4 places: 0.7200 beside it (round 4)
-    assert "0.7200 · 3 seeds" in cmp and "0.7200000000000001" not in cmp and "5.00 · 1 run" in cells and "5.0 " not in cmp
+    # the column holds 0.7568, which its rule reads to 4 places: 0.72 beside it, with no trailing 0 those places add (6b)
+    assert "0.72 · 3 seeds" in cmp and "0.7200000000000001" not in cmp and "5.00 · 1 run" in cells and "5.0 " not in cmp
     view = said(t.text(t.by_id("x-e1")))
     assert "yours" not in view and "not confirmed" not in view
     row = next(e for e in t.all(t.by_id("experiments")) if t.has(e, "srow") and e["attrs"]["data-go"] == "x-e1")
@@ -3674,7 +3674,7 @@ def test_all_criteria_labels_the_baseline(record):
     row = next(e for e in t.all(t.by_id("criteria")) if e["attrs"].get("data-for") == "c-c2")
     # design pass 1, target 3: rb's reading as a plain sentence, the baseline labelled; rb's short reading with its
     # result word in the row's Details
-    assert said(t.text(t.of_class("pr", row)[0])) == "FP32 baseline is 0.7597 (0.7591 to 0.7603) on Top-1, 3 seeds; the cited number is 0.7613."
+    assert said(t.text(t.of_class("pr", row)[0])) == "FP32 baseline is 0.7597 (0.7591 to 0.7603) on top1, 3 seeds; the cited number is 0.7613."
     assert said(t.text(t.of_class("rbr", row)[0])) == "fp32 baseline: observed 75.97 % · cited 76.13 % · measured"
     other = next(e for e in t.all(t.by_id("criteria")) if e["attrs"].get("data-for") == "c-c1")
     assert "INT8 is 0.0029 lower than the FP32 baseline" in said(t.text(t.of_class("cv", other)[0]))
@@ -4050,7 +4050,6 @@ def test_inside_the_hub_the_page_draws_no_bar_of_its_own_and_one_bar_elsewhere(i
     title = html.unescape(re.search(r"<title>(.*?)</title>", export).group(1))
     pid = re.search(r"^id: (\S+)", (int8_demo.root / ".rb/project.yaml").read_text(encoding="utf-8"), re.M).group(1).strip('"')
     version = json.loads(subprocess.run([*command(), "version", "--json"], capture_output=True, encoding="utf-8").stdout)["rb_version"]
-    stamp = html.unescape(re.search(r'class="stamp"[^>]*>([^<]*)<', export).group(1))
     runs = []
     for viewer in ("owner", "reader"):
         at = tmp_path / f"hub-{viewer}.html"
@@ -4060,6 +4059,9 @@ def test_inside_the_hub_the_page_draws_no_bar_of_its_own_and_one_bar_elsewhere(i
     rp = subprocess.run([*command(), "page", "--out", str(page)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
                         stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
     assert rp.returncode == 0, rp.stderr
+    # the time the bar says is the one rb page wrote, read from its own page: rb export's, made first, may be a minute
+    # before it
+    stamp = html.unescape(re.search(r'class="stamp"[^>]*>([^<]*)<', page.read_text(encoding="utf-8")).group(1))
     runs += [["page@1440", page.as_uri(), 1440], ["page@390", page.as_uri(), 390]]
     got = _bar_runs(tmp_path, runs, title, """
     got.aboutView = null;
@@ -4170,7 +4172,7 @@ def test_one_set_of_settings_is_one_table_with_a_column_per_metric(record):
     doc["experiments"][0]["table"]["rows"][1]["metrics"]["top1"].update(lo=-0.0046, hi=-0.0012)
     t = Html(page_of(record, doc))
     [(title, heads, rows, cells)] = grids(t, "x-e1")
-    assert title == "" and heads == ["", "Top-1", "onnx_top1", "latency_ms"], heads
+    assert title == "" and heads == ["", "top1", "onnx_top1", "latency_ms"], heads
     assert list(rows) == ["FP32 baseline", "INT8"] and [x for x in t.of_class("tag", t.by_id("x-e1:cmp"))].__len__() == 1
     assert rows["FP32 baseline"][0] == "0.7597 · 3 seeds", rows
     assert rows["INT8"][0] == "0.7568 · 3 seeds 0.0029 lower than FP32 (-0.0046 to -0.0012)", rows
@@ -4194,7 +4196,7 @@ def test_several_sets_are_columns_an_empty_cell_says_not_run(record):
     ]}
     t = Html(page_of(record, doc))
     [(title, heads, rows, _)] = grids(t, "x-e1")
-    assert title == "Top-1 (%)" and heads == ["", "Calib images: 128 · Per tensor", "Calib images: 512 · Per channel"], heads
+    assert title == "top1 (%)" and heads == ["", "Calib images: 128 · Per tensor", "Calib images: 512 · Per channel"], heads
     assert rows["FP32 baseline"] == ["76.13 · 3 seeds", "76.20 · 1 run"], rows
     assert rows["INT8"] == ["75.80 · 3 seeds 0.33 points lower than FP32 (-0.50 to -0.16)", "Not run"], rows
     assert rows["W8a16"] == ["Not run", "76.10 · 1 run 0.10 points lower than FP32 · one run, so no interval"], rows
@@ -4214,7 +4216,7 @@ def test_a_difference_whose_units_do_not_pair_says_so(record):
         r["metrics"] = {"accuracy": r["metrics"]["top1"]}
     t = Html(page_of(record, doc))
     [(_, heads, rows, _)] = grids(t, "x-e1")
-    assert heads == ["", "Accuracy (%)"]
+    assert heads == ["", "accuracy (%)"]
     assert rows["INT8"] == ["40.60 · 2 seeds 2.60 points lower than FP32 · seeds don't match, so no interval"], rows
     assert "lower" in rows["INT8"][0] and "unpaired" not in rows["INT8"][0]
 
@@ -4227,7 +4229,7 @@ def test_two_variants_under_several_sets_lie_on_their_side(record):
     [(title, heads, rows, _)] = grids(t, "x-e2")
     assert heads == ["", "FP32 baseline", "INT8", "Difference"], heads
     assert list(rows) == ["Calib images: 128", "Calib images: 512", "Calib images: 1024", "Calib images: 2048"], rows
-    assert all(r[0] == rows["Calib images: 128"][0] and r[0].startswith("0.760 · 1 run") for r in rows.values()), rows
+    assert all(r[0] == rows["Calib images: 128"][0] and r[0].startswith("0.76 · 1 run") for r in rows.values()), rows
     assert rows["Calib images: 128"][1].startswith("0.741 · 1 run") and "lower than FP32" in rows["Calib images: 128"][2], rows
     assert "Each row is measured under its own settings" in said(t.text(t.by_id("x-e2:cmp")))
 

@@ -70,6 +70,27 @@ pub fn kind_said(path: &str) -> &'static str {
     }
 }
 
+/// A CSV or TSV table whose first line reads as a data row (a number with a decimal point): the numbers that line
+/// holds, as rb says them, and how many rows the table holds, that line among them. rb names no column from that line,
+/// and so offers no column (nor an alias for one) that is a number.
+fn no_header(t: &CsvTable) -> Option<(Vec<String>, usize)> {
+    let numbers: Vec<&String> = t.columns.iter().filter(|c| number(c).is_some() && c.contains('.')).collect();
+    if numbers.is_empty() {
+        return None;
+    }
+    let rows = t.rows.iter().filter(|r| r.cells.iter().any(|(_, v)| !v.is_empty())).count() + 1;
+    Some((numbers.iter().take(4).map(|c| c.to_string()).collect(), rows))
+}
+
+/// How many rows a CSV or TSV table holds, its first line among them, where that line reads as a data row: None where
+/// it reads as a header (or the file is JSON Lines, whose rows name their keys).
+pub fn rows_without_header(text: &str, path: &str) -> Option<usize> {
+    if is_jsonl(path) {
+        return None;
+    }
+    no_header(&parse(text, path)).map(|(_, rows)| rows)
+}
+
 /// The table a file holds, told by its name: a JSON Lines file's rows, or a CSV or TSV table's. A JSON Lines line that
 /// is not a JSON object is said with its line.
 pub fn read(text: &str, path: &str) -> Result<CsvTable, String> {
@@ -77,12 +98,7 @@ pub fn read(text: &str, path: &str) -> Result<CsvTable, String> {
         parse_jsonl(text, path)
     } else {
         let t = parse(text, path);
-        // a first line that names a number is a data row, not a header: rb names no column from it, and so offers no
-        // column (nor an alias for one) that is a number
-        let numbers: Vec<&String> = t.columns.iter().filter(|c| number(c).is_some() && c.contains('.')).collect();
-        if !numbers.is_empty() {
-            let shown: Vec<String> = numbers.iter().take(4).map(|c| c.to_string()).collect();
-            let rows = t.rows.iter().filter(|r| r.cells.iter().any(|(_, v)| !v.is_empty())).count() + 1;
+        if let Some((shown, rows)) = no_header(&t) {
             return Err(format!(
                 "{path} seems to have no header line: its first line reads as a data row (it holds {}), so rb cannot name its columns; it holds {rows} row{}, that line among them",
                 shown.join(", "),

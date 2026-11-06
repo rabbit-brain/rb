@@ -175,3 +175,64 @@ def test_the_unpaired_reading_reads_the_runs_the_paired_one_leaves_out_too(rb):
         rb("run", "add", "int8", "int8.top1=76.0", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
     unpaired = rb("show", "c1").data["finding"]["comparison"]["pairing"]["unpaired"]
     assert unpaired["n"] == 5 and abs(unpaired["estimate"] - (76.0 - (76.0 + 76.0 + 90.0) / 3)) < 1e-9, unpaired
+
+
+def test_the_unpaired_reading_reads_runs_that_give_both_arms_as_each_arms_number(rb):
+    """Some runs give one arm, others both: the unpaired figure reads every run of the arms, a run of both read as each
+    arm's number, never only the runs that give the difference (round 5)."""
+    two_arms(rb)
+    for seed, (a, b) in ((8, (76.8, 75.0)), (9, (75.0, 75.9))):
+        rb("run", "add", "int8", f"fp32.top1={a}", f"int8.top1={b}", "--set", f"seed={seed}", "--produced-at", "2026-05-08")
+    f = rb("show", "c1").data["finding"]
+    assert f["comparison"]["n"] == 5, f["comparison"]
+    unpaired = f["comparison"]["pairing"]["unpaired"]
+    fp32 = [76.1, 75.2, 76.4, 76.8, 75.0]
+    int8 = [75.6, 75.1, 75.2, 75.0, 75.9]
+    assert unpaired["n"] == 10 and abs(unpaired["estimate"] - (sum(int8) / 5 - sum(fp32) / 5)) < 1e-9, unpaired
+    code, out = rb("show", "c1", text=True)
+    assert "unpaired, the same runs read" in out and "unpaired difference, Welch interval, 10 " in out, out
+
+
+def test_no_unpaired_figure_where_a_run_gives_only_the_difference(rb):
+    two_arms(rb)
+    rb("run", "add", "int8", "change.top1=-0.4", "--set", "seed=8", "--produced-at", "2026-05-08")
+    comparison = rb("show", "c1").data["finding"]["comparison"]
+    assert comparison["pairing"]["unpaired"] is None, comparison["pairing"]
+    code, out = rb("show", "c1", text=True)
+    assert "paired by seed" in out and "unpaired" not in out, out
+
+
+def test_a_setting_a_rule_selects_on_is_never_offered_as_a_repeat(rb):
+    two_arms(rb)
+    rb("criterion", "add", "INT8 holds at seed 1", "-e", "int8", "--metric", "change.top1", "--at-least", "-1", "--where", "seed=1", "--id", "c2")
+    comparison = rb("show", "c2").data["finding"]["comparison"]
+    assert comparison["pairing"]["command"] is None, comparison["pairing"]
+    code, out = rb("show", "c2", text=True)
+    assert "paired by seed" in out and "population.repeat" not in out, out
+    # the rule that selects nothing still gets the offer
+    assert rb("show", "c1").data["finding"]["comparison"]["pairing"]["command"] == "rb spec set int8 population.repeat seed --no-verify"
+
+
+def test_rb_compare_gives_no_row_of_its_own_to_a_declared_repeat(rb):
+    rb("experiment", "add", "INT8 against FP32", "--id", "int8", "--purpose", "the sweep", "--baseline", "fp32", "--candidate", "int8")
+    rb("spec", "set", "int8", "seed", "--per-run")
+    rb("spec", "set", "int8", "epoch", "--per-run")
+    rb("spec", "set", "int8", "population.unit", "seed", "--no-verify")
+    rb("criterion", "add", "INT8 loses at most 1 point", "-e", "int8", "--metric", "change.top1", "--at-least", "-1", "--id", "c1")
+    for seed in (1, 2, 3):
+        for epoch, (a, b) in enumerate([(76.0, 75.5), (76.2, 75.1)]):
+            rb("run", "add", "int8", f"fp32.top1={a}", f"int8.top1={b}", "--set", f"seed={seed}", "--set", f"epoch={epoch}", "--produced-at", "2026-05-01")
+    assert rb("compare", "int8").data.get("conditions") == ["epoch"]
+    rb("spec", "set", "int8", "population.repeat", "epoch", "--no-verify")
+    data = rb("compare", "int8").data
+    assert not data.get("conditions"), data.get("conditions")
+    code, out = rb("compare", "int8", text=True)
+    assert "epoch" not in out and "(n=3)" in out, out
+
+
+def test_an_unpaired_figure_over_runs_of_both_arms_counts_units_not_runs(rb):
+    two_arms(rb)
+    for seed, (a, b) in ((8, (76.8, 75.0)), (9, (75.0, 75.9))):
+        rb("run", "add", "int8", f"fp32.top1={a}", f"int8.top1={b}", "--set", f"seed={seed}", "--produced-at", "2026-05-08")
+    code, out = rb("show", "c1", text=True)
+    assert "Welch interval, 10 units" in out and "10 runs" not in out, out

@@ -147,7 +147,17 @@ impl Ledger {
         let exp: Experiment = self.load(&c.experiment)?;
         let (subject, reference, metric, _) = self.arms(&exp, c)?;
         let arms_here: Vec<&String> = [&subject, &reference].into_iter().filter(|a| !a.is_empty()).collect();
-        let reads_analysis = self.live::<Analysis>()?.iter().any(|a| a.experiment == exp.id) && !self.analysis_readings(&exp, &subject, &reference, &metric, &c.estimand)?.is_empty();
+        // an --each rule reads every unit, which only runs give: an analysis beside it never tests it (K5), so its
+        // hint is a run
+        // an --each rule no run can give (an estimand only an analysis reports, an arm no variant is) is declared again
+        // on what the runs report
+        let unrun = !c.estimand.is_empty() || (!arms_here.is_empty() && arms_here.iter().any(|a| exp.variant(a).is_none()) && !arms_here.iter().all(|a| ROLES.contains(&a.as_str())));
+        if c.over == "each" && unrun {
+            return Ok(format!("rb retract {} --why \"an --each rule reads each unit's runs, and no run reports what it reads\"   (then declare it again on what the runs report)", c.id));
+        }
+        let reads_analysis = c.over != "each"
+            && self.live::<Analysis>()?.iter().any(|a| a.experiment == exp.id)
+            && !self.analysis_readings(&exp, &subject, &reference, &metric, &c.estimand)?.is_empty();
         if !c.estimand.is_empty()
             || reads_analysis
             || (!arms_here.is_empty() && arms_here.iter().any(|a| exp.variant(a).is_none()) && !arms_here.iter().all(|a| ROLES.contains(&a.as_str())))
@@ -220,7 +230,7 @@ impl Ledger {
         Ok(out)
     }
 
-    fn unit_key(&self, r: &Run, unit_setting: Option<&str>, factors: &[String]) -> String {
+    fn unit_key(&self, r: &Run, unit_setting: Option<&str>, factors: &[String], repeats: &[String]) -> String {
         if let Some(us) = unit_setting {
             return match r.per_run.get(us).filter(|v| !v.is_null()) {
                 // counted within its design cell, as a finding counts it
@@ -228,8 +238,9 @@ impl Ledger {
                 None => r.id.clone(),
             };
         }
-        if !r.per_run.is_empty() {
-            let mut kv: Vec<(&String, &Value)> = r.per_run.iter().collect();
+        // a declared repeat index numbers a case within its unit, never a unit of its own
+        let mut kv: Vec<(&String, &Value)> = r.per_run.iter().filter(|(k, _)| !repeats.contains(k)).collect();
+        if !kv.is_empty() {
             kv.sort_by(|a, b| a.0.cmp(b.0));
             return kv.iter().map(|(k, v)| format!("{k}={}", super::findings::unit_value(v))).collect::<Vec<_>>().join(" · ");
         }
@@ -243,6 +254,8 @@ impl Ledger {
         let catalogue: IndexMap<String, Metric> = self.live::<Metric>()?.into_iter().map(|m| (m.id.clone(), m)).collect();
         let runs = self.counted_runs(&exp)?;
         let unit_setting = self.unit_setting(&exp);
+        // a declared repeat index is no condition and no unit: never a row of its own, as in every other reading
+        let repeats = self.repeat_settings(&exp);
         let factors: Vec<String> = exp.settings.iter().filter(|s| s.retracted.is_none() && s.design_factor == Some(true)).map(|s| s.name.clone()).collect();
         let mut variants: Vec<&Variant> = exp.live_variants();
         variants.sort_by(|a, b| (ROLES.iter().position(|r| *r == a.role).unwrap_or(99), &a.name).cmp(&(ROLES.iter().position(|r| *r == b.role).unwrap_or(99), &b.name)));
@@ -252,14 +265,14 @@ impl Ledger {
         let mut conditions: Vec<String> = exp
             .settings
             .iter()
-            .filter(|s| s.retracted.is_none() && s.per_run && Some(s.name.as_str()) != unit_setting.as_deref())
+            .filter(|s| s.retracted.is_none() && s.per_run && Some(s.name.as_str()) != unit_setting.as_deref() && !repeats.contains(&s.name))
             .filter(|s| s.design_factor == Some(true) || crits.iter().any(|c| [&c.r#where, &c.subject_where, &c.reference_where].iter().any(|w| w.contains_key(&s.name))))
             .map(|s| s.name.clone())
             .collect();
         // with the unit declared, so is any other per-run setting that holds more than one value among one variant's
         // runs; with none, the per-run settings together are the unit
         let heads = |r: &Run| -> HashSet<String> { r.metrics.keys().map(|k| partition(&canon(k, &exp, &aliases), ".").0.to_string()).collect() };
-        let others: Vec<&Setting> = exp.settings.iter().filter(|s| unit_setting.is_some() && s.retracted.is_none() && s.per_run && Some(s.name.as_str()) != unit_setting.as_deref() && !conditions.contains(&s.name)).collect();
+        let others: Vec<&Setting> = exp.settings.iter().filter(|s| unit_setting.is_some() && s.retracted.is_none() && s.per_run && Some(s.name.as_str()) != unit_setting.as_deref() && !conditions.contains(&s.name) && !repeats.contains(&s.name)).collect();
         for s in others {
             let mixed = variants.iter().any(|v| {
                 let mut seen: Vec<String> = Vec::new();
@@ -296,7 +309,7 @@ impl Ledger {
         // the runs each variant's cell of a metric reads, by id: what a screen's and a page's note on their code is of
         let mut cell_runs: HashMap<(String, String, String), Vec<String>> = HashMap::new();
         for r in &runs {
-            let key = self.unit_key(r, unit_setting.as_deref(), &factors);
+            let key = self.unit_key(r, unit_setting.as_deref(), &factors, &repeats);
             let cell = label(&cell_of(r, &conditions));
             for (k, x) in &r.metrics {
                 if r.retracted.is_some() && superseded_for(r, k, None) {
@@ -316,7 +329,7 @@ impl Ledger {
             }
         }
         let means = |by_unit: &IndexMap<String, Vec<f64>>| -> Vec<f64> { by_unit.values().map(|v| assess::fmean(v)).collect() };
-        let keys: HashSet<String> = runs.iter().map(|r| self.unit_key(r, unit_setting.as_deref(), &factors)).collect();
+        let keys: HashSet<String> = runs.iter().map(|r| self.unit_key(r, unit_setting.as_deref(), &factors, &repeats)).collect();
         let simple = |k: &str| k.contains('=') && !k.contains(" · ");
         let names: HashSet<&str> = keys.iter().filter(|k| simple(k)).map(|k| k.split('=').next().unwrap_or("")).collect();
         // as a reading names its unit: a per-run setting's, a run's, or a cell's of several per-run settings
@@ -330,7 +343,7 @@ impl Ledger {
         let cell_unit = match &unit_setting {
             Some(u) if !u.is_empty() => u.clone(),
             _ => {
-                let left: Vec<&Setting> = exp.settings.iter().filter(|s| s.retracted.is_none() && s.per_run && !conditions.contains(&s.name) && !factors.contains(&s.name)).collect();
+                let left: Vec<&Setting> = exp.settings.iter().filter(|s| s.retracted.is_none() && s.per_run && !conditions.contains(&s.name) && !factors.contains(&s.name) && !repeats.contains(&s.name)).collect();
                 match left.as_slice() {
                     [one] => one.name.clone(),
                     // the cell's runs share their per-run values: they are one unit, never each a run
@@ -2244,8 +2257,10 @@ fn count_said(units: usize, runs: usize, unit: &str) -> String {
 }
 
 /// Whether a rule met is met on the estimate alone: its reading has no interval, or one that crosses the rule's line
-/// (`straddles`), so the tally says it apart from the rules met across the whole interval.
+/// (`straddles`), so the tally says it apart from the rules met across the whole interval. A count is met on its
+/// recorded values whatever the mean's interval, as its headline says: apart too.
 pub fn on_estimate_alone(f: &crate::record_gen::Finding) -> bool {
     let no_interval = f.comparison.as_ref().map_or(true, |c| c.lo.is_none() || c.hi.is_none());
-    f.rule_outcome == "meets" && (f.caveats.iter().any(|c| c.code == "straddles") || no_interval)
+    let recorded = f.says.get("headline").map_or(false, |h| h.starts_with("recorded values meet") || h.starts_with("reproduced on the recorded"));
+    f.rule_outcome == "meets" && (f.caveats.iter().any(|c| c.code == "straddles") || no_interval || recorded)
 }

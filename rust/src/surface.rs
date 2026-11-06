@@ -74,6 +74,25 @@ pub fn why_not(problems: &[Value]) -> String {
 /// The criterion as the knob it is: '≤ 0.05 nats', '≥ 4 R/wk', '= 0.517 ± 0.005', 'better', 'no worse than 0.05 nats', its
 /// numbers as declared.
 pub fn criterion_text(comparator: &str, target: Option<f64>, tolerance: Option<f64>, unit: &str, margin: Option<f64>, over: &str) -> String {
+    criterion_text_of(comparator, target, tolerance, unit, margin, over, None, None)
+}
+
+/// What a threshold is read on, before the rule's sign: "each unit ", "bound ", "19 of 20 units ", "the best unit ".
+pub fn over_lead(over: &str, count: Option<i64>, of: Option<i64>) -> String {
+    match (over, count, of) {
+        ("each", ..) => "each unit ".into(),
+        ("bound", ..) => "bound ".into(),
+        ("count", Some(k), Some(n)) => format!("{k} of {n} units "),
+        ("count", Some(k), None) => format!("{k} or more units "),
+        ("best", _, Some(n)) => format!("the best of {n} units "),
+        ("best", ..) => "the best unit ".into(),
+        _ => String::new(),
+    }
+}
+
+/// criterion_text, with a count rule's count and the units a count or a best of N is of.
+#[allow(clippy::too_many_arguments)]
+pub fn criterion_text_of(comparator: &str, target: Option<f64>, tolerance: Option<f64>, unit: &str, margin: Option<f64>, over: &str, count: Option<i64>, of: Option<i64>) -> String {
     let g = |x: Option<f64>| x.map_or_else(|| "None".into(), crate::assess::declared);
     let u = if unit.is_empty() { String::new() } else { format!(" {unit}") };
     match comparator {
@@ -82,12 +101,7 @@ pub fn criterion_text(comparator: &str, target: Option<f64>, tolerance: Option<f
         "equivalent" => return format!("within ±{}{u}", g(margin)),
         _ => {}
     }
-    let lead = match over {
-        "mean" => "",
-        "each" => "each unit ",
-        "bound" => "bound ",
-        _ => "",
-    };
+    let lead = over_lead(over, count, of);
     if comparator == "equals" {
         let tol = match tolerance {
             Some(t) => format!(" ± {}", g(Some(t))),
@@ -122,6 +136,9 @@ pub struct CriterionFields<'a> {
     pub tolerance: Option<f64>,
     pub margin: Option<f64>,
     pub over: &'a str,
+    /// a count rule's count, and the units a count or a best of N is of
+    pub count: Option<i64>,
+    pub of: Option<i64>,
     /// the metric's direction in the catalogue: minimize, maximize or none
     pub direction: &'a str,
 }
@@ -163,7 +180,7 @@ pub fn row(c: &CriterionFields, finding: &Value, unit: &str) -> Row {
     Row {
         metric,
         value,
-        criterion: criterion_text(c.comparator, c.target, c.tolerance, unit, c.margin, c.over),
+        criterion: criterion_text_of(c.comparator, c.target, c.tolerance, unit, c.margin, c.over, c.count, c.of),
         margin,
         runs: if n != 0 { format!("{n} {}", crate::assess::plural(&unit_word, n)) } else { String::new() },
         standing: standing_words(finding),

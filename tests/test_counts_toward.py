@@ -47,6 +47,33 @@ def test_a_flat_number_on_an_experiment_of_one_variant_is_that_variants(rb):
     assert f["rule_outcome"] == "meets" and [o["counted"] for o in f["observations"]] == [True]
 
 
+def test_a_rule_that_names_no_arm_reads_the_one_variants_number_and_says_so(rb):
+    rb("experiment", "add", "INT8 alone", "--id", "solo", "--purpose", "a level", "--baseline", "int8")
+    rb("criterion", "add", "INT8 holds 75", "-e", "solo", "--metric", "top1", "--at-least", "75", "--id", "c1")
+    env = rb("run", "add", "solo", "top1=75.6", "--produced-at", "2026-05-01")
+    assert env.data["object"]["metrics"] == {"int8.top1": 75.6}
+    assert not [w for w in env.data.get("warnings", []) if "toward nothing" in w], env.data.get("warnings")
+    st = rb("status").data
+    assert not [o for o in st["open"] if o["code"] == "unread_metric"], [o["what"] for o in st["open"] if o["code"] == "unread_metric"]
+    f = rb("show", "c1").data["finding"]
+    assert f["rule_outcome"] == "meets" and [o["counted"] for o in f["observations"]] == [True]
+    # a number of another name still counts toward nothing, and the line names the rule's name once
+    env = rb("run", "add", "solo", "latency_ms=4.1", "--produced-at", "2026-05-02")
+    said = [w for w in env.data.get("warnings", []) if "toward nothing" in w]
+    assert said and "Its criteria read top1:" in said[0], said
+
+
+def test_rb_show_names_an_arms_number_as_the_rule_does(rb):
+    rb("metric", "add", "eval.top1", "--maximize")
+    rb("experiment", "add", "INT8 vs FP32", "--id", "e1", "--purpose", "the cost", "--baseline", "fp32", "--candidate", "int8", "--varies", "precision")
+    rb("criterion", "add", "INT8 loses at most a point", "-e", "e1", "--metric", "change.eval.top1", "--at-least", "-1", "--id", "c1")
+    rb("run", "add", "e1", "fp32.eval.top1=76.1", "int8.eval.top1=75.6", "--produced-at", "2026-05-01")
+    rb("run", "add", "e1", "eval.top1=76.0", "--variant", "fp32", "--produced-at", "2026-05-02")
+    code, out = rb("show", "c1", text=True)
+    assert "fp32.eval.top1 76" in out, out
+    assert "fp32.top1" not in out, out
+
+
 def test_rb_show_lists_a_run_no_rule_counts_with_why(rb):
     rb("experiment", "add", "INT8 alone", "--id", "solo", "--purpose", "a level", "--baseline", "int8")
     rb("criterion", "add", "INT8 holds 75", "-e", "solo", "--metric", "top1", "--subject", "int8", "--at-least", "75", "--id", "c1")
@@ -101,3 +128,74 @@ def test_a_run_no_rule_counts_says_what_a_rule_with_no_arm_reads(rb):
     rid = rb("run", "add", "solo", "loss=0.3", "--produced-at", "2026-05-01").data["object"]["id"]
     code, out = rb("show", "c7", text=True)
     assert "meets criterion" in out and f"{rid} is on solo and counts toward no rule: it reports int8.loss, and this rule reads top1" in out, out
+
+
+def _nothing(env):
+    return [w for w in env.data.get("warnings", []) if "toward nothing" in w]
+
+
+def test_on_one_variant_the_advice_names_the_number_as_the_rule_does(rb):
+    """On an experiment of one variant, top1 and int8.top1 are the same number. The line a run no rule counts gets gives
+    it as the rule names it: int8.top1 where the rule says int8.top1, top1 where it says top1, as rb show does."""
+    rb("experiment", "add", "INT8 alone", "--id", "named", "--purpose", "a level", "--baseline", "int8")
+    rb("criterion", "add", "INT8 holds 75", "-e", "named", "--metric", "int8.top1", "--at-least", "75", "--id", "c1")
+    said = _nothing(rb("run", "add", "named", "latency_ms=4.1", "--produced-at", "2026-05-01"))
+    assert said and "Its criteria read int8.top1: a run gives them as int8.top1=<value>." in said[0], said
+    rb.root.joinpath("m.json").write_text(json.dumps({"latency_ms": 4.2}), encoding="utf-8")
+    said = _nothing(rb("run", "add", "named", "--from", "m.json", "--produced-at", "2026-05-01"))
+    assert said and 'Its criteria read int8.top1: a file gives them as {"int8": {"top1": ...}}.' in said[0], said
+    # spelled out with --subject, the rule names int8's top1
+    rb("experiment", "add", "INT8 alone, spelled out", "--id", "spelled", "--purpose", "a level", "--baseline", "int8")
+    rb("criterion", "add", "INT8 holds 75", "-e", "spelled", "--metric", "top1", "--subject", "int8", "--at-least", "75", "--id", "c2")
+    said = _nothing(rb("run", "add", "spelled", "latency_ms=4.1", "--produced-at", "2026-05-01"))
+    assert said and "Its criteria read int8.top1:" in said[0], said
+    # the bare name where the rule says the bare name
+    rb("experiment", "add", "INT8 alone, bare", "--id", "bare", "--purpose", "a level", "--baseline", "int8")
+    rb("criterion", "add", "top1 holds 75", "-e", "bare", "--metric", "top1", "--at-least", "75", "--id", "c3")
+    said = _nothing(rb("run", "add", "bare", "latency_ms=4.1", "--produced-at", "2026-05-01"))
+    assert said and "Its criteria read top1: a run gives them as top1=<value>." in said[0], said
+    # both spellings are still read
+    for exp, crit in (("named", "c1"), ("bare", "c3")):
+        rb("run", "add", exp, "top1=75.6", "--produced-at", "2026-05-02")
+        rb("run", "add", exp, "int8.top1=75.8", "--produced-at", "2026-05-03")
+        assert [o["counted"] for o in rb("show", crit).data["finding"]["observations"]] == [True, True]
+
+
+def test_with_the_baseline_retracted_the_advice_names_the_candidate_as_the_rule_does(rb):
+    rb("experiment", "add", "INT8 vs FP32", "--id", "e1", "--baseline", "fp32", "--candidate", "int8", "--varies", "precision")
+    rb("criterion", "add", "INT8 holds 75", "-e", "e1", "--metric", "int8.top1", "--at-least", "75", "--id", "c1")
+    rb("retract", "e1/fp32", "--why", "FP32 is measured elsewhere")
+    said = _nothing(rb("run", "add", "e1", "latency_ms=4.1", "--produced-at", "2026-05-01"))
+    assert said and "Its criteria read int8.top1: a run gives them as int8.top1=<value>." in said[0], said
+    # the reference arm's too: with the candidate retracted, a change rule names fp32's number as fp32.top1
+    rb("experiment", "add", "INT8 vs FP32, INT8 dropped", "--id", "e2", "--baseline", "fp32", "--candidate", "int8", "--varies", "precision")
+    rb("criterion", "add", "INT8 loses at most 1 point", "-e", "e2", "--metric", "change.top1", "--at-least", "-1", "--id", "c2")
+    rb("retract", "e2/int8", "--why", "INT8 is measured elsewhere")
+    said = _nothing(rb("run", "add", "e2", "latency_ms=4.1", "--produced-at", "2026-05-01"))
+    assert said and "fp32.top1" in said[0] and " top1" not in said[0].split("Its criteria read")[1], said
+
+
+def test_the_sdk_and_mcp_name_the_number_as_the_rule_does(rb):
+    import warnings
+
+    import rabbit_brain
+    from rbtest import Mcp, environment
+    rb("experiment", "add", "INT8 alone", "--id", "named", "--purpose", "a level", "--baseline", "int8")
+    rb("criterion", "add", "INT8 holds 75", "-e", "named", "--metric", "int8.top1", "--at-least", "75", "--id", "c1")
+    exp = rabbit_brain.open().experiment("named")
+    with warnings.catch_warnings(record=True) as told:
+        warnings.simplefilter("always")
+        with exp.run() as run:
+            run.log({"latency_ms": 4.1})
+    said = [str(w.message) for w in told if issubclass(w.category, rabbit_brain.RBWarning) and "toward nothing" in str(w.message)]
+    assert said and 'Its criteria read int8.top1: a run logs them as run.log({"int8.top1": ...})' in said[0], said
+    server = Mcp(env={**environment(), "RB_SESSION": "s-one"})
+    try:
+        server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "clientInfo": {"name": "one"}}})
+        got = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                             "params": {"name": "run_add", "arguments": {"experiment": "named", "metrics": {"latency_ms": 4.3}, "produced_at": "2026-05-01"}}})
+    finally:
+        server.close()
+    data = got["result"]["structuredContent"]["data"]
+    said = [w for w in data.get("warnings", []) if "toward nothing" in w]
+    assert said and "Its criteria read int8.top1: a run gives them as int8.top1=<value>." in said[0], (said, got["result"]["structuredContent"].get("errors"))

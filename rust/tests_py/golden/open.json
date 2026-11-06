@@ -274,7 +274,7 @@
     "Reference:",
     "  tour         a one-minute walkthrough: builds a small real project in ./rb-tour and runs the whole loop",
     "  docs         print AGENTS.md (--start: how to start the record in a project already under way; --errors: the error table)",
-    "  schema       print a JSON Schema: `rb schema all` is Rabbit Brain format 1 (rb-v1.schema.json), `rb schema <kind>` one record's shape",
+    "  schema       print a JSON Schema: `rb schema all` is Rabbit Brain formats 1 and 2 (rb-v2.schema.json), `rb schema <kind>` one record's shape",
     "  version      print the version",
     "  feedback     a link to send feedback on rb: the page shows what it would send before you send it; rb sends nothing",
     "",

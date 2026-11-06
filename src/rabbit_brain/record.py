@@ -1,5 +1,5 @@
 """The record: one project's experiments, as YAML files in `.rb/` beside the code. `rb schema <kind>` prints each
-shape, and `rb schema all` the whole format as one JSON Schema (rb-v1.schema.json), the contract every file is
+shape, and `rb schema all` the whole format as one JSON Schema (rb-v2.schema.json), the contract every file is
 checked against.
 
 The ontology is small and closed on purpose, the same drawers in every project:
@@ -48,8 +48,8 @@ from typing import Any, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator, model_validator
 
 RECORD_DIR = ".rb"                                      # the record's directory, beside the code
-FORMAT_KEY = "rb"                                       # every record file opens with `rb: 1`
-RB_FORMAT = 1
+FORMAT_KEY = "rb"                                       # every record file opens with `rb: 1`, or `rb: 2`
+RB_FORMAT = 2                                           # the newest format rb reads and writes; a file is written in format 2 only when it holds what format 1 cannot (format_of)
 ID_PATTERN = r"^[a-zA-Z0-9_.-]{1,80}$"                  # record ids; no '/', so e1/lr addresses a setting unambiguously
 UID_PATTERN = r"^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$"    # global identity: a kind prefix and a ULID, e.g. exp_01J9...
 ACTOR_PATTERN = r"^(human|agent):[A-Za-z0-9_.@+-]{1,80}$"
@@ -67,7 +67,9 @@ Role = Literal["baseline", "candidate", "control", "ablation"]
 Comparator = Literal["at_most", "at_least", "equals", "better", "noninferior", "equivalent"]   # a criterion's rule
 THRESHOLDS = ("at_most", "at_least", "equals")
 INTERVAL_RULES = ("better", "noninferior", "equivalent")
-Over = Literal["mean", "each", "bound"]     # a threshold on the estimate, on every unit, or on the interval's bound
+Over = Literal["mean", "each", "bound", "count", "best"]     # a threshold on the estimate, on every unit, on the interval's bound, on at least `count` units, or on the best unit
+OVER_1 = ("mean", "each", "bound")          # what format 1 holds
+Measure = Literal["", "relative", "means"]  # what rb's own reading of the runs measures: the difference, the relative change, or the difference of the arms' means
 CriterionRole = Literal["primary", "secondary", "exploratory", "gate"]
 Origin = Literal["own", "cited", "inherited"]
 Direction = Literal["minimize", "maximize", "none"]
@@ -594,6 +596,9 @@ class Criterion(Written):
     tolerance: Optional[float] = Field(default=None, ge=0)
     margin: Optional[float] = Field(default=None, gt=0)
     over: Over = "mean"
+    count: Optional[int] = Field(default=None, ge=1, le=100000)
+    of: Optional[int] = Field(default=None, ge=1, le=100000)
+    measure: Measure = ""
     role: CriterionRole = "primary"
     min_n: int = Field(default=1, ge=1, le=100000)
     noise: Optional[float] = Field(default=None, ge=0)
@@ -640,7 +645,27 @@ class Criterion(Written):
             if not self.compares():
                 raise ValueError(f"a '{self.comparator}' rule compares two arms: give a reference (or read change.<metric>)")
             if self.over != "mean":
-                raise ValueError(f"a '{self.comparator}' rule already reads the interval; --each and --bound are for thresholds")
+                raise ValueError(f"a '{self.comparator}' rule already reads the interval; --each, --bound, --count and --best are for thresholds")
+        if self.over == "count" and self.count is None:
+            raise ValueError("a count rule says how many units must meet its threshold: --count K")
+        if self.over != "count" and self.count is not None:
+            raise ValueError("a count applies only to a count rule (over: count)")
+        if self.over in ("count", "best") and self.comparator not in THRESHOLDS:
+            raise ValueError(f"a '{self.over}' rule reads a threshold: --at-most, --at-least or --equals")
+        if self.over == "best" and self.comparator == "equals":
+            raise ValueError("a best run is best in a threshold's direction: --at-most or --at-least")
+        if self.of is not None and self.over not in ("count", "best"):
+            raise ValueError("--of says how many units a count or a best of N is of")
+        if self.of is not None and self.count is not None and self.count > self.of:
+            raise ValueError("a count rule's count is at most the units it is of")
+        if self.measure and not self.compares():
+            raise ValueError(f"a '{self.measure}' reading compares two arms: give a reference (or read change.<metric>)")
+        if self.measure and self.estimand:
+            raise ValueError("a relative or means reading is rb's own reading of the runs; it takes no estimand")
+        if self.measure and (self.comparator not in THRESHOLDS or self.over not in ("mean", "bound")):
+            raise ValueError(f"a '{self.measure}' reading takes a threshold on its estimate or its bound")
+        if self.measure == "means" and self.origin not in ("cited", "inherited"):
+            raise ValueError("a difference of means is what a cited number measures: give its --source and --quote")
         if self.comparator in ("noninferior", "equivalent") and self.margin is None:
             raise ValueError(f"a '{self.comparator}' rule needs its margin")
         if self.comparator not in ("noninferior", "equivalent") and self.margin is not None:
@@ -681,8 +706,13 @@ class Criterion(Written):
         else:
             sign = "=" if self.comparator == "equals" else ("≤" if self.comparator == "at_most" else "≥")
             value = f"{_declared(self.target)} ± {_declared(self.tolerance)}" if self.comparator == "equals" else _declared(self.target)
+            x = {"relative": f"{x} as a relative change", "means": f"{x} as a difference of means"}.get(self.measure, x)
+            value = value + ("%" if self.measure == "relative" else "")
+            of = f" of {self.of}" if self.of is not None else ""
             head = {"mean": x, "each": f"each unit's {x}",
-                    "bound": f"{x}, {'its interval' if self.comparator == 'equals' else ('upper bound' if self.comparator == 'at_most' else 'lower bound')}"}[self.over]
+                    "bound": f"{x}, {'its interval' if self.comparator == 'equals' else ('upper bound' if self.comparator == 'at_most' else 'lower bound')}",
+                    "count": (f"{self.count}{of} units' {x}" if self.of is not None else f"{self.count} or more units' {x}"),
+                    "best": f"the best{of} units' {x}" if self.of is not None else f"the best unit's {x}"}[self.over]
             rule = f"{head} {sign} {value}"
         extra = ([f"n ≥ {self.min_n}"] if self.min_n > 1 else []) + ([f"noise {_declared(self.noise)}"] if self.noise is not None else [])
         return rule + (f" ({', '.join(extra)})" if extra else "")
@@ -1246,21 +1276,52 @@ def stored(record: BaseModel) -> dict:
     return form
 
 
-SCHEMA_ID = "https://rabbitbrain.ai/schema/rb-v1.schema.json"
+SCHEMA_ID = "https://rabbitbrain.ai/schema/rb-v2.schema.json"
+# what format 2 adds, all of it a criterion's: a count rule, a best of N, a relative change and a difference of means
+FORMAT_2 = {"over": ("count", "best"), "count": None, "of": None, "measure": ("relative", "means")}
+
+
+def format_2_holds(form: dict) -> Optional[str]:
+    """What a criterion's stored form holds that only format 2 has ("over: count", "measure: relative"), or None."""
+    for key, values in FORMAT_2.items():
+        v = form.get(key)
+        if v is None or v == "" or (values is not None and v not in values):
+            continue
+        return f"{key}: {v}"
+    return None
+
+
+def format_of(kind: str, form: dict) -> int:
+    """The format a file is written in: 2 only for a criterion that holds what format 1 cannot, 1 for every other."""
+    if kind == "criterion" and format_2_holds(form):
+        return 2
+    if kind == "criteria" and any(format_2_holds(c) for c in form.get("criteria") or []):
+        return 2
+    return 1
 FILE_MODELS: dict[str, type[BaseModel]] = {}      # kind -> the model of a one-record file; filled below
 
 
 def _file_schema(schema: dict, kind: str, title: str) -> dict:
     out = copy.deepcopy(schema)
     out["title"] = title
-    out["properties"] = {FORMAT_KEY: {"const": RB_FORMAT, "description": "the format: Rabbit Brain format 1"}, "kind": {"const": kind},
-                         **out.get("properties", {})}
+    out["properties"] = {FORMAT_KEY: {"enum": [1, 2], "description": "the format: Rabbit Brain format 1, or format 2 where the file holds what format 1 cannot"},
+                         "kind": {"const": kind}, **out.get("properties", {})}
     out["required"] = [FORMAT_KEY, "kind", *out.get("required", [])]
+    if kind == "criterion":
+        out["allOf"] = [FORMAT_1_CRITERION]
     return out
 
 
+# a format-1 criterion holds none of what format 2 adds (FORMAT_2)
+FORMAT_1_CRITERION = {
+    "if": {"properties": {FORMAT_KEY: {"const": 1}}, "required": [FORMAT_KEY]},
+    "then": {"properties": {"over": {"enum": list(OVER_1)}, "measure": {"const": ""}},
+             "not": {"anyOf": [{"required": ["count"]}, {"required": ["of"]}]}},
+}
+
+
 def format_schema() -> dict:
-    """Rabbit Brain format 1 as one JSON Schema (draft 2020-12): the shape of every file a record holds, chosen by its `kind`.
+    """Rabbit Brain formats 1 and 2 as one JSON Schema (draft 2020-12): the shape of every file a record holds, chosen by its `kind`.
     It is the contract: rb writes nothing it does not satisfy, and anything that satisfies it, rb can read."""
     defs: dict[str, Any] = {}
     files: list[dict] = []
@@ -1280,14 +1341,15 @@ def format_schema() -> dict:
         "type": "object", "additionalProperties": False, "title": f"criteria file ({RECORD_DIR}/{FILE_PATHS['criteria']})",
         "description": ("Every criterion of one experiment in one file, as rb wrote them before each criterion had a file of its "
                         "own: still read, and moved to one file each the next time rb writes the experiment."),
-        "properties": {FORMAT_KEY: {"const": RB_FORMAT}, "kind": {"const": "criteria"}, "experiment": {"type": "string", "pattern": ID_PATTERN},
+        "properties": {FORMAT_KEY: {"enum": [1, 2]}, "kind": {"const": "criteria"}, "experiment": {"type": "string", "pattern": ID_PATTERN},
                        "criteria": {"type": "array", "items": {"$ref": "#/$defs/CriterionEntry"}}},
         "required": [FORMAT_KEY, "kind", "experiment", "criteria"],
+        "allOf": [{"if": FORMAT_1_CRITERION["if"], "then": {"properties": {"criteria": {"items": {"allOf": [{"properties": FORMAT_1_CRITERION["then"]["properties"], "not": FORMAT_1_CRITERION["then"]["not"]}]}}}}}],
     }
     files.append({"$ref": "#/$defs/CriteriaFile"})
-    return {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": SCHEMA_ID, "title": "Rabbit Brain record, format 1",
+    return {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": SCHEMA_ID, "title": "Rabbit Brain record, formats 1 and 2",
             "description": ("One file of a Rabbit Brain record: Rabbit Brain YAML (a strict subset of YAML) or its canonical JSON. "
-                            "`rb` is the format and `kind` says which shape the rest of the file has. Findings and availability "
+                            "`rb` is the format (2 only for a criterion that holds a count rule, a best of N, a relative change or a difference of means; 1 for every other file) and `kind` says which shape the rest of the file has. Findings and availability "
                             "are computed from these files on every read and never stored."),
             "type": "object", "oneOf": files, "$defs": dict(sorted(defs.items()))}
 

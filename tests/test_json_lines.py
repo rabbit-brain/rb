@@ -71,7 +71,7 @@ def test_one_wording_of_where_rb_looks(rb, tmp_path, monkeypatch):
     rb("reconcile", "--apply")  # the changed file is recorded by path, so only where rb looks is left to say
     code, out = rb("reconcile", text=True)
     assert "the usual results folders" not in out
-    looks = "folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top"
+    looks = "folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top"
     assert f"rb looks for results in {looks}:" in out and f"Nothing to compile where rb looks for results: {looks}." in out
 
 

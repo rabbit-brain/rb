@@ -22,7 +22,7 @@ from rabbit_brain.models import Envelope
 from rbtest import Open, as_the_user, command, main
 
 HERE = Path(__file__).parent / "fixtures" / "shell"
-SCHEMA = Path(__file__).resolve().parents[1] / "schema" / "rb-v1.schema.json"
+SCHEMA = Path(__file__).resolve().parents[1] / "schema" / "rb-v2.schema.json"
 HAS_GIT = shutil.which("git") is not None
 BRANCH = "lab-notebook"        # the branch the record is written on, which no recipe names
 _spec = importlib.util.spec_from_file_location("reproduce_shape", HERE / "shape.py")

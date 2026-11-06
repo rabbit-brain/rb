@@ -143,6 +143,10 @@ pub fn rule_key(c: &Criterion) -> Value {
     for (name, selector) in [("where", &c.r#where), ("subject_where", &c.subject_where), ("reference_where", &c.reference_where)] {
         if !selector.is_empty() { extra.insert(name.into(), Value::Dict(selector.clone())); }
     }
+    // format 2's rules, only where they are set, so a format-1 rule keys as it always did
+    if let Some(k) = c.count { extra.insert("count".into(), Value::Int(k)); }
+    if let Some(n) = c.of { extra.insert("of".into(), Value::Int(n)); }
+    if !c.measure.is_empty() { extra.insert("measure".into(), Value::Str(c.measure.clone())); }
     let mut links: Vec<&QuestionLink> = c.question_links.iter().filter(|l| l.retracted.is_none()).collect();
     links.sort_by(|a, b| a.question.cmp(&b.question));
     if !links.is_empty() {

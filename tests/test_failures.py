@@ -184,7 +184,7 @@ def test_a_record_file_of_an_odd_shape_is_shown_with_what_is_wrong_with_it(recor
     shapes = {
         "kind-list.yaml": ("rb: 1\nkind:\n  - metric\n", "kind: Input should be a valid string"),
         "kind-none.yaml": ("rb: 1\nid: x\n", "kind: Field required"),
-        "kind-new.yaml": ("rb: 1\nkind: verdict\n", "kind 'verdict' is not a kind format 1 has"),
+        "kind-new.yaml": ("rb: 1\nkind: verdict\n", "kind 'verdict' is not a kind the format has"),
         "criteria-number.yaml": ("rb: 1\nkind: criteria\nexperiment: e1\ncriteria: 5\n", "criteria: Input should be a valid list"),
         "criteria-text.yaml": ("rb: 1\nkind: criteria\nexperiment: e1\ncriteria:\n  - just a line\n", "criterion ?: Input should be a valid dictionary"),
     }

@@ -12,7 +12,38 @@ pub use crate::record_gen::*;
 
 pub const RECORD_DIR: &str = ".rb";
 pub const FORMAT_KEY: &str = "rb";
-pub const RB_FORMAT: i64 = 1;
+/// The newest format this rb reads and writes. A file is written in format 2 only where it holds what format 1 cannot
+/// (format_of): a criterion with a count rule, a best of N, a relative change or a difference of means.
+pub const RB_FORMAT: i64 = 2;
+
+/// What a criterion's stored form holds that only format 2 has ("over: count", "measure: relative"), or None.
+pub fn format_2_holds(form: &Dict) -> Option<String> {
+    let said = |k: &str, v: &Value| format!("{k}: {}", crate::pyjson::py_str(v));
+    match form.get("over").and_then(Value::as_str) {
+        Some(o @ ("count" | "best")) => return Some(format!("over: {o}")),
+        _ => {}
+    }
+    for k in ["count", "of"] {
+        if let Some(v) = form.get(k).filter(|v| !v.is_null()) {
+            return Some(said(k, v));
+        }
+    }
+    match form.get("measure").and_then(Value::as_str) {
+        Some(m) if !m.is_empty() => Some(format!("measure: {m}")),
+        _ => None,
+    }
+}
+
+/// The format a file is written in: 2 only for a criterion (or an earlier rb's criteria file) that holds what format 1
+/// cannot, 1 for every other file, as 0.7 wrote it.
+pub fn format_of(kind: &str, form: &Dict) -> i64 {
+    let holds = match kind {
+        "criterion" => format_2_holds(form).is_some(),
+        "criteria" => form.get("criteria").and_then(Value::as_list).map_or(false, |l| l.iter().any(|c| c.as_dict().map_or(false, |d| format_2_holds(d).is_some()))),
+        _ => false,
+    };
+    if holds { 2 } else { 1 }
+}
 pub const ID_PATTERN: &str = r"^[a-zA-Z0-9_.-]{1,80}$";
 pub const UID_PATTERN: &str = r"^[a-z]{2,4}_[0-9A-HJKMNP-TV-Z]{26}$";
 pub const ACTOR_PATTERN: &str = r"^(human|agent):[A-Za-z0-9_.@+-]{1,80}$";
@@ -375,8 +406,43 @@ pub mod hooks {
                 return Err(format!("a '{cmp}' rule compares two arms: give a reference (or read change.<metric>)"));
             }
             if c.over != "mean" {
-                return Err(format!("a '{cmp}' rule already reads the interval; --each and --bound are for thresholds"));
+                return Err(format!("a '{cmp}' rule already reads the interval; --each, --bound, --count and --best are for thresholds"));
             }
+        }
+        // format 2: a count rule, a best of N, a relative change and a difference of means
+        let over = c.over.as_str();
+        if over == "count" && c.count.is_none() {
+            return Err("a count rule says how many units must meet its threshold: --count K".into());
+        }
+        if over != "count" && c.count.is_some() {
+            return Err("a count applies only to a count rule (over: count)".into());
+        }
+        if (over == "count" || over == "best") && !THRESHOLDS.contains(&cmp) {
+            return Err(format!("a '{over}' rule reads a threshold: --at-most, --at-least or --equals"));
+        }
+        if over == "best" && cmp == "equals" {
+            return Err("a best run is best in a threshold's direction: --at-most or --at-least".into());
+        }
+        if c.of.is_some() && over != "count" && over != "best" {
+            return Err("--of says how many units a count or a best of N is of".into());
+        }
+        if let (Some(of), Some(k)) = (c.of, c.count) {
+            if k > of {
+                return Err("a count rule's count is at most the units it is of".into());
+            }
+        }
+        let measure = c.measure.as_str();
+        if !measure.is_empty() && !c.compares() {
+            return Err(format!("a '{measure}' reading compares two arms: give a reference (or read change.<metric>)"));
+        }
+        if !measure.is_empty() && !c.estimand.is_empty() {
+            return Err("a relative or means reading is rb's own reading of the runs; it takes no estimand".into());
+        }
+        if !measure.is_empty() && (!THRESHOLDS.contains(&cmp) || !(over == "mean" || over == "bound")) {
+            return Err(format!("a '{measure}' reading takes a threshold on its estimate or its bound"));
+        }
+        if measure == "means" && c.origin != "cited" && c.origin != "inherited" {
+            return Err("a difference of means is what a cited number measures: give its --source and --quote".into());
         }
         if (cmp == "noninferior" || cmp == "equivalent") && c.margin.is_none() {
             return Err(format!("a '{cmp}' rule needs its margin"));
@@ -735,9 +801,21 @@ impl Criterion {
                 };
                 let t = self.target.map(g).unwrap_or_else(|| "None".into());
                 let value = if cmp == "equals" { format!("{t} ± {}", self.tolerance.map(g).unwrap_or_else(|| "None".into())) } else { t };
+                // a relative change's threshold is a percent; a difference of means says what the cited number measures
+                let value = if self.measure == "relative" { format!("{value}%") } else { value };
+                let x = match self.measure.as_str() {
+                    "relative" => format!("{x} as a relative change"),
+                    "means" => format!("{x} as a difference of means"),
+                    _ => x,
+                };
+                let of = self.of.map(|n| format!(" of {n}")).unwrap_or_default();
                 let head = match self.over.as_str() {
                     "mean" => x.clone(),
                     "each" => format!("each unit's {x}"),
+                    "count" if self.of.is_some() => format!("{}{of} units' {x}", self.count.unwrap_or(0)),
+                    "count" => format!("{} or more units' {x}", self.count.unwrap_or(0)),
+                    "best" if self.of.is_some() => format!("the best{of} units' {x}"),
+                    "best" => format!("the best unit's {x}"),
                     _ => format!(
                         "{x}, {}",
                         if cmp == "equals" {
@@ -821,7 +899,7 @@ pub const FILE_PATHS: &[(&str, &str)] = &[
     ("criteria", "experiments/<id>/criteria.yaml"),
 ];
 
-/// The JSON Schemas pydantic gave the Python models: `rb schema all` (rb-v1.schema.json) and `rb schema <kind>`.
+/// The JSON Schemas pydantic gave the Python models: `rb schema all` (rb-v2.schema.json) and `rb schema <kind>`.
 pub fn schemas() -> &'static Value {
     static S: OnceLock<Value> = OnceLock::new();
     S.get_or_init(|| crate::pyjson::loads(include_str!("schemas.json")).expect("schemas.json"))

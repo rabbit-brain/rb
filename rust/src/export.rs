@@ -598,7 +598,7 @@ fn manifest(led: &Ledger, tmp: &Path, sources: Option<&(Vec<String>, Vec<String>
     }
     let inv = led.project()?;
     let mut man = crate::dict! {
-        "format" => FORMAT, "version" => FORMAT_VERSION, "rb_version" => crate::version(), "record_format" => 1,
+        "format" => FORMAT, "version" => FORMAT_VERSION, "rb_version" => crate::version(), "record_format" => led.record_format()?,
         "project" => crate::obj! {"id" => inv.id.clone(), "uid" => inv.uid.clone(), "title" => inv.title.clone()},
         "written" => crate::pytime::now_dt().format("%Y-%m-%d %H:%M UTC").to_string(),
         "file_count" => files.len(), "bytes" => total, "files" => Value::Dict(files)

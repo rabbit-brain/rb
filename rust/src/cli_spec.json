@@ -2584,7 +2584,9 @@
              "choices": [
               "mean",
               "each",
-              "bound"
+              "bound",
+              "count",
+              "best"
              ],
              "help": "==SUPPRESS=="
             },
@@ -2609,6 +2611,59 @@
              "const": true,
              "default": false,
              "help": "a threshold on the interval's bound (the upper for --at-most, the lower for --at-least)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--count"
+             ],
+             "dest": "count",
+             "type": "int",
+             "help": "a threshold at least K independent units must meet (\"19 of 20 runs below 0.890\"; with --of N)",
+             "metavar": "K"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--best"
+             ],
+             "dest": "best",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "a threshold the best unit must meet, best in the threshold's direction (\"best of 5 runs reaches 0.889\"; with --of N)"
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--of"
+             ],
+             "dest": "of",
+             "type": "int",
+             "help": "with --count or --best: how many units the rule is of; runs that hold another number leave it undetermined",
+             "metavar": "N"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--relative"
+             ],
+             "dest": "relative",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "read the relative change, (subject - reference) / reference, its threshold a percent (\"improves val_bpb by 22.5%%\": --at-most -22.5)"
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--means"
+             ],
+             "dest": "means",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "with --source: the cited number is a difference of the arms' means over all their units, and rb reads that"
             },
             {
              "kind": "store",
@@ -2774,7 +2829,12 @@
               33,
               34,
               35,
-              36
+              36,
+              37,
+              38,
+              39,
+              40,
+              41
              ]
             }
            ],
@@ -7085,7 +7145,7 @@
     {
      "dest": "schema",
      "metavar": "schema",
-     "help": "print a JSON Schema: `rb schema all` is Rabbit Brain format 1 (rb-v1.schema.json), `rb schema <kind>` one record's shape"
+     "help": "print a JSON Schema: `rb schema all` is Rabbit Brain formats 1 and 2 (rb-v2.schema.json), `rb schema <kind>` one record's shape"
     },
     {
      "dest": "version",

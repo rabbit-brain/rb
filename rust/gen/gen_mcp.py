@@ -1,7 +1,8 @@
 """Write rust/src/assets/mcp.json: what `rb mcp` says of itself. The protocol versions, the instructions, every tool
 (its command words, positional arguments, options and JSON Schema) and the resources come from rust/src/mcp_tools.py;
-the two resources that are the same text in every project (rb://schema and rb://format) from the vocabulary
-(rust/src/ir.py) and the format's schema (src/rabbit_brain/record.py). Run it after changing any of them:
+the resources that are the same text in every project (rb://schema, rb://format and rb://format-2) from the vocabulary
+(rust/src/ir.py), format 1's schema as 0.7 served it (schema/rb-v1.schema.json, unchanged) and the format's schema now
+(src/rabbit_brain/record.py, formats 1 and 2). Run it after changing any of them:
 python rust/gen/gen_mcp.py"""
 import json, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -28,7 +29,9 @@ def text() -> str:
         "tools": tools,
         "resources": mcp.RESOURCES,
         "schema_text": json.dumps({"objects": IR, "note": SCHEMA_NOTE}, indent=1),
-        "format_text": json.dumps(format_schema(), indent=1),
+        # rb://format stays format 1's, as a 0.7 client reads it; rb://format-2 is formats 1 and 2
+        "format_text": json.dumps(json.load(open(os.path.join(HERE, "..", "..", "schema", "rb-v1.schema.json"), encoding="utf-8")), indent=1),
+        "format2_text": json.dumps(format_schema(), indent=1),
     }
     return json.dumps(data, ensure_ascii=False, indent=None, separators=(",", ":"))
 

@@ -804,8 +804,10 @@ fn rule_tally(pairs: &[Value], muted: &[String], alone: Option<&Value>) -> Strin
 
 /// A number as a screen says it (design pass 1, P5): `x` to `places` decimals (two, see `places`); full precision stays
 /// on hover and in Details, a sign where `signed`, never "-0.00".
+/// A number in `places` decimals with no trailing 0 past two that those digits add ("0.74" and "0.735" in one column,
+/// "-0.339" beside "-0.4438", never "0.740" or "-0.3390"), as nodes::fixed says it: AGENTS.md, a grid's numbers.
 fn dec(x: f64, places: usize, signed: bool) -> String {
-    let s = format!("{x:.places$}");
+    let s = super::nodes::fixed(x, places, false);
     let zero = s.trim_start_matches('-').chars().all(|c| c == '0' || c == '.');
     let s = if zero { s.trim_start_matches('-').to_string() } else { s };
     if signed && x > 0.0 && !zero { format!("+{s}") } else { s }
@@ -862,18 +864,23 @@ fn plain_reading(f: &Value) -> String {
     let Some(e) = num("estimate") else {
         return if text(f, "state") == "untested" || text(f, "reading.result") == "untested" { "No results yet.".to_string() } else { String::new() };
     };
+    // a count rule and a best of N are said by their units, never by a mean: as the card says them (reading_short)
+    if matches!(text(f, "reading.over"), "count" | "best") && !text(f, "reading_short").is_empty() {
+        return format!("{}.", text(f, "reading_short"));
+    }
+    let relative = text(f, "reading.unit_said") == "relative";
     let given = text(f, "reading.unit_text");
     // the unit as rb says it in a sentence (unit_said: "points" for a difference of percentages, "%" for one), else
     // rb's own unit; a percentage by any name is "%", never a name (fix 2)
-    let given = match text(f, "reading.unit_said") { "points" | "%" => "%", _ => given };
+    let given = match text(f, "reading.unit_said") { "points" | "%" | "relative" => "%", _ => given };
     // the metric's own name (change.val_bpb reads val_bpb), and its unit unless that is the name itself
     let name = { let m = text(f, "row.metric").split(':').next().unwrap_or("").trim(); m.rsplit('.').next().unwrap_or(m).to_string() };
     // a unit that is no metric's name is said as the unit it is ("0.3289 bpb"); one that is the metric's own name, or a
     // reading that names no metric, as before
     let own = name.is_empty() || given == name;
     let unit = if !said_unit(unit_word(given)).is_empty() || own || given.is_empty() { said_unit(unit_word(given)) } else { given };
-    // a metric with no unit of its own words is named once (fix 3): an identifier (val_bpb) as declared, else by its
-    // title, as the grid heads it ("on Top-1"); never by its unit ("on Bpb")
+    // a metric with no unit of its own words is named once (fix 3), as declared (val_bpb, top1), as the grid heads it
+    // ("on top1"); never by its unit ("on Bpb")
     let metric = if said_unit(unit_word(given)).is_empty() && !given.is_empty() {
         if name.contains('_') { name.clone() } else if own { metric_label(given, "") } else { metric_label(&name, "") }
     } else {
@@ -903,8 +910,10 @@ fn plain_reading(f: &Value) -> String {
         Some(t) => p.max(cited_digits(f, t).split_once('.').map_or(0, |(_, d)| d.len())),
         None => p,
     };
+    // the decimals the model gives this reading (reading.places, its card's): one reading, one way on the page
+    let p = count(f, "reading.places").filter(|p| *p > 0).map_or(p, |p| p as usize);
     // a level with nothing to tell it from keeps rb's own digits (a share of 0.994 against a rule of 0.99)
-    let bare = level && lo.is_none() && target.is_none();
+    let bare = level && lo.is_none() && target.is_none() && count(f, "reading.places").filter(|p| *p > 0).is_none();
     let shown = |x: f64| if bare && x == e && !text(f, "reading.estimate_text").is_empty() { text(f, "reading.estimate_text").to_string() } else { dec(x, p, false) };
     let with_unit = |x: f64| if unit == "%" { format!("{}%", shown(x)) } else if unit.is_empty() { shown(x) } else { format!("{} {unit}", shown(x)) };
     let mut out = if ratio && !level {
@@ -922,7 +931,8 @@ fn plain_reading(f: &Value) -> String {
     } else {
         let size = dec(e.abs(), p, false);
         let by = if unit == "%" { "points" } else { unit };
-        let by = if by.is_empty() { String::new() } else { format!(" {by}") };
+        // a relative change is in percent: "2.33% higher", never points
+        let by = if relative { "%".to_string() } else if by.is_empty() { String::new() } else { format!(" {by}") };
         let the = the_of(reference);
         let on = if metric.is_empty() { String::new() } else { format!(" on {metric}") };
         if e == 0.0 {
@@ -938,12 +948,15 @@ fn plain_reading(f: &Value) -> String {
     if let (Some(lo), Some(hi)) = (lo, hi) {
         let bound = |x: f64| if level { with_unit(x) } else { dec(x, p, !ratio) };
         let interval = format!(" ({} to {})", bound(lo), bound(hi));
-        // after the number, before what it is on: "0.7597 (0.7591 to 0.7603) on Top-1"
+        // after the number, before what it is on: "0.7597 (0.7591 to 0.7603) on top1"
         let on = if metric.is_empty() { String::new() } else { format!(" on {metric}") };
         match out.strip_suffix(&on).filter(|_| !on.is_empty()) {
             Some(head) => out = format!("{head}{interval}{on}"),
             None => out.push_str(&interval),
         }
+    }
+    if text(f, "reading.measure") == "means" {
+        out.push_str(", a difference of means, as cited");
     }
     if n > 0 {
         out.push_str(&format!(", {}", units_said(n, text(f, "reading.unit"))));
@@ -964,8 +977,10 @@ fn plain_reading(f: &Value) -> String {
         return format!("{first}{}: {out}.", c.as_str());
     }
     // a sentence led by a variant's own name keeps it as written ("int8 is ..."), and so does one led by a metric's
-    // declared name (val_bpb); rb's words are capitalised
-    if !subject.is_empty() || out.split(' ').next().map_or(false, |w| w.contains('_')) {
+    // declared name (val_bpb, top1, acc, m.acc: never "Top1"); rb's words are capitalised
+    let full = text(f, "row.metric").split(':').next().unwrap_or("").trim().to_string();
+    let lead = out.split(' ').next().unwrap_or("");
+    if !subject.is_empty() || lead.contains('_') || (!lead.is_empty() && (lead == name || lead == full || full.ends_with(&format!(".{lead}")))) {
         return format!("{out}.");
     }
     let mut c = out.chars();
@@ -1102,38 +1117,13 @@ fn arm_label(v: &str) -> String {
     if ["fp", "int", "uint", "bf", "tf"].contains(&head) && !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()) { v.to_uppercase() } else { v.to_string() }
 }
 
-/// A metric's key as a heading says it (design pass 1, target 6): "top1" reads "Top-1 (%)", "size_kb" "Size (KB)";
-/// never the key in capitals.
+/// A metric's name as a heading says it: as declared, never title-cased or split at "_" or "." (acc heads "acc", m.acc
+/// "m.acc", val_bpb "val_bpb"), its unit after it where it has one the name does not end in ("top1 (%)").
 fn metric_label(name: &str, unit: &str) -> String {
     // a unit that is the metric's own name is none; a percentage by any name is "%"
     let unit = if unit == name { "" } else { unit_word(unit) };
-    // a name that joins words with "_" is an identifier: said as declared, never split at "_" nor cut at its unit
-    // (val_bpb in bpb heads "val_bpb", never "Val (bpb)"), its unit after it where the name does not end in it
-    if name.contains('_') {
-        let ends = !unit.is_empty() && name.to_ascii_lowercase().ends_with(&format!("_{}", unit.to_ascii_lowercase()));
-        return if unit.is_empty() || ends { name.to_string() } else { format!("{name} ({unit})") };
-    }
-    // a name that ends in its unit says it once ("latency_ms" in ms is "Latency (ms)")
-    let name = name.strip_suffix(&format!("_{unit}")).filter(|n| !n.is_empty() && !unit.is_empty()).unwrap_or(name);
-    let (base, unit) = match name.rsplit_once('_') {
-        Some((b, u)) if ["kb", "mb", "gb", "ms"].contains(&u) && (unit.is_empty() || unit.eq_ignore_ascii_case(u)) => (b.to_string(), if u == "ms" { u.to_string() } else { u.to_uppercase() }),
-        _ => (name.to_string(), unit.to_string()),
-    };
-    // "top1" is "top-1" wherever it stands in the name, as prose writes it; an acronym (C's list) and a code of letters
-    // then digits (fp32, int8) keep their capitals, as nodes.rs's metric_said says them: "onnx_top1" reads "ONNX top-1"
-    let topn = |t: &str| t.strip_prefix("top").filter(|d| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit())).map(|d| format!("top-{d}"));
-    let word = |t: &str| {
-        let low = t.to_lowercase();
-        if let Some(x) = topn(&low) {
-            return x;
-        }
-        let letters = low.trim_end_matches(|c: char| c.is_ascii_digit());
-        let code = !letters.is_empty() && letters.len() < low.len() && letters.chars().all(|c| c.is_ascii_lowercase());
-        if code || w::ACRONYMS.contains(&low.as_str()) { low.to_uppercase() } else { t.to_string() }
-    };
-    // a metric is said by its whole name: "eval.top1" and "train.top1" are two metrics
-    let base = capitalised(&base.replace(['.', '_'], " ").split(' ').filter(|t| !t.is_empty()).map(word).collect::<Vec<_>>().join(" "));
-    if unit.is_empty() { base } else { format!("{base} ({unit})") }
+    let ends = !unit.is_empty() && ['_', '.'].iter().any(|sep| name.to_ascii_lowercase().ends_with(&format!("{sep}{}", unit.to_ascii_lowercase())));
+    if unit.is_empty() || ends { name.to_string() } else { format!("{name} ({unit})") }
 }
 
 /// A difference with its direction in words, once (design pass 1, P5): "0.15 lower", "0.04 higher", "no difference".
@@ -1422,7 +1412,37 @@ impl<'a> Page<'a> {
                     .find(|t| text(t, "kind") == "experiment" && text(t, "id") == eid)
                     .map(|t| {
                         let muted = texts(t, "muted");
-                        let parts: Vec<String> = text(t, "standing").split(" \u{b7} ").filter(|p| p.starts_with(|c: char| c.is_ascii_digit())).map(|p| word(p, &muted)).collect();
+                        // the rules of a word met on the estimate alone, said with it, as the question rows and the
+                        // Rules tab say them: a tally never hides a reading's outcome
+                        let alone = |key: &str| -> i64 {
+                            texts(x, "findings")
+                                .iter()
+                                .filter_map(|c| self.finding(c))
+                                .filter(|f| at(f, "on_estimate").is_some_and(Value::truthy))
+                                .filter(|f| {
+                                    let met = if text(f, "role") == "gate" { "gate met" } else if text(f, "standing").starts_with("reproduced") { "reproduced" } else { "meets" };
+                                    met == key
+                                })
+                                .count() as i64
+                        };
+                        let parts: Vec<String> = text(t, "standing")
+                            .split(" \u{b7} ")
+                            .filter(|p| p.starts_with(|c: char| c.is_ascii_digit()))
+                            .map(|p| {
+                                let (n, label) = p.split_once(' ').unwrap_or((p, ""));
+                                let k = n.parse::<i64>().unwrap_or(0);
+                                let estimate = ["meets", "reproduced", "gate met"].iter().find(|key| crate::assess::rule_label(key, k) == label).map_or(0, |key| alone(key));
+                                let said = word(p, &muted);
+                                if estimate == 0 {
+                                    return said;
+                                }
+                                let tail = esc(&crate::cmds::reading::on_estimate_said(estimate, n));
+                                match said.rfind("</span>") {
+                                    Some(i) => format!("{}{tail}{}", &said[..i], &said[i..]),
+                                    None => said + &tail,
+                                }
+                            })
+                            .collect();
                         if parts.is_empty() { String::new() } else { format!("{DOT}<span class=\"tl\"><span class=\"k\">{}</span>{}</span>", w::RULES_LEAD, parts.join(DOT)) }
                     })
                     .unwrap_or_default();
@@ -2354,7 +2374,7 @@ impl<'a> Page<'a> {
         let mut units: Vec<(String, String)> = x.map(|x| list(x, "table.metrics").iter().map(|m| (text(m, "name").to_string(), text(m, "unit").to_string())).collect()).unwrap_or_default();
         // FIX4: a metric its comparison table leaves out (one a run names for no arm, as the INT8 demo's onnx_top1) keeps
         // the unit rb's reading of it says, in any experiment, so its title reads as its neighbours' do ("ONNX top-1 (%)"
-        // beside "Top-1 (%)") in every runs table
+        // beside "top1 (%)") in every runs table
         if let Some(Value::Dict(fs)) = at(self.doc, "findings") {
             // a unit is the metric's, so any experiment's reading of it says it; a level's reading only: a difference's
             // unit ("points") is not the metric's
@@ -4697,7 +4717,7 @@ mod tests {
         let m = crate::pyjson::loads(r#"{"name": "latency_ms", "unit": "ms"}"#).unwrap();
         assert_eq!(metric_title(&m), "latency_ms", "a name joined with _ is said as declared, its unit in it (round 4)");
         let m = crate::pyjson::loads(r#"{"name": "accuracy", "unit": "percent"}"#).unwrap();
-        assert_eq!(metric_title(&m), "Accuracy (%)");
+        assert_eq!(metric_title(&m), "accuracy (%)", "a metric is named as declared (round 5)");
     }
 
     use super::*;
@@ -5336,7 +5356,7 @@ mod tests {
     }
 
     /// FIX4: a metric the comparison table leaves out (named for no arm) heads the runs table with the unit rb's reading
-    /// of it says, as its neighbours do: "ONNX top-1 (%)" beside "Top-1 (%)", never one with a unit and one without.
+    /// of it says, as its neighbours do: "ONNX top-1 (%)" beside "top1 (%)", never one with a unit and one without.
     #[test]
     fn a_metric_named_for_no_arm_heads_the_runs_table_with_its_unit() {
         let mut live = crate::pyjson::loads(include_str!("../../../tests/fixtures/shell/int8-demo.live.view.json")).unwrap();
@@ -5439,8 +5459,11 @@ mod tests {
     /// Design pass 1, targets 5 and 6: keys and arms read as words in a heading, never a key in capitals.
     #[test]
     fn a_heading_says_a_metric_and_an_arm_in_words() {
-        assert_eq!(metric_label("top1", "%"), "Top-1 (%)");
+        assert_eq!(metric_label("top1", "%"), "top1 (%)");
         assert_eq!(metric_label("size_kb", ""), "size_kb");
+        assert_eq!(metric_label("acc", ""), "acc", "never title-cased (round 5)");
+        assert_eq!(metric_label("m.acc", ""), "m.acc", "never split at a dot (round 5)");
+        assert_eq!(metric_label("lat.ms", "ms"), "lat.ms", "a dotted name that ends in its unit says it once");
         assert_eq!(metric_label("latency_ms", "ms"), "latency_ms");
         assert_eq!(plain_key("calib_images"), "Calib images");
         assert_eq!(arm_label("int8"), "INT8");
@@ -5522,7 +5545,7 @@ mod tests {
         assert_eq!(plain_reading(&f), "INT8 at tag a] is 0.10 nats lower than INT8 at tag b], 2 runs.");
         // a metric with no unit is still named once, after its number
         let f = crate::pyjson::loads(r#"{"state": "meets", "subject_label": "fp32 baseline", "reading": {"estimate": 0.7597, "n": 3, "unit": "seed", "unit_text": "top1", "unit_said": "top1"}}"#).unwrap();
-        assert_eq!(plain_reading(&f), "FP32 baseline is 0.76 on Top-1, 3 seeds.");
+        assert_eq!(plain_reading(&f), "FP32 baseline is 0.76 on top1, 3 seeds.");
     }
 
     /// Fix 3, item 4 (Look 4): the question's rule list says a variant in plain words, an interval with its unit in the
@@ -5539,7 +5562,7 @@ mod tests {
         // with no rule text, the number's own shortest digits
         let f = crate::pyjson::loads(r#"{"state": "misses", "subject_label": "fp32 baseline", "reference_label": "cited", "cited": {"path": "R.md"}, "check_band": {"target": 0.7613},
             "reading": {"estimate": 0.7597, "lo": 0.7591, "hi": 0.7603, "n": 3, "unit": "seed", "unit_text": "top1"}}"#).unwrap();
-        assert_eq!(plain_reading(&f), "FP32 baseline is 0.7597 (0.7591 to 0.7603) on Top-1, 3 seeds; the cited number is 0.7613.");
+        assert_eq!(plain_reading(&f), "FP32 baseline is 0.7597 (0.7591 to 0.7603) on top1, 3 seeds; the cited number is 0.7613.");
     }
 
     /// Fix 2, item 2: one title per metric on a page, and a record's dotted key by its own name in words.
@@ -5547,15 +5570,15 @@ mod tests {
     fn one_title_per_metric_and_keys_in_words() {
         let m = crate::pyjson::loads(r#"{"name": "top1", "unit": "percent"}"#).unwrap();
         assert_eq!(metric_title(&m), metric_label("top1", "percent"));
-        assert_eq!(metric_title(&m), "Top-1 (%)");
-        assert_eq!(metric_label("top1", "%"), "Top-1 (%)");
-        // an acronym (C's list) and a precision code keep their capitals, as nodes.rs's metric_said says them (FIX6)
+        assert_eq!(metric_title(&m), "top1 (%)");
+        assert_eq!(metric_label("top1", "%"), "top1 (%)");
+        // every name as declared, an acronym and a precision code too (round 5)
         assert_eq!(metric_label("onnx_top1", ""), "onnx_top1");
         assert_eq!(metric_label("int8_top1", "%"), "int8_top1 (%)");
         assert_eq!(metric_label("gpu_latency_ms", "ms"), "gpu_latency_ms");
-        assert_eq!(metric_label("val.f1", ""), "Val F1");
+        assert_eq!(metric_label("val.f1", ""), "val.f1");
         assert_eq!(metric_label("share_under_2pt", ""), "share_under_2pt");
-        assert_eq!(metric_label("top1", "top1"), "Top-1");
+        assert_eq!(metric_label("top1", "top1"), "top1");
         assert_eq!(setting_said("data.batch_size", "32", &[]), "Batch size: 32");
         assert_eq!(plain_key("optim.lr"), "Lr");
         // two of one last name are each said whole, in a heading and a metric's title, so two never read as one
@@ -5563,7 +5586,7 @@ mod tests {
         assert_eq!(setting_said("optim.lr", "0.1", &keys), "Optim lr: 0.1");
         assert_eq!(setting_said("data.batch_size", "32", &keys), "Batch size: 32");
         assert_ne!(metric_label("eval.top1", "pct"), metric_label("train.top1", "pct"));
-        assert_eq!(metric_label("eval.top1", "pct"), "Eval top-1 (%)");
+        assert_eq!(metric_label("eval.top1", "pct"), "eval.top1 (%)");
     }
 
     /// Fix 2, item 5: what waits "for a confirmation" is the owner's on the owner's view of the export, as rb page and

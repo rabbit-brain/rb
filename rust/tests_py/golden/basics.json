@@ -430,7 +430,7 @@
     "  - qqtdhpa is open and nothing is filed under it: json mode",
     "      rb experiment add \"<what would test it>\" -q qqtdhpa --hypothesis \"<what you expect>\"",
     "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "Experiments",
     "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
@@ -493,7 +493,7 @@
     "  - nothing in the record tests e1 yet: wider is better",
     "      rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
     "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "Experiments",
     "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
@@ -574,7 +574,7 @@
     "  - qqtdhpa is open and nothing is filed under it: json mode",
     "      rb experiment add \"<what would test it>\" -q qqtdhpa --hypothesis \"<what you expect>\"",
     "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "Experiments",
     "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
@@ -634,7 +634,7 @@
     "  - qqtdhpa is open and nothing is filed under it: json mode",
     "      rb experiment add \"<what would test it>\" -q qqtdhpa --hypothesis \"<what you expect>\"",
     "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "Experiments",
     "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
@@ -1104,8 +1104,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "334260d73132d9f9883ddc41ea93c310977f3fad47a87e23ddc1675e8753a45c",
-   "bytes": 196543
+   "sha256": "e744dede64c68da79d4b00377af9d52c9bcd5321f7de07565182c6508ae7f869",
+   "bytes": 196678
   }
  }
 }

@@ -3556,7 +3556,10 @@ impl Scope {
             _ => items.join(""),
         };
         let usual = DEFAULT_DIRS.len().min(self.folders.len());
-        let mut named: Vec<String> = self.folders[..usual].to_vec();
+        // the usual folders at the top, then the rule reconcile says, in its words, then what this repository holds
+        // beyond the usual ones: one account of where rb looks on every read
+        let defaults = and_list(&self.folders[..usual]);
+        let mut named: Vec<String> = Vec::new();
         let others = &self.folders[usual..];
         named.extend(others.iter().take(2).cloned());
         if others.len() > 2 {
@@ -3569,10 +3572,12 @@ impl Scope {
             });
         }
         let top = if self.git { "the repository's top folder" } else { "the project's top folder" };
+        let here = if named.is_empty() { String::new() } else { format!(", in {}", and_list(&named)) };
+        let rule = format!("rb looks in {defaults} at the top, in {}{here}", crate::repo::where_rb_looks());
         let what = if self.git {
-            format!("rb looks in {}, at the files in {top}, and at .json, .yaml and .toml files git shows as new or changed.", and_list(&named))
+            format!("{rule}, at the files in {top}, and at .json, .yaml and .toml files git shows as new or changed.")
         } else {
-            format!("rb looks in {}, and at the files in {top}.", and_list(&named))
+            format!("{rule}, and at the files in {top}.")
         };
         let when = match &self.looked_at {
             Some(at) => format!("It last looked at {} UTC.", at.chars().take(16).collect::<String>().replace('T', " ")),

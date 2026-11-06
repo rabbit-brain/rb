@@ -457,7 +457,7 @@
     "  - warmup: results/warmup/audit.json says passed: false",
     "      open results/warmup/audit.json",
     "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "Experiments",
     "  other   Other \u00b7 planned \u00b7 no variants \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
@@ -1028,12 +1028,12 @@
     "  - warmup: results/warmup/audit.json says passed: false",
     "      open results/warmup/audit.json",
     "",
-    "Nothing to do (1)",
+    "Facts that ask for nothing (1)",
     "  - warmup: runs report top5, which no recorded criterion reads",
     "",
     "Found in the repository, not in the record (1): 1 results file was there when rb first looked here, which rb reconcile lists and proposes no run of",
     "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "Rules",
     "  c1      top1 holds",
@@ -1749,7 +1749,7 @@
     "  - warmup: results/warmup/audit.json says passed: false",
     "      open results/warmup/audit.json",
     "",
-    "## Nothing to do",
+    "## Facts that ask for nothing",
     "",
     "  - warmup: runs report loss, top5, which no recorded criterion reads",
     "",
@@ -1781,7 +1781,7 @@
     "",
     "- last rb reconcile --apply, 2026-10-01 12:00: 1 re-indexed (warmup) \u00b7 1 result quoted \u00b7 checks: 1 passed \u00b7 1 audit file saying failed \u00b7 1 manifest, 1 source changed since frozen",
     "- Found in the repository, not in the record (1): 1 results file was there when rb first looked here, which rb reconcile lists and proposes no run of",
-    "- rb looks in out/, outputs/, results/, eval-out/ and metrics/, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "- rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
     "",
     "## Recent activity",
     "",
@@ -2221,8 +2221,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "b277306671199323ecae9c1b3f2cd222d8da8305feef154d0382f882784beb01",
-   "bytes": 199465
+   "sha256": "38a13ceff712c57daad233bb74199dd05e8865a91ecfdb78410836121d01660e",
+   "bytes": 199608
   },
   "results/other/report.md": [
    "# Other",

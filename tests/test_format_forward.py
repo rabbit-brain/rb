@@ -201,7 +201,7 @@ def test_a_bundle_holding_a_part_only_a_newer_rb_reads_is_not_cloned(repo, capsy
         rel = Path(".rb") / "experiments" / "e2" / "experiment.yaml"
         logged_as_a_newer_rb(repo, rel, "experiment", "e2", lambda e2: e2["relations"][0].update(kind="supersedes"))
     elif change == "criterion file format":
-        logged_as_a_newer_rb(repo, CRITERION, "criterion", "c1", lambda c1: c1.update(rb=2))
+        logged_as_a_newer_rb(repo, CRITERION, "criterion", "c1", lambda c1: c1.update(rb=3))
     else:
         form = {"id": "dv1", "text": "hold e1 until the rerun", "created_by": "agent:future", "created_at": "2099-01-01T00:00:00+00:00"}
         (repo / ".rb" / "directives").mkdir()
@@ -237,7 +237,7 @@ def test_a_bumped_format_number_asks_for_an_upgrade(repo, capsys):
     seed(capsys)
     p = repo / ".rb" / "project.yaml"
     doc = rbyaml.loads(p.read_text(encoding="utf-8"))
-    doc["rb"] = 2
+    doc["rb"] = 3
     p.write_text(rbyaml.dumps(doc), encoding="utf-8")
     for argv in (["status"], ["show", "c1"], ["freeze", "e1", "-m", "lock"]):
         code, env = rbj(capsys, *argv)
@@ -250,7 +250,7 @@ def test_a_record_file_in_a_newer_format_asks_for_an_upgrade_and_never_reads_as_
     is logged: c1 is there, unreadable here, so it is newer, never missing or edited, and nothing may be locked on top
     of it."""
     seed(capsys)
-    edit_criterion(repo, lambda c1: c1.update(rb=2))
+    edit_criterion(repo, lambda c1: c1.update(rb=3))
     c1 = {k: v for k, v in rbyaml.loads((repo / CRITERION).read_text(encoding="utf-8")).items() if k not in ("rb", "kind")}
     entry = {"at": "2099-01-01T00:00:00+00:00", "actor": "human:future", "actor_via": "git-email", "via": "cli",
              "op": "add", "kind": "criterion", "id": "c1", "path": CRITERION.as_posix(), "sha256": rbyaml.content_sha(c1)}
@@ -289,7 +289,7 @@ def test_a_question_only_a_newer_rb_reads_leaves_the_rest_of_the_record_read(rep
     if shape == "a call on it settling that gate":
         assert rbj(capsys, "criterion", "add", "serving stays cheap", "-e", "e1", "--metric", "cost", "--at-most", "5", "--id", "c2", "-q", "q2")[0] == 0
         assert rbj(capsys, "decide", "q1", "park", "--why", "the saving is below the bar")[0] == 0
-    logged_as_a_newer_rb(repo, Path(".rb") / "questions" / "q1.yaml", "question", "q1", lambda q1: q1.update(rb=2))
+    logged_as_a_newer_rb(repo, Path(".rb") / "questions" / "q1.yaml", "question", "q1", lambda q1: q1.update(rb=3))
     code, env = rbj(capsys, "status")
     assert code == 0 and env.ok, env.errors
     items = env.data["open"]
@@ -328,7 +328,7 @@ def test_a_call_resting_on_a_criterion_only_a_newer_rb_reads_is_still_read_and_s
     assert code == 0, env.errors
     decision = env.data["object"]["id"]
     assert rested_on in env.data["object"]["basis"]
-    logged_as_a_newer_rb(repo, Path(".rb") / "experiments" / "e1" / "criteria" / f"{rested_on}.yaml", "criterion", rested_on, lambda c: c.update(rb=2))
+    logged_as_a_newer_rb(repo, Path(".rb") / "experiments" / "e1" / "criteria" / f"{rested_on}.yaml", "criterion", rested_on, lambda c: c.update(rb=3))
     code, env = rbj(capsys, "status")
     assert code == 0 and env.ok, env.errors
     assert [i["code"] for i in env.data["open"] if i["code"] in ("state_newer", "decision_outdated", "gate_missed")] == ["state_newer"]

@@ -385,12 +385,12 @@ def test_a_reconcile_that_finds_nothing_names_every_folder_it_looked_in(tmp_path
         return said, Envelope.model_validate_json(capsys.readouterr().out).data["looked_in"]
 
     said, looked = reconcile()
-    assert "Nothing to compile where rb looks for results: folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), " \
+    assert "Nothing to compile where rb looks for results: folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), " \
            "down to 4 levels from the top. No folder there holds a report or a results file yet." in said and looked == usual
     assert main(["init", "t", "--no-agents"]) == 0
     capsys.readouterr()
     said, looked = reconcile()
-    assert "Nothing to compile where rb looks for results: folders named for them (results/, eval/, metrics/, reports/, artifacts/ and the like), " \
+    assert "Nothing to compile where rb looks for results: folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), " \
            "down to 4 levels from the top." in said and looked == usual
     Path("out").mkdir()                                   # one of them, which rb watches
     Path("logs/a").mkdir(parents=True)

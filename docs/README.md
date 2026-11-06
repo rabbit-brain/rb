@@ -11,7 +11,7 @@ The [manual](../AGENTS.md) is the reference for the commands, record format, att
 | Read or share a record | [Manual: reading the record](../AGENTS.md#reading-the-record) |
 | See what rb would write, and take it out again | [Manual: leaving rb](../AGENTS.md#leaving-rb) |
 | Hosted login and sync (optional) | [Manual: rabbitbrain.ai](../AGENTS.md#rabbitbrainai-optional-rb-login-rb-sync) |
-| Validate record files | [JSON Schema](../schema/rb-v1.schema.json), also available locally through `rb schema all` |
+| Validate record files | [JSON Schema](../schema/rb-v2.schema.json), also available locally through `rb schema all` |
 | Understand data handling | [Privacy](../PRIVACY.md) |
 | Report a problem or contribute | [Contributing](../CONTRIBUTING.md), [security reports](../SECURITY.md) |
 | Build or release the package | [Rust implementation](../rust/ARCHITECTURE.md), [releasing](../RELEASING.md) |

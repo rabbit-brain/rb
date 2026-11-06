@@ -161,7 +161,8 @@ TOOLS: list[dict] = [
     {"name": "criterion_add", "description": ("Declare a criterion on an experiment: a rule over one comparison, before the evidence that tests it. "
                                               "What it compares: metric (val_loss, int8.val_loss, change.val_loss) or subject + reference + metric (+ estimand). "
                                               "Exactly one rule: at_most, at_least, equals with tolerance (on the estimate; each or bound read every "
-                                              "unit or the interval's bound), better, noninferior (a margin) or equivalent (a margin). role: primary, "
+                                              "unit or the interval's bound; count with of, at least count units of of; best, the best unit, with of), "
+                                              "relative (a relative change, its threshold a percent), means (a cited difference of the arms' means), better, noninferior (a margin) or equivalent (a margin). role: primary, "
                                               "secondary, exploratory, or gate (a priority policy: a miss parks a line, it never refutes it). "
                                               "question: the questions its finding bears on, with when_met for what meeting the rule would mean there; "
                                               "a question's reading counts only the criteria linked to it (criterion_file links one already recorded)."),
@@ -169,7 +170,8 @@ TOOLS: list[dict] = [
      "opts": {"experiment": "--experiment", "metric": "--metric", "subject": "--subject", "reference": "--reference", "estimand": "--estimand",
               "where": "--where", "subject_where": "--subject-where", "reference_where": "--reference-where",
               "at_most": "--at-most", "at_least": "--at-least", "equals": "--equals", "tolerance": "--tolerance", "better": "--better",
-              "noninferior": "--noninferior", "equivalent": "--equivalent", "each": "--each", "bound": "--bound", "role": "--role",
+              "noninferior": "--noninferior", "equivalent": "--equivalent", "each": "--each", "bound": "--bound", "count": "--count", "best": "--best", "of": "--of",
+              "relative": "--relative", "means": "--means", "role": "--role",
               "min_n": "--min-n", "noise": "--noise", "question": "--question", "when_met": "--when-met",
               "source": "--source", "quote": "--quote", "locator": "--locator", "note": "--note", "id": "--id", "amend": "--amend", "why": "--why", "words": "--words"},
      "props": {"words": WORDS, "statement": S, "experiment": S, "metric": S, "subject": S, "reference": S, "estimand": S, "at_most": N, "at_least": N,
@@ -177,6 +179,10 @@ TOOLS: list[dict] = [
                "question": _d(LIST, "the question ids this criterion bears on"), "when_met": _d(S, "your verbatim interpretation for those questions when the rule is met"),
                "equals": N, "tolerance": N, "better": B, "noninferior": _d(N, "the margin"), "equivalent": _d(N, "the margin"),
                "each": _d(B, "every unit must meet the threshold"), "bound": _d(B, "the threshold reads the interval's bound"),
+               "count": _d({"type": "integer"}, "at least this many units meet the threshold"), "best": _d(B, "the best unit, in the threshold's direction, meets it"),
+               "of": _d({"type": "integer"}, "with count or best: how many units the rule is of"),
+               "relative": _d(B, "the relative change, (subject - reference) / reference, its threshold a percent"),
+               "means": _d(B, "with source: the cited number is a difference of the arms' means over all their units"),
                "role": {"type": "string", "enum": ["primary", "secondary", "exploratory", "gate"]}, "min_n": {"type": "integer"}, "noise": N,
                "source": _d(S, "where a cited number comes from"), "quote": _d(S, "the exact text that states the number, or the ordering a threshold of 0 cites"), "locator": S, "note": S, "id": S, "amend": AMEND, "why": WHY},
      "required": ["statement", "experiment", "metric"]},
@@ -293,6 +299,7 @@ RESOURCES = [
     {"uri": "rb://status", "name": "status", "description": "The record as JSON: findings, open items, every record", "mimeType": "application/json"},
     {"uri": "rb://schema", "name": "schema", "description": "rb's vocabulary: every record kind, what it means, the command that writes it, and the sources rb requires", "mimeType": "application/json"},
     {"uri": "rb://format", "name": "rb-v1.schema.json", "description": "Rabbit Brain format 1 as JSON Schema: the shape of every file in .rb/", "mimeType": "application/schema+json"},
+    {"uri": "rb://format-2", "name": "rb-v2.schema.json", "description": "Rabbit Brain formats 1 and 2 as JSON Schema: the shape of every file in .rb/, a criterion's format-2 rules included", "mimeType": "application/schema+json"},
     {"uri": "rb://docs", "name": "AGENTS.md", "description": "The manual: rules, commands, and how a finding is read on its axes", "mimeType": "text/markdown"},
     {"uri": "rb://start", "name": "start", "description": "The start protocol: how to record work already done in a project under way (rb docs --start)", "mimeType": "text/markdown"},
 ]

@@ -1908,7 +1908,8 @@ def test_an_each_rule_names_a_unit_of_several_values_by_all_of_them(human, capsy
 
 def test_an_analysis_that_crosses_the_threshold_is_noted_as_the_runs_are(human, capsys):
     """An analysis's reading is read on the estimate the same way: -0.05 [-0.08, +0.01] meets at most -0.01 on the
-    estimate, not across the whole interval. Read on the bound, or on each unit (an analysis gives none), nothing."""
+    estimate, not across the whole interval. Read on the bound, nothing; an --each rule reads each unit's run, never the
+    analysis, and here no run is recorded (round 5)."""
     start(capsys, "--baseline", "none", "--candidate", "p01")
     for c, extra in (("c1", []), ("c2", ["--bound"]), ("c3", ["--each"])):
         ok(capsys, "criterion", "add", "s", "-e", "e1", "--metric", "change.val_loss", "--at-most", "-0.01", *extra, "--id", c)
@@ -1917,7 +1918,7 @@ def test_an_analysis_that_crosses_the_threshold_is_noted_as_the_runs_are(human, 
     f = finding(capsys, "c1")
     assert (f["rule_outcome"], f["result"]) == ("meets", "unresolved")
     assert crossings(f) == ["the interval [-0.08, +0.01] crosses -0.01: met on the estimate, not across the whole interval"]
-    assert [(g["rule_outcome"], crossings(g)) for g in (finding(capsys, "c2"), finding(capsys, "c3"))] == [("misses", []), ("undetermined", [])]
+    assert [(g["rule_outcome"], crossings(g)) for g in (finding(capsys, "c2"), finding(capsys, "c3"))] == [("misses", []), ("untested", [])]
 
 
 def test_a_cited_criterion_is_not_comparable_when_a_setting_differs_from_the_cited_value(human, capsys):

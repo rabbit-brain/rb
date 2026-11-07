@@ -1472,11 +1472,11 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "1d3d32309c7fbe6825be181dccebd792f35759da0f26fb671cd9c48ee6ea8be1",
-   "bytes": 274792
+   "sha256": "11b45d2f321a28d58a4d8e316b6fd10182606640cae747be76d9190d16bc788c",
+   "bytes": 274793
   },
   "said.txt": [
-   "grid: FP32 baseline INT8 Difference Batch: 32 0.966 \u00b7 3 seeds 0.995 \u00b7 4 seeds 0.02968 nats higher than FP32 (+0.0205 to +0.03885) Batch: 64 0.956 \u00b7 3 seeds 0.982 \u00b7 4 seeds 0.03 nats higher than FP32",
+   "grid: FP32 baseline INT8 Difference Batch: 32 0.966 \u00b7 3 seeds 0.995 \u00b7 4 seeds 0.02968 nats higher than FP32 (+0.0205 to +0.03885) Batch: 64 0.956 \u00b7 3 seeds 0.982 \u00b7 4 seeds 0.027 nats higher than FP32",
    "card: INT8 is 0.02968 nats higher than the FP32 baseline (+0.0205 to +0.03885)",
    "card: INT8 is 2.791% higher than the FP32 baseline (+1.205 to +4.378)",
    "legend: shaded: what the rule accepts \u00b7 dot: estimate \u00b7 bar: interval",

@@ -460,8 +460,8 @@ def test_a_grid_cell_a_means_rule_owns_says_its_reading_as_the_card(rb, rule):
     with the card ("0.030 nats higher (+0.021 to +0.039)" beside "0.02968 ... (+0.0205 to +0.03885)"). The rule owns the
     cell (both arms in runs of their own, no design cell); the grid says the reading the card says, its estimate too
     (0.8.0's grid said rb compare's change of the means, "0.02967", beside the card's "0.02968"). A relative rule reads
-    the cell otherwise (rb compare's read_by), in percent: the cell says its own change in nats, linked to the rule, and
-    never the rule's numbers (P12), while the card says the rule's reading."""
+    the cell otherwise (rb compare's read_by), in percent: the cell says its own change in nats, in its own digits,
+    linked to the rule, and never the rule's numbers or digits (P12, P5), while the card says the rule's reading."""
     rb("spec", "vary", "e1", "precision")
     rb("spec", "set", "e1", "fp32.precision", "fp32", "--no-verify")
     rb("spec", "set", "e1", "int8.precision", "int8", "--no-verify")
@@ -492,8 +492,9 @@ def test_a_grid_cell_a_means_rule_owns_says_its_reading_as_the_card(rb, rule):
     assert grids and page_text.count(card) >= 2, (card, grids)          # the card's sentence and the list's
     assert f"INT8 is {amount} higher than the FP32 baseline {card}" in page_text, (amount, card)
     if rule == "relative":
-        assert any("0.03 nats higher than FP32" in g for g in grids) and not any("%" in g for g in grids), grids
-        assert re.search(r'<span class="gd"><a [^>]*href="#cr?-cm"[^>]*>0\.03 nats higher than FP32</a>', raw), "linked to its rule"
+        # in its own digits (P5), as a cell no rule reads says them: the rule's edges, in %, are none of the cell's
+        assert any("0.030 nats higher than FP32" in g for g in grids) and not any("%" in g for g in grids), grids
+        assert re.search(r'<span class="gd"><a [^>]*href="#cr?-cm"[^>]*>0\.030 nats higher than FP32</a>', raw), "linked to its rule"
     else:
         assert any(f"{amount} higher than FP32 {card}" in g for g in grids), (amount, card, grids)
 
@@ -530,7 +531,8 @@ def test_a_relative_rule_s_figure_across_cells_says_its_amounts_in_percent_as_it
     rb("page", "--out", "page.html")
     legend = [html.unescape(m) for m in re.findall(r'<p class="figleg figv">(.*?)</p>', Path("page.html").read_text(encoding="utf-8"))]
     assert legend and all(x.endswith("estimate: +0.3312%") for x in legend), legend
-    assert "batch 32: +0.5625% (outside the rule)" in legend[0] and "batch 64: +0.10%" in legend[0], legend
+    # each amount in its own digits, as rb show says them ("+0.1% to +0.5625%"), never padded to "+0.10%" (MP-1107-1620)
+    assert "batch 32: +0.5625% (outside the rule)" in legend[0] and "batch 64: +0.1%" in legend[0] and "+0.10%" not in legend[0], legend
     assert "INT8 is 0.3312% higher" in page(rb)
 
 
@@ -719,3 +721,73 @@ def test_a_relative_rule_the_other_way_round_leaves_the_grid_cell_its_own(rb):
     flat = lambda h: re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", h)))  # noqa: E731
     grids = [flat(g) for g in re.findall(r'<table class="grid">.*?</table>', raw, re.S)]
     assert any("higher than FP32" in g for g in grids) and not any("lower than FP32" in g or "%" in g for g in grids), grids
+
+
+# ---------------------------------------------------------------- one reading, one set of digits (round 8)
+
+def raw_page(rb) -> str:
+    rb("page", "--out", "page.html")
+    return Path("page.html").read_text(encoding="utf-8")
+
+
+def test_a_means_rule_s_row_says_its_margin_in_the_rule_s_digits(rb):
+    """MP-1107-1620: "rule as a difference of means = 0.0317 ± 0.00005 nats · margin 0.00 nats". A reading on the band's
+    edge has a margin of 0 at the rule's own resolution: "0.00000", never "0.00", which hides what it was rounded from."""
+    rb("spec", "vary", "e1", "precision")
+    Path("paper.md").write_text("INT8 adds 0.0317 to the validation loss.\n", encoding="utf-8")
+    rb("criterion", "add", "INT8 adds what the paper says", "-e", "e1", "--metric", "change.val_loss", "--equals", "0.0317", "--tolerance", "0.00005",
+       "--means", "--source", "paper.md", "--quote", "adds 0.0317 to the validation loss", "--id", "cm")
+    for i, (f, x) in enumerate([(0.962, 0.993), (0.963, 0.994), (0.964, 0.995), (0.968, 1.002)], 1):
+        rb("run", "add", "e1", f"fp32.val_loss={f}", f"int8.val_loss={x}", "--set", f"seed={i}", "--produced-at", "2026-05-01")
+    text = page(rb)
+    assert "rule as a difference of means = 0.0317 ± 0.00005 nats · margin 0.00000 nats" in text, re.findall(r"rule as a difference[^·]*· margin [^ ]+ nats", text)
+
+
+def test_a_count_across_design_cells_says_its_estimate_as_rb_show_does(rb):
+    """MP-1107-1228: across design cells a count's card said "What rb measured 0.992 nats" where rb show says 0.9915: the
+    cells' mean is no cell of the grid, so the grid's 3 decimals never round it. Its legend says it alike, and so do a
+    mean rule's card and legend across the same cells (+0.0245, never +0.025)."""
+    rb("spec", "set", "e1", "batch", "--per-run", "--design-factor")
+    rb("criterion", "add", "INT8 adds at most 0.05", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.05", "--id", "c1")
+    rb("criterion", "add", "2 of 3 seeds keep INT8 below 1.0", "-e", "e1", "--metric", "int8.val_loss", "--at-most", "1.0", "--count", "2", "--of", "3", "--id", "cc")
+    batches(rb, {32: [(0.987, 0.961), (0.989, 0.962), (0.991, 0.963)], 64: [(0.992, 0.971), (0.994, 0.972), (0.996, 0.973)]})
+    raw = raw_page(rb)
+    text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw)))
+    legends = [html.unescape(m) for m in re.findall(r'<p class="figleg figv">(.*?)</p>', raw)]
+    for cid, est in (("cc", "0.9915"), ("c1", "+0.0245")):
+        assert finding(rb, cid)["says"]["comparison"].split(": ")[1].startswith(est.lstrip("+") if cid == "cc" else est)
+        assert re.search(rf"What rb measured {re.escape(est)} nats", text), (cid, re.findall(r"What rb measured [^ ]+ nats", text))
+        assert any(x.endswith(f"estimate: {est}") for x in legends), (cid, legends)
+
+
+def test_a_relative_rule_s_cells_list_says_each_cell_as_rb_show_says_its_reading(rb):
+    """MP-1107-0840 later 3: the cells' list said "batch 32 +0.56 [+0.545033, +0.579967]" beside the card's "0.5625%
+    (+0.545 to +0.58)" of a rule on that cell: one reading in three sets of digits. Each cell of a relative change is said
+    as rb show says a reading with its numbers, and a count's cell as its legend says it."""
+    rb("spec", "set", "e1", "batch", "--per-run", "--design-factor")
+    rb("criterion", "add", "at most 0.5% at batch 32", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.5", "--relative", "--where", "batch=32", "--id", "c32")
+    rb("criterion", "add", "at most 0.5% across batches", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.5", "--relative", "--id", "c2")
+    rb("criterion", "add", "4 of 6 at most 0.81", "-e", "e1", "--metric", "int8.val_loss", "--at-most", "0.81", "--count", "4", "--of", "6", "--id", "c4")
+    batches(rb, CELLS)
+    est, lo, hi = re.search(r": ([^ ]+) \[([^,\]]+), ([^\]]+)\]", finding(rb, "c32")["says"]["comparison"]).groups()
+    lists = [re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", m))) for m in re.findall(r'<ul class="cells">(.*?)</ul>', raw_page(rb), re.S)]
+    assert any(f"batch 32 {est} [{lo}, {hi}]" in x for x in lists), (est, lo, hi, lists)
+    assert any("batch 64 +0.1 [" in x for x in lists), lists
+    assert any("batch 32 0.8045 [" in x for x in lists), lists                              # the count's, as its legend
+    assert not any("0.545033" in x or "+0.56 " in x for x in lists), lists
+
+
+def test_a_grid_cell_no_rule_owns_says_its_change_as_its_legend_does(rb):
+    """MP-1107-1228 (own1228): the batch 32 cell, which a relative rule reads otherwise and a mean rule reads only as one
+    of its cells, said "0.03 nats higher than FP32" beside its legend's "batch 32: +0.027": the relative rule's edge, in
+    %, set the cell's digits. No rule's reading is that cell's, so it keeps its own digits (P5), linked to the rule (P12)."""
+    rb("spec", "set", "e1", "batch", "--per-run", "--design-factor")
+    rb("criterion", "add", "INT8 adds at most 0.05", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.05", "--id", "c1")
+    rb("criterion", "add", "INT8 adds at most 3% at batch 32", "-e", "e1", "--metric", "change.val_loss", "--at-most", "3", "--relative", "--where", "batch=32", "--id", "cr")
+    batches(rb, {32: [(0.987, 0.961), (0.989, 0.962), (0.991, 0.963)], 64: [(0.992, 0.971), (0.994, 0.972), (0.996, 0.973)]})
+    raw = raw_page(rb)
+    grid = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", re.search(r'<table class="grid">.*?</table>', raw, re.S).group(0))))
+    legend = next(html.unescape(m) for m in re.findall(r'<p class="figleg figv">(.*?)</p>', raw) if "batch 32" in m)
+    assert "batch 32: +0.027" in legend, legend
+    assert "0.027 nats higher than FP32" in grid and "0.03 nats higher" not in grid, grid
+    assert "%" not in grid, grid

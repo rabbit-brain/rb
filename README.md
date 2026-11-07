@@ -23,7 +23,7 @@ uv tool install rabbit-brain   # or rb in an environment of its own, which keeps
 rb tour        # builds a small real project in ./rb-tour and runs the whole loop, every command shown with its real output
 ```
 
-Either gives the `rb` binary for Linux, macOS and Windows, with the Python SDK and the terminal screen. Python 3.10 or later. Installed with pip, rb never touches the project's environment and says one line when a newer rb is out; installed as a tool (`uv tool install rabbit-brain`, or `pipx install rabbit-brain`), it checks for a newer release at most once a day and updates itself in the background. `rb config auto-update off` turns both off. To try it without installing anything, `uvx --from rabbit-brain rb tour`. After `uvx`, `rb` is not on your path: run the tour's next commands as `uvx --from rabbit-brain rb ui`, or keep `rb` with `uv tool install rabbit-brain`. Each release's wheels are also attached to its [GitHub release](https://github.com/rabbit-brain/rb/releases), with their checksums. The record's format is YAML with the surprises taken out, specified as one JSON Schema: [schema/rb-v2.schema.json](https://github.com/rabbit-brain/rb/blob/main/schema/rb-v2.schema.json). [CHANGELOG.md](https://github.com/rabbit-brain/rb/blob/main/CHANGELOG.md) says what each version changed.
+Either gives the `rb` binary for Linux, macOS and Windows, with the Python SDK and the terminal screen. Python 3.10 or later. Installed with pip, rb never touches the project's environment and says one line when a newer rb is out; installed as a tool (`uv tool install rabbit-brain`, or `pipx install rabbit-brain`), it checks for a newer release at most once a day and updates itself in the background. `rb config auto-update off` turns both off. To try it without installing anything, `uvx --from rabbit-brain rb tour`. After `uvx`, `rb` is not on your path: run the tour's next commands as `uvx --from rabbit-brain rb ui`, or keep `rb` with `uv tool install rabbit-brain`. Each release's wheels are also attached to its [GitHub release][releases], with their checksums. The record's format is YAML with the surprises taken out, specified as one JSON Schema: [schema/rb-v2.schema.json][schema]. [CHANGELOG.md][changelog] says what each version changed.
 
 ## Quick start
 
@@ -116,7 +116,7 @@ Agents already leave research in a repository: a results folder with a report, a
 
 ### For coding agents
 
-`rb init` installs `rb`'s instructions for the agents it detects in the repository: a skill and `rb`'s MCP server for Claude Code, a marked section in AGENTS.md for Codex, a rule for Cursor. It asks once before it changes an `AGENTS.md` or `.mcp.json` that was there, and No is the default (`--yes` answers up front); off a terminal it leaves them as they are and says what to add. `rb skill add` installs the skill for one agent later: Claude Code by default (in your home directory, or `--project` for this repository), `--cursor`, or `--agents-md` for Codex. `rb docs` prints [AGENTS.md](https://github.com/rabbit-brain/rb/blob/main/AGENTS.md) in full: the rules, every command, the JSON envelope every command gives with `--json`, the exit codes, and every error code with its fix.
+`rb init` installs `rb`'s instructions for the agents it detects in the repository: a skill and `rb`'s MCP server for Claude Code, a marked section in AGENTS.md for Codex, a rule for Cursor. It asks once before it changes an `AGENTS.md` or `.mcp.json` that was there, and No is the default (`--yes` answers up front); off a terminal it leaves them as they are and says what to add. `rb skill add` installs the skill for one agent later: Claude Code by default (in your home directory, or `--project` for this repository), `--cursor`, or `--agents-md` for Codex. `rb docs` prints [AGENTS.md][agents] in full: the rules, every command, the JSON envelope every command gives with `--json`, the exit codes, and every error code with its fix.
 
 ### From Python
 
@@ -139,7 +139,7 @@ The block records one run when it ends without an error. `rb mcp` serves the sam
 
 ## Usage analytics
 
-`rb` collects nothing until someone runs `rb telemetry enable`. Enabled, it sends usage events with a random installation identifier and fixed categories (the operation, whether it succeeded, the platform), never research content, paths, command arguments or names. `rb telemetry preview` shows what would be sent, `rb telemetry disable` stops it and deletes the local state, and `DO_NOT_TRACK=1` or `RB_TELEMETRY=0` keeps it off. [PRIVACY.md](https://github.com/rabbit-brain/rb/blob/main/PRIVACY.md) lists every field.
+`rb` collects nothing until someone runs `rb telemetry enable`. Enabled, it sends usage events with a random installation identifier and fixed categories (the operation, whether it succeeded, the platform), never research content, paths, command arguments or names. `rb telemetry preview` shows what would be sent, `rb telemetry disable` stops it and deletes the local state, and `DO_NOT_TRACK=1` or `RB_TELEMETRY=0` keeps it off. [PRIVACY.md][privacy] lists every field.
 
 ## Roadmap
 
@@ -147,8 +147,16 @@ Planned: `rb paper`, a paper's criteria and settings as a pre-filled experiment.
 
 ## Building from source
 
-The `rb` binary is Rust, in `rust/`; maturin builds it into the wheel beside the Python SDK and the terminal screen in `src/rabbit_brain`. With a stable Rust toolchain, `pip install -e ".[dev]"` builds both, and `pytest` runs the suite against that `rb`. [rust/ARCHITECTURE.md](https://github.com/rabbit-brain/rb/blob/main/rust/ARCHITECTURE.md) is the guide to the code.
+The `rb` binary is Rust, in `rust/`; maturin builds it into the wheel beside the Python SDK and the terminal screen in `src/rabbit_brain`. With a stable Rust toolchain, `pip install -e ".[dev]"` builds both, and `pytest` runs the suite against that `rb`. [rust/ARCHITECTURE.md][architecture] is the guide to the code.
 
 ## License
 
-Apache-2.0. See [LICENSE](https://github.com/rabbit-brain/rb/blob/main/LICENSE).
+Apache-2.0. See [LICENSE][license].
+
+[releases]: https://github.com/rabbit-brain/rb/releases
+[schema]: https://github.com/rabbit-brain/rb/blob/main/schema/rb-v2.schema.json
+[changelog]: https://github.com/rabbit-brain/rb/blob/main/CHANGELOG.md
+[agents]: https://github.com/rabbit-brain/rb/blob/main/AGENTS.md
+[privacy]: https://github.com/rabbit-brain/rb/blob/main/PRIVACY.md
+[architecture]: https://github.com/rabbit-brain/rb/blob/main/rust/ARCHITECTURE.md
+[license]: https://github.com/rabbit-brain/rb/blob/main/LICENSE

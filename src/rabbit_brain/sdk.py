@@ -234,11 +234,11 @@ class State:
 
     # -- reading
     def experiment(self, id: str) -> "Experiment":
-        self._call("load", kind="experiment", id=id)
+        self._call("load", kind="experiment", id=id, check=True)
         return Experiment(self, id)
 
     def criterion(self, id: str) -> "Criterion":
-        self._call("load", kind="criterion", id=id)
+        self._call("load", kind="criterion", id=id, check=True)
         return Criterion(self, id)
 
     def get(self, id: str, kind: Optional[str] = None) -> Any:

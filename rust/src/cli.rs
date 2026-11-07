@@ -291,6 +291,16 @@ pub fn ns_opt_list(ns: &Namespace, k: &str) -> Option<Vec<String>> {
     }
 }
 
+/// An address as rb's text says it in a sentence: a web address in angle brackets, so no punctuation after it reads
+/// as part of it (RFC 3986, appendix C), and anything else (a path) as it is.
+pub fn address_said(s: &str) -> String {
+    if s.contains("://") && !s.starts_with('<') {
+        format!("<{s}>")
+    } else {
+        s.to_string()
+    }
+}
+
 // ---------------------------------------------------------------- shlex
 
 /// shlex.quote(s)
@@ -449,6 +459,42 @@ pub type Handler = fn(&Namespace, &mut Out) -> Res<i32>;
 /// A command's implementation, by the name the declared command line gives it.
 pub fn handler(func: &str) -> Option<Handler> {
     crate::commands::handler(func)
+}
+
+/// The writes that leave out a note whose file does not read, and name it: every write that previews (--dry-run), and
+/// rb reconcile --apply. Every read (rb status, rb show, the gates) stops at such a file, as before.
+const NOTES_BESIDE: &[&str] = &[
+    "project title", "question add", "question move", "question reword", "experiment add", "experiment file", "experiment relate",
+    "experiment gate", "note add", "variant add", "metric add", "spec set", "spec verify", "spec vary", "criterion add",
+    "criterion file", "criterion relate", "analysis add", "run add", "resource add", "resource locate", "resource expose",
+    "retract", "freeze", "decide", "confirm",
+];
+
+fn notes_beside_command(command: &str, ns: &Namespace) -> bool {
+    NOTES_BESIDE.contains(&command) || (command == "reconcile" && ns_bool(ns, "apply"))
+}
+
+/// A write made whole beside a note whose file does not read: each such file, after what the write said, with doctor's
+/// fix, in data.unread_files beside any file the write itself named.
+pub fn say_notes_left(out: &mut Out, left: &[(String, String)]) {
+    const FIX: &str = "rb doctor lists every such file; rb doctor --restore puts back what rb last wrote.";
+    let mut files = match out.data.shift_remove("unread_files") {
+        Some(Value::List(l)) => l,
+        _ => Vec::new(),
+    };
+    for (path, why) in left {
+        if files.iter().any(|f| f.get_str("path") == Some(path.as_str())) {
+            continue;
+        }
+        out.notes.push(format!("{why}. A note changes no finding: the write is made whole, and this reply leaves that note out. {FIX}"));
+        files.push(crate::obj! {"path" => path.clone(), "why" => why.clone(), "fix" => FIX});
+    }
+    if !files.is_empty() {
+        out.data.insert("unread_files".into(), Value::List(files));
+        if !out.next.iter().any(|n| n == "rb doctor") {
+            out.next.insert(0, "rb doctor".into());
+        }
+    }
 }
 
 /// The commands that carry rb_delta in an agent session.
@@ -666,6 +712,9 @@ fn run(argv: Vec<String>) -> i32 {
     }
     // a command line run inside another (rb reconcile --apply recording a run) keeps its notes, and leaves the other's
     let enclosing = crate::plain::set_aside();
+    // a write leaves out a note whose file does not read and names it (a note changes no finding); a read stops at it
+    let beside = notes_beside_command(&command, &ns);
+    let (was_beside, left_before) = if beside { (crate::ledger::notes_beside(true), crate::ledger::notes_left()) } else { (false, Vec::new()) };
     let result = match handler(&func) {
         Some(h) => guarded(|| {
             // RB_TEST_FAULT=<text> makes a command stop on a fault of rb's own, as RB_TEST_NOW fixes the clock: the
@@ -682,6 +731,15 @@ fn run(argv: Vec<String>) -> i32 {
             .with_exit(EXIT_ENVIRONMENT)),
     };
     crate::ledger::set_words(None);
+    if beside {
+        crate::ledger::notes_beside(was_beside);
+        let left = crate::ledger::notes_left();
+        if result.is_ok() {
+            say_notes_left(&mut out, &left);
+        }
+        // the enclosing write's own (rb reconcile --apply) are said in its reply
+        crate::ledger::notes_left_again(left_before.into_iter().chain(left));
+    }
     if dry {
         if let Some(preview) = crate::dry::end() {
             // a record rb init would start is not on disk: its paths are said from where it would be

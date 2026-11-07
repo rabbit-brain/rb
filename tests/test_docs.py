@@ -489,3 +489,54 @@ def test_the_changelog_says_where_rb_looks_what_nothing_cites_and_names_a_place_
     assert "**Where rb looks, said where it reads.**" in log and "**Changes nothing in the record cites.**" in log
     assert "names work elsewhere by its commit" not in log and "`rb status` names each place elsewhere by its branch and path, as rb names" in log
     assert "the owner's" not in log
+
+
+def test_no_punctuation_touches_an_address_in_the_manual_or_the_readme():
+    """Nov 7: a terminal's link took the full stop after the schema's address, and sent readers to a page that is not
+    there. Every web address in AGENTS.md and README.md stands with nothing touching it: in angle brackets in a
+    sentence, alone at the end of a link definition, or between spaces in a command. A placeholder (`https://...`)
+    is no address."""
+    for name in ("AGENTS.md", "README.md"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        for n, line in enumerate(text.splitlines(), 1):
+            for m in re.finditer(r"https?://", line):
+                end = m.start()
+                while end < len(line) and not line[end].isspace() and line[end] not in "<>":
+                    end += 1
+                url, before, after = line[m.start():end], line[m.start() - 1:m.start()], line[end:end + 1]
+                if url.startswith("https://...") or url.startswith("http://..."):
+                    continue
+                bracketed = before == "<" and after == ">"
+                spaced = before in ("", " ") and after in ("", " ") and url[-1] not in ".,;:)]!?'\"`"
+                assert bracketed or spaced, f"{name}:{n}: punctuation touches {url!r} (before it {before!r}, after it {after!r})"
+
+
+def test_the_privacy_note_covers_rb_and_points_to_the_website_s():
+    """Nov 7 (10:44Z): the website counts page views, so PRIVACY.md's "Analytics is off by default" is said of rb (the CLI,
+    the SDK, MCP and its viewers), with the website's own note named apart; llms.txt keeps its line true the same way."""
+    note = " ".join((ROOT / "PRIVACY.md").read_text(encoding="utf-8").split())
+    llms = " ".join((ROOT / "llms.txt").read_text(encoding="utf-8").split())
+    assert "This note covers `rb` itself: the CLI, the Python SDK, its MCP server and its viewers" in note
+    assert "In `rb`, analytics is off by default" in note and "<https://rabbitbrain.ai/privacy>" in note
+    assert "`rb`'s usage analytics is off unless" in llms and "<https://rabbitbrain.ai/privacy>" in llms
+
+
+def test_the_manual_says_which_writes_beside_an_unreadable_file_succeed_and_which_are_refused():
+    """MP-1107-2006 should 1: the sentence read as if every rb run add succeeds beside a file that does not read. It
+    names the row path's --select, and the writes still refused (tests/test_format_two.py holds each)."""
+    said = DOC[DOC.index("and any other write is made whole and succeeds"):DOC.index("`rb doctor` still runs.")]
+    assert "`rb run add` of numbers typed or read from a file" in said and "the SDK's `record()` and `analysis()`" in said
+    assert "where `--select` names them" in said and "every column of the row that holds a number is one" in said
+    assert "refuses a batch of several whole" in said
+    assert "`rb reconcile --apply`, which reads them to place what it found" in said and "beside an analysis's, `rb analysis add` on its experiment" in said
+    assert "a question's or a resource's among them" in said
+    # MP-1108-0010 shoulds 1 and 2: criterion add and freeze beside an analysis's file succeed; a note's file refuses
+    # only a write to that note; experiment.yaml refuses every write to its experiment; a metric's file refuses
+    # numbers that name no variant as a criterion's does
+    assert "`rb criterion add` and `rb freeze` beside an analysis's file" in said and "already recorded (nothing written)" in said
+    assert "beside an experiment's note or a project note that does not read, every write leaves that note out" in said
+    assert "only a write to that note itself (`rb retract <note>`) is refused" in said
+    assert "beside an experiment's `experiment.yaml`, which declares its variants, every write to that experiment" in said
+    assert "beside a criterion's or a metric's file, `rb reconcile --apply`" in said and "a run of numbers that name no variant" in said
+    assert "a note's or an experiment's file, which it reads" not in said
+    assert "`rb question add --parent` of it succeeds" in said and "a write that links that question" not in said

@@ -1757,8 +1757,9 @@ impl Ledger {
 
     /// Record a run on an experiment.
     pub fn add_run(&self, experiment_id: &str, a: NewRun) -> Res<Added<Run>> {
-        // @<column> is a value of the row read from a database; with no row, it is a placeholder, never a value
-        if a.row.is_none() {
+        // @<column> is a value of the row read from a database or a table; with no row, it is a placeholder, never a
+        // value (a table's cell that reads @oops is that row's value)
+        if a.row.is_none() && a.table_row.is_none() {
             let read = "a row is read with --from <database> --table <table> --where <column>=<value>";
             if let Some((k, v)) = a.per_run.iter().find_map(|(k, v)| v.as_str().filter(|t| t.len() > 1 && t.starts_with('@')).map(|t| (k, t))) {
                 return Err(RBError::msg_fix(

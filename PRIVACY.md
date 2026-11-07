@@ -1,6 +1,8 @@
 # Optional usage analytics
 
-Rabbit Brain works with analytics disabled. Analytics is off by default: it creates no analytics identity, stores no analytics events, and makes no analytics requests until you explicitly enable it. Analytics is separate from `.rb/`, the research journal, and `rb sync`.
+This note covers `rb` itself: the CLI, the Python SDK, its MCP server and its viewers (`rb ui`, `rb open` and the pages `rb page` and `rb export` write). Rabbit Brain works with analytics disabled. In `rb`, analytics is off by default: it creates no analytics identity, stores no analytics events, and makes no analytics requests until you explicitly enable it. Analytics is separate from `.rb/`, the research journal, and `rb sync`.
+
+The website, rabbitbrain.ai, has a privacy note of its own: <https://rabbitbrain.ai/privacy>.
 
 The purpose is to understand whether people reach a useful research record and return to use it, and to find which product operations fail. A command count is activity, not evidence that a researcher benefited.
 

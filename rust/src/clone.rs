@@ -1021,7 +1021,7 @@ pub fn clone(source: &str, dest: Option<&Path>, code: Option<&str>) -> Res<Dict>
             // the bundle's own address, which its export saw does not hold the code's commit: the bundle's words
             let not_there = code.is_none() && named.and_then(|r| r.get("at_origin")).map_or(false, |v| matches!(v, Value::Bool(false)));
             if let (true, Some(c)) = (not_there, wanted.as_deref()) {
-                why = format!("the bundle says its code's commit {} is not at {}", c.chars().take(12).collect::<String>(), said_address(a));
+                why = format!("the bundle says its code's commit {} is not at {}", c.chars().take(12).collect::<String>(), crate::cli::address_said(&said_address(a)));
             }
             crate::obj! {
                 "url" => said_address(a), "commit" => wanted.clone().map(Value::Str).unwrap_or(Value::Null), "got" => false, "branch" => Value::Null, "why" => why,

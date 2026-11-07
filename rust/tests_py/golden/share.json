@@ -210,7 +210,7 @@
     " \"data\": {",
     "  \"path\": \"@BASE@/work/rb-export\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 138403,",
+    "  \"bytes\": 138404,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
@@ -418,7 +418,7 @@
     " \"data\": {",
     "  \"path\": \"@BASE@/work/pub.zip\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 143236,",
+    "  \"bytes\": 143237,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
@@ -922,17 +922,17 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 123700,",
+   " \"bytes\": 123701,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"ec2e8b076c75247069bd3a3aad7668e69c15863b4cf3f91f0ee73c77b8a0a6c8\"",
+   "  \"page.html\": \"8b9e68a5fa7e74fcc821341d92a59f922e655d38b0b2a507d9b16cfb7803004f\"",
    " }",
    "}",
    ""
   ],
   "bundles/b1/page.html": {
-   "sha256": "ec2e8b076c75247069bd3a3aad7668e69c15863b4cf3f91f0ee73c77b8a0a6c8",
-   "bytes": 123109
+   "sha256": "8b9e68a5fa7e74fcc821341d92a59f922e655d38b0b2a507d9b16cfb7803004f",
+   "bytes": 123110
   },
   "configs/train.json": [
    "{\"optim\": {\"lr\": 0.0003, \"betas\": [0.9, 0.999]}, \"model\": {\"depth\": 18, \"width\": 64}, \"name\": \"base\"}",
@@ -981,21 +981,21 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 123700,",
+   " \"bytes\": 123701,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"ec2e8b076c75247069bd3a3aad7668e69c15863b4cf3f91f0ee73c77b8a0a6c8\"",
+   "  \"page.html\": \"8b9e68a5fa7e74fcc821341d92a59f922e655d38b0b2a507d9b16cfb7803004f\"",
    " }",
    "}",
    ""
   ],
   "plain/page.html": {
-   "sha256": "ec2e8b076c75247069bd3a3aad7668e69c15863b4cf3f91f0ee73c77b8a0a6c8",
-   "bytes": 123109
+   "sha256": "8b9e68a5fa7e74fcc821341d92a59f922e655d38b0b2a507d9b16cfb7803004f",
+   "bytes": 123110
   },
   "pub.zip": {
-   "sha256": "31cf743b89b9b977e5b8282bcae70ec26ebaed1f2589d709e47047906bf3ca7d",
-   "bytes": 146819
+   "sha256": "408db6c4abf5aba9d6f5be1840bfe5b11afeee443da73beee414729bd0cb223c",
+   "bytes": 146820
   },
   "published/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1060,8 +1060,8 @@
    ""
   ],
   "published/bundle.zip": {
-   "sha256": "68dcbaf334c9564261845c3ad91f74bc65f85d53aa834dfef96390dd5f3ce32c",
-   "bytes": 146914
+   "sha256": "5dc3cde116c3fa06f405fbff38581a80d4758824508e8097d55e3c0933e217d4",
+   "bytes": 146915
   },
   "published/manifest.json": [
    "{",
@@ -1076,10 +1076,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 143280,",
+   " \"bytes\": 143281,",
    " \"files\": {",
    "  \"README.md\": \"fb3d38898e893f4588356c9f5015eca9d468bcd5f12881be5ac63effc32759cf\",",
-   "  \"page.html\": \"30a5379dbbd204d71b6c6f84951fba9e51f895e057103706b55465d5c4b00d2c\",",
+   "  \"page.html\": \"d148a101e6beaa56ccb08b9e9a35111336e814244652bc2fed12186a63bdc7b2\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
@@ -1122,8 +1122,8 @@
    ""
   ],
   "published/page.html": {
-   "sha256": "30a5379dbbd204d71b6c6f84951fba9e51f895e057103706b55465d5c4b00d2c",
-   "bytes": 127878
+   "sha256": "d148a101e6beaa56ccb08b9e9a35111336e814244652bc2fed12186a63bdc7b2",
+   "bytes": 127879
   },
   "published/record/.rb/.gitattributes": [
    "* -text",
@@ -1479,8 +1479,8 @@
    ""
   ],
   "rb-export.zip": {
-   "sha256": "16be6e8ec9156713104d00c33f5958e39df53db30b89f7e8024f8cd240af085e",
-   "bytes": 124208
+   "sha256": "60b72eba19e9bce99fa00b8f8bb816707f5010e6874a0f2157b2b617da741efc",
+   "bytes": 124209
   },
   "rb-export/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1553,10 +1553,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 138403,",
+   " \"bytes\": 138404,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"19f75e47d843906e5a1b813ec111e51d17ad50227c3496faa052a0002a349c00\",",
+   "  \"page.html\": \"1a6a31e5010c1ea96d9e753ea90dfadf35d845570ac5a2af6fe72a0068fada40\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
@@ -1591,8 +1591,8 @@
    ""
   ],
   "rb-export/page.html": {
-   "sha256": "19f75e47d843906e5a1b813ec111e51d17ad50227c3496faa052a0002a349c00",
-   "bytes": 123100
+   "sha256": "1a6a31e5010c1ea96d9e753ea90dfadf35d845570ac5a2af6fe72a0068fada40",
+   "bytes": 123101
   },
   "rb-export/record/.rb/.gitattributes": [
    "* -text",

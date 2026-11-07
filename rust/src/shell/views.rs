@@ -1894,7 +1894,14 @@ impl<'a> Page<'a> {
         // (FIX5, model's said_places): 2 decimals at least, apart from each other and from the rule's number, more only
         // where these would put a number on or across an edge ("0.16 points lower", never rb compare's 0.1567 beside
         // ≥ -1); else the screen's own
-        let band = rule.as_deref().and_then(|c| self.finding(c)).and_then(|f| at(f, "check_band").map(|b| (f, b)));
+        // only a rule whose reading is this cell's change gives it edges: one that reads it otherwise (`read_by`, a
+        // relative change in %) or reads the mean of the design cells has none on it, and the cell keeps its own digits,
+        // as the figure's legend says it (P12, P5): "0.027 nats higher", never "0.03" beside "batch 32: +0.027"
+        let otherwise: Vec<&str> = list(cell, "read_by").iter().map(|r| text(r, "criterion")).collect();
+        let owner = Some(text(cell, "criterion")).filter(|c| !c.is_empty()).map(str::to_string).or_else(|| {
+            texts(cell, "criteria").into_iter().find(|c| !otherwise.contains(&c.as_str()) && self.finding(c).is_some_and(|f| list(f, "design_cells").is_empty()))
+        });
+        let band = owner.as_deref().and_then(|c| self.finding(c)).and_then(|f| at(f, "check_band").map(|b| (f, b)));
         let (edges, target): (Vec<f64>, Option<f64>) = match band.map(|(f, b)| (text(f, "rule"), num(Some(b), "target"), num(Some(b), "tolerance"), text(b, "comparator"))) {
             Some((rule, Some(t), tol, how)) => {
                 // a margin either side of 0, and no number of its own, for a rule that asks for no threshold

@@ -43,6 +43,18 @@ fn say(warning: Option<&String>) {
     }
 }
 
+/// A write made whole beside record files that do not read: each, with every file the index could not read, said as an
+/// RBWarning with doctor's fix, as the command line says it in data.warnings.
+fn say_unread(led: &Ledger, what: &str, not_read: &mut Vec<(String, String)>) -> Res<()> {
+    led.unread_beside(not_read)?;
+    let mut said = crate::cli::Out::new("", true);
+    crate::cmds::record::say_not_read(&mut said, what, not_read);
+    for w in &said.notes {
+        say(Some(w));
+    }
+    Ok(())
+}
+
 /// What a JSON value is, in the words a refusal uses.
 fn word(v: Option<&Value>) -> &'static str {
     match v {
@@ -207,7 +219,12 @@ fn opened(led: &Ledger) -> Value {
 
 fn op_open(a: &Args, via: &str, agent: Option<&str>) -> Res<Value> {
     let path = a.opt_text("path")?;
-    let led = Ledger::open_with(path.as_deref().map(Path::new), Some(via), agent)?;
+    // opening reads the project to find the record, never its notes' words: a note whose file does not read is no
+    // reason to refuse it (a write names that file; every read still stops at it)
+    let was = ledger::notes_beside(true);
+    let led = Ledger::open_with(path.as_deref().map(Path::new), Some(via), agent);
+    ledger::notes_beside(was);
+    let led = led?;
     // a path that names no worktree of its own picks the record; the code is the caller's, where it works in one
     let led = if path.is_some() && led.here == led.root { led.at(None) } else { led };
     Ok(opened(&led))
@@ -368,6 +385,14 @@ fn op_availability(led: &Ledger, a: &Args) -> Res<Value> {
 
 fn op_load(led: &Ledger, a: &Args) -> Res<Value> {
     let (kind, id) = (a.need_text("kind")?, a.need_text("id")?);
+    // state.experiment(id) and state.criterion(id) only ask that the record reads ("check"): a note whose file does not
+    // read is no reason to refuse that, as no write is refused for it. Every other load reads the note or stops at it.
+    if a.flag("check")? {
+        let was = ledger::notes_beside(true);
+        let got = led.load_kind(&kind, &id).map(|_| Value::Null);
+        ledger::notes_beside(was);
+        return got;
+    }
     Ok(led.load_kind(&kind, &id)?.to_value())
 }
 
@@ -531,8 +556,12 @@ fn op_add_criterion(led: &Ledger, a: &Args) -> Res<Value> {
         why: a.text("why")?,
     };
     let crit = led.add_criterion(&new)?;
-    // as rb criterion add says it: a metric close to a name the runs report is most likely misspelt
-    say(led.metric_near(&crit)?.as_ref());
+    // as rb criterion add says it: a metric close to a name the runs report is most likely misspelt; the criterion is
+    // written whole, and a record file beside it that does not read is said as an RBWarning
+    let mut not_read: Vec<(String, String)> = Vec::new();
+    say(led.after_write(led.metric_near(&crit), &mut not_read)?.flatten().as_ref());
+    led.after_write(led.finding(&crit), &mut not_read)?;
+    say_unread(led, "criterion", &mut not_read)?;
     Ok(Value::Str(crit.id))
 }
 
@@ -585,6 +614,26 @@ fn op_add_analysis(led: &Ledger, a: &Args) -> Res<Value> {
     let got = led.add_analysis(&a.need_text("experiment")?, new)?;
     NEW_EVIDENCE.with(|flag| flag.set(got.duplicate_of.is_none()));
     say(got.warning.as_ref());
+    if got.duplicate_of.is_none() {
+        // the analysis is written whole: a record file beside it that does not read leaves out what reads it, as rb
+        // analysis add says it (its experiment's findings), and analysis() returns the analysis with that line as an
+        // RBWarning
+        let mut not_read: Vec<(String, String)> = Vec::new();
+        for c in led.live_readable::<Criterion>(&mut not_read)? {
+            if c.experiment == got.record.experiment {
+                led.after_write(led.finding(&c), &mut not_read)?;
+            }
+        }
+        say_unread(led, "analysis", &mut not_read)?;
+    } else {
+        let mut not_read: Vec<(String, String)> = Vec::new();
+        led.unread_beside(&mut not_read)?;
+        let mut said = crate::cli::Out::new("", true);
+        crate::cmds::record::say_not_read_as(&mut said, crate::cmds::record::ALREADY_UNREAD, &not_read);
+        for w in &said.notes {
+            say(Some(w));
+        }
+    }
     Ok(Value::Dict(got.record.dump(false)))
 }
 
@@ -644,16 +693,40 @@ fn op_add_run(led: &Ledger, a: &Args) -> Res<Value> {
     };
     let shape = if new.basis == "file" { crate::cmds::record::Shape::File } else { crate::cmds::record::Shape::Sdk };
     let got = led.add_run(&a.need_text("experiment")?, new)?;
+    let mut unread: Option<Value> = None;
     NEW_EVIDENCE.with(|flag| flag.set(got.duplicate_of.is_none()));
     say(got.warning.as_ref());
     if got.duplicate_of.is_none() {
-        for w in crate::cmds::record::postdates_run(led, &got.record.experiment, &got.record.id)? {
+        // the run is written whole: a record file beside it that does not read leaves out what reads it, as rb run add
+        // says it, and record() returns the run
+        let mut not_read: Vec<(String, String)> = Vec::new();
+        for w in led.after_write(crate::cmds::record::postdates_run(led, &got.record.experiment, &got.record.id), &mut not_read)?.unwrap_or_default() {
             say(Some(&w));
         }
         // as rb run add says it: a run none of whose numbers a criterion reads counts toward nothing
-        say(crate::cmds::record::nothing_counts(led, &got.record, shape)?.as_ref());
+        say(led.after_write(crate::cmds::record::nothing_counts(led, &got.record, shape), &mut not_read)?.flatten().as_ref());
+        led.unread_beside(&mut not_read)?;
+        let mut said = crate::cli::Out::new("run add", true);
+        crate::cmds::record::say_not_read(&mut said, "run", &not_read);
+        for w in &said.notes {
+            say(Some(w));
+        }
+        unread = said.data.shift_remove("unread_files");
+    } else {
+        // already recorded, nothing written: a record file beside it that does not read is said all the same
+        let mut not_read: Vec<(String, String)> = Vec::new();
+        led.unread_beside(&mut not_read)?;
+        let mut said = crate::cli::Out::new("", true);
+        crate::cmds::record::say_not_read_as(&mut said, crate::cmds::record::ALREADY_UNREAD, &not_read);
+        for w in &said.notes {
+            say(Some(w));
+        }
     }
-    Ok(crate::obj! {"run" => Value::Dict(got.record.dump(false)), "duplicate" => got.duplicate_of.is_some()})
+    let mut done = crate::obj! {"run" => Value::Dict(got.record.dump(false)), "duplicate" => got.duplicate_of.is_some()};
+    if let (Some(u), Value::Dict(d)) = (unread, &mut done) {
+        d.insert("unread_files".into(), u);
+    }
+    Ok(done)
 }
 
 fn op_compare(led: &Ledger, a: &Args) -> Res<Value> {
@@ -961,6 +1034,12 @@ pub fn call(req: &Value) -> Value {
     if dry {
         crate::dry::begin();
     }
+    // a write leaves out a note whose file does not read and names it, as the command line does
+    let beside = RECORD_WRITES.contains(&op.as_str());
+    if beside {
+        ledger::notes_beside(true);
+        ledger::notes_left();
+    }
     let mut root_of: Option<std::path::PathBuf> = None;
     let result: Res<Value> = crate::cli::guarded(|| -> Res<Value> {
         // RB_TEST_FAULT=<text> stops a request on a fault of rb's own, as it stops a command: the tests hold how one is said
@@ -1044,6 +1123,14 @@ pub fn call(req: &Value) -> Value {
     ledger::set_session(None, None);
     crate::owned::during(None);
     let mut said = SAID.with(|s| std::mem::take(&mut *s.borrow_mut()));
+    if beside {
+        ledger::notes_beside(false);
+        // a file the write's own lines already named is said once
+        let left: Vec<(String, String)> = ledger::notes_left().into_iter().filter(|(p, _)| !said.iter().any(|s| s.starts_with(p.as_str()))).collect();
+        let mut out = crate::cli::Out::new("", true);
+        crate::cli::say_notes_left(&mut out, &left);
+        said.extend(out.notes);
+    }
     said.extend(crate::plain::take_note());
     // a fault in rb carries the report link, as on the command line; a request names no command of rb's tree
     let mut answer = result.unwrap_or_else(|err| error(&crate::ledger::report_link::reported(err, "")));

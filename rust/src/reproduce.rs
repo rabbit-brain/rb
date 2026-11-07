@@ -1404,7 +1404,7 @@ fn code_here(led: &Ledger, code: Option<(&str, &str)>, failed: bool, differs: &d
         return ("unknown", "the runs need the code; this bundle doesn't say where it is".into(), again("<address of the code>"), holds_files(led));
     };
     let short: String = commit.chars().take(12).collect();
-    let at = if commit.is_empty() { url.to_string() } else { format!("{url} at {short}") };
+    let at = if commit.is_empty() { crate::cli::address_said(url) } else { format!("{url} at {short}") };
     if failed {
         return ("elsewhere", format!("{at}, which rb clone could not get from that address"), again("<address of the code>"), false);
     }
@@ -1645,7 +1645,7 @@ fn command_said(c: &Value) -> String {
 /// commands, the first of them the command to run first.
 pub fn rerun_lines(v: &Value) -> Vec<String> {
     let p = v.get("parent").cloned().unwrap_or(Value::empty_dict());
-    let mut l = vec![format!("- parent: {} (cloned {} from {})", one_line(p.get_str("title").unwrap_or("")), p.get_str("cloned_at").unwrap_or("").chars().take(10).collect::<String>(), one_line(p.get_str("url").unwrap_or("")))];
+    let mut l = vec![format!("- parent: {} (cloned {} from {})", one_line(p.get_str("title").unwrap_or("")), p.get_str("cloned_at").unwrap_or("").chars().take(10).collect::<String>(), crate::cli::address_said(&one_line(p.get_str("url").unwrap_or(""))))];
     let code = v.get("code").cloned().unwrap_or(Value::empty_dict());
     let get = code.get_str("get").unwrap_or("");
     l.push(format!("- code: {}{}", one_line(code.get_str("text").unwrap_or("")), if get.is_empty() { String::new() } else { format!(": `{}`", one_line(get)) }));
@@ -3065,7 +3065,7 @@ mod tests {
         assert_eq!(text(e1, "first"), "rb journal run -- python eval.py --seed 1");
         assert_eq!(rerun_next(&v), vec!["rb journal run -- python eval.py --seed 1".to_string()]);
         let lines = rerun_lines(&v);
-        assert_eq!(lines[0], format!("- parent: INT8 ResNet-50 on ImageNet (cloned {} from https://example.org/ana/int8/bundle.zip)", &crate::pytime::now()[..10]));
+        assert_eq!(lines[0], format!("- parent: INT8 ResNet-50 on ImageNet (cloned {} from <https://example.org/ana/int8/bundle.zip>)", &crate::pytime::now()[..10]));
         assert_eq!(lines[1], format!("- code: {url} at {short}, here: this checkout's code is commit {short}'s, the record aside"));
         assert_eq!(
             lines.last().unwrap(),
@@ -3177,7 +3177,7 @@ mod tests {
         // an address rb clone could not get is not offered again
         let failed = fork_with(&scratch("failed"), Some(crate::obj! {"url" => url, "commit" => Value::Null, "got" => false, "failed" => true}), plan.clone());
         let v = rerun(&failed).unwrap().unwrap();
-        assert_eq!(text(&v, "code.text"), format!("{url}, which rb clone could not get from that address"));
+        assert_eq!(text(&v, "code.text"), format!("<{url}>, which rb clone could not get from that address"));
         assert_eq!(text(&v, "code.get"), "rb clone https://example.org/ana/int8/bundle.zip <new folder> --code <address of the code>");
         assert_eq!(rerun_next(&v), vec![text(&v, "code.get")]);
         // not got for want of a git identity: the address stands

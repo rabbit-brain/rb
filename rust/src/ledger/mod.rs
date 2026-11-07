@@ -1185,6 +1185,37 @@ struct Worked {
 
 thread_local! {
     static WORKED: RefCell<Option<Worked>> = const { RefCell::new(None) };
+    /// While a write runs: a note whose file does not read is left out of its experiment or the project (with_parts),
+    /// and gathered in NOTES_LEFT for the write's reply to name. Every read outside a write stops at it, as before.
+    static NOTES_BESIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static NOTES_LEFT: RefCell<Vec<(String, String)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// A write starts (true), or a write ends and puts back what it was before (`notes_beside` answers it): while one runs,
+/// a note whose file does not read is left out and named, never a reason to refuse the write. A write run inside
+/// another (rb reconcile --apply recording a run) leaves the other's on.
+pub fn notes_beside(on: bool) -> bool {
+    NOTES_BESIDE.with(|b| b.replace(on))
+}
+
+/// Put back what an enclosing write left out (a write run inside it took the list to say its own), each once.
+pub fn notes_left_again(left: impl IntoIterator<Item = (String, String)>) {
+    if !NOTES_BESIDE.with(|b| b.get()) {
+        return;
+    }
+    NOTES_LEFT.with(|l| {
+        let mut l = l.borrow_mut();
+        for (p, w) in left {
+            if !l.iter().any(|(q, _)| *q == p) {
+                l.push((p, w));
+            }
+        }
+    });
+}
+
+/// The notes a write left out because their files do not read, as (path, why): taken, so each is said once.
+pub fn notes_left() -> Vec<(String, String)> {
+    NOTES_LEFT.with(|l| std::mem::take(&mut *l.borrow_mut()))
 }
 
 /// Forget every file read and what was worked out from it, by the files' stamps: after a preview, which read files of
@@ -1209,7 +1240,8 @@ impl Drop for Ledger {
     /// A ledger that read the record and holds the whole log as it stands hands what it worked out to the next ledger
     /// the same command opens for rb_delta.
     fn drop(&mut self) {
-        if self.depth.get() != 0 || self.index.borrow().is_none() || crate::dry::active() {
+        // a write's ledger may hold records read without a note whose file does not read: no later read takes them
+        if self.depth.get() != 0 || self.index.borrow().is_none() || crate::dry::active() || NOTES_BESIDE.with(|b| b.get()) {
             return;
         }
         // what it holds of the log is the log as some stamp names it; the rows themselves only when read at that stamp
@@ -1538,8 +1570,31 @@ impl Ledger {
             out.insert("variants".into(), Value::List(all));
         }
         let mut notes: Vec<Dict> = Vec::new();
-        for (key, _) in self.parts_of("note", owner)? {
-            notes.push(self.form("note", &key)?);
+        for (key, path) in self.parts_of("note", owner)? {
+            // a write (notes_beside) leaves out a note whose file does not read, and names it: a note changes no
+            // finding, is in no design or freeze, and a write rewrites only the files it changes
+            let form = self.form("note", &key).and_then(|f| {
+                if NOTES_BESIDE.with(|b| b.get()) {
+                    let rel = self.rel(&path);
+                    validate_as(&Value::Dict(f.clone()), &rel, "note", |v, l, e| Note::validate(v, l, e))?;
+                }
+                Ok(f)
+            });
+            match form {
+                Ok(f) => notes.push(f),
+                Err(e) if e.code == "E_STATE_CORRUPT" && NOTES_BESIDE.with(|b| b.get()) => {
+                    let rel = self.rel(&path);
+                    let why = e.message.trim_end_matches('.').to_string();
+                    let why = if why.starts_with(&rel) { why } else { format!("{rel}: {why}") };
+                    NOTES_LEFT.with(|l| {
+                        let mut l = l.borrow_mut();
+                        if !l.iter().any(|(p, _)| *p == rel) {
+                            l.push((rel, why));
+                        }
+                    });
+                }
+                Err(e) => return Err(e),
+            }
         }
         notes.sort_by(|a, b| (s(a, "at"), s(a, "id")).cmp(&(s(b, "at"), s(b, "id"))));
         let mut all: Vec<Value> = match form.get("notes") {
@@ -3997,6 +4052,65 @@ impl Ledger {
 
     pub fn live<T: FromObj>(&self) -> Res<Vec<T>> {
         Ok(self.all::<T>()?.iter().filter(|o| o.retraction().is_none()).cloned().collect())
+    }
+
+    /// As live, for the reply of a write already made whole: the records of a kind that read, where a file beside them
+    /// does not (`unread` gathers it, as `after_write` does).
+    pub fn live_readable<T: FromObj>(&self, unread: &mut Vec<(String, String)>) -> Res<Vec<T>> {
+        if let Some(all) = self.after_write(self.live::<T>(), unread)? {
+            return Ok(all);
+        }
+        let ids: Vec<String> = self.where_()?.keys().filter(|(k, _)| k == T::KIND).map(|(_, id)| id.clone()).collect();
+        let mut items = Vec::new();
+        for id in ids {
+            if let Some(o) = self.after_write(self.load_t::<T>(&id), unread)? {
+                if o.retraction().is_none() {
+                    items.push(o);
+                }
+            }
+        }
+        items.sort_by(|a: &T, b: &T| (a.sort_time(), a.rec_id()).cmp(&(b.sort_time(), b.rec_id())));
+        Ok(items)
+    }
+
+    /// A read for the reply of a write already made whole (its files and its log line): where a record file that does
+    /// not read stops it (E_STATE_CORRUPT), the write stands and the read is left out (None), and `unread` gathers each
+    /// such file as (path, why), for the reply to name. Every other error is the command's.
+    pub fn after_write<T>(&self, read: Res<T>, unread: &mut Vec<(String, String)>) -> Res<Option<T>> {
+        match read {
+            Ok(v) => Ok(Some(v)),
+            Err(e) if e.code == "E_STATE_CORRUPT" => {
+                // the file this read stopped at (one that parses and is no valid record is in no index's list), and each
+                // file the index found it could not read
+                let why = e.message.trim_end_matches('.').to_string();
+                let path = why.split(|c: char| c == ':' || c == ' ').next().unwrap_or_default().to_string();
+                let mut said: Vec<(String, String)> = self.unreadable.borrow().clone().into_iter().collect();
+                if !said.iter().any(|(p, _)| *p == path) {
+                    said.push((path, why));
+                }
+                for s in said {
+                    if !unread.iter().any(|(p, _)| *p == s.0) {
+                        unread.push(s);
+                    }
+                }
+                Ok(None)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// For the reply of a write made whole: every record file the index found it could not read, whether or not the
+    /// reply read it (a question's, a resource's), so a clean reply never stands beside a record rb status cannot read.
+    /// A file that parses and is no valid record is found only by the reads that load it (`after_write` names those):
+    /// telling every such file would read every record, which a write does not.
+    pub fn unread_beside(&self, unread: &mut Vec<(String, String)>) -> Res<()> {
+        self.where_()?;
+        for (path, why) in self.unreadable.borrow().iter() {
+            if !unread.iter().any(|(p, _)| p == path) {
+                unread.push((path.clone(), why.trim_end_matches('.').to_string()));
+            }
+        }
+        Ok(())
     }
 
     /// Runs that still say something: everything not retracted whole. Read once per state of the record.

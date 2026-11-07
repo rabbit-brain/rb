@@ -236,8 +236,11 @@ pub fn cmd_experiment_gate(ns: &Namespace, out: &mut Out) -> R {
     let was = crate::view::gate_line(&before.if_holds, &before.if_not);
     // the gate as every screen says it: the words given once, and whether it is the user's
     let changed = (&e.if_holds, &e.if_not) != (&before.if_holds, &before.if_not);
-    let (words, by) = if changed { (led.words.clone(), led.actor()?.id) } else { led.gate_words()?.remove(&e.id).unwrap_or_default() };
-    let design = led.design(&e.id)?.unwrap_or_default();
+    // the gate is written whole, its log line with it: a record file beside it that does not read (a criterion's, which
+    // the design reads) leaves out what reads it, named after the gate's own lines
+    let mut not_read: Vec<(String, String)> = Vec::new();
+    let (words, by) = if changed { (led.words.clone(), led.actor()?.id) } else { led.after_write(led.gate_words(), &mut not_read)?.and_then(|mut w| w.remove(&e.id)).unwrap_or_default() };
+    let design = led.after_write(led.design(&e.id), &mut not_read)?.flatten().unwrap_or_default();
     let said = crate::view::gate_said(&e.if_holds, &e.if_not, &words, &design.writer(&by, "gate"), "");
     if changed {
         out.say(format!("{} gates: {said}", e.id));
@@ -252,6 +255,11 @@ pub fn cmd_experiment_gate(ns: &Namespace, out: &mut Out) -> R {
         out.say(format!("  before: {was} (kept in rb log {})", e.id));
     }
     actor_line(out, &led)?;
+    if !not_read.is_empty() {
+        led.unread_beside(&mut not_read)?;
+        say_not_read(out, "gate", &not_read);
+        out.next.insert(0, "rb doctor".into());
+    }
     out.data.insert("object".into(), obj("experiment", e.dump(false)));
     Ok(0)
 }
@@ -1078,8 +1086,11 @@ pub fn cmd_criterion_add(ns: &Namespace, out: &mut Out) -> R {
         why: s_or(ns, "why"),
     };
     let crit = led.add_criterion(&a)?;
-    let fd = led.finding(&crit)?;
-    if let Some(near) = led.metric_near(&crit)? {
+    // the criterion is written whole, its log line with it: what follows only reads, and a record file beside it that
+    // does not read (an analysis's, which the write never reads) leaves out what reads it, named after its own lines
+    let mut not_read: Vec<(String, String)> = Vec::new();
+    let fd = led.after_write(led.finding(&crit), &mut not_read)?;
+    if let Some(near) = led.after_write(led.metric_near(&crit), &mut not_read)?.flatten() {
         out.warn_of(&led, &near);
     }
     out.say(format!("{}: {}", crit.id, crate::view::statement_said(&crit.statement, &crit.words, &crit.created_by).unwrap_or_else(|| crit.statement.clone())));
@@ -1096,14 +1107,21 @@ pub fn cmd_criterion_add(ns: &Namespace, out: &mut Out) -> R {
             }
         ));
     }
-    out.say(format!("  {}", fd.says.get("timing").cloned().unwrap_or_default()));
-    if fd.comparison.is_some() {
-        out.say(format!("  it already reads {}: {}", fd.says.get("comparison").cloned().unwrap_or_default(), fd.says.get("rule").cloned().unwrap_or_default()));
+    if let Some(fd) = &fd {
+        out.say(format!("  {}", fd.says.get("timing").cloned().unwrap_or_default()));
+        if fd.comparison.is_some() {
+            out.say(format!("  it already reads {}: {}", fd.says.get("comparison").cloned().unwrap_or_default(), fd.says.get("rule").cloned().unwrap_or_default()));
+        }
     }
     actor_line(out, &led)?;
+    let hint = led.after_write(led.run_hint(&crit), &mut not_read)?;
+    led.unread_beside(&mut not_read)?;
+    say_not_read(out, "criterion", &not_read);
     out.data.insert("object".into(), obj("criterion", crit.dump(false)));
-    out.data.insert("finding".into(), Value::Dict(fd.dump(false)));
-    out.next = vec![led.run_hint(&crit)?];
+    if let Some(fd) = &fd {
+        out.data.insert("finding".into(), Value::Dict(fd.dump(false)));
+    }
+    out.next = if not_read.is_empty() { hint.into_iter().collect() } else { vec!["rb doctor".into()] };
     Ok(0)
 }
 
@@ -1144,6 +1162,59 @@ fn commit_of_row(flag_value: &str, cell: Option<String>, holder: &str, column: &
             "Give the commit itself, --commit <sha>, or leave --commit out.",
         )),
     }
+}
+
+/// A row read as a run beside record files that do not read (`unread`, from journal::names_readable): its numbers are
+/// the columns that name a metric the project declares, and such a file may declare one, so the row is read only where
+/// that file cannot change which columns those are: --select names them, each a metric the files that read declare,
+/// or every column holding a number is one. Otherwise it is refused, naming the file, with nothing written.
+fn beside_unread(unread: &[(String, String)], numbers: &[String], select: &[String], placed: &[String], declared: &dyn Fn(&str) -> bool) -> Res<()> {
+    let open: Vec<String> = if select.is_empty() { numbers.iter().filter(|c| !declared(c)).cloned().collect() } else { comma_list(select).into_iter().filter(|c| !declared(c)).collect() };
+    if open.is_empty() {
+        return Ok(());
+    }
+    let files = unread.iter().map(|(_, why)| format!("{why}.")).collect::<Vec<_>>().join(" ");
+    let named: Vec<String> = numbers.iter().filter(|c| declared(c)).cloned().collect();
+    // a column the command line names as the row's key or a per-run value is said last, and why it is asked of too: a
+    // metric of that name is one of the row's numbers when the file reads, whatever else picks the row by it
+    let (keys, rest): (Vec<String>, Vec<String>) = open.into_iter().partition(|c| placed.contains(c));
+    let ordered: Vec<String> = rest.iter().chain(keys.iter()).cloned().collect();
+    let these = match ordered.as_slice() {
+        [one] => one.clone(),
+        [first @ .., last] => format!("{} or {last}", first.join(", ")),
+        [] => String::new(),
+    };
+    let these = match keys.as_slice() {
+        [] => these,
+        [one] => format!("{these} ({one} picks the row or gives a per-run value, and a metric of that name is one of its numbers too)"),
+        many => format!("{these} ({} pick the row or give per-run values, and a metric of one of those names is one of its numbers too)", many.join(", ")),
+    };
+    Err(RBError::msg_fix(
+        "E_STATE_CORRUPT",
+        format!(
+            "{files} A row's numbers are its columns that name a metric the project declares, and rb cannot tell whether {} declares a metric named {these}, so it cannot tell which columns are this run's numbers. Nothing written.",
+            if unread.len() == 1 { "that file" } else { "those files" }
+        ),
+        if named.is_empty() {
+            "rb doctor lists every such file; rb doctor --restore puts back what rb last wrote.".to_string()
+        } else {
+            format!(
+                "rb doctor --restore puts back what rb last wrote; or name the run's numbers with --select, each a metric the files that read declare: --select {}.",
+                named.join(",")
+            )
+        },
+    ))
+}
+
+/// The columns of a row the command line names itself: those --where picks the row by, and those an @<column> gives a
+/// per-run value, the time the run was made or its commit. A metric of such a name is still one of the row's numbers
+/// (the row is read so whether or not that file reads), so beside a file that does not read the refusal still asks
+/// of it, and says why.
+fn row_placed(where_: &Dict, per_run: &Dict, produced_at: Option<&str>, commit: Option<&str>) -> Vec<String> {
+    let mut placed: Vec<String> = where_.keys().cloned().collect();
+    let at = per_run.values().filter_map(|v| v.as_str()).chain(produced_at).chain(commit);
+    placed.extend(at.filter_map(|t| t.strip_prefix('@')).filter(|c| !c.contains('.') && !c.contains('[')).map(str::to_string));
+    placed
 }
 
 /// One row of a CSV or TSV table as a run, as a database row is read: `--where` picks exactly one row, its numbers are
@@ -1195,7 +1266,8 @@ fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Di
     let picked = || where_.iter().map(|(k, v)| format!("{k}={}", show(v))).collect::<Vec<_>>().join(", ");
     let hits: Vec<&crate::csvtable::CsvRow> =
         table.rows.iter().filter(|r| where_.iter().all(|(k, v)| r.column(k).map_or(false, |(_, cell)| crate::csvtable::matches(cell, v)))).collect();
-    let names = crate::journal::names(led)?;
+    let mut unread = Vec::new();
+    let names = crate::journal::names_readable(led, &mut unread)?;
     let declared = |c: &str| crate::journal::canon_of(c, &names).is_some();
     let row = match hits.as_slice() {
         // --every-row: each of the rows --where picks in turn
@@ -1221,6 +1293,11 @@ fn read_table_row(led: &Ledger, file: &std::path::Path, shown: &str, where_: &Di
         }
     };
     let shown_row = format!("{shown}, line {}", row.line);
+    if !unread.is_empty() {
+        let placed = row_placed(where_, &per_run, produced_at.as_deref(), commit.as_deref());
+        let numbers: Vec<String> = row.cells.iter().filter(|(c, _)| row.number_of(c).is_some()).map(|(c, _)| c.clone()).collect();
+        beside_unread(&unread, &numbers, select, &placed, &declared)?;
+    }
     let mut chosen: Vec<&(String, String)> = Vec::new();
     if select.is_empty() {
         chosen.extend(row.cells.iter().filter(|(c, _)| declared(c)));
@@ -1520,9 +1597,15 @@ fn read_from_row(led: &Ledger, path: &str, keys: &[String], table: Option<&str>,
     };
     let pairs: Vec<(String, Value)> = where_.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
     let (row, stamp) = crate::sqlite::read_row_at(&file, &shown, table, &pairs, pick)?;
-    let names = crate::journal::names(led)?;
+    let mut unread = Vec::new();
+    let names = crate::journal::names_readable(led, &mut unread)?;
     let all_columns = || row.cells.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ");
     let declared = |c: &str| crate::journal::canon_of(c, &names).is_some();
+    if !unread.is_empty() {
+        let placed = row_placed(where_, &per_run, produced_at.as_deref(), commit.as_deref());
+        let numbers: Vec<String> = row.cells.iter().filter(|(_, cell)| cell.number().is_some()).map(|(c, _)| c.clone()).collect();
+        beside_unread(&unread, &numbers, select, &placed, &declared)?;
+    }
     let mut chosen: Vec<&(String, crate::sqlite::Cell)> = Vec::new();
     if select.is_empty() {
         chosen.extend(row.cells.iter().filter(|(c, _)| declared(c)));
@@ -1757,6 +1840,11 @@ fn run_add_every_row(ns: &Namespace, out: &mut Out) -> R {
             "Record the row that replaces or repeats a run on its own: --where picking it alone, without --every-row.",
         ));
     }
+    // beside a metric's or a criterion's file that does not read, rb cannot tell which columns that file declares as
+    // metrics, and so which columns tell two rows apart and which are numbers: one row is read as one row is, and a
+    // batch of several is refused before any is read
+    let mut unread = Vec::new();
+    crate::journal::names_readable(&led, &mut unread)?;
     let n = if database {
         // a database's rows are told apart by their rowid, which the receipt keeps with the row
         let pairs: Vec<(String, Value)> = where_.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -1766,8 +1854,9 @@ fn run_add_every_row(ns: &Namespace, out: &mut Out) -> R {
         let table = crate::csvtable::read(&String::from_utf8_lossy(&bytes), &shown).map_err(|e| RBError::msg("E_OBJECT_INVALID", format!("{e}.")))?;
         let hits: Vec<&crate::csvtable::CsvRow> = table.rows.iter().filter(|r| where_.iter().all(|(k, v)| r.column(k).map_or(false, |(_, cell)| crate::csvtable::matches(cell, v)))).collect();
         // a row is told by its own cells but the numbers it gives: two rows told apart by their numbers alone are one run
-        // to rb, so none is recorded and the lines are said, never one of them passed as recorded already
-        let names = crate::journal::names(&led)?;
+        // to rb, so none is recorded and the lines are said, never one of them passed as recorded already (beside a file
+        // that does not read, a batch of several is refused below, and one row is told from no other)
+        let names = crate::journal::names_readable(&led, &mut Vec::new())?;
         let told = |r: &crate::csvtable::CsvRow| -> Vec<String> { r.cells.iter().filter(|(c, _)| crate::journal::canon_of(c, &names).is_none()).map(|(c, v)| format!("{c}={v}")).collect() };
         for (i, a) in hits.iter().enumerate() {
             if let Some(b) = hits[..i].iter().find(|b| told(b) == told(a)) {
@@ -1784,14 +1873,30 @@ fn run_add_every_row(ns: &Namespace, out: &mut Out) -> R {
         // said as one row's read says it: what the rows hold
         return run_add_one(ns, out, None);
     }
+    if n > 1 && !unread.is_empty() {
+        let files = unread.iter().map(|(_, why)| format!("{why}.")).collect::<Vec<_>>().join(" ");
+        return Err(RBError::msg_fix(
+            "E_STATE_CORRUPT",
+            format!(
+                "{files} --where picks {n} rows of {shown}, and rb cannot tell whether {} declares as a metric a column that tells them apart, so it cannot tell whether they are {n} runs. Nothing written.",
+                if unread.len() == 1 { "that file" } else { "those files" }
+            ),
+            "rb doctor lists every such file; rb doctor --restore puts back what rb last wrote; or record each row on its own, --where picking it alone.",
+        ));
+    }
     // every row read first, as its run would read it (its numbers, its @<column> values, its commit): a row that cannot be
     // read is said before any run is written
     let per_run = parse_pairs(&list(ns, "set"), "--set", false)?;
     for i in 0..n {
         read_from_row(&led, &ff, &list(ns, "keys"), table_name.as_deref(), &where_, &list(ns, "select"), per_run.clone(), s(ns, "produced_at"), s(ns, "commit"), Some(i))
-            .map_err(|e| RBError::msg_fix(&e.code, format!("row {} of the {n} --where picks: {} Nothing written.", i + 1, e.message), e.fix.clone()))?;
+            .map_err(|e| {
+                let nothing = if e.message.ends_with("Nothing written.") { "" } else { " Nothing written." };
+                RBError::msg_fix(&e.code, format!("row {} of the {n} --where picks: {}{nothing}", i + 1, e.message), e.fix.clone())
+            })?;
     }
     let (mut recorded, mut already, mut ids) = (Vec::new(), Vec::new(), Vec::new());
+    // what each row's reply could not read beside it (say_not_read), said once for the batch
+    let mut unread: Vec<Value> = Vec::new();
     for i in 0..n {
         let mut one = Out::new(&out.command, out.json_mode);
         match run_add_one(ns, &mut one, Some(i)) {
@@ -1806,7 +1911,16 @@ fn run_add_every_row(ns: &Namespace, out: &mut Out) -> R {
                     }
                 }
                 out.warnings.extend(one.warnings);
-                out.notes.extend(one.notes);
+                for note in one.notes {
+                    if !out.notes.contains(&note) {
+                        out.notes.push(note);
+                    }
+                }
+                for u in one.data.get("unread_files").and_then(Value::as_list).cloned().unwrap_or_default() {
+                    if !unread.iter().any(|x| x.get("path") == u.get("path")) {
+                        unread.push(u);
+                    }
+                }
                 ids.push(Value::Str(id));
             }
             Err(e) => {
@@ -1825,6 +1939,10 @@ fn run_add_every_row(ns: &Namespace, out: &mut Out) -> R {
     out.data.insert("runs".into(), Value::List(ids));
     out.data.insert("recorded_count".into(), Value::Int(recorded.len() as i64));
     out.data.insert("already_count".into(), Value::Int(already.len() as i64));
+    if !unread.is_empty() {
+        out.data.insert("unread_files".into(), Value::List(unread));
+        out.next.insert(0, "rb doctor".into());
+    }
     Ok(0)
 }
 
@@ -1940,6 +2058,13 @@ fn run_add_one(ns: &Namespace, out: &mut Out, pick: Option<usize>) -> R {
             out.warn(w);
         }
         actor_line(out, &led)?;
+        // nothing written, and a record file beside it that does not read is still named, as rb status will stop at it
+        let mut not_read: Vec<(String, String)> = Vec::new();
+        led.unread_beside(&mut not_read)?;
+        say_not_read_as(out, ALREADY_UNREAD, &not_read);
+        if !not_read.is_empty() {
+            out.next.insert(0, "rb doctor".into());
+        }
         out.data.insert("object".into(), obj("run", run.dump(false)));
         out.data.insert("duplicate_of".into(), Value::Str(run.id.clone()));
         return Ok(0);
@@ -2036,21 +2161,26 @@ fn run_add_one(ns: &Namespace, out: &mut Out, pick: Option<usize>) -> R {
         ));
     }
     // a verified setting it is recorded under, read from a file made after it, is said at the write as on the finding
-    out.notes.extend(postdates_run(&led, &run.experiment, &run.id)?);
-    let criteria: Vec<Criterion> = led.live::<Criterion>()?.into_iter().filter(|c| c.experiment == run.experiment).collect();
+    // the run is written whole, its log line with it: what follows only reads, and a record file beside it that does
+    // not read leaves out what reads it, named after the run's own lines, never undoes or fails the write
+    let mut not_read: Vec<(String, String)> = Vec::new();
+    out.notes.extend(led.after_write(postdates_run(&led, &run.experiment, &run.id), &mut not_read)?.unwrap_or_default());
+    let criteria: Vec<Criterion> = led.live_readable::<Criterion>(&mut not_read)?.into_iter().filter(|c| c.experiment == run.experiment).collect();
     let mut findings = Vec::new();
     for c in &criteria {
-        findings.push(led.finding(c)?);
+        findings.extend(led.after_write(led.finding(c), &mut not_read)?);
     }
     for fd in &findings {
         out.say(format!("  {} {}: {}", fd.criterion, fd.says.get("headline").cloned().unwrap_or_default(), fd.says.get("comparison").cloned().unwrap_or_default()));
     }
     actor_line(out, &led)?;
     let exp: Experiment = led.load(&run.experiment)?;
-    let unread = led.unread_metrics(&exp, std::slice::from_ref(&run), &criteria)?;
-    if let Some(w) = nothing_counts(&led, &run, if from_file.is_some() { Shape::File } else { Shape::Typed })? {
+    let unread = led.after_write(led.unread_metrics(&exp, std::slice::from_ref(&run), &criteria), &mut not_read)?.unwrap_or_default();
+    if let Some(w) = led.after_write(nothing_counts(&led, &run, if from_file.is_some() { Shape::File } else { Shape::Typed }), &mut not_read)?.flatten() {
         out.warn(&w);
     }
+    led.unread_beside(&mut not_read)?;
+    say_not_read(out, "run", &not_read);
     out.data.insert("object".into(), obj("run", run.dump(false)));
     out.data.insert("findings".into(), Value::List(findings.iter().map(|f| Value::Dict(f.dump(false))).collect()));
     out.data.insert("unread_metrics".into(), Value::list_of_str(unread));
@@ -2058,11 +2188,37 @@ fn run_add_one(ns: &Namespace, out: &mut Out, pick: Option<usize>) -> R {
     names.sort_by(|a, b| (!a.starts_with("change."), *a).cmp(&(!b.starts_with("change."), *b)));
     let pick = names.first().map(|s| s.to_string()).unwrap_or_default();
     out.next = findings.iter().take(3).map(|f| format!("rb show {}", f.criterion)).collect();
-    if out.next.is_empty() {
+    if !not_read.is_empty() {
+        out.next.insert(0, "rb doctor".into());
+    } else if out.next.is_empty() {
         out.next = vec![format!("rb criterion add \"<what it should show>\" -e {}{} --metric {pick} --at-most <x>   (write the criterion before the next run)", run.experiment, led.question_arg(&exp))];
     }
     Ok(0)
 }
+
+/// What a write made whole beside record files that do not read says of them, after its own lines: each file and why,
+/// with doctor's fix (data.warnings), and `data.unread_files` with each one's path, why and fix.
+pub fn say_not_read(out: &mut Out, what: &str, not_read: &[(String, String)]) {
+    say_not_read_as(out, &format!("The {what} is recorded; this reply leaves out what reads that file, findings among them."), not_read)
+}
+
+/// The same, with what the write did said in `done` (a run already recorded: nothing written).
+pub fn say_not_read_as(out: &mut Out, done: &str, not_read: &[(String, String)]) {
+    if not_read.is_empty() {
+        return;
+    }
+    const FIX: &str = "rb doctor lists every such file; rb doctor --restore puts back what rb last wrote.";
+    for (_, why) in not_read {
+        out.notes.push(format!("{why}. {done} {FIX}"));
+    }
+    out.data.insert(
+        "unread_files".into(),
+        Value::List(not_read.iter().map(|(p, w)| crate::obj! {"path" => p.clone(), "why" => w.clone(), "fix" => FIX}).collect()),
+    );
+}
+
+/// What a reply that wrote nothing (the run or the analysis is already recorded) says beside a file that does not read.
+pub const ALREADY_UNREAD: &str = "It is already recorded, and nothing was written; rb status stops at that file until it can be read.";
 
 /// How the numbers of a run were given, so its notice says how to give them: typed (NAME=VALUE), a file (--from) or the
 /// SDK's run.log.
@@ -2367,6 +2523,12 @@ pub fn cmd_analysis_add(ns: &Namespace, out: &mut Out) -> R {
     let a = res.record;
     if res.duplicate_of.is_some() {
         out.say(format!("Already recorded as {} (the same comparisons, files and reads); nothing written.", a.id));
+        let mut not_read: Vec<(String, String)> = Vec::new();
+        led.unread_beside(&mut not_read)?;
+        say_not_read_as(out, ALREADY_UNREAD, &not_read);
+        if !not_read.is_empty() {
+            out.next.insert(0, "rb doctor".into());
+        }
         out.data.insert("object".into(), obj("analysis", a.dump(false)));
         out.data.insert("duplicate_of".into(), Value::Str(a.id.clone()));
         return Ok(0);
@@ -2384,9 +2546,14 @@ pub fn cmd_analysis_add(ns: &Namespace, out: &mut Out) -> R {
             _ => String::new(),
         }
     ));
+    // the analysis is written whole: a record file beside it that does not read leaves out what reads it, as for a run
+    let mut not_read: Vec<(String, String)> = Vec::new();
     for c in &a.comparisons {
         // a level is one arm's number, so it has no sign; each as the rule of a criterion reading it says it
-        let [est, lo, hi] = led.comparison_said(&a.experiment, c)?;
+        let [est, lo, hi] = match led.after_write(led.comparison_said(&a.experiment, c), &mut not_read)? {
+            Some(said) => said,
+            None => assess::said_all([Some(c.estimate), c.lo, c.hi], &[None, None, None], !c.reference.is_empty()),
+        };
         let iv = match (c.lo, c.hi) {
             (Some(_), h) => format!(" [{lo}, {}]", if h.is_some() { hi } else { "None".into() }),
             _ => " (no interval)".into(),
@@ -2413,9 +2580,9 @@ pub fn cmd_analysis_add(ns: &Namespace, out: &mut Out) -> R {
         out.warn(w);
     }
     let mut read_here = Vec::new();
-    for c in led.live::<Criterion>()? {
+    for c in led.live_readable::<Criterion>(&mut not_read)? {
         if c.experiment == a.experiment {
-            let fd = led.finding(&c)?;
+            let Some(fd) = led.after_write(led.finding(&c), &mut not_read)? else { continue };
             if fd.comparison.as_ref().map_or(false, |x| x.source == a.id) {
                 read_here.push(fd);
             }
@@ -2425,10 +2592,14 @@ pub fn cmd_analysis_add(ns: &Namespace, out: &mut Out) -> R {
         out.say(format!("  {} {}: {}", fd.criterion, fd.says.get("headline").cloned().unwrap_or_default(), fd.says.get("comparison").cloned().unwrap_or_default()));
     }
     actor_line(out, &led)?;
+    led.unread_beside(&mut not_read)?;
+    say_not_read(out, "analysis", &not_read);
     out.data.insert("object".into(), obj("analysis", a.dump(false)));
     out.data.insert("findings".into(), Value::List(read_here.iter().map(|f| Value::Dict(f.dump(false))).collect()));
     out.next = read_here.iter().take(3).map(|f| format!("rb show {}", f.criterion)).collect();
-    if out.next.is_empty() {
+    if !not_read.is_empty() {
+        out.next.insert(0, "rb doctor".into());
+    } else if out.next.is_empty() {
         let c0 = &a.comparisons[0];
         out.next = vec![format!(
             "rb criterion add \"<what it should show>\" -e {}{} --metric {} --subject {}{} --better",
@@ -2530,7 +2701,10 @@ pub fn cmd_freeze(ns: &Namespace, out: &mut Out) -> R {
             words(&fr.words, &fr.by)
         ));
     }
-    out.say_all(freeze_review(&led, &exp)?);
+    // the freeze is written whole, its log line with it: a record file beside it that does not read (an analysis's,
+    // which the freeze never reads) leaves out what reads it, named after the review
+    let mut not_read: Vec<(String, String)> = Vec::new();
+    out.say_all(freeze_review(&led, &exp, &mut not_read)?);
     if !amend_ {
         out.say("  Changing a setting or its source, a variant, what it varies, or a criterion now needs --amend --why \"<reason>\"; the amendment is kept with who made it.");
         if !fr.after_runs.is_empty() {
@@ -2549,6 +2723,8 @@ pub fn cmd_freeze(ns: &Namespace, out: &mut Out) -> R {
         ));
     }
     actor_line(out, &led)?;
+    led.unread_beside(&mut not_read)?;
+    say_not_read(out, "freeze", &not_read);
     out.data.insert("object".into(), obj("experiment", exp.dump(false)));
     out.data.insert("unknown_required".into(), Value::list_of_str(unknown));
     out.next = vec![format!("rb run add {} --from <metrics.json> --command \"...\"", exp.id)];
@@ -2573,7 +2749,7 @@ fn named_otherwise(name: &str, st: &Setting) -> Option<String> {
 }
 
 /// What freezing an experiment locks, the way anyone should read it before they do.
-pub fn freeze_review(led: &Ledger, exp: &Experiment) -> Res<Vec<String>> {
+pub fn freeze_review(led: &Ledger, exp: &Experiment, not_read: &mut Vec<(String, String)>) -> Res<Vec<String>> {
     let mut lines = vec![
         format!("  {}: {}", exp.id, exp.title),
         format!(
@@ -2596,7 +2772,7 @@ pub fn freeze_review(led: &Ledger, exp: &Experiment) -> Res<Vec<String>> {
             look.push(format!("    look: {} is locked as the test now. Check it is the one you mean: a change to it needs --amend --why \"<reason>\".", c.id));
         }
     }
-    let caveats = led.setting_caveats(exp, led.has_origin(exp)?, None)?;
+    let caveats = led.after_write(led.has_origin(exp).and_then(|o| led.setting_caveats(exp, o, None)), not_read)?.unwrap_or_default();
     for (full, st) in exp.all_settings() {
         let state = if st.per_run { "per-run".to_string() } else { st.status.clone() };
         let where_ = st.source.as_ref().map(|x| x.label()).unwrap_or_else(|| "no source".into());

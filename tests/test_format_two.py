@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -22,14 +23,20 @@ OLD = os.environ.get("RB_OLD_BIN")
 needs_old = pytest.mark.skipif(not OLD, reason="RB_OLD_BIN names an older rb (0.7.0, 0.7.1 or 0.8.0)")
 
 
+def _old_version() -> tuple:
+    """RB_OLD_BIN's version, (0, 8, 1) for 0.8.1."""
+    said = subprocess.run([OLD, "version"], capture_output=True, text=True).stdout.split()
+    return tuple(int(x) for x in (said[-1] if said else "0").split(".")[:3] if x.isdigit())
+
+
 def _old_reads_format_2() -> bool:
     """Whether RB_OLD_BIN reads format 2: 0.8.0 does, 0.7.x reads format 1 alone."""
-    said = subprocess.run([OLD, "version"], capture_output=True, text=True).stdout.split()
-    version = tuple(int(x) for x in (said[-1] if said else "0").split(".")[:2] if x.isdigit())
-    return version >= (0, 8)
+    return _old_version()[:2] >= (0, 8)
 
 
 OLD_READS_2 = bool(OLD) and _old_reads_format_2()
+# 0.8.1 names a file raised to rb: 2 by hand, as this rb does; 0.8.0 reads it as fine
+OLD_NAMES_RAISED = bool(OLD) and _old_version() >= (0, 8, 1)
 
 
 @pytest.fixture
@@ -200,6 +207,268 @@ def test_a_write_stops_before_its_files_change_while_a_record_file_does_not_read
     assert wrote == logged == (code == 0), (code, env.errors, wrote, logged)
 
 
+def files_of(root: Path) -> dict:
+    """Every file of the record but rb's cache, by path, with its bytes' digest."""
+    return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((root / ".rb").rglob("*"))
+            if p.is_file() and "cache" not in p.relative_to(root / ".rb").parts}
+
+
+@pytest.mark.parametrize("broken", ["raised", "yaml"])
+@pytest.mark.parametrize("on", ["e1", "e2"])
+def test_a_run_or_an_analysis_beside_a_file_that_does_not_read_is_recorded_and_names_it(repo, capsys, broken, on):
+    """rb run add and rb analysis add need no criterion file to write: beside one that does not read, the write is made
+    whole and succeeds (exit 0, ok true), and its reply names the file with doctor's fix in place of what reads it. The
+    gates still fail closed, and a write that needs the file is refused with every file as it was."""
+    import warnings
+
+    import rabbit_brain as rb
+
+    seed(capsys)
+    ok(capsys, "experiment", "add", "INT8 at batch 64", "--id", "e2", "--purpose", "the batch", "--baseline", "fp32", "--candidate", "int8")
+    ok(capsys, "criterion", "add", "INT8 adds at most 0.05 at batch 64", "-e", "e2", "--metric", "change.val_loss", "--at-most", "0.05", "--id", "c9")
+    p = repo / CRITERIA / "c0.yaml"
+    p.write_text(p.read_text(encoding="utf-8").replace("rb: 1\n", "rb: 2\n", 1) if broken == "raised" else "rb: 1\nkind: [\n", encoding="utf-8")
+    rel = (CRITERIA / "c0.yaml").as_posix()
+    seed_ = ["--set", "seed=5"] if on == "e1" else []
+    for argv, kind in [(["run", "add", on, "fp32.val_loss=0.96", "int8.val_loss=0.97", *seed_], "run"),
+                       (["analysis", "add", on, "--compare", "int8/fp32:val_loss=0.01[0.0,0.02]", "--method", "paired bootstrap over images"], "analysis")]:
+        log = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n")
+        code, env = rbj(capsys, *argv)
+        assert code == 0 and env.ok, (argv, code, env.errors)
+        assert env.data["object"]["kind"] == kind
+        assert [u["path"] for u in env.data["unread_files"]] == [rel], env.data.get("unread_files")
+        assert "rb doctor --restore" in env.data["unread_files"][0]["fix"]
+        assert any(rel in w and "rb doctor" in w for w in env.data["warnings"]), env.data["warnings"]
+        assert env.next[0] == "rb doctor", env.next
+        assert (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n") == log + 1
+        if on == "e2":
+            assert "c9" in [f["criterion"] for f in env.data["findings"]], env.data["findings"]
+    # the text says it too, after the write's own lines
+    assert main(["run", "add", on, "fp32.val_loss=0.95", "int8.val_loss=0.97", *(["--set", "seed=6"] if on == "e1" else [])]) == 0
+    said = capsys.readouterr().out
+    assert rel in said and "is recorded" in said and "rb doctor --restore" in said, said
+    # the SDK's record() returns the run, with the file named as an RBWarning
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        got = rb.open().experiment(on).record({"fp32.val_loss": 0.94, "int8.val_loss": 0.96}, per_run={"seed": 7} if on == "e1" else None)
+    assert got is not None and got.id.startswith("run")
+    assert any(rel in str(w.message) for w in caught), [str(w.message) for w in caught]
+    # what still stops: the gates, and a write that reads the file
+    code, env = rbj(capsys, "status", "--fail-on", "integrity")
+    assert code == 2 and not env.ok and env.errors[0].code in ("E_STATE_CORRUPT", "E_STATE_EDITED"), (code, env.errors)
+    before = files_of(repo)
+    code, env = rbj(capsys, "criterion", "add", "another", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.1")
+    assert code == 2 and not env.ok, (code, env.errors)
+    assert files_of(repo) == before
+
+
+def broken_beside(capsys, repo, *before):
+    """Two experiments, e1 and e2, each with a rule; the commands `before`; then an analysis on e1 whose file does not
+    read."""
+    seed(capsys)
+    ok(capsys, "experiment", "add", "INT8 at batch 64", "--id", "e2", "--purpose", "the batch", "--baseline", "fp32", "--candidate", "int8")
+    ok(capsys, "criterion", "add", "INT8 adds at most 0.05 at batch 64", "-e", "e2", "--metric", "change.val_loss", "--at-most", "0.05", "--id", "c9")
+    for argv in before:
+        assert main(list(argv)) == 0, argv
+        capsys.readouterr()
+    aid = ok(capsys, "analysis", "add", "e1", "--compare", "int8/fp32:val_loss=0.02[0.01,0.03]", "--method", "paired bootstrap over images").data["object"]["id"]
+    p = next((repo / ".rb" / "experiments" / "e1" / "analyses").glob(f"{aid}.yaml"))
+    p.write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    return p.relative_to(repo).as_posix()
+
+
+def test_every_unreadable_file_beside_a_run_is_named_one_that_parses_too(repo, capsys):
+    """Codex S1 should 1: with one file that is not YAML and another that parses but is no valid criterion, the reply
+    named the first alone. Each file the reply's reads stopped at is named."""
+    broken = broken_beside(capsys, repo)
+    c0 = repo / CRITERIA / "c0.yaml"
+    c0.write_text(c0.read_text(encoding="utf-8").replace("at_most", "at_most_by_hand", 1), encoding="utf-8")
+    code, env = rbj(capsys, "run", "add", "e2", "fp32.val_loss=0.96", "int8.val_loss=0.97")
+    assert code == 0 and env.ok, env.errors
+    named = [u["path"] for u in env.data["unread_files"]]
+    assert broken in named and (CRITERIA / "c0.yaml").as_posix() in named, named
+
+
+def test_every_row_and_reconcile_name_an_unreadable_file_beside_the_runs_they_record(repo, capsys):
+    """Codex S1 shoulds 2 and 3: rb run add --every-row and rb reconcile --apply record runs through rb run add, and
+    dropped what its reply said of a file that does not read: each says it once, with rb doctor first."""
+    observed = ("journal", "run", "--", sys.executable, "-c", "print('{\"metrics\": {\"fp32.val_loss\": 0.95, \"int8.val_loss\": 0.99}}')")
+    broken = broken_beside(capsys, repo, ("retract", "c0", "--why", "only e2 reads these numbers"), ("journal", "scan"), observed)
+    Path("rows.csv").write_text("group,seed,fp32.val_loss,int8.val_loss\nx,1,0.96,0.97\nx,2,0.95,0.97\n", encoding="utf-8")
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "rows.csv", "--where", "group=x", "--every-row")
+    assert code == 0 and env.ok and env.data["recorded_count"] == 2, env.errors
+    assert [u["path"] for u in env.data["unread_files"]] == [broken] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
+    assert sum(broken in w for w in env.data["warnings"]) == 1, env.data["warnings"]
+    code, env = rbj(capsys, "reconcile", "--apply")
+    assert code == 0 and env.ok and env.data["recorded"], (env.errors, env.data.get("recorded"), env.data.get("not_recorded"))
+    assert [u["path"] for u in env.data["unread_files"]] == [broken] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
+
+
+def beside_a_criterion(capsys, repo, broken):
+    """e1 with a second rule, c3, on change.top1, which the catalogue does not declare, and e2 with c9 and a per-run
+    seed; then c3's file made not YAML ("yaml") or raised to rb: 2 by hand ("raised"). Returns c3's path."""
+    seed(capsys)
+    ok(capsys, "criterion", "add", "INT8 keeps top-1", "-e", "e1", "--metric", "change.top1", "--at-least", "-0.5", "--id", "c3")
+    ok(capsys, "experiment", "add", "INT8 at batch 64", "--id", "e2", "--purpose", "the batch", "--baseline", "fp32", "--candidate", "int8")
+    ok(capsys, "spec", "set", "e2", "seed", "--per-run")
+    ok(capsys, "criterion", "add", "INT8 adds at most 0.05 at batch 64", "-e", "e2", "--metric", "change.val_loss", "--at-most", "0.05", "--id", "c9")
+    p = repo / CRITERIA / "c3.yaml"
+    p.write_text(p.read_text(encoding="utf-8").replace("rb: 1\n", "rb: 2\n", 1) if broken == "raised" else "rb: 1\nkind: [\n", encoding="utf-8")
+    Path("rows.csv").write_text("group,seed,fp32.val_loss,int8.val_loss,int8.top1\nx,1,0.96,0.97,75.1\nx,2,0.95,0.97,75.0\n", encoding="utf-8")
+    return (CRITERIA / "c3.yaml").as_posix()
+
+
+@pytest.mark.parametrize("broken", ["yaml", "raised"])
+def test_a_row_beside_an_unreadable_criterion_file_is_read_where_select_names_its_numbers(repo, capsys, broken):
+    """MP-1107-2006 should 1: a row's numbers are its columns that name a declared metric, and a criterion's file that
+    does not read may declare one, so without --select the row is refused, naming the file and the columns it cannot
+    place, with nothing written. With --select naming metrics the files that read declare, the row is the same run
+    whichever the file declares: it is recorded whole, one row or --every-row, and the reply names the file."""
+    rel = beside_a_criterion(capsys, repo, broken)
+    before = files_of(repo)
+    for extra in ([], ["--every-row"]):
+        code, env = rbj(capsys, "run", "add", "e2", "--from", "rows.csv", "--where", "group=x" if extra else "group=x,seed=1", "--set", "seed=@seed", *extra)
+        assert code == 2 and not env.ok and env.errors[0].code == "E_STATE_CORRUPT", (extra, code, env.errors)
+        said = env.errors[0].message
+        assert rel in said and ("picks 2 rows" if extra else "int8.top1") in said and said.count("Nothing written.") == 1, said
+        if not extra:
+            assert "--select fp32.val_loss,int8.val_loss" in env.errors[0].fix, env.errors[0].fix
+        assert files_of(repo) == before
+    # a column only that file could declare cannot be selected beside it
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "rows.csv", "--where", "group=x,seed=1", "--set", "seed=@seed", "--select", "int8.top1")
+    assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT" and rel in env.errors[0].message, env.errors
+    assert files_of(repo) == before
+    log = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n")
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "rows.csv", "--where", "group=x,seed=1", "--set", "seed=@seed", "--select", "fp32.val_loss,int8.val_loss")
+    assert code == 0 and env.ok, env.errors
+    assert sorted(env.data["object"]["metrics"]) == ["fp32.val_loss", "int8.val_loss"], env.data["object"]["metrics"]
+    assert [u["path"] for u in env.data["unread_files"]] == [rel] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
+    assert (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n") == log + 1
+    # --every-row picking several rows: that file may declare as a metric every column that tells them apart, which
+    # rb does not tell two runs apart by (Codex S2 should 1), so the batch is refused whole, --select or not
+    before = files_of(repo)
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "rows.csv", "--where", "group=x", "--set", "seed=@seed", "--select", "fp32.val_loss,int8.val_loss", "--every-row")
+    assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT" and rel in env.errors[0].message and "picks 2 rows" in env.errors[0].message, env.errors
+    assert files_of(repo) == before
+    # --every-row picking one row is that row
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "rows.csv", "--where", "group=x,seed=2", "--set", "seed=@seed", "--select", "fp32.val_loss,int8.val_loss", "--every-row")
+    assert code == 0 and env.ok and env.data["recorded_count"] == 1, env.errors
+    assert [u["path"] for u in env.data["unread_files"]] == [rel], env.data.get("unread_files")
+    # with no --select, a row whose every column holding a number names a metric the files that read declare
+    Path("rows2.csv").write_text("group,fp32.val_loss,int8.val_loss\ny,0.96,0.97\n", encoding="utf-8")
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "rows2.csv", "--where", "group=y", "--set", "seed=8")
+    assert code == 0 and env.ok and sorted(env.data["object"]["metrics"]) == ["fp32.val_loss", "int8.val_loss"], env.errors
+
+
+def test_a_database_row_beside_an_unreadable_criterion_file_is_read_where_select_names_its_numbers(repo, capsys):
+    """MP-1107-2006 should 1, a SQLite row: as a table's row."""
+    import sqlite3
+
+    rel = beside_a_criterion(capsys, repo, "yaml")
+    con = sqlite3.connect("results.db")
+    con.execute("create table evals (seed integer, fp32_loss real, int8_loss real, top1 real)")
+    con.execute("insert into evals values (1, 0.96, 0.97, 75.1)")
+    con.commit()
+    con.close()
+    ok(capsys, "metric", "add", "fp32_loss", "--minimize")
+    before = files_of(repo)
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "results.db", "--table", "evals", "--where", "seed=1", "--set", "seed=@seed", "--variant", "fp32")
+    assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT" and rel in env.errors[0].message and "top1" in env.errors[0].message, env.errors
+    assert files_of(repo) == before
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "results.db", "--table", "evals", "--where", "seed=1", "--set", "seed=@seed", "--variant", "fp32", "--select", "fp32_loss")
+    assert code == 0 and env.ok and [u["path"] for u in env.data["unread_files"]] == [rel], (env.errors, env.data.get("unread_files"))
+
+
+def test_a_row_beside_an_unreadable_analysis_file_is_recorded_and_names_it(repo, capsys):
+    """MP-1107-2006 should 1: an analysis's file declares no metric, so a row beside one that does not read is read
+    whole, with no --select, and the reply names the file."""
+    broken = broken_beside(capsys, repo)
+    ok(capsys, "spec", "set", "e2", "seed", "--per-run")
+    Path("rows.csv").write_text("group,seed,fp32.val_loss,int8.val_loss\nx,1,0.96,0.97\n", encoding="utf-8")
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "rows.csv", "--where", "group=x", "--set", "seed=@seed")
+    assert code == 0 and env.ok, env.errors
+    assert [u["path"] for u in env.data["unread_files"]] == [broken], env.data.get("unread_files")
+
+
+def test_every_row_reads_a_cell_that_starts_with_an_at_as_the_row_s_value(repo, capsys):
+    """Codex S2: a table's cell "@b" given as a per-run value with --set seed=@seed passed the batch's first read of
+    every row, then failed rb run add's check for an @<column> no row gives, after the rows before it were written.
+    A row's cell is that row's value: every row is recorded."""
+    seed(capsys)
+    Path("rows.csv").write_text("group,seed,fp32.val_loss,int8.val_loss\nx,a1,0.96,0.97\nx,@b,0.95,0.97\n", encoding="utf-8")
+    code, env = rbj(capsys, "run", "add", "e1", "--from", "rows.csv", "--where", "group=x", "--set", "seed=@seed", "--every-row")
+    assert code == 0 and env.ok and env.data["recorded_count"] == 2, env.errors
+
+
+@pytest.mark.parametrize("kind", ["question", "resource"])
+def test_a_run_or_an_analysis_names_an_unreadable_file_its_reply_never_reads(repo, capsys, kind):
+    """MP-1107-2006 later 3: a question's or a resource's file that does not read is in no read a run's reply makes,
+    and rb status then stops on it: the reply names it too, from the index the write already read."""
+    seed(capsys)
+    if kind == "question":
+        ok(capsys, "question", "add", "Does INT8 cost accuracy?", "--id", "q1")
+        p = repo / ".rb" / "questions" / "q1.yaml"
+    else:
+        ok(capsys, "resource", "add", "holdout-v2", "--type", "dataset", "--name", "held-out images, v2")
+        p = repo / ".rb" / "resources" / "holdout-v2.yaml"
+    p.write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    rel = p.relative_to(repo).as_posix()
+    for argv in (["run", "add", "e1", "fp32.val_loss=0.95", "int8.val_loss=0.97", "--set", "seed=9"],
+                 ["analysis", "add", "e1", "--compare", "int8/fp32:val_loss=0.02[0.01,0.03]", "--method", "paired bootstrap over images"]):
+        code, env = rbj(capsys, *argv)
+        assert code == 0 and env.ok, (argv, env.errors)
+        assert rel in [u["path"] for u in env.data.get("unread_files", [])], (argv, env.data.get("unread_files"))
+        assert env.next[0] == "rb doctor", env.next
+    code, env = rbj(capsys, "status")
+    assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT"
+
+
+@pytest.mark.parametrize("where", ["criterion", "question"])
+def test_the_sdk_s_analysis_beside_an_unreadable_file_names_it(repo, capsys, where):
+    """MP-1107-2006 should 2: exp.analysis(...) beside a record file that does not read returns the analysis, with the
+    file named as an RBWarning, as rb analysis add names it."""
+    import warnings
+
+    import rabbit_brain as rb
+
+    seed(capsys)
+    ok(capsys, "question", "add", "Does INT8 cost accuracy?", "--id", "q1")
+    p = repo / (CRITERIA / "c0.yaml" if where == "criterion" else Path(".rb") / "questions" / "q1.yaml")
+    p.write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    rel = p.relative_to(repo).as_posix()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        got = rb.open().experiment("e1").analysis([{"subject": "int8", "reference": "fp32", "metric": "val_loss", "estimate": 0.02, "lo": 0.01, "hi": 0.03}],
+                                                  method="paired bootstrap over images")
+    assert got is not None and got.id.startswith("a")
+    assert any(rel in str(w.message) and "rb doctor" in str(w.message) for w in caught), [str(w.message) for w in caught]
+
+
+@pytest.mark.parametrize("where", ["criterion", "question"])
+def test_mcp_analysis_add_beside_an_unreadable_file_names_it(repo, capsys, where):
+    """MP-1107-2006 should 2: the analysis_add tool beside a record file that does not read answers ok, with the file in
+    data.unread_files and among data.warnings, as rb analysis add does."""
+    from rbtest import Mcp
+
+    seed(capsys)
+    ok(capsys, "question", "add", "Does INT8 cost accuracy?", "--id", "q1")
+    p = repo / (CRITERIA / "c0.yaml" if where == "criterion" else Path(".rb") / "questions" / "q1.yaml")
+    p.write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    rel = p.relative_to(repo).as_posix()
+    server = Mcp(root=repo)
+    try:
+        server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "clientInfo": {"name": "an-mcp-client", "version": "1.0"}}})
+        server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        answer = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "analysis_add", "arguments": {
+            "experiment": "e1", "compare": ["int8/fp32:val_loss=0.02[0.01,0.03]"], "method": "paired bootstrap over images"}}})["result"]
+    finally:
+        server.close()
+    env = answer["structuredContent"]
+    assert not answer["isError"] and env["ok"], env
+    assert [u["path"] for u in env["data"]["unread_files"]] == [rel], env["data"].get("unread_files")
+    assert any(rel in w and "rb doctor" in w for w in env["data"]["warnings"]), env["data"]["warnings"]
+
+
 def test_rb_doctor_restore_puts_a_raised_format_back(repo, capsys):
     seed(capsys)
     p = repo / CRITERIA / "c0.yaml"
@@ -312,12 +581,162 @@ def test_rb_show_of_a_file_reads_its_format_as_it_always_has(repo, capsys):
 @pytest.mark.skipif(not OLD_READS_2, reason="RB_OLD_BIN reads format 1 alone, where rb: 2 is newer")
 def test_a_file_raised_by_hand_is_the_one_file_0_8_0_and_this_rb_read_apart(repo, capsys):
     """A team on two versions (MP-1107-0443): a question raised to rb: 2 by hand reads as fine in 0.8.0, and this rb
-    names it, with its fix. A file rb writes reads alike in both."""
+    names it, with its fix; 0.8.1 names it too. A file rb writes reads alike in each."""
     seed(capsys)
     ok(capsys, "question", "add", "Does INT8 cost accuracy?", "--id", "q1")
     assert older("doctor")[0] == 0
     p = repo / ".rb" / "questions" / "q1.yaml"
     p.write_text(p.read_text(encoding="utf-8").replace("rb: 1\n", "rb: 2\n", 1), encoding="utf-8")
-    assert older("doctor")[0] == 0
+    assert older("doctor")[0] == (1 if OLD_NAMES_RAISED else 0)
     code, env = rbj(capsys, "doctor")
     assert code == 1 and any(x["check"] == "corrupt" and "q1.yaml" in x["detail"] for x in env.data["outcome"]["failures"]), env.data
+
+
+@pytest.mark.parametrize("argv", [
+    ["criterion", "add", "INT8 adds at most 0.1", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.1", "--id", "c5"],
+    ["criterion", "add", "INT8 adds at most 0.1", "-e", "e1", "-q", "q1", "--metric", "change.val_loss", "--at-most", "0.1", "--id", "c5"],
+    ["freeze", "e1", "-m", "before the held-out runs"],
+], ids=["criterion", "criterion-q", "freeze"])
+def test_a_criterion_or_a_freeze_beside_an_unreadable_analysis_file_is_made_whole(repo, capsys, argv):
+    """MP-1108-0010 should 1: rb criterion add (and rb freeze) beside an analysis's file that does not read wrote the
+    criterion, then read its finding and exited 2: a half write. The write reads no analysis before it writes, so that
+    file cannot change what it writes: it is made whole, exits 0, and its reply names the file."""
+    import warnings
+
+    import rabbit_brain as rb
+
+    broken = broken_beside(capsys, repo, ("question", "add", "Does INT8 cost accuracy?", "--id", "q1"))
+    log = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n")
+    code, env = rbj(capsys, *argv)
+    assert code == 0 and env.ok, (code, env.errors)
+    assert [u["path"] for u in env.data["unread_files"]] == [broken] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
+    assert any(broken in w and "rb doctor --restore" in w for w in env.data["warnings"]), env.data["warnings"]
+    assert (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n") == log + 1
+    if argv[0] == "criterion":
+        assert env.data["object"]["id"] == "c5" and "finding" not in env.data
+        # the SDK's criterion() returns the criterion, with the file named as an RBWarning
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            got = rb.open().experiment("e1").criterion("INT8 adds at most 0.2", metric="change.val_loss", at_most=0.2)
+        assert got is not None
+        assert any(broken in str(w.message) for w in caught), [str(w.message) for w in caught]
+    code, env = rbj(capsys, "status", "--fail-on", "integrity")
+    assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT"
+
+
+@pytest.mark.parametrize("where", ["experiment", "project"])
+def test_a_write_beside_an_unreadable_note_file_is_made_whole_and_names_it(repo, capsys, where):
+    """MP-1108-0010 should 2: beside a note's file that does not read, every write that read the experiment (or the
+    project) was refused, a run's and an analysis's among them. A note changes no finding and is in no design or
+    freeze, and a write rewrites only the files it changes: the write leaves that note out, is made whole and names
+    the file. Every read (rb status, rb show) still stops at it, and the note's own file is never written."""
+    import warnings
+
+    import rabbit_brain as rb
+
+    seed(capsys)
+    ok(capsys, "question", "add", "Does INT8 cost accuracy?", "--id", "q1")
+    nid = ok(capsys, "note", "add", "the held-out set is not in the pretraining data", *(["-e", "e1"] if where == "experiment" else [])).data["object"]["id"]
+    p = repo / ".rb" / (f"experiments/e1/notes/{nid}.yaml" if where == "experiment" else f"notes/{nid}.yaml")
+    p.write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    rel, held = p.relative_to(repo).as_posix(), p.read_bytes()
+    for argv in (["run", "add", "e1", "fp32.val_loss=0.95", "int8.val_loss=0.97", "--set", "seed=9"],
+                 ["analysis", "add", "e1", "--compare", "int8/fp32:val_loss=0.02[0.01,0.03]", "--method", "paired bootstrap over images"],
+                 ["criterion", "add", "INT8 adds at most 0.1", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.1"],
+                 ["note", "add", "a second note", "-e", "e1"],
+                 ["spec", "set", "e1", "optim.lr", "0.1", "--no-verify"],
+                 ["variant", "add", "e1", "int4", "--role", "ablation"],
+                 ["decide", "c0", "accept", "--why", "within budget"],
+                 ["freeze", "e1", "-m", "before the held-out runs"]):
+        log = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n")
+        code, env = rbj(capsys, *argv)
+        assert code == 0 and env.ok, (argv, code, env.errors)
+        assert rel in [u["path"] for u in env.data.get("unread_files", [])], (argv, env.data.get("unread_files"))
+        assert env.next[0] == "rb doctor", (argv, env.next)
+        assert (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n") > log, argv
+        assert p.read_bytes() == held, argv
+    # a write that reads neither the experiment nor the project's notes succeeds, and names no file it never reads
+    code, env = rbj(capsys, "question", "add", "Does INT8 cost latency?")
+    assert code == 0 and env.ok and p.read_bytes() == held, env.errors
+    # the SDK too, with the file named as an RBWarning
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        got = rb.open().experiment("e1").record({"fp32.val_loss": 0.94, "int8.val_loss": 0.96}, per_run={"seed": 10})
+    assert got is not None and any(rel in str(w.message) for w in caught), [str(w.message) for w in caught]
+    for argv in (["status", "--fail-on", "integrity"], ["show", "e1"]):
+        code, env = rbj(capsys, *argv)
+        assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT", (argv, env.errors)
+    # the note's own file is the one write that stays refused
+    code, env = rbj(capsys, "retract", nid, "--why", "wrong")
+    assert code == 2 and p.read_bytes() == held, env.errors
+
+
+def test_a_duplicate_run_or_analysis_names_an_unreadable_file(repo, capsys):
+    """MP-1108-0010 later 3: a run (or an analysis) already recorded answered "nothing written" and named no file that
+    does not read, while rb status stopped at it: the reply names it too, the SDK's record_from as an RBWarning."""
+    import warnings
+
+    import rabbit_brain as rb
+
+    seed(capsys)
+    ok(capsys, "question", "add", "Does INT8 cost accuracy?", "--id", "q1")
+    Path("m.json").write_text('{"fp32": {"val_loss": 0.93}, "int8": {"val_loss": 0.95}}', encoding="utf-8")
+    ok(capsys, "run", "add", "e1", "--from", "m.json", "--set", "seed=11")
+    compare = ["analysis", "add", "e1", "--compare", "int8/fp32:val_loss=0.02[0.01,0.03]", "--method", "paired bootstrap over images"]
+    ok(capsys, *compare)
+    p = repo / ".rb" / "questions" / "q1.yaml"
+    p.write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    rel = p.relative_to(repo).as_posix()
+    for argv in (["run", "add", "e1", "--from", "m.json", "--set", "seed=11"], compare):
+        before = files_of(repo)
+        code, env = rbj(capsys, *argv)
+        assert code == 0 and env.ok and env.data.get("duplicate_of"), (argv, env.errors)
+        assert [u["path"] for u in env.data.get("unread_files", [])] == [rel] and env.next[0] == "rb doctor", (argv, env.data.get("unread_files"), env.next)
+        assert files_of(repo) == before
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        got = rb.open().experiment("e1").record_from("m.json", per_run={"seed": 11})
+    assert got is None and any(rel in str(w.message) for w in caught), [str(w.message) for w in caught]
+
+
+def test_reconcile_apply_that_records_nothing_names_an_unreadable_file(repo, capsys):
+    """MP-1108-0010 later 4: rb reconcile --apply beside a question's file that does not read named it only when it
+    recorded a run: an apply that records nothing names it too."""
+    seed(capsys)
+    ok(capsys, "question", "add", "Does INT8 cost accuracy?", "--id", "q1")
+    p = repo / ".rb" / "questions" / "q1.yaml"
+    p.write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    code, env = rbj(capsys, "reconcile", "--apply")
+    assert code == 0 and env.ok and not env.data["recorded"], env.errors
+    assert [u["path"] for u in env.data.get("unread_files", [])] == [p.relative_to(repo).as_posix()] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
+
+
+def test_a_row_refusal_says_why_it_asks_of_a_column_that_picks_the_row(repo, capsys):
+    """MP-1108-0010 later 5: beside an unreadable criterion file, a row's refusal named seed, the column --where picks
+    the row by and --set seed=@seed reads, as one that file might declare, with no word why. A metric of that name is
+    one of the row's numbers whenever the file reads (Codex S3 should 2), so rb still cannot place it: the refusal names
+    the other columns first, and says why it asks of seed."""
+    rel = beside_a_criterion(capsys, repo, "yaml")
+    before = files_of(repo)
+    code, env = rbj(capsys, "run", "add", "e2", "--from", "rows.csv", "--where", "group=x,seed=1", "--set", "seed=@seed")
+    assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT" and files_of(repo) == before, env.errors
+    said = env.errors[0].message
+    assert rel in said and "named int8.top1 or seed (seed picks the row or gives a per-run value, and a metric of that name is one of its numbers too)" in said, said
+
+
+def test_a_session_s_gate_beside_an_unreadable_criterion_file_is_made_whole(repo, capsys, monkeypatch):
+    """Codex S3 blocker (in rb 0.8.1 too): in an agent session, rb experiment gate beside a criterion's file that does
+    not read wrote the gate and its log line, then read the experiment's design for its reply and exited 2. The gate
+    is made whole: it exits 0 and names the file."""
+    seed(capsys)
+    p = repo / CRITERIA / "c0.yaml"
+    p.write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    rel = p.relative_to(repo).as_posix()
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-gate-3f10")
+    log = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n")
+    code, env = rbj(capsys, "experiment", "gate", "e1", "--if-holds", "INT8 ships")
+    assert code == 0 and env.ok, (code, env.errors)
+    assert [u["path"] for u in env.data["unread_files"]] == [rel] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
+    lines = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").splitlines()[log:]
+    assert [json.loads(x)["op"] for x in lines if json.loads(x)["op"] != "session"] == ["gate"], lines

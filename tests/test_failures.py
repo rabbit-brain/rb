@@ -226,7 +226,7 @@ def test_a_credentials_file_that_is_not_one_holds_no_credential_and_is_not_calle
         assert (account / "credentials.json").read_bytes() == junk            # rb changes nothing it cannot read
     (account / "credentials.json").unlink()
     code, out, err = said(capsys, "logout", "--hub", NOWHERE)
-    assert code == 0 and err == "" and out.strip() == f"Nothing stored for {NOWHERE}; nothing to do."
+    assert code == 0 and err == "" and out.strip() == f"Nothing stored for <{NOWHERE}>; nothing to do."
 
 
 def test_logging_out_removes_the_credential_here_whatever_stops_the_revoke(record, capsys):
@@ -235,6 +235,8 @@ def test_logging_out_removes_the_credential_here_whatever_stops_the_revoke(recor
     (account / "credentials.json").write_text(json.dumps({NOWHERE: {"token": "rb_stub_made_up", "handle": "t"}}), encoding="utf-8")
     code, out, err = said(capsys, "logout", "--hub", NOWHERE)
     assert code == 0 and err == "" and "credential removed" in out and "not reachable to revoke it" in out
+    # an address in a sentence is said in angle brackets, so the punctuation after it is not read as part of it
+    assert f"Logged out of <{NOWHERE}>: credential removed" in out, out
     assert json.loads((account / "credentials.json").read_text(encoding="utf-8")) == {}
 
 
@@ -243,6 +245,7 @@ def test_an_address_set_to_nothing_is_said_not_guessed(record, capsys, monkeypat
     for cmd in ("login", "logout", "sync"):
         code, env, _ = envelope(capsys, cmd)
         assert code == 2 and env.errors[0].code == "E_USAGE" and env.errors[0].message == "RB_HUB_URL is set to nothing.", cmd
+        assert env.errors[0].fix == "Unset it to use <https://rabbitbrain.ai>, or give it the hub's address.", env.errors[0].fix
 
 
 def test_rb_init_starts_the_record_whatever_state_an_instruction_file_is_in(tmp_path, monkeypatch, capsys):

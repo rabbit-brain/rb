@@ -159,7 +159,7 @@ fn not_an_address(what: &str) -> RBError {
     RBError::msg_fix(
         "E_USAGE",
         format!("{what} is not a web address: one starts with https:// (or http://) and names a host."),
-        "Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses https://rabbitbrain.ai.",
+        "Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses <https://rabbitbrain.ai>.",
     )
 }
 
@@ -172,7 +172,7 @@ fn unsendable() -> RBError {
 fn named(flag: Option<String>) -> Res<String> {
     let given = hub_of(flag);
     if given.is_empty() {
-        return Err(RBError::msg_fix("E_USAGE", "RB_HUB_URL is set to nothing.", "Unset it to use https://rabbitbrain.ai, or give it the hub's address."));
+        return Err(RBError::msg_fix("E_USAGE", "RB_HUB_URL is set to nothing.", "Unset it to use <https://rabbitbrain.ai>, or give it the hub's address."));
     }
     Ok(given)
 }
@@ -358,7 +358,7 @@ pub fn cmd_login(hub_flag: Option<String>, out: &mut Out) -> Res<i32> {
     let shown = crate::sys::slashed(&path);
     // elsewhere the file is readable by its owner alone because rb sets it so; on Windows the profile it sits in is
     let kept = if cfg!(windows) { "" } else { " (mode 0600)" };
-    out.say(format!("Signed in as {} on {hub}.", handle.as_deref().unwrap_or("you")));
+    out.say(format!("Signed in as {} on {}.", handle.as_deref().unwrap_or("you"), crate::cli::address_said(&hub)));
     out.say(format!("The token lives in {shown}{kept}, not in your environment; RB_HUB_TOKEN still overrides it for CI."));
     out.say("rb sync now works here. rb logout revokes and removes it.");
     out.data = crate::dict! {"hub" => hub.clone(), "handle" => handle.map(Value::Str).unwrap_or(Value::Null), "credentials" => shown};
@@ -381,10 +381,10 @@ pub fn cmd_logout(hub_flag: Option<String>, out: &mut Out) -> Res<i32> {
     let revoked = token.as_ref().filter(|t| t.truthy()).map_or(false, |t| revoke(&hub, t));
     let dropped = drop_token(&hub)?;
     if !token.as_ref().map_or(false, Value::truthy) && !dropped {
-        out.say(format!("Nothing stored for {hub}; nothing to do."));
+        out.say(format!("Nothing stored for {}; nothing to do.", crate::cli::address_said(&hub)));
     } else {
         out.say(
-            format!("Logged out of {hub}: credential removed from {}", crate::sys::slashed(&creds_path()))
+            format!("Logged out of {}: credential removed from {}", crate::cli::address_said(&hub), crate::sys::slashed(&creds_path()))
                 + if revoked { " and revoked on the hub." } else { ". The hub was not reachable to revoke it; revoke at /account if it may have leaked." },
         );
     }
@@ -579,7 +579,7 @@ fn code_words(code: Option<&Dict>) -> String {
     }
     let commit: String = code.and_then(|c| c.get("commit")).map(py_str).unwrap_or_default().chars().take(10).collect();
     let at = if commit.is_empty() { String::new() } else { format!("{}{commit}", w::AT_COMMIT) };
-    format!("{}{url}{at}. Readers who rerun it get the code with the record.", w::CODE_THE_RUNS_USED)
+    format!("{}{}{at}. Readers who rerun it get the code with the record.", w::CODE_THE_RUNS_USED, if at.is_empty() { crate::cli::address_said(&url) } else { url })
 }
 
 /// Whether a record sent names the code: by rb export's one rule (`export::readable_code_address`), over origin's

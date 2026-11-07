@@ -1626,6 +1626,29 @@ pub fn names(led: &Ledger) -> Res<indexmap::IndexMap<String, String>> {
     Ok(names)
 }
 
+/// As names, for a write beside record files that do not read: the names the files that read declare, where a metric's
+/// or a criterion's file does not (`unread` gathers it, as `Ledger::after_write` does).
+pub fn names_readable(led: &Ledger, unread: &mut Vec<(String, String)>) -> Res<indexmap::IndexMap<String, String>> {
+    let mut names: indexmap::IndexMap<String, String> = match led.after_write(led.metric_aliases(), unread)? {
+        Some(a) => a.as_ref().clone(),
+        None => {
+            let mut out = indexmap::IndexMap::new();
+            for m in led.live_readable::<Metric>(unread)? {
+                out.insert(m.id.clone(), m.id.clone());
+                for a in &m.aliases {
+                    out.insert(a.clone(), m.id.clone());
+                }
+            }
+            out
+        }
+    };
+    for c in led.live_readable::<Criterion>(unread)? {
+        let leaf = c.metric.rsplit('.').next().unwrap_or("").to_string();
+        names.entry(leaf.clone()).or_insert(leaf);
+    }
+    Ok(names)
+}
+
 /// The experiment these metric names point at; ambiguity is returned as options, never resolved by guessing.
 pub fn target(led: &Ledger, canon_names: &HashSet<String>, names: &indexmap::IndexMap<String, String>) -> Res<(Option<String>, Vec<String>)> {
     let exps = led.live::<Experiment>()?;

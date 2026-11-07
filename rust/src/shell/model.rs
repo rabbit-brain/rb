@@ -1275,6 +1275,9 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
     let said_places = |t: &str| t.split([' ', ',', '[', ']']).filter(|n| n.chars().any(|c| c.is_ascii_digit())).map(decimals_of).max().unwrap_or(0);
     let places = match places {
         Some(p) if !c.measure.is_empty() && parts.is_some() => Some(p.max(said_places(&p_text(&parts)))),
+        // across fixed design cells the reading is the cells' mean, which no grid cell says: its estimate in the digits
+        // rb show says it in ("0.9915", never the grid's "0.992")
+        Some(k) if f.comparison.as_ref().map_or(false, |r| !r.design.is_empty()) => Some(k.max(said_places(&p.estimate))),
         p => p,
     };
     // their bounds as rb show's line rounds them ("[+0.01004, +4.544]"), for the sentences said here: each in its own
@@ -1532,7 +1535,11 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
             let mut xs = vec![e];
             xs.extend(r.and_then(|r| r.lo.zip(r.hi)).map(|(lo, hi)| [lo, hi]).into_iter().flatten());
             // and as the reading's short sentence says it (card_places): one reading, one way
-            let said = decp(m, places.unwrap_or_else(|| card_places(&xs, Some(t), &edges, pct)));
+            // never in fewer decimals than the rule was written with: a margin of 0 beside "= 0.0317 ± 0.00005" is
+            // "0.00000", which says the reading sits on the band's edge at the rule's own resolution, never "0.00"
+            let written = [Some(t), c.tolerance].iter().flatten().map(|x| crate::assess::declared(*x).split_once('.').map_or(0, |(_, f)| f.len())).max().unwrap_or(0);
+            let p = places.unwrap_or_else(|| card_places(&xs, Some(t), &edges, pct)).max(written);
+            let said = if m == 0.0 { format!("{:.p$}", 0.0) } else { decp(m, p) };
             let u = match () {
                 _ if ratio => String::new(),
                 _ if relative => "%".to_string(),
@@ -2264,10 +2271,21 @@ fn finding_graph(led: &Ledger, h: &Home, c: &Criterion, f: &Finding) -> Res<Dict
         xs.extend(read.iter().filter_map(|(k, _, _, _)| bounds(k)).flat_map(|(lo, hi)| [lo, hi]));
         let mut said = crate::assess::cells_said(Some(c), cur, &xs).into_iter();
         let estimates: Vec<String> = read.iter().map(|(_, x, _, _)| if x.is_some() { said.next().unwrap_or_default() } else { String::new() }).collect();
-        for ((key, _, outside, runs), estimate_text) in read.into_iter().zip(estimates) {
+        for ((key, x, outside, runs), estimate_text) in read.into_iter().zip(estimates) {
             let interval_text = match bounds(&key) {
                 Some(_) => format!("[{}, {}]", said.next().unwrap_or_default(), said.next().unwrap_or_default()),
                 None => String::new(),
+            };
+            // a relative change's or a difference of means' cell is a reading of its own, said as rb show says one (a
+            // rule with --where on that cell reads "+0.5625 [+0.545, +0.58]"), never in the digits of the cells' range
+            let (estimate_text, interval_text) = match x.filter(|_| !c.measure.is_empty()) {
+                Some(e) => {
+                    let mut one = cur.clone();
+                    (one.estimate, one.lo, one.hi) = (Some(e), bounds(&key).map(|b| b.0), bounds(&key).map(|b| b.1));
+                    let [e, lo, hi] = crate::assess::said_all([one.estimate, one.lo, one.hi], &crate::assess::rule_numbers(c, &one, ""), !one.reference.is_empty());
+                    (e, if one.lo.is_some() && one.hi.is_some() { format!("[{lo}, {hi}]") } else { String::new() })
+                }
+                None => (estimate_text, interval_text),
             };
             let cell = of_cell(&key).unwrap_or(Value::Null);
             cells.push(crate::obj! {

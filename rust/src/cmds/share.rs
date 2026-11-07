@@ -179,9 +179,9 @@ pub fn cmd_clone(ns: &Namespace, out: &mut Out) -> R {
             let said = c.get("git_said").map(pyjson::py_str).unwrap_or_default();
             let why = c.get("why").map(pyjson::py_str).unwrap_or_default();
             if said.is_empty() {
-                out.say(format!("rb clone could not get the code from {url}: {}.", why.trim_end_matches('.')));
+                out.say(format!("rb clone could not get the code from {}: {}.", crate::cli::address_said(&url), why.trim_end_matches('.')));
             } else {
-                out.say(format!("rb clone could not get the code from {url}. git said: {}", said.trim_end()));
+                out.say(format!("rb clone could not get the code from {}. git said: {}", crate::cli::address_said(&url), said.trim_end()));
             }
             out.say(format!("With access, or a copy you can reach: {again}"));
         }

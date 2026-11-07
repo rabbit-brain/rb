@@ -1014,7 +1014,9 @@ impl Doc<'_> {
         } else if !cells.is_empty() {
             let mut li = String::new();
             // the cells' values in digits said alike (P5)
-            let cell_d = decimals(&cells.iter().filter_map(|c| parsed(s(c, "estimate_text"))).collect::<Vec<_>>());
+            // and as the figure's legend says them (figure_amounts): one cell's number, one set of digits
+            let xs: Vec<f64> = cells.iter().filter_map(|c| parsed(s(c, "estimate_text"))).collect();
+            let cell_d = places_for(&xs, decimals(&xs), reading_digits(f));
             for c in cells {
                 let out = at(c, "outside").and_then(Value::as_bool).unwrap_or(false);
                 let runs: Vec<&str> = strs(c, "runs");
@@ -1027,7 +1029,7 @@ impl Doc<'_> {
                     "<li{}><span class=\"k\">{}</span><span class=\"v\">{}</span>{iv}{n}{}<span class=\"rs\">{}</span></li>",
                     if out { " class=\"out\"" } else { "" },
                     esc(&cell_said(s(c, "key"))),
-                    format!("<a href=\"#{}\">{}</a>", esc(&first), nb(s(c, "estimate_text"), Some(cell_d), compared(f))),
+                    format!("<a href=\"#{}\">{}</a>", esc(&first), cell_value(f, s(c, "estimate_text"), cell_d)),
                     if out { "<span class=\"o\">outside the rule</span>" } else { "" },
                     self.run_links(&runs)
                 );
@@ -2773,12 +2775,33 @@ pub(crate) fn unpadded(f: &Value, v: f64, shown: String) -> String {
 pub(crate) fn unpadded_by(interval_text: &str, v: f64, shown: String) -> String {
     let line = interval_text.trim().trim_start_matches('[').split(']').next().unwrap_or("");
     let Some(said) = line.split(", ").find(|x| !x.contains(['e', 'E']) && parsed(x) == Some(v)) else { return shown };
-    let k = said.split_once('.').map_or(0, |(_, d)| d.len());
+    unpadded_to(said, shown)
+}
+
+/// `shown` without the trailing 0s its decimals add past `said`, rb's own text of the same number ("+0.1", never
+/// "+0.10"); as `shown` where `said` has an exponent, or `shown` would lose a digit that is not a 0.
+fn unpadded_to(said: &str, shown: String) -> String {
+    if said.contains(['e', 'E']) {
+        return shown;
+    }
+    let k = said.trim().split_once('.').map_or(0, |(_, d)| d.chars().take_while(char::is_ascii_digit).count());
     match shown.split_once('.') {
         Some((whole, frac)) if frac.len() > k && frac.chars().all(|c| c.is_ascii_digit()) && frac[k..].chars().all(|c| c == '0') => {
             if k == 0 { whole.to_string() } else { format!("{whole}.{}", &frac[..k]) }
         }
         _ => shown,
+    }
+}
+
+/// A design cell's estimate in the cells' list: in `d` decimals said alike (P5), but a relative change's or a
+/// difference of means' in its own digits, as rb show says the cell's reading ("+0.5625", never "+0.56"; "+0.1").
+fn cell_value(f: &Value, text: &str, d: usize) -> String {
+    if s(f, "reading.measure").is_empty() {
+        return nb(text, Some(d), compared(f));
+    }
+    match parsed(text) {
+        Some(v) => nb_shown(v, text, text.trim().to_string()),
+        None => esc(text),
     }
 }
 
@@ -3581,7 +3604,10 @@ pub(crate) fn figure_amounts(f: &Value, texts: &[&str], signed: bool) -> Vec<Str
     let xs: Vec<f64> = texts.iter().filter_map(|t| parsed(t)).collect();
     let d = places_for(&xs, decimals(&xs), reading_digits(f));
     let pct = relative(f);
-    texts.iter().map(|t| parsed(t).map_or_else(|| t.to_string(), |v| if pct { with_unit(&fixed(v, d, signed), "%") } else { fixed(v, d, signed) })).collect()
+    // a relative change's and a difference of means' amounts each in their own digits, as rb show writes them ("+0.1%",
+    // never "+0.10%", beside "+0.5625%"), as a card says their bounds (unpadded)
+    let own = |t: &str, shown: String| if s(f, "reading.measure").is_empty() { shown } else { unpadded_to(t, shown) };
+    texts.iter().map(|t| parsed(t).map_or_else(|| t.to_string(), |v| { let n = own(t, fixed(v, d, signed)); if pct { with_unit(&n, "%") } else { n } })).collect()
 }
 
 /// A number in a sentence, marked so the sentence drills from it (the drill law) and nowhere else is in link colour

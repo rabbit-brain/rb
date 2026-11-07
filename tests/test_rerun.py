@@ -376,7 +376,7 @@ def test_a_bundle_whose_export_saw_its_commit_was_not_at_origin_says_so_where_th
     finally:
         os.chdir(cwd)
     assert code == 0
-    words = f"rb clone could not get the code from {SERVED}: the bundle says its code's commit {ahead[:12]} is not at {SERVED}."
+    words = f"rb clone could not get the code from <{SERVED}>: the bundle says its code's commit {ahead[:12]} is not at <{SERVED}>."
     assert words in lines, lines
     assert not any("git said" in line or "has no commit" in line for line in lines), lines
     assert lines[lines.index(words) + 1].startswith("With access, or a copy you can reach: rb clone ")

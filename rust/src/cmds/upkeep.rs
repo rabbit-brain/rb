@@ -716,9 +716,11 @@ fn loose_lines(
 
 /// Record each result reconcile placed without doubt, through the same rb run add anyone would type: (what was
 /// recorded, what was not, each with why).
-fn record_found(placed: &[Found]) -> (Vec<String>, Vec<String>) {
+/// The third: each record file a recorded run's reply could not read beside it, as (path, why), once.
+fn record_found(placed: &[Found]) -> (Vec<String>, Vec<String>, Vec<(String, String)>) {
     let mut done = Vec::new();
     let mut not_done = Vec::new();
+    let mut unread: Vec<(String, String)> = Vec::new();
     for it in placed {
         let mut argv = it.argv.clone();
         argv.push("--json".into());
@@ -729,6 +731,13 @@ fn record_found(placed: &[Found]) -> (Vec<String>, Vec<String>) {
         for told in env.get("data").and_then(|d| d.get("warnings")).and_then(Value::as_list).into_iter().flatten().map(pyjson::py_str) {
             if crate::sources::is_snapshot_ref_told(&told) {
                 crate::plain::tell(told);
+            }
+        }
+        // a run recorded beside a file that does not read: the file, said by this command once (say_not_read)
+        for u in env.get("data").and_then(|d| d.get("unread_files")).and_then(Value::as_list).into_iter().flatten() {
+            let path = u.get("path").map(pyjson::py_str).unwrap_or_default();
+            if !unread.iter().any(|(p, _)| *p == path) {
+                unread.push((path, u.get("why").map(pyjson::py_str).unwrap_or_default()));
             }
         }
         let rid = env.get("data").and_then(|d| d.get("object")).and_then(|o| o.get("id")).filter(|v| v.truthy()).map(pyjson::py_str);
@@ -744,7 +753,7 @@ fn record_found(placed: &[Found]) -> (Vec<String>, Vec<String>) {
             }
         }
     }
-    (done, not_done)
+    (done, not_done, unread)
 }
 
 /// The changed files nothing cites, the results found, what rb cannot place and the folders it reads, each of which rb
@@ -773,8 +782,9 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
     let mut all = jr::found_all(&led, view)?;
     let mut recorded: Vec<String> = Vec::new();
     let mut not_recorded: Vec<String> = Vec::new();
+    let mut not_read: Vec<(String, String)> = Vec::new();
     if applied.is_some() && !all.placed.is_empty() {
-        (recorded, not_recorded) = record_found(&all.placed);
+        (recorded, not_recorded, not_read) = record_found(&all.placed);
         led = Ledger::open(None)?;
         all = jr::found_all(&led, view)?;
         // a folder a run it recorded named is that experiment's now: the folders read as they are after it
@@ -996,6 +1006,7 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
     }
     out.data.insert("repository".into(), Value::Dict(repo::plan_as_dict(&plan)));
     out.data.insert("read".into(), Value::Dict(reads));
+    let (was_applied, recorded_none) = (applied.is_some(), recorded.is_empty());
     out.data.insert("applied".into(), applied.map(Value::Dict).unwrap_or(Value::Null));
     out.data.insert("recorded".into(), Value::list_of_str(recorded));
     out.data.insert("not_recorded".into(), Value::list_of_str(not_recorded));
@@ -1011,6 +1022,19 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
     // the next step never adds an experiment nobody declared: --apply is offered only while it would add none
     let mut next: Vec<String> = if pending && new.is_empty() { vec!["rb reconcile --apply".into()] } else { Vec::new() };
     next.extend(placed.iter().take(2).map(typed));
+    // a run it recorded beside a record file that does not read: the file, with doctor's fix, and rb doctor first
+    // an apply names each file the record's index could not read, whether or not it recorded a run beside it
+    if was_applied {
+        led.unread_beside(&mut not_read)?;
+    }
+    if !not_read.is_empty() {
+        if recorded_none {
+            crate::cmds::record::say_not_read_as(out, "What this apply keeps is recorded; this reply leaves out what reads that file.", &not_read);
+        } else {
+            crate::cmds::record::say_not_read(out, "run", &not_read);
+        }
+        next.insert(0, "rb doctor".into());
+    }
     out.next = next;
     Ok(0)
 }

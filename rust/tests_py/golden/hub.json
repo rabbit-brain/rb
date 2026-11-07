@@ -4,7 +4,7 @@
    "run": "login: rb login --hub http://127.0.0.1:47821/m/ok",
    "exit": 0,
    "out": [
-    "Signed in as t on http://127.0.0.1:47821/m/ok.",
+    "Signed in as t on <http://127.0.0.1:47821/m/ok>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -33,7 +33,7 @@
    "run": "login: rb login --hub http://127.0.0.1:47821/m/complete",
    "exit": 0,
    "out": [
-    "Signed in as t on http://127.0.0.1:47821/m/complete.",
+    "Signed in as t on <http://127.0.0.1:47821/m/complete>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -66,7 +66,7 @@
    "run": "login: rb login --hub http://127.0.0.1:47821/m/slow",
    "exit": 0,
    "out": [
-    "Signed in as t on http://127.0.0.1:47821/m/slow.",
+    "Signed in as t on <http://127.0.0.1:47821/m/slow>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -283,7 +283,7 @@
    "run": "login: rb login --hub http://127.0.0.1:47821/m/nohandle",
    "exit": 0,
    "out": [
-    "Signed in as you on http://127.0.0.1:47821/m/nohandle.",
+    "Signed in as you on <http://127.0.0.1:47821/m/nohandle>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -324,7 +324,7 @@
    "run": "login: rb login --hub http://127.0.0.1:47821/m/nullhandle",
    "exit": 0,
    "out": [
-    "Signed in as you on http://127.0.0.1:47821/m/nullhandle.",
+    "Signed in as you on <http://127.0.0.1:47821/m/nullhandle>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -598,7 +598,7 @@
    "run": "login: rb login --hub http://127.0.0.1:47821/m/strinterval",
    "exit": 0,
    "out": [
-    "Signed in as t on http://127.0.0.1:47821/m/strinterval.",
+    "Signed in as t on <http://127.0.0.1:47821/m/strinterval>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -692,7 +692,7 @@
    ],
    "err": [
     "rb login: rabbitbrain is not a web address: one starts with https:// (or http://) and names a host.",
-    "  \u2192 Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses https://rabbitbrain.ai.",
+    "  \u2192 Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses <https://rabbitbrain.ai>.",
     ""
    ],
    "credentials": {
@@ -733,7 +733,7 @@
    ],
    "err": [
     "rb login: localhost:1 is not a web address: one starts with https:// (or http://) and names a host.",
-    "  \u2192 Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses https://rabbitbrain.ai.",
+    "  \u2192 Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses <https://rabbitbrain.ai>.",
     ""
    ],
    "credentials": {
@@ -774,7 +774,7 @@
    ],
    "err": [
     "rb login: https:// is not a web address: one starts with https:// (or http://) and names a host.",
-    "  \u2192 Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses https://rabbitbrain.ai.",
+    "  \u2192 Give the hub's address in full, with --hub or RB_HUB_URL. Without either, rb uses <https://rabbitbrain.ai>.",
     ""
    ],
    "credentials": {
@@ -874,7 +874,7 @@
    "run": "login env: rb login",
    "exit": 0,
    "out": [
-    "Signed in as t on http://127.0.0.1:47821/m/complete.",
+    "Signed in as t on <http://127.0.0.1:47821/m/complete>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -923,7 +923,7 @@
    "run": "logout: rb logout --hub http://127.0.0.1:47821/m/ok",
    "exit": 0,
    "out": [
-    "Logged out of http://127.0.0.1:47821/m/ok: credential removed from @BASE@/cfg/credentials.json and revoked on the hub.",
+    "Logged out of <http://127.0.0.1:47821/m/ok>: credential removed from @BASE@/cfg/credentials.json and revoked on the hub.",
     ""
    ],
    "err": [
@@ -959,7 +959,7 @@
    "run": "logout again: rb logout --hub http://127.0.0.1:47821/m/ok",
    "exit": 0,
    "out": [
-    "Nothing stored for http://127.0.0.1:47821/m/ok; nothing to do.",
+    "Nothing stored for <http://127.0.0.1:47821/m/ok>; nothing to do.",
     ""
    ],
    "err": [
@@ -995,7 +995,7 @@
    "run": "login for norevoke: rb login --hub http://127.0.0.1:47821/m/norevoke",
    "exit": 0,
    "out": [
-    "Signed in as t on http://127.0.0.1:47821/m/norevoke.",
+    "Signed in as t on <http://127.0.0.1:47821/m/norevoke>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -1092,7 +1092,7 @@
    "run": "login for revokejunk: rb login --hub http://127.0.0.1:47821/m/revokejunk",
    "exit": 0,
    "out": [
-    "Signed in as t on http://127.0.0.1:47821/m/revokejunk.",
+    "Signed in as t on <http://127.0.0.1:47821/m/revokejunk>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -1141,7 +1141,7 @@
    "run": "logout revokejunk: rb logout --hub http://127.0.0.1:47821/m/revokejunk",
    "exit": 0,
    "out": [
-    "Logged out of http://127.0.0.1:47821/m/revokejunk: credential removed from @BASE@/cfg/credentials.json. The hub was not reachable to revoke it; revoke at /account if it may have leaked.",
+    "Logged out of <http://127.0.0.1:47821/m/revokejunk>: credential removed from @BASE@/cfg/credentials.json. The hub was not reachable to revoke it; revoke at /account if it may have leaked.",
     ""
    ],
    "err": [
@@ -1177,7 +1177,7 @@
    "run": "logout nothing: rb logout --hub http://127.0.0.1:47821/m/never",
    "exit": 0,
    "out": [
-    "Nothing stored for http://127.0.0.1:47821/m/never; nothing to do.",
+    "Nothing stored for <http://127.0.0.1:47821/m/never>; nothing to do.",
     ""
    ],
    "err": [
@@ -1738,7 +1738,7 @@
    "run": "logout unreachable: rb logout --hub http://127.0.0.1:1",
    "exit": 0,
    "out": [
-    "Nothing stored for http://127.0.0.1:1; nothing to do.",
+    "Nothing stored for <http://127.0.0.1:1>; nothing to do.",
     ""
    ],
    "err": [
@@ -2095,7 +2095,7 @@
    "run": "login hugeexpiry: rb login --hub http://127.0.0.1:47821/m/hugeexpiry",
    "exit": 0,
    "out": [
-    "Signed in as t on http://127.0.0.1:47821/m/hugeexpiry.",
+    "Signed in as t on <http://127.0.0.1:47821/m/hugeexpiry>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -2144,7 +2144,7 @@
    "run": "login for revoke204: rb login --hub http://127.0.0.1:47821/m/revoke204",
    "exit": 0,
    "out": [
-    "Signed in as t on http://127.0.0.1:47821/m/revoke204.",
+    "Signed in as t on <http://127.0.0.1:47821/m/revoke204>.",
     "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
     "rb sync now works here. rb logout revokes and removes it.",
     ""
@@ -2335,7 +2335,7 @@
    ],
    "err": [
     "rb logout: RB_HUB_URL is set to nothing.",
-    "  \u2192 Unset it to use https://rabbitbrain.ai, or give it the hub's address.",
+    "  \u2192 Unset it to use <https://rabbitbrain.ai>, or give it the hub's address.",
     ""
    ],
    "credentials": {

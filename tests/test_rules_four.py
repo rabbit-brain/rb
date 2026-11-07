@@ -409,6 +409,105 @@ def test_a_cited_difference_of_means_at_one_design_cell_is_read_as_one(rb):
     assert f["comparison"]["estimate"] == pytest.approx(0.0045)
 
 
+def means_and_relative_at_32(rb):
+    rb("spec", "set", "e1", "batch", "--per-run", "--design-factor")
+    Path("paper.md").write_text("At batch 32 INT8 adds 0.0045 to the validation loss.\n", encoding="utf-8")
+    rb("criterion", "add", "the paper's difference at batch 32", "-e", "e1", "--metric", "change.val_loss", "--equals", "0.0045", "--tolerance", "0.00005", "--means",
+       "--source", "paper.md", "--quote", "INT8 adds 0.0045 to the validation loss", "--where", "batch=32", "--id", "cm")
+    rb("criterion", "add", "INT8 adds at most 0.5% at batch 32", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.5", "--relative", "--where", "batch=32", "--id", "c32")
+    batches(rb, CELLS)
+
+
+def test_a_means_card_says_its_interval_in_the_digits_of_its_reading_line(rb):
+    """MP-1106-2212 later 3: "(-0.61 to -0.19)" on the card beside "-0.4 [-0.6078, -0.1922]" on rb show's line."""
+    means_and_relative_at_32(rb)
+    said = finding(rb, "cm")["says"]["comparison"]
+    lo, hi = re.search(r"\[([^,\]]+), ([^\]]+)\]", said).groups()
+    assert len(lo.split(".")[1]) > 2, said
+    assert f"({lo} to {hi})" in page(rb), (lo, hi)
+
+
+def test_a_means_card_says_each_bound_as_its_reading_line_does(rb):
+    """Each bound in its own digits, as rb show writes it: "+0.01004, +4.544", never "+0.01004 to +4.54396"."""
+    Path("paper.md").write_text("INT8 adds 2.277 to the validation loss.\n", encoding="utf-8")
+    rb("criterion", "add", "the paper's difference", "-e", "e1", "--metric", "change.val_loss", "--equals", "2.277", "--tolerance", "0.0005", "--means",
+       "--source", "paper.md", "--quote", "INT8 adds 2.277 to the validation loss", "--id", "cm")
+    seeds(rb, [3.277, 4.277, 5.277], [1, 2, 3])
+    said = finding(rb, "cm")["says"]["comparison"]
+    lo, hi = re.search(r"\[([^,\]]+), ([^\]]+)\]", said).groups()
+    assert len(lo.split(".")[1]) != len(hi.split(".")[1]), said
+    assert f"({lo} to {hi})" in page(rb), (lo, hi)
+
+
+def test_a_relative_card_says_each_bound_as_its_reading_line_does(rb):
+    """The orchestrator, Nov 7 10:05 (MP-1107-0840 later 4): rule-relative's page said "(-22.60 to -22.37)" where rb show
+    says "[-22.6, -22.37]": a bound's decimals padded with a 0 its line does not write. Each in its own digits, on the
+    card, its big reading and the list's sentence alike."""
+    rb("criterion", "add", "INT8 improves val_loss by 22.5% over FP32", "-e", "e1", "--metric", "change.val_loss", "--at-most", "-22.5", "--relative", "--id", "c1")
+    for i, (fp32, int8) in enumerate([(1.4635, 1.1346), (1.4602, 1.1311), (1.4651, 1.1362)], 1):
+        rb("run", "add", "e1", f"fp32.val_loss={fp32}", f"int8.val_loss={int8}", "--set", f"seed={i}", "--produced-at", "2026-05-01")
+    lo, hi = re.search(r"\[([^,\]]+), ([^\]]+)\]", finding(rb, "c1")["says"]["comparison"]).groups()
+    assert len(lo.split(".")[1]) != len(hi.split(".")[1]), (lo, hi)   # the case: one bound written in fewer digits
+    page_text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", page(rb))))
+    assert page_text.count(f"({lo} to {hi})") >= 2, (lo, hi)            # the card's sentence and the list's
+    padded = lo + "0" if len(lo.split(".")[1]) < len(hi.split(".")[1]) else hi + "0"
+    assert padded not in page_text, padded
+
+
+@pytest.mark.parametrize("rule", ["means", "means in exponent form", "relative"])
+def test_a_grid_cell_a_means_rule_owns_says_its_reading_as_the_card(rb, rule):
+    """MP-1107-0443's blocker: rounding the model's reading.lo and hi to rb show's digits put the grid's cell out of step
+    with the card ("0.030 nats higher (+0.021 to +0.039)" beside "0.02968 ... (+0.0205 to +0.03885)"). The rule owns the
+    cell (both arms in runs of their own, no design cell); the grid says the reading the card says, its estimate too
+    (0.8.0's grid said rb compare's change of the means, "0.02967", beside the card's "0.02968"). A relative rule reads
+    the cell otherwise (rb compare's read_by), in percent: the cell says its own change in nats, linked to the rule, and
+    never the rule's numbers (P12), while the card says the rule's reading."""
+    rb("spec", "vary", "e1", "precision")
+    rb("spec", "set", "e1", "fp32.precision", "fp32", "--no-verify")
+    rb("spec", "set", "e1", "int8.precision", "int8", "--no-verify")
+    # the second, scaled by 1e-7, gives bounds rb show writes in exponent form ("+3.885e-09"): MP-1107-0443's second pass
+    small = rule == "means in exponent form"
+    said = "3.17e-9" if small else "0.0317"
+    if rule == "relative":
+        rb("criterion", "add", "INT8 adds at most 3.5%", "-e", "e1", "--metric", "change.val_loss", "--at-most", "3.5", "--relative", "--id", "cm")
+    else:
+        Path("paper.md").write_text(f"INT8 adds {said} to the validation loss.\n", encoding="utf-8")
+        rb("criterion", "add", "INT8 adds what the paper says", "-e", "e1", "--metric", "change.val_loss", "--equals", said, "--tolerance", "5.0e-12" if small else "0.00005",
+           "--means", "--source", "paper.md", "--quote", f"adds {said} to the validation loss", "--id", "cm")
+    scale = (lambda x: f"{x * 1e-7:.10g}") if small else (lambda x: f"{x:g}")  # noqa: E731
+    for i, f in enumerate([0.9612, 0.9655, 0.9701], 1):
+        rb("run", "add", "e1", f"fp32.val_loss={scale(f)}", "--set", f"seed={i}", "--produced-at", "2026-05-01")
+    for i, f in enumerate([0.9931, 0.9978, 1.000309 if small else 1.0003, 0.9899], 1):
+        rb("run", "add", "e1", f"int8.val_loss={scale(f)}", "--set", f"seed={i}", "--produced-at", "2026-05-01")
+    rb("page", "--out", "page.html")
+    raw = Path("page.html").read_text(encoding="utf-8")
+    flat = lambda h: re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", h)))  # noqa: E731
+    grids = [flat(g) for g in re.findall(r'<table class="grid">.*?</table>', raw, re.S)]
+    est, lo, hi = re.search(r": ([^ ]+) \[([^,\]]+), ([^\]]+)\]", finding(rb, "cm")["says"]["comparison"]).groups()
+    # each number as rb show writes it, in plain decimals where it writes an exponent
+    plain = lambda t: ("+" if t.startswith("+") else "") + format(__import__("decimal").Decimal(t), "f")  # noqa: E731
+    card = f"({plain(lo)} to {plain(hi)})"
+    amount = plain(est).lstrip("+") + ("%" if rule == "relative" else " nats")
+    page_text = flat(raw)
+    assert grids and page_text.count(card) >= 2, (card, grids)          # the card's sentence and the list's
+    assert f"INT8 is {amount} higher than the FP32 baseline {card}" in page_text, (amount, card)
+    if rule == "relative":
+        assert any("0.03 nats higher than FP32" in g for g in grids) and not any("%" in g for g in grids), grids
+        assert re.search(r'<span class="gd"><a [^>]*href="#cr?-cm"[^>]*>0\.03 nats higher than FP32</a>', raw), "linked to its rule"
+    else:
+        assert any(f"{amount} higher than FP32 {card}" in g for g in grids), (amount, card, grids)
+
+
+def test_rb_compare_names_every_criterion_that_reads_a_cell(rb):
+    """MP-1106-2212 later 4: the batch 32 cell named the rule whose number it shows, and not the relative rule beside it."""
+    means_and_relative_at_32(rb)
+    env = rb("compare", "e1")
+    cell = next(r for r in env.data["rows"] if r["variant"] == "int8" and r["where"].get("batch") == 32)["metrics"]["val_loss"]
+    assert cell["delta"] == pytest.approx(0.0045) and [x["criterion"] for x in cell.get("read_beside", [])] == ["c32"], cell
+    code, out = rb("compare", "e1", text=True)
+    assert "(also read by c32)" in out and "read otherwise by a criterion, beside the change shown: c32 reads" in out, out
+
+
 def test_across_design_cells_each_cell_reads_the_rule_s_own_estimand(rb):
     """MP-1104-09 should: 'both cells meet the threshold' from the cells' plain differences, in the metric's unit."""
     rb("spec", "set", "e1", "batch", "--per-run", "--design-factor")
@@ -421,6 +520,18 @@ def test_across_design_cells_each_cell_reads_the_rule_s_own_estimand(rb):
     assert f["comparison"]["design"]["meets"] == 1
     assert "1 of 2 cells meet the threshold" in f["says"]["units"] and "+0.1% to +0.5625%" in f["says"]["units"], f["says"]["units"]
     assert f["comparison"]["method"].startswith("relative change") and "%" in f["says"]["comparison"] and "nats" not in f["says"]["comparison"], f["says"]
+
+
+def test_a_relative_rule_s_figure_across_cells_says_its_amounts_in_percent_as_its_card(rb):
+    """MP-1106-2212 should 2: the figure's words said "+0.56 ... estimate: +0.33" beside the card's 0.3312%."""
+    rb("spec", "set", "e1", "batch", "--per-run", "--design-factor")
+    rb("criterion", "add", "INT8 adds at most 0.5%", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.5", "--relative", "--id", "cr")
+    batches(rb, CELLS)
+    rb("page", "--out", "page.html")
+    legend = [html.unescape(m) for m in re.findall(r'<p class="figleg figv">(.*?)</p>', Path("page.html").read_text(encoding="utf-8"))]
+    assert legend and all(x.endswith("estimate: +0.3312%") for x in legend), legend
+    assert "batch 32: +0.5625% (outside the rule)" in legend[0] and "batch 64: +0.10%" in legend[0], legend
+    assert "INT8 is 0.3312% higher" in page(rb)
 
 
 def pooled(rb, a, b):
@@ -588,3 +699,23 @@ def test_a_relative_change_s_runs_in_points_stay_in_points(rb):
     assert not re.search(r"\b(82|85|80|81|79)\.00 ?%", text), re.findall(r".{20}\b8\d\.00 ?%.{10}", text)
     assert re.search(r"\b82\.00 points\b", text), re.findall(r".{20}\b82\.00.{12}", text)
     assert re.search(r"INT8 is 2\.\d+% higher than the FP32 baseline", text), re.findall(r"INT8 is [^()]*", text)
+
+
+def test_a_relative_rule_the_other_way_round_leaves_the_grid_cell_its_own(rb):
+    """Q2's review: a relative rule of fp32 against int8 reads INT8's cell otherwise (rb compare's read_by), and the
+    other way round. The cell keeps its own change of int8 against the baseline: never "2.982% lower than FP32" beside
+    means that say INT8 is higher."""
+    rb("spec", "vary", "e1", "precision")
+    rb("spec", "set", "e1", "fp32.precision", "fp32", "--no-verify")
+    rb("spec", "set", "e1", "int8.precision", "int8", "--no-verify")
+    rb("criterion", "add", "FP32 is at most 3.5% below INT8", "-e", "e1", "--metric", "val_loss", "--subject", "fp32", "--reference", "int8",
+       "--at-most", "3.5", "--relative", "--id", "cm")
+    for i, f in enumerate([0.9612, 0.9655, 0.9701], 1):
+        rb("run", "add", "e1", f"fp32.val_loss={f:g}", "--set", f"seed={i}", "--produced-at", "2026-05-01")
+    for i, f in enumerate([0.9931, 0.9978, 1.0003, 0.9899], 1):
+        rb("run", "add", "e1", f"int8.val_loss={f:g}", "--set", f"seed={i}", "--produced-at", "2026-05-01")
+    rb("page", "--out", "page.html")
+    raw = Path("page.html").read_text(encoding="utf-8")
+    flat = lambda h: re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", h)))  # noqa: E731
+    grids = [flat(g) for g in re.findall(r'<table class="grid">.*?</table>', raw, re.S)]
+    assert any("higher than FP32" in g for g in grids) and not any("lower than FP32" in g or "%" in g for g in grids), grids

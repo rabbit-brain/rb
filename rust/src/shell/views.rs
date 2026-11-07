@@ -50,7 +50,7 @@ pub fn page(doc: &Value, surface: Surface) -> String {
         _ => String::new(),
     };
     format!(
-        "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\">\
+        "<!doctype html>\n<html lang=\"en\" data-inspector-from=\"1280\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\">\
          <title>{}</title><link rel=\"icon\" href=\"{}\"><style>{}</style>{script}</head><body>\
          <a class=\"skip\" href=\"#main\">{}</a>{}{}{}<main id=\"main\" tabindex=\"-1\">{}\
          <div class=\"sec\" id=\"sec-overview\">{overview}</div>\
@@ -298,6 +298,16 @@ fn crumb_title(title: &str, id: &str) -> String {
     format!("<span class=\"au\">{}</span> <span class=\"cid\">{}</span>", esc(&cut_title(title)), esc(id))
 }
 
+/// A question's or an experiment's view named in the top bar and the inspector's trail (NAV-SPEC 4): its title cut
+/// short as its crumb, its id apart (`data-crumb-of`), which the script draws after it, dim; by its id where it has no
+/// title. A page an older rb wrote names the view by its id alone, as its crumb.
+fn view_crumb(title: &str, id: &str) -> String {
+    if title.trim().is_empty() {
+        return format!("data-crumb=\"{}\"", esc(id));
+    }
+    format!("data-crumb=\"{}\" data-crumb-of=\"{}\"", esc(&cut_title(title)), esc(id))
+}
+
 /// Text escaped, each word joined by a hyphen (`ResNet-50`, `per-channel`) kept on one line, so a line breaks between
 /// words and never at a word's own hyphen; a word too long for a narrow line is left to break.
 fn whole_words(s: &str) -> String {
@@ -479,10 +489,23 @@ fn top_bar(doc: &Value, surface: Surface, pickers: &str, rerun: &str) -> String 
     // About's, never the bar's
     format!(
         "<header class=\"top\" id=\"top\" data-swap><span class=\"rbwm\">rb<span class=\"rbdot\">.</span></span><span class=\"ttl\">{}</span>\
-         <span class=\"vcrumb\"></span>{pickers}<span class=\"end\">{rerun}<span class=\"stamp\">{}</span>{end}</span></header>",
+         <span class=\"vcrumb\"></span>{pickers}<span class=\"end\">{rerun}<span class=\"stamp\"{}>{}</span>{end}</span></header>",
         au_title(text(doc, "project.title")),
+        // the export's own bar never shows it (the hub draws its own; with no script there is no app's bar)
+        stamp_short(text(doc, "at")).filter(|_| surface != Surface::Export).map(|s| format!(" data-short=\"{}\"", esc(&s))).unwrap_or_default(),
         esc(text(doc, "at")),
     )
+}
+
+/// The snapshot's moment in short form ("2026-10-19 09:41 UTC" reads "19 Oct 09:41"), which the bar says under 960 in
+/// place of the whole (NAV-SPEC 5); none where the moment is not in that form.
+fn stamp_short(at: &str) -> Option<String> {
+    const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let (day, rest) = at.split_once(' ')?;
+    let time = rest.strip_suffix(" UTC")?;
+    let mut ymd = day.split('-');
+    let (_, m, d) = (ymd.next()?, ymd.next()?.parse::<usize>().ok()?, ymd.next()?.parse::<u32>().ok()?);
+    (time.len() == 5 && time.as_bytes()[2] == b':' && (1..=12).contains(&m)).then(|| format!("{d} {} {time}", MONTHS[m - 1]))
 }
 
 /// About and, where the page carries the script, the theme and keyboard controls it drives: in the top bar on rb page and
@@ -547,8 +570,10 @@ fn record_line(doc: &Value) -> String {
     )
 }
 
-/// The nav: Overview · Research (the questions whole, All criteria) · Experiments (each by id and short title) ·
-/// Record (Runs, Resources, History), with Your call (N) at the foot. Counts are rb's; absent, none is drawn.
+/// The nav: Overview · Research (the questions whole, Rules) · Experiments (each by id and short title) · Record
+/// (Runs, Resources, History), with Your call (N) at the foot. Counts are rb's; absent, none is drawn. One hierarchy at
+/// every width (NAV-SPEC): as a row (under 960, and with no script) it is Overview · Research · Experiments · Record ·
+/// Your call, Record a link to the record's views, which start with their own row; a reader's row has no Your call.
 fn nav(doc: &Value, surface: Surface) -> String {
     let n = |key: &str| count(doc, &format!("home.counts.{key}")).map(|n| format!(" <span class=\"n\">{n}</span>")).unwrap_or_default();
     let qs: String = list(doc, "questions")
@@ -582,12 +607,14 @@ fn nav(doc: &Value, surface: Surface) -> String {
     // queue, which holds them too, may count more
     let yc = count(doc, "your_call.n").map(|n| format!(" <span class=\"n\">{n}</span>")).unwrap_or_default();
     let foot = if surface == Surface::Export { controls(surface) } else { String::new() };
+    // a reader has nothing to call: on the export (a reader's, unless the hub says its owner looks) the row leaves it out
+    let row = if surface == Surface::Export { " data-row=\"owner\"" } else { "" };
     format!(
         "<nav class=\"nav\" id=\"nav\" aria-label=\"Research record\"><ul><li><a href=\"#overview\">{}</a></li>\
          <li><a href=\"#research\">{}{}</a><ul class=\"sub\">{qs}<li><a href=\"#criteria\"><span class=\"tx\">{}</span>{}</a></li></ul></li>\
          <li><a href=\"#experiments\">{}{}</a><ul class=\"sub\">{xs}</ul></li>\
-         <li><span class=\"grp\">{}</span><ul class=\"rec\"><li><a href=\"#runs\">{}{}</a></li><li><a href=\"#resources\">{}{}</a></li><li><a href=\"#history\">{}</a></li></ul></li>\
-         <li class=\"yc\"><a href=\"#your-call\">{}{yc}</a></li></ul>{foot}</nav>",
+         <li class=\"rcd\"><a class=\"grp\" href=\"#record\">{}</a><ul class=\"rec\"><li><a href=\"#runs\">{}{}</a></li><li><a href=\"#resources\">{}{}</a></li><li><a href=\"#history\">{}</a></li></ul></li>\
+         <li class=\"yc\"{row}><a href=\"#your-call\">{}{yc}</a></li></ul>{foot}</nav>",
         w::OVERVIEW,
         w::RESEARCH,
         n("questions"),
@@ -636,6 +663,28 @@ fn section(id: &str, title: &str, crumb: &str, root: &str, body: &str) -> String
         esc(crumb),
         esc(root)
     )
+}
+
+/// As `section`, for a view under a place of the navigator (`nav`: research, record), which it marks as current.
+fn section_in(nav: &str, id: &str, title: &str, crumb: &str, root: &str, body: &str) -> String {
+    format!(
+        "<section class=\"view\" id=\"{id}\" data-nav=\"{nav}\" data-title=\"{}\" data-crumb=\"{}\" data-root=\"{}\" aria-labelledby=\"h-{id}\">{body}</section>",
+        esc(title),
+        esc(crumb),
+        esc(root)
+    )
+}
+
+/// The record's own row, at the start of each of its views (Runs, Resources, History), the one shown marked: the
+/// navigator's row leaves them out (NAV-SPEC). Counts are rb's; absent, none is drawn.
+fn record_row(doc: &Value, here: &str) -> String {
+    let n = |key: &str| count(doc, &format!("home.counts.{key}")).map(|n| format!(" <span class=\"n\">{n}</span>")).unwrap_or_default();
+    let items = [("runs", w::RUNS, n("runs")), ("resources", w::RESOURCES, n("resources")), ("history", w::HISTORY, String::new())];
+    let links: Vec<String> = items
+        .iter()
+        .map(|(id, label, n)| format!("<a href=\"#{id}\"{}>{label}{n}</a>", if *id == here { " aria-current=\"page\"" } else { "" }))
+        .collect();
+    format!("<nav class=\"subrow\" aria-label=\"{}\">{}</nav>", w::RECORD, links.concat())
 }
 
 fn with_project(doc: &Value, what: &str) -> String {
@@ -887,7 +936,7 @@ fn plain_reading(f: &Value) -> String {
         String::new()
     };
     let n = count(f, "reading.n").unwrap_or(0);
-    let (lo, hi) = (num("lo"), num("hi"));
+    let (lo, hi) = super::nodes::shown_bounds(f);
     let (subject, reference) = arms_said(f);
     let (subject, reference) = (subject.as_str(), reference.as_str());
     // a level where there is no reference, or the reference is the cited number itself (a cited level, "fp32 baseline
@@ -946,7 +995,7 @@ fn plain_reading(f: &Value) -> String {
     // the interval in brackets after its number, as the cards say it (fix 3); a level's bounds keep its unit
     // ("13.07% (11.00% to 15.14%)"), a difference's are the points or units just said ("(+0.62 to +6.58)")
     if let (Some(lo), Some(hi)) = (lo, hi) {
-        let bound = |x: f64| if level { with_unit(x) } else { dec(x, p, !ratio) };
+        let bound = |x: f64| if level { with_unit(x) } else { super::nodes::unpadded(f, x, dec(x, p, !ratio)) };
         let interval = format!(" ({} to {})", bound(lo), bound(hi));
         // after the number, before what it is on: "0.7597 (0.7591 to 0.7603) on top1"
         let on = if metric.is_empty() { String::new() } else { format!(" on {metric}") };
@@ -1503,9 +1552,9 @@ impl<'a> Page<'a> {
         h.push(self.reproduce_panel(x, &xid));
         h.push(self.experiment_folds(x, &xid));
         format!(
-            "<article class=\"view obj\" id=\"{}\" data-nav=\"experiments\" data-crumb=\"{}\" data-title=\"{}\" data-root=\"{}\" aria-labelledby=\"h-{}\">{}</article>",
+            "<article class=\"view obj\" id=\"{}\" data-nav=\"experiments\" {} data-title=\"{}\" data-root=\"{}\" aria-labelledby=\"h-{}\">{}</article>",
             esc(&xid),
-            esc(eid),
+            view_crumb(text(x, "title"), eid),
             esc(&with_project(doc, eid)),
             "insp-none",
             esc(&xid),
@@ -1884,6 +1933,15 @@ impl<'a> Page<'a> {
             });
         let card = rule.as_deref().and_then(|c| self.finding(c)).filter(|_| same_reading).map(|f| super::nodes::reading_digits(f).max(places(said_unit(unit_word(text(m, "unit"))), &xs)));
         let p = card.map_or(p, |c| c.max(p));
+        // and in the card's own numbers: its estimate (rb compare's change of the means can round the other way:
+        // "0.02967" beside the card's "0.02968") and its bounds as the card says them (nodes::shown_bounds)
+        let (e, lo, hi) = match rule.as_deref().and_then(|c| self.finding(c)).filter(|_| card.is_some()) {
+            Some(f) => {
+                let (l, h) = super::nodes::shown_bounds(f);
+                (at(f, "reading.estimate").and_then(Value::as_f64).unwrap_or(e), l.or(lo), h.or(hi))
+            }
+            None => (e, lo, hi),
+        };
         // a number under 0.01 keeps two significant figures where a rule's sentence says it, as the finding does
         let dec = |x: f64, p: usize, signed: bool| {
             if card.is_some() {
@@ -1916,7 +1974,12 @@ impl<'a> Page<'a> {
             }
         };
         if let (Some(lo), Some(hi)) = (lo, hi) {
-            said.push_str(&format!(" ({} to {})", dec(lo, p, !ratio), dec(hi, p, !ratio)));
+            // the card's bounds each in its own digits, as it says them (nodes::unpadded)
+            let own = |x: f64| match rule.as_deref().and_then(|c| self.finding(c)).filter(|_| card.is_some()) {
+                Some(f) => super::nodes::unpadded(f, x, dec(x, p, !ratio)),
+                None => dec(x, p, !ratio),
+            };
+            said.push_str(&format!(" ({} to {})", own(lo), own(hi)));
         } else {
             // rb's words for why there is none, where it gives them (`no_interval`); a document before them, what the
             // cell's basis says
@@ -2591,7 +2654,7 @@ impl<'a> Page<'a> {
                 plural(n, "analysis", "analyses")
             ));
         }
-        section("runs", &with_project(d, w::RUNS), w::RUNS, "insp-none", &h.concat())
+        section_in("record", "runs", &with_project(d, w::RUNS), w::RUNS, "insp-none", &(record_row(d, "runs") + &h.concat()))
     }
 
     /// Resources: rb's line, then a row per resource folding what it is: its type and role, how many runs read it and
@@ -2603,8 +2666,8 @@ impl<'a> Page<'a> {
             _ => String::new(),
         };
         let rows = if rows.is_empty() { String::new() } else { format!("<div class=\"list\">{rows}</div>") };
-        let body = format!("<h1 id=\"h-resources\">{}</h1><p class=\"lede\">{}</p>{rows}", w::RESOURCES, w::RESOURCES_LEDE);
-        section("resources", &with_project(d, w::RESOURCES), w::RESOURCES, "insp-none", &body)
+        let body = format!("{}<h1 id=\"h-resources\">{}</h1><p class=\"lede\">{}</p>{rows}", record_row(d, "resources"), w::RESOURCES, w::RESOURCES_LEDE);
+        section_in("record", "resources", &with_project(d, w::RESOURCES), w::RESOURCES, "insp-none", &body)
     }
 
     fn resource_row(&self, id: &str, r: &Value) -> String {
@@ -2725,7 +2788,7 @@ impl<'a> Page<'a> {
         if !rows.is_empty() {
             h.push(format!("<h2>{}</h2><ol class=\"hlist log\">{rows}</ol>", w::LOG));
         }
-        section("history", &with_project(d, w::HISTORY), w::HISTORY, "insp-none", &h.concat())
+        section_in("record", "history", &with_project(d, w::HISTORY), w::HISTORY, "insp-none", &(record_row(d, "history") + &h.concat()))
     }
 
     /// The finding of criterion `cid`, if the document holds one.
@@ -2787,8 +2850,13 @@ impl<'a> Page<'a> {
         // each question as the Overview's card says it, a sub-question set in under its parent (design pass 1, target 1)
         let cards: String = list(d, "questions").iter().map(|q| self.question_card(q, "rs")).collect();
         let cards = if cards.is_empty() { String::new() } else { format!("<div class=\"cards\" aria-label=\"Questions\">{cards}</div>") };
+        // the link to Rules under the intro, which the navigator's row leaves out (NAV-SPEC): a link, never the tally
+        let rules = match count(d, "home.counts.criteria") {
+            Some(n) => format!("{} ({n})", w::ALL_CRITERIA),
+            None => w::ALL_CRITERIA.to_string(),
+        };
         let body = format!(
-            "<h1 id=\"h-research\">{}</h1><p class=\"lede\">{}</p>{cards}{}",
+            "<h1 id=\"h-research\">{}</h1><p class=\"lede\">{}</p><p class=\"rlink\"><a href=\"#criteria\">{rules} \u{2192}</a></p>{cards}{}",
             w::RESEARCH,
             w::RESEARCH_LEDE,
             self.unfiled(),
@@ -2883,9 +2951,9 @@ impl<'a> Page<'a> {
         }
         h.push(self.question_folds(q, id, &qid, &mine));
         format!(
-            "<article class=\"view obj\" id=\"{}\" data-nav=\"research\" data-crumb=\"{}\" data-title=\"{}\" data-root=\"{}\" aria-labelledby=\"h-{}\">{}</article>",
+            "<article class=\"view obj\" id=\"{}\" data-nav=\"research\" {} data-title=\"{}\" data-root=\"{}\" aria-labelledby=\"h-{}\">{}</article>",
             esc(&qid),
-            esc(id),
+            view_crumb(text(q, "text"), id),
             esc(&with_project(doc, id)),
             esc(&format!("{qid}:rail")),
             esc(&qid),
@@ -3451,7 +3519,7 @@ impl<'a> Page<'a> {
                 plural(cs.len() as i64, "rule", "rules")
             ));
         }
-        section("criteria", &with_project(d, w::ALL_CRITERIA), w::ALL_CRITERIA, "insp-none", &h.concat())
+        section_in("research", "criteria", &with_project(d, w::ALL_CRITERIA), w::ALL_CRITERIA, "insp-none", &h.concat())
     }
 
     /// A rule in Rules (design pass 1, target 3): its sentence with its state on the right; under it rb's reading in a
@@ -5123,6 +5191,15 @@ mod tests {
     /// the hub's metas to take the place of; an experiment's Reproduce place has its own prompt naming it and its rules; with no repository
     /// the code line says the bundle does not say where the code is.
     #[test]
+    fn the_bar_keeps_the_snapshot_s_moment_in_short_form() {
+        // NAV-SPEC 5: under 960 the bar says the moment in short form; one not in rb's form gets none
+        assert_eq!(stamp_short("2026-10-19 09:41 UTC").as_deref(), Some("19 Oct 09:41"));
+        assert_eq!(stamp_short("2026-01-02 00:05 UTC").as_deref(), Some("2 Jan 00:05"));
+        assert_eq!(stamp_short("2026-13-02 00:05 UTC"), None);
+        assert_eq!(stamp_short("a while ago"), None);
+    }
+
+    #[test]
     fn rerun_this_research_is_drawn_only_with_a_clone_address() {
         let (mut live, _) = live_open();
         let d = live.as_dict_mut().unwrap();
@@ -5141,7 +5218,7 @@ mod tests {
         // the bar's button, at the right before the time, and the Overview's, each opening the one panel
         let bar = &html[html.find("<header class=\"top\"").unwrap()..];
         let bar = &bar[..bar.find("</header>").unwrap()];
-        assert!(bar.contains(&format!("<span class=\"end\"><a class=\"rrb rrun rrbar\" href=\"#rerun\" data-rerun>{}</a><span class=\"stamp\">", w::RERUN)), "{bar}");
+        assert!(bar.contains(&format!("<span class=\"end\"><a class=\"rrb rrun rrbar\" href=\"#rerun\" data-rerun>{}</a><span class=\"stamp\"", w::RERUN)), "{bar}");
         assert_eq!(html.matches("href=\"#rerun\" data-rerun>").count(), 2);
         assert_eq!(html.matches("id=\"rerun\"").count(), 1);
         let panel = &html[html.find("<aside class=\"rerun rrun\" id=\"rerun\"").unwrap()..];

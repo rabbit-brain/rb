@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.1 (2026-11-07)
+
+The page has one navigator at every width and says a rule's numbers in its card's digits wherever it shows them, and rb names a file raised to `rb: 2` by hand as no valid record.
+
+- **One navigator at every width.** From 1280 px the page keeps its three panes. From 960 to 1279 px it shows the questions column and the working view, and a card opens as a sheet over the work. Under 960 px, and with no script, it is one row: Overview · Research · Experiments · Record · Your call (a reader's row holds the four places). The record's views start with their own row, Research links its Rules, and the bar names a question or an experiment by its title. The hub's one copy of the script lays out pages an older rb wrote as they were.
+- **A file raised to `rb: 2` by hand.** A record file whose first line says `rb: 2` and that holds none of the four format-2 rules is no valid record (`E_STATE_CORRUPT`), where rb 0.8.0 said nothing. `rb doctor` names it and says to set its first line back to `rb: 1` (or `rb doctor --restore` puts back what rb wrote), every gate fails closed, and rb writes nothing over it until it is fixed.
+- **A write beside a file that does not read.** A write beside a record file that does not read is made whole or not at all: it never leaves its own file written without its log line, as rb 0.8.0 could.
+- **A file a newer rb wrote.** `rb show` of a file in a format newer than this rb reads says a newer rb wrote it (`E_STATE_NEWER`), as `rb status`, `rb doctor` and every write do.
+- **The page says a rule's numbers as its card does.**
+  - A comparison grid's cell that is a rule's reading says that rule's card's numbers, its estimate as well as its interval: a cited difference of means no longer reads 0.02967 in the grid beside 0.02968 on its card.
+  - A relative rule's figure across design cells says its amounts in percent and in its card's digits.
+  - A difference of means' or a relative change's card says each bound as `rb show`'s line writes it, with no 0 added ("-22.6 to -22.37").
+  - A cited difference of means is said as one where its rule is shown: in the rule's row ("as a difference of means = 0.0317 ± 0.00005 nats") and in a design's "criterion added" line, which says a relative rule's threshold in percent, never in the metric's unit.
+- **`rb compare`** names a criterion that reads a cell otherwise (a relative change beside a cited difference of means) beside the change it shows: `(also read by c1)`, and `read_beside` in `--json`.
+- **Help.** `rb run add --every-row`'s help names a SQLite table too.
+- **A team on two versions.** rb 0.8.0 reads every file 0.8.1 writes. The one file they read apart is a file raised to `rb: 2` by hand with none of the four rules, which 0.8.0 reads as fine and 0.8.1 names as no valid record.
+
 ## 0.8.0 (2026-11-07)
 
 Four new kinds of rule (a count, a best of N, a relative change and a cited difference of means) are kept in record format 2, each is read its own way wherever rb reads it, and rb writes every other file in format 1, as rb 0.7 writes it.

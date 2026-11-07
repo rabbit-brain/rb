@@ -734,11 +734,11 @@ html:not(.app) .card:target, html:not(.app) tr:target, html:not(.app) .repro:tar
 <li><a href="#research">Research <span class="n">2</span></a><ul class="sub">
 <li><a href="#q-q1"><span class="tx q">Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1?</span></a></li>
 <li><a class="d1" href="#q-q1a"><span class="tx q">↳ How many calibration images does INT8 need?</span></a></li>
-<li><a href="#criteria"><span class="tx">All criteria</span> <span class="n">6</span></a></li></ul></li>
+<li><a href="#criteria"><span class="tx">Rules</span> <span class="n">6</span></a></li></ul></li>
 <li><a href="#experiments">Experiments <span class="n">2</span></a><ul class="sub">
 <li><a href="#x-e1" title="int8 against fp32"><span class="tx x"><span class="mono">e1</span> int8 against fp32</span></a></li>
 <li><a href="#x-e2" title="calibration set size: how many images INT8 needs"><span class="tx x"><span class="mono">e2</span> calibration set size</span></a></li></ul></li>
-<li><span class="grp">Record</span><ul class="rec">
+<li class="rcd"><a class="grp" href="#record">Record</a><ul class="rec">
 <li><a href="#runs">Runs <span class="n">9</span></a></li>
 <li><a href="#resources">Resources <span class="n">4</span></a></li>
 <li><a href="#history">History</a></li></ul></li>
@@ -755,7 +755,7 @@ html:not(.app) .card:target, html:not(.app) tr:target, html:not(.app) .repro:tar
 <div class="srow sg" data-go="q-q1"><p class="r1"><a class="sq" href="#q-q1">Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1?</a> <span class="qs">open</span></p><p class="ansp"><a class="ans" href="#c-c1">int8 holds top1 within 1 point of fp32</a></p></div>
 <div class="srow sg d1" data-go="q-q1a"><p class="r1"><a class="sq" href="#q-q1a">↳ How many calibration images does INT8 need?</a> <span class="qs">open</span></p></div>
 </nav>
-<p class="quiet"><a href="#criteria">All criteria · 6</a>: 4 criteria met · 2 criteria not met</p>
+<p class="quiet"><a href="#criteria">Rules · 6</a>: 4 criteria met · 2 criteria not met</p>
 <section class="ycl" id="ov-calls" data-rail data-rootname="Your call (4)" aria-labelledby="h-ovc">
 <h2 id="h-ovc">Your call (4)</h2>
 <p class="lede sm">4 calls wait on you.</p>
@@ -797,8 +797,8 @@ html:not(.app) .card:target, html:not(.app) tr:target, html:not(.app) .repro:tar
 <ul class="evl"><li class="evr" id="f-c5:q1a" data-go="c-c5" data-row data-x="e2"><div class="evh"><a class="stm" href="#c-c5">int8 stays within 1 point of fp32 at every calibration size</a><a class="sw bad evs" href="#c-c5">criterion not met</a></div><p class="evu"><a href="#c-c5">4 runs</a></p></li></ul>
 <p class="sm"><a href="#notes">Notes on the project (1)</a></p>
 </article>
-<section class="view" id="criteria" data-nav="research" data-crumb="All criteria" data-title="All criteria · INT8 ResNet-50 on ImageNet" data-root="ov-calls" aria-labelledby="h-crit">
-<h1 id="h-crit">All criteria</h1>
+<section class="view" id="criteria" data-nav="research" data-crumb="Rules" data-title="Rules · INT8 ResNet-50 on ImageNet" data-root="ov-calls" aria-labelledby="h-crit">
+<h1 id="h-crit">Rules</h1>
 <div class="filterbar"><input type="search" aria-label="Filter the criteria" placeholder="filter"><span class="fchips"><button type="button" class="fchip" data-fx="e1" aria-pressed="false">e1</button><button type="button" class="fchip" data-fx="e2" aria-pressed="false">e2</button></span></div>
 <div class="list" data-group>
 <details class="nd" data-row data-x="e1" data-for="c-c1" data-fold="crit-c1"><summary><span class="mono">c1</span> int8 holds top1 within 1 point of fp32 · criterion met</summary>

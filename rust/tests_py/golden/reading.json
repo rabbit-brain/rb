@@ -9860,7 +9860,7 @@
     " \"command\": \"page\",",
     " \"data\": {",
     "  \"path\": \"@BASE@/work/shared/one.html\",",
-    "  \"bytes\": 310408",
+    "  \"bytes\": 311742",
     " },",
     " \"errors\": [],",
     " \"next\": [],",
@@ -13197,12 +13197,12 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "3fd64758d1aaf57d3d8a17e16604546dc47b1d4da96e1e016daf6cc788629483",
-   "bytes": 310408
+   "sha256": "f70e3c6a411dac67a90ff1f02e570bedb0846c0874ab1acdc0895079ea4dad26",
+   "bytes": 311742
   },
   "shared/one.html": {
-   "sha256": "3fd64758d1aaf57d3d8a17e16604546dc47b1d4da96e1e016daf6cc788629483",
-   "bytes": 310408
+   "sha256": "f70e3c6a411dac67a90ff1f02e570bedb0846c0874ab1acdc0895079ea4dad26",
+   "bytes": 311742
   }
  }
 }

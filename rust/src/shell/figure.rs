@@ -162,13 +162,13 @@ pub fn draw(f: &Value, legend: bool) -> String {
         String::new()
     } else {
         let shown: Vec<&Value> = list(f, "design_cells").iter().filter(|c| !text(c, "key").is_empty() && !text(c, "estimate_text").is_empty()).collect();
-        // in words and in two decimals said alike across the cells and the estimate (DESIGN-PASS-1 P5, P8)
+        // in words, said alike across the cells and the estimate (DESIGN-PASS-1 P5, P8), in the card's digits and unit
         let mut texts: Vec<&str> = shown.iter().map(|c| text(c, "estimate_text")).collect();
         if est.is_some() {
             texts.push(text(f, "reading.estimate_text"));
         }
         // signed only where the reading is a difference of two arms; a level is a number as it is
-        let nums = nodes::two_decimals(&texts, nodes::compared(f));
+        let nums = nodes::figure_amounts(f, &texts, nodes::compared(f));
         let mut said: Vec<String> = shown
             .iter()
             .zip(&nums)

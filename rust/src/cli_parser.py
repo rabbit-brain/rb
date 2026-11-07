@@ -132,7 +132,7 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser) -> None:
         s.add_argument("--where", action="append", default=None, metavar="COLUMN=VALUE",
                        help="with --table, or a CSV, TSV or JSON Lines table: the row's columns and their values, e.g. precision=int8,seed=1; exactly one row must have them all")
         s.add_argument("--every-row", action="store_true",
-                       help="with a CSV, TSV or JSON Lines table: record every row --where picks, each as its own run, its @<column> values from its own row")
+                       help="with --table, or a CSV, TSV or JSON Lines table: record every row --where picks, each as its own run (a SQLite row kept by its rowid), its @<column> values from its own row")
         s.add_argument("--select", action="append", default=None, metavar="COLUMN",
                        help="with --table, or a CSV, TSV or JSON Lines table: only these of the row's columns that name a declared metric (default: all of them)")
         s.add_argument("--config", default=None, help="the run's own resolved config (Hydra, W&B config.yaml, hparams.yaml): checks it ran with the spec")

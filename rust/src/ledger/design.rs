@@ -1922,7 +1922,18 @@ impl Ledger {
     /// What a write's line keeps of the designs it made from ones the user owned (`detail.owned`): each design as it
     /// reads once written, where it is not the one before and no line keeps it yet; `words`, the gate's words the line
     /// gives, where it sets them.
+    /// What owned_after reads, read before a write's files change, so a file that does not read stops it there.
+    pub(crate) fn owned_after_reads(&self) -> Res<()> {
+        self.design_index()?;
+        self.all::<Criterion>()?;
+        self.gate_words()?;
+        Ok(())
+    }
+
     pub(crate) fn owned_after(&self, before: &[(String, String)], words: Option<(&str, &str)>) -> Res<Option<Value>> {
+        if before.is_empty() {
+            return Ok(None);
+        }
         let ix = self.design_index()?;
         let mut out = Dict::new();
         for (x, before_full) in before {

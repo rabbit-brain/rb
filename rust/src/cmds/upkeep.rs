@@ -257,7 +257,16 @@ pub fn research_doctor(ns: &Namespace, out: &mut Out, led: &Ledger) -> R {
             }
             Err(Err(u)) => {
                 let newer = matches!(u, crate::ledger::Unreadable::Newer(_));
-                problems.push(problem(if newer { "state_newer" } else { "corrupt" }, u.text().to_string(), if newer { "pip install --upgrade rabbit-brain" } else { fix_edit }));
+                // a format said by hand is put back, never adopted: rb writes each file in the one format its content takes
+                let format = matches!(u, crate::ledger::Unreadable::Format(_));
+                let fix = if newer {
+                    "pip install --upgrade rabbit-brain"
+                } else if format {
+                    "rb doctor --restore puts back what rb last wrote, in the format its content takes"
+                } else {
+                    fix_edit
+                };
+                problems.push(problem(if newer { "state_newer" } else { "corrupt" }, u.text().to_string(), fix));
             }
         }
     }

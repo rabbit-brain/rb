@@ -1234,9 +1234,10 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
 /// on a miss, what rb's rule sentence says after its rule word (`rule_detail`); the unit amended after the lock, where
 /// that changes how its runs pair (`unit_amended`); its receipt as rows of field, words and the ids they name, with no
 /// writer (`receipt_rows`); and a cited number's source (`cited`).
-/// A reading's estimate as rb's comparison text says it: its decimals are the reading's, its bounds' too.
+/// A reading's estimate and interval as rb's comparison text says them: its decimals are the reading's, its bounds'
+/// too ("-0.4 [-0.6078, -0.1922]" is said in four).
 fn p_text(parts: &Option<crate::assess::ReadingParts>) -> String {
-    parts.as_ref().map_or(String::new(), |p| p.estimate.clone())
+    parts.as_ref().map_or(String::new(), |p| format!("{} {}", p.estimate, p.interval))
 }
 
 fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
@@ -1263,13 +1264,28 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
     };
     // only as far as its own numbers need them: never a trailing 0 the grid's digits add ("0.74", never "0.740")
     let places = places.map(|p| grid.map_or(p, |g| super::nodes::places_for(&xs, p, g)));
-    // a relative change and a difference of means are said in the digits rb show says their estimate in ("estimate
-    // -0.3821% ≥ -0.5%"): the card, its interval too, never in fewer
-    let said_places = |t: &str| t.split([' ', ',', '[', ']']).filter(|n| !n.contains('e')).filter_map(|n| n.split_once('.')).map(|(_, f)| f.chars().take_while(char::is_ascii_digit).count()).max().unwrap_or(0);
+    // a relative change and a difference of means are said in the digits rb show says their reading in ("estimate
+    // -0.3821% ≥ -0.5%", "-0.4 [-0.6078, -0.1922]"): the card, its interval too, never in fewer
+    // a number in exponent form says its decimals too ("+3.885e-09" is said to 12)
+    let decimals_of = |n: &str| -> usize {
+        let (m, e) = n.split_once(['e', 'E']).map_or((n, 0), |(m, e)| (m, e.parse::<i64>().unwrap_or(0)));
+        let frac = m.split_once('.').map_or(0, |(_, f)| f.chars().take_while(char::is_ascii_digit).count()) as i64;
+        (frac - e).max(0) as usize
+    };
+    let said_places = |t: &str| t.split([' ', ',', '[', ']']).filter(|n| n.chars().any(|c| c.is_ascii_digit())).map(decimals_of).max().unwrap_or(0);
     let places = match places {
         Some(p) if !c.measure.is_empty() && parts.is_some() => Some(p.max(said_places(&p_text(&parts)))),
         p => p,
     };
+    // their bounds as rb show's line rounds them ("[+0.01004, +4.544]"), for the sentences said here: each in its own
+    // digits, never one bound padded to the other's ("+4.54396"). reading.lo and hi stay rb's numbers, which the grid
+    // and the figures read; the page's own sentences read these from interval_text (nodes::shown_bounds)
+    let bounds: Option<(f64, f64)> = r.and_then(|r| r.lo.zip(r.hi)).map(|(lo, hi)| {
+        let line = (!c.measure.is_empty()).then(|| p.interval.trim().trim_start_matches('[').split(']').next().unwrap_or("").split_once(", ")).flatten();
+        let as_said = |t: &str, v: f64| t.trim().trim_start_matches('+').parse::<f64>().ok().filter(|x| x.is_finite()).unwrap_or(v);
+        line.map_or((lo, hi), |(l, h)| (as_said(l, lo), as_said(h, hi)))
+    });
+    let interval_said = p.interval.clone();
     let reading = crate::obj! {
         "places" => places.map_or(Value::Null, |p| Value::Int(p as i64)),
         "estimate" => num(r.and_then(|r| r.estimate)), "lo" => num(r.and_then(|r| r.lo)), "hi" => num(r.and_then(|r| r.hi)),
@@ -1392,7 +1408,9 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
     let cells = r.map_or(false, |r| r.method.contains("design cells"));
     // a level with no arm named is said by its metric's own name, never as an empty label (Look 3, also seen)
     let said_plain = if subject_label.is_empty() { metric_said(&metric) } else { plain(&subject_label) };
-    let reading_short = match r.and_then(|r| r.estimate.map(|e| (e, r.lo.zip(r.hi)))) {
+    // a relative change's and a difference of means' bounds each in its own digits, as rb show's line writes them
+    let unpad = |x: f64, t: String| if c.measure.is_empty() { t } else { super::nodes::unpadded_by(&interval_said, x, t) };
+    let reading_short = match r.and_then(|r| r.estimate.map(|e| (e, bounds))) {
         Some((e, iv)) => {
             // 2 decimals, more where 2 would round a number onto or past the rule's own (the rule's digits)
             let mut xs = vec![e];
@@ -1406,7 +1424,7 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
             // points or units just said, a level's each with its unit
             match cited_target {
                 _ if !reference.is_empty() => {
-                    let between = iv.map(|(lo, hi)| format!(" ({} to {})", signedp(lo, p), signedp(hi, p))).unwrap_or_default();
+                    let between = iv.map(|(lo, hi)| format!(" ({} to {})", unpad(lo, signedp(lo, p)), unpad(hi, signedp(hi, p)))).unwrap_or_default();
                     // a mean across fixed design cells says so, since one cell can miss a rule the mean meets
                     let across = if cells { " on average across its design cells" } else { "" };
                     format!("{}{across}{between}", differs_by(&plain(&subject_label), &plain(&the(&exp, &reference)), e, &unit, p))
@@ -1447,7 +1465,7 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
         subject: &if subject.is_empty() { metric_said(&metric) } else { plain(&subject) },
         reference: &plain(&reference),
         estimate: r.and_then(|r| r.estimate),
-        interval: r.and_then(|r| r.lo.zip(r.hi)),
+        interval: bounds,
         unit: &unit,
         rule_words: &rule_words,
         relative,
@@ -1477,7 +1495,9 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
     let level = reference.is_empty();
     let unit_after = |n: &str| match () {
         _ if ratio => String::new(),
-        _ if pct && (level || relative) => "%".to_string(),
+        // a relative change's threshold is a percent whatever the metric's unit ("≤ 3.5%", never "≤ 3.5 nats")
+        _ if relative => "%".to_string(),
+        _ if pct && level => "%".to_string(),
         _ if pct => format!(" {}", if n.trim_start_matches(['-', '+', '\u{b1}']) == "1" { "point" } else { "points" }),
         _ if unit.is_empty() => String::new(),
         _ => format!(" {unit}"),
@@ -1494,6 +1514,8 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
         }
         _ => format!("{rule_said}{}", unit_after(rule_said.rsplit(' ').next().unwrap_or(""))),
     };
+    // a difference of means says what the cited number measures, as rb show's rule does
+    let rule_said = if c.measure == "means" { format!("as a difference of means {rule_said}") } else { rule_said };
     let margin_said = match (r.and_then(|r| r.estimate), c.target) {
         (Some(e), Some(t)) if matches!(c.comparator.as_str(), "at_most" | "at_least" | "equals") && c.over == "mean" => {
             // a reading on its number is that number: the distance from it is snapped, never the band around it
@@ -1565,9 +1587,12 @@ fn rule_on_page(led: &Ledger, c: &Criterion) -> Res<Option<String>> {
     let (subject, reference, metric, _) = led.arms(&exp, c)?;
     let unit = sentence_unit(&led.catalogue_entry(&metric)?.map(|m| m.unit).unwrap_or_default(), &metric);
     let level = reference.is_empty();
+    // a relative change's numbers are percents, whatever the metric's unit (as rb show's rule says them)
+    let relative = c.measure == "relative";
     let said = |x: f64| {
         let n = crate::assess::declared(x);
         match () {
+            _ if relative => format!("{n}%"),
             _ if is_percent(&unit) && level => format!("{n}%"),
             _ if is_percent(&unit) => format!("{n} {}", if n.trim_start_matches(['-', '+']) == "1" { "point" } else { "points" }),
             _ if unit.is_empty() => n,
@@ -1578,10 +1603,12 @@ fn rule_on_page(led: &Ledger, c: &Criterion) -> Res<Option<String>> {
         "at_least" => format!("{} or more", said(t)),
         "at_most" => format!("{} or less", said(t)),
         _ => match c.tolerance {
-            Some(tol) => format!("{} \u{b1} {}", said(t), if level && is_percent(&unit) { said(tol).trim_end_matches('%').to_string() + " points" } else { said(tol) }),
+            Some(tol) => format!("{} \u{b1} {}", said(t), if level && is_percent(&unit) && !relative { said(tol).trim_end_matches('%').to_string() + " points" } else { said(tol) }),
             None => return Ok(None),
         },
     };
+    // a difference of means says what the cited number measures, as rb show's rule does
+    let bound = if c.measure == "means" { format!("{bound}, as a difference of means") } else { bound };
     let title = metric_said(&metric);
     let subject_label = arm_label(&exp, &subject);
     Ok(Some(match () {

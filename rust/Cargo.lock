@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "rabbit-brain"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "chrono",
  "fancy-regex",

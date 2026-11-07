@@ -1319,16 +1319,16 @@ def test_one_honesty_line(record):
 
 
 def test_the_nav_and_its_counts(record):
-    """The nav: Overview, Research with each question whole, All criteria, Experiments by id and short title, Record
-    (Runs, Resources, History), and Your call (N) at the foot, each count rb's."""
+    """The nav: Overview, Research with each question whole, Rules, Experiments by id and short title, Record (a link
+    to the record's views, over Runs, Resources, History), and Your call (N) at the foot, each count rb's."""
     t = Html(page_of(record))
     nav = t.by_id("nav")
     links = [(e["attrs"]["href"], said(t.text(e))) for e in t.all(nav) if e["tag"] == "a"]
     hrefs = [h for h, _ in links]
-    assert hrefs == ["#overview", "#research", "#q-q1", "#q-q1a", "#criteria", "#experiments", "#x-e1", "#x-e2", "#runs", "#resources",
-                     "#history", "#your-call"]
+    assert hrefs == ["#overview", "#research", "#q-q1", "#q-q1a", "#criteria", "#experiments", "#x-e1", "#x-e2", "#record", "#runs",
+                     "#resources", "#history", "#your-call"]
     shown = dict(links)
-    assert shown["#research"] == "Research 2" and shown["#criteria"] == "Rules 6" and shown["#runs"] == "Runs 9"
+    assert shown["#research"] == "Research 2" and shown["#criteria"] == "Rules 6" and shown["#runs"] == "Runs 9" and shown["#record"] == "Record"
     # an experiment by its short title, its id trailing (design pass 1, P3)
     assert shown["#x-e2"] == "calibration set size e2" and shown["#q-q1a"].startswith("↳ How many")
     # the user's calls alone: what waits for a confirmation is never under Your call (AGENTS.md)
@@ -1996,7 +1996,8 @@ def test_each_view_roots_the_inspector_on_its_own(record):
         assert rail["attrs"].get("data-rootname"), rail["attrs"].get("id")
     assert not [e for e in t.all(t.by_id("overview")) if "data-rail" in e["attrs"]]
     rules = css(page)
-    wide = next(sheet for media, sheet in rules.items() if "min-width: 960px" in media)
+    # the inspector is a column from 1280 (under it a card is a sheet, NAV-SPEC): from there its root needs no bar
+    wide = next(sheet for media, sheet in rules.items() if "min-width: 1280px" in media and "html.app .ibar:has(> .crumbs > .rootname:empty)" in sheet)
     assert wide["html.app .ibar:has(> .crumbs > .rootname:empty)"]["display"] == "none"
     app = next(sheet for media, sheet in rules.items() if media == "@media screen")
     assert app["html.app.ready main > .nodes"]["display"] == "none"
@@ -2371,6 +2372,111 @@ def test_a_hosted_page_keeps_nothing_shows_no_guide_by_itself_and_folds_its_top_
     bare = _hosted(tmp_path, {"bare": (page, 1280, "")}, frame=False)["bare"]
     assert bare["stored"] == "kept" and not bare["hosted"] and bare["guide"] and bare["top"], json.dumps(bare)
     assert stamp not in bare["line"] and bare["ctl"] == 0, json.dumps(bare)
+
+
+_NAV_PROBE = r"""(async () => {
+  const vis = e => { if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; };
+  const said = e => e.innerText.replace(/\s+/g, ' ').trim();
+  const items = [...document.querySelectorAll('#nav > ul a')].filter(vis);
+  const out = { row: items.map(said), lines: new Set(items.map(a => Math.round(a.getBoundingClientRect().top))).size,
+                column: vis(document.querySelector('#nav .sub a')), app: document.documentElement.classList.contains('app') };
+  if (!out.app) return JSON.stringify(out);
+  const wait = () => new Promise(r => setTimeout(r, 300));
+  const marked = () => [...document.querySelectorAll('#nav a[aria-current="page"], #nav a.in')].filter(vis).map(a => a.getAttribute('href'));
+  out.marks = {};
+  for (const v of ['overview', 'research', 'q-q1', 'criteria', 'experiments', 'x-e1', 'runs', 'resources', 'history', 'your-call']) {
+    location.hash = '#' + v; await wait();
+    out.marks[v] = marked();
+  }
+  location.hash = '#research'; await wait();
+  out.rules = [...document.querySelectorAll('#research p.rlink a')].filter(vis).map(said);
+  location.hash = '#runs'; await wait();
+  out.subrow = [...document.querySelectorAll('#runs nav.subrow a')].filter(vis).map(a => said(a) + (a.getAttribute('aria-current') ? ' *' : ''));
+  const card = document.querySelector('.card[data-kind="criterion"]');
+  location.hash = '#' + card.id; await wait();
+  const aside = document.querySelector('aside.insp');
+  out.sheet = document.documentElement.classList.contains('sheet') && getComputedStyle(aside).position === 'fixed' && vis(aside);
+  out.beside = !out.sheet && vis(aside);
+  return JSON.stringify(out);
+})()"""
+
+
+def _nav(tmp_path, pages: dict) -> dict:
+    """What the navigator shows of each page in `pages` ({name: (html, width)}), opened as it is in a real Chrome: the
+    row's (or the column's) items and on how many lines, whether the column lists the questions, and with the script,
+    the items each view marks, Research's link to its Rules, the record's own row, and how a card opens."""
+    runs = []
+    for name, (page, width) in pages.items():
+        at = tmp_path / f"nav-{name}.html"
+        # the guide is seen: it is no part of the navigator
+        at.write_text(page.replace("<head>", "<head><script>try{localStorage.setItem('rb.guide.1','ended')}catch(e){}</script>", 1), encoding="utf-8")
+        runs.append((name, at.as_uri(), width))
+    script = _cdp_script(tmp_path / "nav.mjs", f"""
+const out = {{}};
+await cdp.run(async () => {{
+  for (const [name, url, width] of {json.dumps(runs)}) {{
+    const page = await (await cdp.launchChrome()).page();
+    await page.viewport(width, 900);
+    await page.goto(url);
+    await cdp.sleep(600);
+    out[name] = JSON.parse(await page.ev({json.dumps(_NAV_PROBE)}));
+    await cdp.stopAll();
+  }}
+  return {{}};
+}}, {{ timeoutMs: 170000 }});
+console.log(JSON.stringify({{ ok: true, out }}));
+""")
+    code, said, err = _runner(_node(), script, env=dict(os.environ))
+    assert code == 0 and said.get("ok"), err[-3000:]
+    return said["out"]
+
+
+def test_one_navigator_at_every_width(record, tmp_path):
+    """NAV-SPEC (the owner, Nov 7): one hierarchy at every width. Under 960 and with no script the row is Overview ·
+    Research · Experiments · Record · Your call, on one line at 390, Your call at its end; a reader's row (the hub's
+    reader, an export opened with no viewer named) holds the four places alone. Rules, Runs, Resources and History
+    leave the row: Research links its Rules under its intro, and each of the record's views starts with its own row,
+    the one shown marked. From 960 the column lists the questions; under 1280 a card opens as a sheet over the working
+    view, from 1280 beside it. Every view marks one visible navigator item, at every width."""
+    page = page_of(record)
+    export = page_of(record, surface="export")
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.js").read_text(encoding="utf-8")
+    hub = lambda who: export.replace("<head>", f'<head><meta name="rb-viewer" content="{who}"><script>{script}</script>', 1)  # noqa: E731
+    bare = re.sub(r"<script>.*?</script>", "", page, flags=re.S)
+    # rb page with a reader's meta (the preview's reader page): a reader's row too
+    preview = page.replace("<head>", '<head><meta name="rb-viewer" content="reader">', 1)
+    pages = {}
+    for w in (390, 720):
+        pages.update({f"owner-{w}": (page, w), f"hub-owner-{w}": (hub("owner"), w), f"reader-{w}": (hub("reader"), w),
+                      f"none-{w}": (export, w), f"noscript-{w}": (bare, w), f"preview-{w}": (preview, w)})
+    for w in (1100, 1440):
+        pages[f"owner-{w}"] = (page, w)
+    # printed, the report keeps no navigation: the record's own row and Research's link to Rules go with the navigator
+    printed = next(sheet for media, sheet in css(page).items() if media.startswith("@media print") and any("nav.nav" in k for k in sheet))
+    hidden = [k for k, v in printed.items() if v.get("display", "").startswith("none")]
+    assert {"nav.nav", "nav.subrow", "p.rlink"} <= set(hidden), hidden
+    got = _nav(tmp_path, pages)
+    owner = ["Overview", "Research 2", "Experiments 2", "Record", "Your call 4"]
+    for w in (390, 720):
+        for name in ("owner", "hub-owner", "noscript"):
+            g = got[f"{name}-{w}"]
+            assert g["row"] == owner and g["lines"] == 1 and not g["column"], (name, w, g)
+        for name in ("reader", "none", "preview"):
+            g = got[f"{name}-{w}"]
+            assert g["row"] == owner[:4] and g["lines"] == 1 and not g["column"], (name, w, g)
+        for name in ("owner", "hub-owner", "reader"):
+            g = got[f"{name}-{w}"]
+            assert g["rules"] == ["Rules (6) →"] and g["subrow"] == ["Runs 9 *", "Resources 4", "History"] and g["sheet"], (name, w, g)
+            marks = {v: m for v, m in g["marks"].items() if not (name == "reader" and v == "your-call")}
+            assert all(len(m) == 1 for m in marks.values()), (name, w, g["marks"])
+            assert g["marks"]["criteria"] == ["#research"] and g["marks"]["runs"] == ["#record"] and g["marks"]["q-q1"] == ["#research"], g["marks"]
+    for w in (1100, 1440):
+        g = got[f"owner-{w}"]
+        assert g["column"] and g["lines"] > 1 and not g["rules"] and not g["subrow"], (w, g)
+        assert all(g["marks"].values()) and "#criteria" in g["marks"]["criteria"] and "#research" in g["marks"]["criteria"], g["marks"]
+        assert "#runs" in g["marks"]["runs"] and "#record" in g["marks"]["runs"], g["marks"]
+        # under 1280 a card is a sheet over the working view; from 1280 the inspector is a column beside it
+        assert g["sheet"] == (w < 1280) and g["beside"] == (w >= 1280), (w, g)
 
 
 def test_plain_words_pass_1_on_the_views(record):
@@ -3847,13 +3953,16 @@ console.log(JSON.stringify({ ok: true, out }));
         ov = {name: g["overview"] for name, g in (("none", none), ("owner", owner), ("reader", reader))}
         n = ov["none"]["rows"]
         assert n and ov["owner"]["rows"] == ov["reader"]["rows"] == n, ov
-        assert ov["none"]["head"] == ["Needs judgment"] and ov["none"]["nav"][0].startswith("Open calls") and ov["none"]["buttons"] == 0, ov
+        # a reader's row holds the four places (NAV-SPEC): under 960 the export with no viewer named and the reader have
+        # no call item; the column keeps it
+        calls = lambda nav, word: nav[0].startswith(word) if width >= 960 else nav == []  # noqa: E731
+        assert ov["none"]["head"] == ["Needs judgment"] and calls(ov["none"]["nav"], "Open calls") and ov["none"]["buttons"] == 0, ov
         assert ov["none"]["lede"] == ["Open one to see why it waits and decide it."], ov
         assert ov["owner"]["head"] == ["Needs your judgment"] and ov["owner"]["nav"][0].startswith("Your call"), ov
         assert ov["owner"]["lede"] == ["Open one to see why it waits and decide it."], ov
         # each row opens its item for every viewer (the owner's composer is in the item): the export draws no button
         assert ov["owner"]["buttons"] == 0 and owner["your-call"]["callsHead"][0].startswith("Your call ("), owner["your-call"]
-        assert ov["reader"]["head"] == ["Still open"] and ov["reader"]["nav"][0].startswith("Open calls"), ov
+        assert ov["reader"]["head"] == ["Still open"] and calls(ov["reader"]["nav"], "Open calls"), ov
         assert ov["reader"]["lede"] == ["Not decided yet. Open one to see why it waits."], ov
         assert reader["your-call"]["callsLede"] == ["Calls are made with rb in a terminal, not on this page; it shows where they stand."] and reader["your-call"]["callsHead"][0].startswith("Open calls ("), reader["your-call"]
         # every view: the reader sees no action and no rb command, and every Next step its words; the others see actions
@@ -4069,7 +4178,7 @@ def test_inside_the_hub_the_page_draws_no_bar_of_its_own_and_one_bar_elsewhere(i
       await cdp.sleep(300);
       got.aboutView = await page.ev("(() => { const v = document.querySelector('main .view.on'); return v ? [v.id, v.innerText] : null; })()");
     }
-    await page.clickEl("[...document.querySelectorAll('#nav a[href=\\"#runs\\"]')].find(e => e.getBoundingClientRect().width > 0)");
+    await page.clickEl("[...document.querySelectorAll('#nav a[href=\\"#runs\\"], #nav a[href=\\"#record\\"]')].find(e => e.getBoundingClientRect().width > 0)");
     await cdp.sleep(300);
     got.runs = await page.ev("(document.querySelector('main .view.on') || {}).id || ''");
 """)
@@ -4115,7 +4224,7 @@ def test_the_one_bar_names_the_view_shown_and_any_viewer_meta_folds_it(int8_demo
     hub = tmp_path / "hub.html"
     hub.write_text((out / "page.html").read_text(encoding="utf-8").replace("</head>", f'<meta name="rb-viewer" content="owner"><script>{script}</script></head>', 1), encoding="utf-8")
     got = _bar_runs(tmp_path, [["page@1440", page.as_uri(), 1440], ["meta@1440", meta.as_uri(), 1440], ["hub@390", hub.as_uri(), 390]], title, """
-    await page.clickEl("[...document.querySelectorAll('#nav a[href=\\"#runs\\"]')].find(e => e.getBoundingClientRect().width > 0)");
+    await page.clickEl("[...document.querySelectorAll('#nav a[href=\\"#runs\\"], #nav a[href=\\"#record\\"]')].find(e => e.getBoundingClientRect().width > 0)");
     await cdp.sleep(300);
     got.runs = await page.ev(PROBE);
 """)

@@ -1,11 +1,12 @@
 // The empty inspector's slim rail (Design pass 1, target 8) on any page the shell's script runs on, the export the hub
 // serves included: at 1280 and 1100, light and dark, the Overview's inspector with nothing picked is a slim rail and the
 // working view takes its width; a card opened from the Overview (else the first view with one) by a real click takes the inspector's width back, Esc
-// folds it again; under 960 there is no rail and no sheet until a card opens.
+// folds it again; under the width the page names for its inspector's column (data-inspector-from: 1280 from rb 0.8.1,
+// 960 on a page an older rb wrote) there is no rail and no sheet until a card opens, and then it opens as the sheet.
 //   node tests/app/rail.mjs --url <address> [--timeout <s>, 240]
 // The last line on stdout is JSON: {"ok", "checks": [{"name", "pass", "detail"}]}; exit 0, 1 on a failed check, 3 with
 // no Chrome.
-import { findChrome, launchChrome, parseArgs, progress, run, sleep } from './cdp.mjs';
+import { findChrome, launchChrome, parseArgs, progress, run } from './cdp.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 if (!a.url) { process.stderr.write('give --url\n'); process.exit(2); }
@@ -15,6 +16,16 @@ const j = x => JSON.stringify(x);
 const RAIL = `(() => { const a = document.querySelector('aside.insp'), m = document.querySelector('main'), e = document.querySelector('.ibody > .rootc');
   return { empty: !!(e && e.dataset.empty === '1'), insp: a ? Math.round(a.getBoundingClientRect().width) : null, main: Math.round(m.getBoundingClientRect().width),
     sheet: document.documentElement.classList.contains('sheet'), rail: document.documentElement.classList.contains('irail') }; })()`;
+// the rail's state once it is what `want` (a function of that state, as source) asks and has settled: no transition or
+// animation running on the page and every width the same over two frames in a row. Never a fixed wait: a slow runner
+// (GitHub's macOS) can still be mid-transition after one. After 10 s it gives the state as it is, `late` set, and
+// a check fails on any late state: what it tests never passes unsettled.
+const STEADY = (want = 's => true') => `new Promise(res => { const until = performance.now() + 10000; let last = null;
+  const look = () => { const s = ${RAIL}, k = JSON.stringify(s), moving = document.getAnimations().some(x => x.playState === 'running');
+    if ((${want})(s) && !moving && k === last) return res(s);
+    if (performance.now() > until) return res(Object.assign(s, { late: true }));
+    last = k; requestAnimationFrame(look); };
+  requestAnimationFrame(look); })`;
 // the first link or row shown in the working view that opens a card
 const CARD = `(() => { document.querySelectorAll('[data-rail-pick]').forEach(x => x.removeAttribute('data-rail-pick')); const v = document.querySelector('#main .view.on'); const l = Array.from(v.querySelectorAll('a[href^="#"], [data-for] > summary, [data-for]')).find(x => {
   const id = x.getAttribute('href') ? x.getAttribute('href').slice(1) : (x.closest('[data-for]') || {}).dataset.for; const t = id && document.getElementById(id);
@@ -29,26 +40,27 @@ await run(async () => {
     await p.goto(a.url + '#overview');
     if (!(await p.waitFor(`document.documentElement.classList.contains('ready')`, 10000))) throw new Error('never ready');
     await p.ev(`(() => { try { localStorage.setItem('rb.guide.1', 'ended'); } catch (e) {} const g = document.querySelector('.guide:not([hidden]) .gskip'); if (g) g.click(); return true; })()`);
-    await p.settle({ quietMs: 100 }); await sleep(250);
-    const first = await p.ev(RAIL);
-    if (w >= 960) check(`rail: with nothing picked the inspector is a slim rail [${at}]`, first.empty && first.rail && first.insp <= 20, j(first));
-    else check(`rail: under 960 neither a rail nor a sheet with nothing picked [${at}]`, first.empty && !first.sheet && first.insp !== null, j(first));
+    await p.settle({ quietMs: 100 });
+    const from = await p.ev(`(n => n >= 320 && n <= 4096 ? n : 960)(parseInt(document.documentElement.getAttribute('data-inspector-from') || '', 10))`);
+    const wide = w >= from;
+    const first = await p.ev(STEADY(wide ? 's => s.empty && s.rail' : 's => s.empty'));
+    if (w >= from) check(`rail: with nothing picked the inspector is a slim rail [${at}]`, !first.late && first.empty && first.rail && first.insp <= 20, j(first));
+    else check(`rail: under ${from} neither a rail nor a sheet with nothing picked [${at}]`, !first.late && first.empty && !first.sheet && first.insp !== null, j(first));
     // a card opened from the Overview, else from the first view with an empty inspector where a link or a row opens one
     let card = await p.ev(CARD), before = first;
     const views = await p.ev(`Array.from(document.querySelectorAll('main .view')).map(v => v.id)`);
     for (const v of views) {
       if (card && before.empty) break;
-      await p.ev(`location.hash = ${j('#' + v)}`); await sleep(200);
-      before = await p.ev(RAIL); card = before.empty ? await p.ev(CARD) : null;
+      await p.ev(`location.hash = ${j('#' + v)}`);
+      before = await p.ev(STEADY(`s => document.querySelector('#main .view.on') === document.getElementById(${j(v)})`)); card = before.empty ? await p.ev(CARD) : null;
     }
     if (card) await p.clickEl(`document.querySelector('[data-rail-pick]')`);
-    await sleep(300);
-    const opened = await p.ev(RAIL);
-    await p.key('Escape', 'Escape', 27); await sleep(300);
-    const closed = await p.ev(RAIL);
-    if (w >= 960) check(`rail: a card takes the inspector's width, and Esc folds it back [${at}]`,
-      !!card && !opened.rail && opened.insp >= 300 && opened.main < before.main && closed.rail && closed.insp <= 20 && closed.main === before.main, j({ card, before, opened, closed }));
-    else check(`rail: under 960 a card opens as the sheet, and Esc closes it [${at}]`, !!card && opened.sheet && !closed.sheet, j({ card, opened, closed }));
+    const opened = await p.ev(STEADY(wide ? 's => !s.rail && s.insp >= 300' : 's => s.sheet'));
+    await p.key('Escape', 'Escape', 27);
+    const closed = await p.ev(STEADY(wide ? 's => s.rail && s.insp <= 20' : 's => !s.sheet'));
+    if (wide) check(`rail: a card takes the inspector's width, and Esc folds it back [${at}]`,
+      !!card && ![before, opened, closed].some(x => x.late) && !opened.rail && opened.insp >= 300 && opened.main < before.main && closed.rail && closed.insp <= 20 && closed.main === before.main, j({ card, before, opened, closed }));
+    else check(`rail: under ${from} a card opens as the sheet, and Esc closes it [${at}]`, !!card && ![opened, closed].some(x => x.late) && opened.sheet && !closed.sheet, j({ card, opened, closed }));
   }
   const failed = results.filter(r => !r.pass);
   if (failed.length) throw Object.assign(new Error(`${failed.length} of ${results.length} checks failed: ${failed.map(f => f.name).join('; ')}`), { results });

@@ -136,6 +136,8 @@ pub struct CriterionFields<'a> {
     pub tolerance: Option<f64>,
     pub margin: Option<f64>,
     pub over: &'a str,
+    /// what the reading measures (format 2): "" for the rule's own estimand, "relative" (in percent) or "means"
+    pub measure: &'a str,
     /// a count rule's count, and the units a count or a best of N is of
     pub count: Option<i64>,
     pub of: Option<i64>,
@@ -180,7 +182,13 @@ pub fn row(c: &CriterionFields, finding: &Value, unit: &str) -> Row {
     Row {
         metric,
         value,
-        criterion: criterion_text_of(c.comparator, c.target, c.tolerance, unit, c.margin, c.over, c.count, c.of),
+        // as the rule reads: a relative change's threshold in percent, whatever the metric's unit; a difference of means
+        // says what the cited number measures, as rb show's rule does
+        criterion: match c.measure {
+            "relative" => format!("{}%", criterion_text_of(c.comparator, c.target, c.tolerance, "", c.margin, c.over, c.count, c.of)),
+            "means" => format!("as a difference of means {}", criterion_text_of(c.comparator, c.target, c.tolerance, unit, c.margin, c.over, c.count, c.of)),
+            _ => criterion_text_of(c.comparator, c.target, c.tolerance, unit, c.margin, c.over, c.count, c.of),
+        },
         margin,
         runs: if n != 0 { format!("{n} {}", crate::assess::plural(&unit_word, n)) } else { String::new() },
         standing: standing_words(finding),
@@ -322,5 +330,19 @@ mod tests {
         assert_eq!(why_not(&[]), "");
         let unnamed: Vec<Value> = vec![crate::obj! {"code" => "some_new_code"}];
         assert_eq!(why_not(&unnamed), "integrity: some new code");
+    }
+
+    /// A rule's row says it as it reads (the orchestrator, Nov 7): a relative change's threshold in percent, never the
+    /// metric's unit ("≤ 3.5 nats"), and a cited difference of means with what it measures.
+    #[test]
+    fn a_format_two_rule_s_row_says_it_as_it_reads() {
+        let fields = |comparator, target, tolerance, measure| CriterionFields {
+            metric: "change.val_loss", reads: String::new(), comparator, target: Some(target), tolerance, margin: None, over: "mean", measure,
+            count: None, of: None, direction: "minimize",
+        };
+        let none = Value::empty_dict();
+        assert_eq!(row(&fields("at_most", 3.5, None, "relative"), &none, "nats").criterion, "≤ 3.5%");
+        assert_eq!(row(&fields("equals", 0.0317, Some(0.00005), "means"), &none, "nats").criterion, "as a difference of means = 0.0317 ± 0.00005 nats");
+        assert_eq!(row(&fields("at_most", 0.05, None, ""), &none, "nats").criterion, "≤ 0.05 nats");
     }
 }

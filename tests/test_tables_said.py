@@ -372,3 +372,12 @@ def test_a_keyless_row_read_alone_after_every_row_reads_as_that_row_changed(rb):
     con.close()
     env = rb("run", "add", "e19", "--from", "keyed.db", "--table", "evals", "--where", "seed=22", "--set", "seed=@seed", "--produced-at", "2026-05-01", ok=False)
     assert not env.ok and "--replaces" in env.errors[0].fix, env.errors
+
+
+def test_every_rows_help_names_a_sqlite_table_too():
+    """MP-1107-0219: --every-row reads a SQLite table's rows too, each kept by its rowid; its help said a CSV, TSV or JSON
+    Lines table alone."""
+    from rbtest import command, environment
+    said = subprocess.run([*command(), "run", "add", "--help"], capture_output=True, text=True, env=environment()).stdout
+    line = " ".join(said.split()).rsplit("--every-row", 1)[1].split("--select", 1)[0]
+    assert "with --table, or a CSV, TSV or JSON Lines table" in line and "rowid" in line, line

@@ -573,6 +573,17 @@ impl Ledger {
                                     "read_by".into(),
                                     Value::List(theirs.iter().map(|p| crate::obj! {"criterion" => p.3.clone(), "reads" => p.5.clone()}).collect()),
                                 );
+                            } else {
+                                // a rule that reads this change otherwise (a relative change beside a difference another
+                                // rule reads as the means do) is named beside the change, never left out
+                                let beside: Vec<Value> = theirs
+                                    .iter()
+                                    .filter(|p| !same(if p.0 == v.name { p.4 } else { -p.4 }))
+                                    .map(|p| crate::obj! {"criterion" => p.3.clone(), "reads" => p.5.clone()})
+                                    .collect();
+                                if !beside.is_empty() {
+                                    cell.insert("read_beside".into(), Value::List(beside));
+                                }
                             }
                         }
                     }

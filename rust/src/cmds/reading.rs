@@ -927,6 +927,16 @@ fn show_file(subject: &str, out: &mut Out) -> R {
         Value::Dict(d) => d.get("kind").cloned().unwrap_or(Value::Null),
         _ => Value::Null,
     };
+    // a file in a format newer than this rb reads was written by a newer rb, as rb status, rb doctor and every write
+    // say: never read as a record that is not valid (AGENTS.md, E_STATE_NEWER)
+    if let Some(Value::Int(f)) = data.as_dict().and_then(|d| d.get(FORMAT_KEY)) {
+        if *f > crate::record::RB_FORMAT {
+            return Err(RBError::msg(
+                "E_STATE_NEWER",
+                format!("{path} is format {f}; this rb reads formats 1 to {}: it was written by a newer rb", crate::record::RB_FORMAT),
+            ));
+        }
+    }
     let mut problems: Vec<String> = Vec::new();
     // the format as rb show has always compared it (equality, as Python's: a format given as true is 1)
     let format = match &data {
@@ -934,13 +944,19 @@ fn show_file(subject: &str, out: &mut Out) -> R {
         _ => None,
     };
     // format 1 is fixed: a format-1 criterion that holds what only format 2 has is no valid record of either
-    let format_1_holds = match (&data, kind.as_str()) {
-        (Value::Dict(d), Some("criterion")) if format == Some(1) => crate::record::format_2_holds(d),
-        (Value::Dict(d), Some("criteria")) if format == Some(1) => criteria_of(d).iter().filter_map(Value::as_dict).find_map(crate::record::format_2_holds),
+    // and rb writes format 2 only where a file holds what format 1 cannot, so a format-2 file that holds none of it is
+    // no valid record of either
+    let holds = match (&data, kind.as_str()) {
+        (Value::Dict(d), Some("criterion")) => crate::record::format_2_holds(d),
+        (Value::Dict(d), Some("criteria")) => criteria_of(d).iter().filter_map(Value::as_dict).find_map(crate::record::format_2_holds),
         _ => None,
     };
-    if let Some(h) = &format_1_holds {
-        problems.push(format!("format 1 holds no {h}: only format 2 does, and rb writes such a file as {FORMAT_KEY}: 2"));
+    match (&holds, format) {
+        (Some(h), Some(1)) => problems.push(format!("format 1 holds no {h}: only format 2 does, and rb writes such a file as {FORMAT_KEY}: 2")),
+        (None, Some(2)) => problems.push(format!(
+            "format 2 holds a count, a best of N, a relative change or a cited difference of means, and this file holds none: rb writes it as {FORMAT_KEY}: 1, so set its first line back to {FORMAT_KEY}: 1"
+        )),
+        _ => {}
     }
     if format.is_none() {
         problems.push(format!("not a record of Rabbit Brain format 1 or 2: it does not start with {FORMAT_KEY}: 1 (or {FORMAT_KEY}: 2)"));
@@ -2074,6 +2090,9 @@ fn compare_of(led: &Ledger, ns: &Namespace, out: &mut Out) -> R {
                 if truthy(c, "primary") {
                     txt += " [primary]";
                 }
+                if let Some(Value::List(others)) = c.get("read_beside").filter(|r| r.truthy()) {
+                    txt += &format!(" (also read by {})", others.iter().map(|r| gs(r, "criterion")).collect::<Vec<_>>().join(", "));
+                }
             }
             // what a change rests on, as the page says it: units the baseline does not share, or another factor too
             let unpaired = if c.get("paired").map_or(false, |p| !p.truthy()) && c.get("read_by").map_or(true, |r| !r.truthy()) { ", unpaired" } else { "" };
@@ -2094,19 +2113,21 @@ fn compare_of(led: &Ledger, ns: &Namespace, out: &mut Out) -> R {
     for cells in &rows {
         out.say("  ".to_string() + &cells.iter().zip(&widths).map(|(c, w)| ljust(c, *w)).collect::<Vec<_>>().join("  "));
     }
-    let mut read_by: Vec<String> = Vec::new();
-    for r in items(&tv, "rows") {
-        for (_, c) in r.get("metrics").and_then(|m| m.as_dict()).into_iter().flatten() {
-            for x in c.get("read_by").and_then(Value::as_list).into_iter().flatten() {
-                let said = format!("{} reads {}", gs(x, "criterion"), gs(x, "reads"));
-                if !read_by.contains(&said) {
-                    read_by.push(said);
+    for (key, said_as) in [("read_by", "read by a criterion, in the place of the unpaired means"), ("read_beside", "read otherwise by a criterion, beside the change shown")] {
+        let mut read_by: Vec<String> = Vec::new();
+        for r in items(&tv, "rows") {
+            for (_, c) in r.get("metrics").and_then(|m| m.as_dict()).into_iter().flatten() {
+                for x in c.get(key).and_then(Value::as_list).into_iter().flatten() {
+                    let said = format!("{} reads {}", gs(x, "criterion"), gs(x, "reads"));
+                    if !read_by.contains(&said) {
+                        read_by.push(said);
+                    }
                 }
             }
         }
-    }
-    if !read_by.is_empty() {
-        out.say(format!("  read by a criterion, in the place of the unpaired means: {}", read_by.join("; ")));
+        if !read_by.is_empty() {
+            out.say(format!("  {said_as}: {}", read_by.join("; ")));
+        }
     }
     if metrics.iter().any(|m| !truthy(m, "declared")) {
         out.say("  * not in the catalogue: rb metric add <name> --unit <unit> --minimize|--maximize says which way is better");

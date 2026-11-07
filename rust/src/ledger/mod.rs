@@ -569,12 +569,15 @@ pub fn client() -> Option<Client> {
 pub enum Unreadable {
     Bad(String),
     Newer(String),
+    /// no valid record because of the format its first line says (format 1 holding what only format 2 has, or format 2
+    /// holding none of it): read as Bad, and put back by rb doctor --restore, never adopted
+    Format(String),
 }
 
 impl Unreadable {
     pub fn text(&self) -> &str {
         match self {
-            Unreadable::Bad(s) | Unreadable::Newer(s) => s,
+            Unreadable::Bad(s) | Unreadable::Newer(s) | Unreadable::Format(s) => s,
         }
     }
 }
@@ -593,16 +596,20 @@ fn body(data: &Value, kind: &str, rel: &str) -> Result<Dict, Unreadable> {
     if !matches!(fmt, Some(Value::Int(f)) if (1..=RB_FORMAT).contains(f)) {
         return Err(Unreadable::Bad(format!("{rel} does not start with {FORMAT_KEY}: 1")));
     }
-    // format 1 is fixed: a format-1 file that holds what only format 2 has was not written by rb as it stands
-    if fmt == Some(&Value::Int(1)) && (kind == "criterion" || kind == "criteria") {
-        let holds = if kind == "criterion" {
-            crate::record::format_2_holds(d)
-        } else {
-            d.get("criteria").and_then(Value::as_list).and_then(|l| l.iter().filter_map(Value::as_dict).find_map(crate::record::format_2_holds))
-        };
+    // format 1 is fixed: a format-1 file that holds what only format 2 has was not written by rb as it stands; and rb
+    // writes format 2 only where a file holds what format 1 cannot, so a format-2 file that holds none of it (its first
+    // line raised by hand) was not written by rb as it stands either
+    let holds = match kind {
+        "criterion" => crate::record::format_2_holds(d),
+        "criteria" => d.get("criteria").and_then(Value::as_list).and_then(|l| l.iter().filter_map(Value::as_dict).find_map(crate::record::format_2_holds)),
+        _ => None,
+    };
+    if fmt == Some(&Value::Int(1)) {
         if let Some(h) = holds {
-            return Err(Unreadable::Bad(format!("{rel} is format 1 and holds {h}, which only format 2 has: rb writes such a file as {FORMAT_KEY}: 2")));
+            return Err(Unreadable::Format(format!("{rel} is format 1 and holds {h}, which only format 2 has: rb writes such a file as {FORMAT_KEY}: 2")));
         }
+    } else if holds.is_none() {
+        return Err(Unreadable::Format(format!("{rel} is format 2 and holds nothing only format 2 has (a count, a best of N, a relative change or a cited difference of means): rb writes such a file as {FORMAT_KEY}: 1, so set its first line back to {FORMAT_KEY}: 1")));
     }
     if d.get("kind").and_then(|k| k.as_str()) != Some(kind) {
         let k = d.get("kind").map(pyjson::py_repr).unwrap_or_else(|| "None".into());
@@ -1478,11 +1485,11 @@ impl Ledger {
         }
         let doc = self.doc(&p).map_err(|e| match e {
             Unreadable::Newer(m) => RBError::msg("E_STATE_NEWER", format!("{m}.")),
-            Unreadable::Bad(m) => RBError::msg("E_STATE_CORRUPT", format!("{m}.")),
+            Unreadable::Bad(m) | Unreadable::Format(m) => RBError::msg("E_STATE_CORRUPT", format!("{m}.")),
         })?;
         let b = body(&doc.data, "project", &self.rel(&p)).map_err(|e| match e {
             Unreadable::Newer(m) => RBError::msg("E_STATE_NEWER", format!("{m}.")),
-            Unreadable::Bad(m) => RBError::msg("E_STATE_CORRUPT", format!("{m}.")),
+            Unreadable::Bad(m) | Unreadable::Format(m) => RBError::msg("E_STATE_CORRUPT", format!("{m}.")),
         })?;
         let b = self.with_parts(&b, None)?;
         let rel = self.rel(&p);
@@ -1770,7 +1777,7 @@ impl Ledger {
                     }
                     continue;
                 }
-                Err(Unreadable::Bad(why)) => {
+                Err(Unreadable::Bad(why) | Unreadable::Format(why)) => {
                     bad.insert(self.rel(&path), why);
                     self.ids_at(kind, &path)?
                 }
@@ -1883,7 +1890,7 @@ impl Ledger {
                 }
             }
             Err(Unreadable::Newer(m)) => return Err(RBError::msg("E_STATE_NEWER", format!("{m}."))),
-            Err(Unreadable::Bad(m)) => {
+            Err(Unreadable::Bad(m) | Unreadable::Format(m)) => {
                 return Err(RBError::msg_fix("E_STATE_CORRUPT", format!("{m}."), "rb doctor lists every such file; rb doctor --restore puts back what rb last wrote."))
             }
         }
@@ -2037,7 +2044,7 @@ impl Ledger {
                         cm = Some(doc.comments.clone());
                     }
                     Err(Unreadable::Newer(m)) => return Err(RBError::msg("E_STATE_NEWER", format!("{m}; this rb will not write over it."))),
-                    Err(Unreadable::Bad(m)) => return Err(RBError::msg("E_STATE_EDITED", format!("{m}; rb will not write over it."))),
+                    Err(Unreadable::Bad(m) | Unreadable::Format(m)) => return Err(RBError::msg("E_STATE_EDITED", format!("{m}; rb will not write over it."))),
                 }
             }
             match items.iter().position(|x| x.get_str("id") == Some(id)) {
@@ -2225,6 +2232,11 @@ impl Ledger {
             }
         }
         let owned = self.owned_before(who, &touching)?;
+        // what the line reads after the files change (owned_after) is read once before: a file that does not read stops
+        // the write here, never between its files and its log line
+        if !owned.is_empty() {
+            self.owned_after_reads()?;
+        }
         for (key, path, f, sha) in &writes {
             self.put(&key.0, &key.1, path, f.clone())?;
             self.stash(f, sha);

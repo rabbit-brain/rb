@@ -8,24 +8,18 @@
   H.classList.add('app');
   // the viewer's own choices, kept in this browser: the theme, and whether single keys act
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (_) {} return null; };
-  // hosted: the hub frames the page with sandbox="allow-scripts" and no allow-same-origin, an opaque origin ("null")
-  // where storage throws. Its own bar above names the record and the sync time, so this page's top bar folds away and
-  // its time and rb's version move to the Overview's header line (HOSTED-VIEW, the hosted-mode pass)
-  // (a frame on a local file has a null origin too, and keeps storage: it is not hosted)
+  // hosted: the hub's sandboxed frame, an opaque origin where storage throws (a local file's frame keeps storage). The
+  // hub's bar names the record and its time, so the top bar folds and they move to the Overview's header (HOSTED-VIEW)
   const HOSTED = (() => {
     try { if (window.self === window.top || String(window.origin || location.origin) !== 'null') return false; } catch (_) { return true; }
     try { localStorage.getItem('rb-theme'); return false; } catch (_) { return true; }
   })();
-  // who looks: the hub says it on the page it serves, `<meta name="rb-viewer" content="owner">` on the owner's own
-  // address and "reader" on a link shared with others. The owner gets the working view; a reader gets the record to
-  // read, with every warning and open item and none of the actions (no call's buttons, reason or line, no rb command,
-  // no Copy). With no meta (rb page, rb open, an export opened from disk) the page is as it was. Read once, here, as the
-  // hub puts the meta before this script; else once more when the document is in
+  // who looks: the hub's <meta name="rb-viewer"> says "owner" (the working view) or "reader" (the record to read, every
+  // warning and open item, no action, rb command or Copy). With no meta the page is as it was. Read here, else once
+  // more when the document is in
   const viewer = () => { const m = document.querySelector('meta[name="rb-viewer"]'), v = m && (m.getAttribute('content') || '').trim(); return v === 'owner' || v === 'reader' ? v : null; };
-  // what a reader is not shown: the parts that make a call (a row's Review button where its title is a link), and the
-  // boxes and chips that hold an rb command (marked `rbcmd` below), never the warnings, open items and trust lines
-  // around them; a recipe stays as text to read. Until the app has marked them (and if it never starts) every command
-  // box is held back too, so none shows for a moment
+  // what a reader is not shown: what makes a call and what holds an rb command (`rbcmd`), never the warnings and open
+  // items around them; a recipe stays as text. Until the app marks them every command box is held back
   const READER_CSS = 'html[data-viewer="reader"] :is(.rbcmd, .decide, [data-level="decide"], .queue li:has(a[href]:not(.qbtn)) .qbtn, .composer, .seg, input.why, .cp, .cprow, .keys):not(:is(#rerun, .rrx) *) { display: none !important; }' +
     ' html[data-viewer="reader"]:not(.ready) :is(.cmdbox, pre.cmd):not(:is(#rerun, .rrx) *) { display: none !important; }';
   function setViewer(v) {
@@ -62,8 +56,9 @@
   const esc = s => (window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/[^\w-]/g, '\\$&'));
   // rb's view names before the shell, and rb open's tabs, each the view it is now
   const ALIAS = { record: 'runs', findings: 'research', top: 'overview', questions: 'overview', 'found-recordings': 'overview' };
-  // the width from which the inspector is a column beside the work; under it, a sheet over the work
-  const WIDE = window.matchMedia('(min-width: 960px)');
+  // from this width the inspector is a column, under it a sheet: as the page says (0.8.1), else 960 (an older page)
+  const FROM = (n => (n >= 320 && n <= 4096 ? n : 960))(parseInt(H.getAttribute('data-inspector-from') || '', 10));
+  const WIDE = window.matchMedia('(min-width: ' + FROM + 'px)');
   // c: the working view's id; s: the inspector's stack of card ids, newest last; f: the part opened, if any
   let st = { c: 'overview', s: [], f: null };
   let main, aside, ibody, crumbs, backBtn, linkBtn, closeBtn, live, helpBox, opener = null;
@@ -97,10 +92,8 @@
     setInterval(() => sayChanged(main), 60000);
     const nav = byId('nav');
     if (nav) nav.addEventListener('keydown', onNavKey);
-    // rb open's live module replaced the navigator's and the views' children with a newer drawing of the record: the
-    // new parts get their copy buttons and composers, and the app stands where it stood (the view, the selected row,
-    // the inspector's stack cloned again; a card gone from the record says so, as an address that names nothing
-    // does), moving no focus and no scroll and telling of no card opened; the module puts back the rest
+    // rb open's live module drew the record anew: the new parts get their buttons and composers, and the app stands
+    // where it stood (view, row, the inspector's stack; a card gone says so), moving no focus or scroll
     document.addEventListener('rb:swapped', e => {
       ownWords(document); enhanceAll(byId('nav')); enhanceAll(main);
       const kept = inspectorHeld();
@@ -289,14 +282,13 @@
     foot.append(t, k);
   }
 
-  // with nothing picked and nothing of the view's own, from 960 the inspector is a slim rail and the working view takes
-  // the width; its sentence stays for a screen reader, fixed at the corner so it runs past nothing
-  const RAIL_CSS = '@media screen and (min-width: 960px) {' +
+  // with nothing picked, a column inspector is a slim rail; its sentence stays for a screen reader, at the corner
+  const RAIL_CSS = '@media screen and (min-width: ' + FROM + 'px) {' +
     ' html.app.irail body { grid-template-columns: var(--navw) minmax(0, 1fr) 14px; }' +
     ' html.app.irail aside.insp { overflow: hidden; background: var(--bg); }' +
     ' html.app.irail aside.insp > .ibar { display: none; }' +
     ' html.app.irail aside.insp > .ibody { position: fixed; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }' +
-    '@media screen and (min-width: 960px) and (max-width: 1279px) { html.app.irail body { grid-template-columns: minmax(0, 1fr) 14px; } }' +
+    (FROM < 1280 ? '@media screen and (min-width: ' + FROM + 'px) and (max-width: 1279px) { html.app.irail body { grid-template-columns: minmax(0, 1fr) 14px; } }' : '') +
     // a term's hint takes no clicks
     ' .term::after { pointer-events: none; }' +
     // closed while hovered: no hover hint until the pointer leaves
@@ -392,7 +384,7 @@
     // an address that names nothing says so in the inspector, over the working object, and keeps the address as typed
     if (!el) return { c: (fresh && !typed) || !byId(st.c) ? 'overview' : st.c, s: id ? ['?' + id] : [], f: null };
     if (el.closest('aside')) return { c: fresh || !byId(st.c) ? 'overview' : st.c, s: [], f: null };
-    // a view: from the inspector beside the work the trail stays; under 960 the sheet closes onto the view
+    // a view: from the inspector beside the work the trail stays; under the sheet width it closes onto the view
     if (isView(el)) return { c: id, s: fresh ? [] : (fromInsp && WIDE.matches ? st.s.slice() : []), f: null };
     const card = el.classList.contains('card') ? el : el.closest('.card');
     if (card) {
@@ -493,11 +485,21 @@
     // a view the top bar names (About) is marked there as the nav marks its own
     $$('header.top a[href^="#"]').filter(a => !a.closest('.where')).forEach(a => { if (a.getAttribute('href').slice(1) === id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     // the top bar names the view after the record's title
-    const vc = $('#top .vcrumb'); if (vc) vc.textContent = v.dataset.crumb || '';
+    const vc = $('#top .vcrumb'); if (vc) named(vc, v.dataset.crumb || '', v.dataset.crumbOf);
     // away from the place rb open started on, live, the title names the place shown first (the scope bar says it)
     const bar = $('#scope .bar');
     document.title = (bar && bar.dataset.title || '') + (v.dataset.title || document.title);
     if (top) main.scrollTop = 0;
+  }
+
+  // a view's name: its title, then its id dim, where it gives one
+  function named(el, label, id) {
+    el.textContent = label;
+    if (!id) return;
+    el.textContent = '';
+    const t = document.createElement('span'); t.className = 'vt'; t.textContent = label;
+    const c = document.createElement('span'); c.className = 'cid'; c.textContent = id;
+    el.append(t, c);
   }
 
   // the view's own action: its rail, else the element its data-root names
@@ -675,7 +677,7 @@
       return;
     }
     const origin = byId(st.c);
-    const items = [{ label: (origin && origin.dataset.crumb) || st.c, root: true }]
+    const items = [{ label: (origin && origin.dataset.crumb) || st.c, id0: origin && origin.dataset.crumbOf, root: true }]
       .concat(s.map((id, i) => ({ label: crumbOf(id), id, i, last: i === s.length - 1 })));
     const shown = items.length > 4 ? [items[0], { label: '…', gap: true }].concat(items.slice(-2)) : items;
     shown.forEach((it, i) => {
@@ -684,7 +686,7 @@
       if (it.last) { el = document.createElement('span'); el.setAttribute('aria-current', 'location'); }
       else if (it.gap) { el = document.createElement('span'); }
       else { el = document.createElement('a'); el.href = '#' + (it.id || st.c); el.dataset.crumb = it.root ? 'root' : String(it.i); }
-      el.textContent = it.label; el.title = it.label;
+      named(el, it.label, it.id0); el.title = it.label + (it.id0 ? ' ' + it.id0 : '');
       crumbs.appendChild(el);
     });
   }
@@ -1019,14 +1021,13 @@
     else if (k === '/') { const f = $('main .view.on .filterbar input'); if (f) { e.preventDefault(); f.focus(); } }
     else if (k === 'j' || k === 'k') { e.preventDefault(); if (!moveQueue(k === 'j' ? 1 : -1)) moveRow(k === 'j' ? 1 : -1); }
     else if (k === 'a' || k === 'r' || k === 'i') {
-      // only a call that shows: under 960 the root is drawn in the centre, and the inspector shows only a card opened
+      // only a call that shows: under the sheet width the root is drawn in the centre
       const box = (WIDE.matches || st.s.length) && $('.ibody .decide');
       const act = Object.keys(KEYOF).find(x => KEYOF[x] === k);
       if (box && $('.seg button[data-action="' + act + '"]', box)) { e.preventDefault(); choose(box, act); }
     }
     else if (k === 'c') {
       // the card's primary: its Copy recipe, else the composed call line once it is live, else its first command
-      // (only from an inspector that shows: under 960 with nothing open, the centre holds the same commands)
       const b = (WIDE.matches || st.s.length) && ($('.ibar .bact .cp') || $('.ibody .cprow:not(.cmprow) .cp') || $('.ibody .composer .cp:not(:disabled)') || $('.ibody .cmdbox .cp'));
       if (b) b.click();
     }
@@ -1140,11 +1141,9 @@
     const first = $('a, input', helpBox); if (first) first.focus({ preventScroll: true });
   }
 
-  // ---------- the rerun panel: a page with a clone address (an export with --url, which the hub serves with its
-  // rb-clone meta) offers a prompt to copy and paste into a coding tool. rb draws its parts (.rrun: the openers, data-rerun, the
-  // panel #rerun, an experiment's prompt) with its own addresses in data-fill spans; the script puts the hub's addresses
-  // there, and opens the panel over the page. Inside the hub with no rb-clone meta (the owner did not let readers rerun
-  // it), and at a past version, none of it is there. The clipboard alone: nothing is sent.
+  // ---------- the rerun panel: a page with a clone address (the hub's rb-clone meta) offers a prompt to copy into a
+  // coding tool. rb draws its parts (.rrun, data-rerun, #rerun) with data-fill spans the script fills with the hub's
+  // addresses. None of it with no rb-clone meta or at a past version. The clipboard alone: nothing is sent.
   let rerunDlg = null, rerunFrom = null, rerunCold = false, rerunDownOut = false;
   // an address a meta gives: https (http on this machine alone), with nothing in it that could end the line or the prompt
   function metaAddr(name) {
@@ -1278,12 +1277,9 @@
   }
 })();
 
-// ---------- the pointer guide: a first visit's few steps in app mode, each a spotlight on one part of the screen and a
-// short tooltip beside it. It shows and never asks. It is this block and guide.css alone: leave both out and nothing
-// else changes. Ended or skipped, it never shows again in this browser (rb.guide.1); where the browser keeps nothing
-// (a hosted page's sandboxed frame), it never shows by itself. Never in print, never with the script off (it is the script's), never on an address that
-// names anything past the Overview (a view, a card, a place): whoever followed that link came for it. The keys list's
-// "Show the guide again" replays it.
+// ---------- the pointer guide: a first visit's few spotlit steps in app mode; it shows and never asks. This block and
+// guide.css alone. Ended or skipped, never again in this browser (rb.guide.1); never by itself where nothing is kept
+// (a hosted frame), in print, or on an address past the Overview. "Show the guide again" replays it.
 (() => {
   'use strict';
   const H = document.documentElement;
@@ -1303,27 +1299,26 @@
     const n = a && $('.n', a);
     return n && parseInt(n.textContent, 10) > 0 && shown(a) ? a : null;
   };
-  // from 960 the navigator is a column that lists the questions; under it a row of tabs, and the Overview lists them
+  // from 960 the navigator is a column that lists the questions; under it a row of the places
   const WIDE = window.matchMedia('(min-width: 960px)');
   const narrow = () => !WIDE.matches;
+  const FROM = (n => (n >= 320 && n <= 4096 ? n : 960))(parseInt(H.getAttribute('data-inspector-from') || '', 10));
+  const SHEET = window.matchMedia('(max-width: ' + (FROM - 1) + 'px)');
   const view = () => $('#main .view.on');
-  // under 960, the Overview's list of the questions, where it shows
-  const strip = () => { const e = $('#main .view.on nav.strip.ov'); return shown(e) ? e : null; };
   // the finding step 3 opens, as a click would: one whose rule is met, else the first
   const finding = () => { const met = $$('.card[data-kind="criterion"].is-good'); return met.find(c => $('.part[id$=":runs"] table', c)) || met[0] || $('.card[data-kind="criterion"]'); };
   // the inspector shows a finding or a run: the card on its top
   const inInsp = () => $('.ibody > .card[data-kind="criterion"], .ibody > .card[data-kind="run"], .ibody > .card[data-kind="analysis"]');
   // each step: what it lights, and its words; a step whose part is not drawn is left out
   const STEPS = [
-    { spot: () => (narrow() && strip()) || $('#nav'), title: 'Questions and experiments',
+    { spot: () => $('#nav'), title: 'Questions and experiments',
       text: () => !narrow() ? 'The navigator lists the questions this record asks and the experiments that test them. Pick one to read it.'
-        : strip() ? 'This lists the questions the record asks, each with where it stands. Pick one to read it and the experiments that test it.'
-        : 'These tabs lead to the questions, the experiments, the runs and the rest. Pick one to read it.' },
+        : 'These lead to the questions, the experiments and the record. Pick one to read it.' },
     // under 960 the working view is the whole screen: its title and summary are what is lit
     { spot: () => narrow() ? head(view()) : $('#main'), title: 'What the record says',
       text: 'The working view shows what the record says about the one picked, and what is still open.' },
-    // a finding opened in the inspector, its provenance lit: beside the work from 960, a sheet over it under 960
-    { spot: () => { const c = inInsp(); if (!c) return null; return narrow() ? ($('.part[data-id$=":runs"]', c) || c) : $('aside.insp'); },
+    // a finding opened in the inspector, its provenance lit
+    { spot: () => { const c = inInsp(); if (!c) return null; return SHEET.matches ? ($('.part[data-id$=":runs"]', c) || c) : $('aside.insp'); },
       title: 'Where it came from', open: true,
       text: 'A rule or a run opens here: what rb measured, the runs it rests on, and how to run it again.' },
     // a reader is shown where the calls stand, not asked to make them
@@ -1404,7 +1399,7 @@
     window.addEventListener('scroll', place, true);
     document.addEventListener('rb:swapped', place);
     document.addEventListener('keydown', onEsc, true);
-    // a card opened as a sheet (under 960) covers the screen: the guide waits behind it, and comes back when it closes,
+    // a card opened as a sheet covers the screen: the guide waits behind it, and comes back when it closes,
     // a step on when the user did what the step asked
     watch = new MutationObserver(onSheet);
     watch.observe(H, { attributes: true, attributeFilter: ['class'] });
@@ -1479,7 +1474,7 @@
   function onSheet() {
     if (!box) return;
     const sheet = H.classList.contains('sheet');
-    // the card the guide opened (step 3; a sheet under 960) is the step: the guide stays over it; closed by the user,
+    // the card the guide opened (step 3) is the step: the guide stays over it; closed by the user,
     // the guide goes a step on
     if (mine) {
       if (!box.hidden && !inInsp()) { mine = null; if (i < steps.length - 1) { i++; draw(true); } else end(); }
@@ -1495,7 +1490,7 @@
     } else place();
   }
 
-  // the inspector slides in or out across 960: measure again once it has
+  // the inspector slides in or out: measure again once it has
   function onResize() { place(); clearTimeout(later); later = setTimeout(place, 300); }
 
   // the spotlight on the step's part as it shows on the screen; the tooltip whole on the screen, beside the part and

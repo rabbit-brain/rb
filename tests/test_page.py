@@ -24,6 +24,10 @@ def repo(workdir, monkeypatch, tmp_path_factory, capsys):
     cfg.write_text("", encoding="utf-8")
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(cfg))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    # the run's receipt names the ML packages of the Python it was recorded with, which the page says (its environment,
+    # its recipe): pinned, so the page's bytes are the record's and not the test machine's (MP-1107-0840: a slot whose
+    # venv held torch and numpy measured 175 bytes more). A research machine's: torch and numpy beside pydantic.
+    monkeypatch.setenv("RB_TEST_ENV", json.dumps({"python": "3.12.15", "platform": "test-box", "torch": "2.14.1+cpu", "numpy": "2.5.2", "pydantic": "2.14.3"}))
     subprocess.run(["git", "init", "-q"], check=True)
     subprocess.run(["git", "config", "user.email", "t@example.com"], check=True)
     subprocess.run(["git", "config", "user.name", "t"], check=True)

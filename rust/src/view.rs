@@ -2142,6 +2142,7 @@ pub fn briefs(led: &Ledger, st: &Dict) -> Res<Vec<QuestionBrief>> {
                     tolerance: obj.tolerance,
                     margin: obj.margin,
                     over: &obj.over,
+                    measure: &obj.measure,
                     count: obj.count,
                     of: obj.of,
                     direction,

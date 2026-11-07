@@ -3222,3 +3222,50 @@ def test_rb_status_and_rb_context_say_rules_and_needs_judgment_as_the_page_does(
     for c in ("c1", "c2", "c3"):
         rb(you, "retract", c, "--why", "the wrong split")
     assert "Rules: none standing (3 retracted)" in rb(you, "status").splitlines()
+
+
+def format_two_rules_record(root: Path) -> Writers:
+    """int8_record with val_loss in nats, then, on a design the user confirmed, a session's relative rule c7 (at most
+    3.5% on val_loss) and its cited difference of means c8 (0.0317 ± 0.00005 nats), each with runs that read them."""
+    rec = int8_record(root)
+    rec.rb(Writers.HUMAN, "metric", "add", "val_loss", "--minimize", "--unit", "nats")
+    # a session's rule on the design, which the user then confirms: the design they own, from which the rules below differ
+    rec.rb(CLAUDE_CODE, "criterion", "add", "INT8 keeps top-1 within two points", "-e", "e1", "--metric", "change.top1", "--at-least", "-2", "--id", "c3")
+    listed = rec.json(Writers.HUMAN, "confirm", "e1")["data"]
+    rec.rb(Writers.HUMAN, "confirm", next(d["confirm"] for d in listed["designs_pending"]).split()[-1])
+    (root / "paper.md").write_text("INT8 adds 0.0317 to the validation loss.\n", encoding="utf-8")
+    rec.rb(CLAUDE_CODE, "criterion", "add", "INT8 adds at most 3.5% validation loss", "-e", "e1", "--metric", "change.val_loss", "--at-most", "3.5",
+           "--relative", "--id", "c7")
+    rec.rb(CLAUDE_CODE, "criterion", "add", "INT8 adds what the paper says", "-e", "e1", "--metric", "change.val_loss", "--equals", "0.0317",
+           "--tolerance", "0.00005", "--means", "--source", "paper.md", "--quote", "adds 0.0317 to the validation loss", "--id", "c8")
+    for seed, (fp32, int8) in enumerate([(0.9612, 0.9931), (0.9655, 0.9978), (0.9701, 1.0003)], 1):
+        rec.rb(Writers.HUMAN, "run", "add", "e1", f"fp32.val_loss={fp32}", f"int8.val_loss={int8}", "--set", f"seed={seed}")
+    return rec
+
+
+@pytest.fixture(scope="module")
+def format_two_rules(tmp_path_factory):
+    return format_two_rules_record(tmp_path_factory.mktemp("shell-model-format-two") / "int8")
+
+
+def test_the_as_declared_row_says_a_rule_as_it_reads(format_two_rules, tmp_path):
+    """The orchestrator, Nov 7: the "as declared" row built "rule ≤ 3.5 nats" from the metric's catalogue unit, though a
+    relative rule's threshold is a percent, and said a difference of means as if it were the rule's own estimand."""
+    doc = dumped(format_two_rules.root, "page", tmp_path)[0]
+    assert doc["findings"]["c7"]["row"]["criterion"] == "≤ 3.5%", doc["findings"]["c7"]["row"]
+    assert doc["findings"]["c8"]["row"]["criterion"] == "as a difference of means = 0.0317 ± 0.00005 nats", doc["findings"]["c8"]["row"]
+    page = (format_two_rules.root / "rb-page.html")
+    subprocess.run([*command(), "page", "--out", str(page)], cwd=format_two_rules.root, env=format_two_rules.env, check=True, capture_output=True)
+    flat = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", page.read_text(encoding="utf-8")))
+    assert "rule ≤ 3.5%" in flat and "rule ≤ 3.5 nats" not in flat, "the relative rule's row"
+    assert "rule as a difference of means = 0.0317 ± 0.00005 nats" in flat, "the means rule's row"
+
+
+def test_a_design_change_keeps_a_relative_rule_s_percent_and_a_means_rule_s_words(format_two_rules, tmp_path):
+    """The orchestrator, Nov 7: rule_on_page reworded a format-2 rule as a plain one, so a design's line said a relative
+    rule's threshold in the metric's unit ("3.5 nats or less") and a cited difference of means without its estimand."""
+    for tier, doc in both_tiers(format_two_rules.root, tmp_path).items():
+        lines = next(e for e in doc["experiments"] if e["id"] == "e1")["design"]["lines"]
+        assert any(l.endswith("criterion c7 added: val_loss, INT8 against the FP32 baseline: 3.5% or less (primary)") for l in lines), (tier, lines)
+        assert any(l.endswith("criterion c8 added: val_loss, INT8 against the FP32 baseline: 0.0317 nats ± 0.00005 nats, as a difference of means (primary)")
+                   for l in lines), (tier, lines)

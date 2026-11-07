@@ -93,8 +93,20 @@ nav.nav a { display: inline-flex; align-items: center; gap: 6px; padding: 10px 1
 nav.nav a:hover { color: var(--ink); text-decoration: none; }
 nav.nav a:focus-visible { outline-offset: -2px; }
 nav .n { font: 12px var(--mono); color: var(--dim); }
-nav .sub, nav .grp { display: none; }
-nav .rec { display: flex; }
+/* one hierarchy at every width (NAV-SPEC): the row is the column's first level, Record a link to its views; a reader's
+   row (the export's, unless its owner looks) has no Your call */
+nav .sub, nav .rec { display: none; }
+html:not(.app):not([data-viewer="owner" i]):not(:has(meta[name="rb-viewer"][content="owner" i])) nav li.yc:is([data-row], html:has(meta[name="rb-viewer"]) *) { display: none; }
+@media screen and (max-width: 959px) {
+  html.app:not([data-viewer="owner" i]):not(:has(meta[name="rb-viewer"][content="owner" i])) nav li.yc:is([data-row], html:has(meta[name="rb-viewer"]) *) { display: none; }
+}
+/* the record's own row, and Research's link to its Rules: the places the row leaves out, each where its view starts */
+nav.subrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; margin: 0 0 10px; font-size: 13.5px; }
+nav.subrow a { color: var(--dim); padding: 2px 1px; border-bottom: 2px solid #0000; }
+nav.subrow a[aria-current="page"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--teal); }
+nav.subrow a + a { position: relative; margin-left: 10px; }
+nav.subrow a + a::before { content: "\b7"; position: absolute; left: -11px; color: var(--line); font-weight: 400; }
+p.rlink { margin: -2px 0 12px; font-size: 14px; }
 nav li.yc { margin-left: auto; }
 nav li.yc .n { background: var(--ink); color: var(--bg); border-radius: 10px; padding: 0 7px; font-weight: 600; font-family: var(--sans); font-size: 12px; line-height: 18px; }
 main { max-width: 880px; margin: 0 auto; padding-block: 18px 64px; }
@@ -673,6 +685,10 @@ footer.foot .honest1 { margin: 0 0 2px; color: var(--ink); }
   html.app header.top .vcrumb { font-weight: 400; }
   html.app header.top .vcrumb::before { content: "/ "; color: var(--line); }
   html.app header.top .vcrumb:empty { display: none; }
+  /* a question or an experiment by its title, cut short where it must be, then its id dim and whole (NAV-SPEC 4) */
+  html.app header.top .vcrumb:has(> .vt), .ibar .crumbs :is(a, span):has(> .vt) { display: flex; gap: .35em; align-items: baseline; }
+  html.app header.top .vcrumb > .vt, .ibar .crumbs .vt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html.app header.top .vcrumb > .cid, .ibar .crumbs .cid { flex-shrink: 0; }
   html.app header.top .end { flex-wrap: nowrap; white-space: nowrap; gap: 6px; align-items: center; }
   html.app header.top .stamp { font-size: 12.5px; }
   html.app .ctl { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--dim); font: 500 12.5px var(--sans); cursor: pointer; }
@@ -699,7 +715,6 @@ footer.foot .honest1 { margin: 0 0 2px; color: var(--ink); }
   html.app nav .sub li + li a .tx.q { padding-top: 1px; }
   html.app nav .sub a.d1 { padding-left: 34px; }
   html.app nav .sub a[aria-current="page"], html.app nav .sub a[aria-current="page"] .tx.q { color: var(--ink); font-weight: 500; }
-  html.app nav .grp { display: block; padding: 14px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
   html.app nav .rec { display: block; }
   html.app nav li.yc { margin: auto -8px -12px; padding: 8px 8px 12px; border-top: 1px solid var(--line); position: sticky; bottom: -12px; background: var(--bg); }
   html.app nav li.yc a { font-weight: 600; }
@@ -796,32 +811,42 @@ footer.foot .honest1 { margin: 0 0 2px; color: var(--ink); }
 }
 
 /* app mode with the rail visible: the working object's action block moves to the inspector root */
-@media screen and (min-width: 960px) {
+@media screen and (min-width: 1280px) {
   html.app.ready main [data-rail] { display: none; }
   /* a root with no name and nothing to go back to or close: no bar, so no empty band above it */
   html.app .ibar:has(> .crumbs > .rootname:empty) { display: none; }
 }
-/* 960 to 1279: the nav folds into a bar; two columns remain */
-@media screen and (max-width: 1279px) {
-  html.app body { grid-template-columns: minmax(0, 1fr) min(400px, 40vw); grid-template-rows: var(--toph) auto minmax(0, 1fr); grid-template-areas: "top top" "nav nav" "main insp"; }
-  html.app nav.nav { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 12px; overflow: visible; }
-  html.app nav.nav > ul { flex-direction: row; flex-wrap: wrap; min-height: 0; align-items: center; }
-  html.app nav.nav a { padding: 9px 10px 8px; margin: 0; border-radius: 0; border-bottom: 2px solid transparent; }
-  html.app nav.nav a:hover { background: none; }
-  html.app nav.nav a[aria-current="page"], html.app nav.nav a.in { background: var(--hover2); border-radius: 6px; }
-  html.app nav .sub, html.app nav .grp { display: none; }
-  html.app nav .rec { display: flex; }
-  html.app nav li.yc { margin: 0 0 0 auto; padding: 0; border: 0; position: static; background: none; }
-  html.app main { padding: 20px 28px 80px; }
+/* the column holds the record's places from 960; the record's own row and Research's link to Rules are the row's */
+html.app nav.nav a.grp { display: block; padding: 14px 10px 4px; margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+@media screen and (min-width: 960px) {
+  html.app nav.subrow, html.app p.rlink { display: none; }
 }
-/* under 960: one column; the inspector is a sheet over the working object */
-@media screen and (max-width: 959px) {
-  html.app body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "top" "nav" "main"; }
+/* under 1280 (the owner's decision, Nov 7): a card opens as a sheet over the working view, never a third pane */
+@media screen and (max-width: 1279px) {
   html.app aside.insp { position: fixed; top: 0; right: 0; bottom: 0; width: min(500px, 100vw); z-index: 50; transform: translateX(102%); visibility: hidden; box-shadow: var(--shadow); border-left: 1px solid var(--line); }
   html.app.sheet aside.insp { transform: none; visibility: visible; }
   html.app.sheet main { overflow: hidden; }
-  html.app header.top .stamp { display: none; }
+  html.app main { padding: 20px 28px 80px; }
   @media (prefers-reduced-motion: no-preference) { html.app aside.insp { transition: transform .18s ease-out, visibility .18s; } }
+}
+/* 960 to 1279: the questions column and the working view, the column as at 1280 at the width the space allows */
+@media screen and (min-width: 960px) and (max-width: 1279px) {
+  html.app body { grid-template-columns: min(var(--navw), 26vw) minmax(0, 1fr); grid-template-areas: "top top" "nav main"; }
+}
+/* under 960: one column, the navigator a row of the four places and Your call at its end */
+@media screen and (max-width: 959px) {
+  html.app body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "top" "nav" "main"; }
+  html.app nav.nav { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 12px; overflow: visible; }
+  html.app nav.nav > ul { flex-direction: row; flex-wrap: wrap; min-height: 0; align-items: center; }
+  html.app nav.nav a, html.app nav.nav a.grp { padding: 9px 10px 8px; margin: 0; border-radius: 0; border-bottom: 2px solid transparent; }
+  html.app nav.nav a.grp { display: flex; font-size: 14px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--ink); }
+  html.app nav.nav a:hover { background: none; }
+  html.app nav.nav a[aria-current="page"], html.app nav.nav a.in { background: var(--hover2); border-radius: 6px; font-weight: 600; }
+  html.app nav .sub, html.app nav .rec { display: none; }
+  html.app nav li.yc { margin: 0 0 0 auto; padding: 0; border: 0; position: static; background: none; }
+  /* the snapshot's moment stays, in short form; the whole is the bar's text, which a screen reader reads */
+  html.app header.top .stamp[data-short] { font-size: 0; }
+  html.app header.top .stamp[data-short]::before { content: attr(data-short) / ""; font-size: 12px; }
 }
 @media screen and (max-width: 639px) {
   :root { --barh: 78px; }
@@ -853,14 +878,18 @@ footer.foot .honest1 { margin: 0 0 2px; color: var(--ink); }
   .evh .evs { display: block; text-align: left; margin-top: 2px; }
   html.app header.top { padding: 0 8px 0 12px; height: var(--toph); }
   /* one bar at every width (plain words pass 4): the title gives way first, cut short, before the view's name */
-  html.app header.top .vcrumb { flex-shrink: 0; max-width: 45%; }
+  html.app header.top .vcrumb { flex-shrink: 1; max-width: 45%; }
+  /* the bar keeps the snapshot's moment in short form (NAV-SPEC 5): the title gives way first, then the view's name */
+  html.app header.top .ttl { flex-shrink: 4; min-width: 2.5em; }
   html.app .ctl .lt { display: none; }
-  html.app nav.nav { padding: 0 6px; }
-  html.app nav.nav a { padding: 8px 7px 7px; font-size: 13.5px; }
+  /* the row's five items on one line at 390 */
+  html.app nav.nav { padding: 0 4px; }
+  html.app nav.nav a, html.app nav.nav a.grp { padding: 8px 4px 7px; font-size: 13.5px; gap: 3px; }
   html.app nav .n { padding-left: 2px; }
   html.app main { padding: 16px 16px 72px; }
   html.app aside.insp { width: 100vw; border-left: 0; }
-  nav.nav a { padding: 7px 7px 6px; font-size: 13.5px; }
+  nav.nav { margin: 0 -16px; padding: 0 8px; }
+  nav.nav a { padding: 7px 4px 6px; font-size: 13.5px; gap: 3px; }
   dl.ax, dl.rx { grid-template-columns: minmax(0, 1fr); gap: 0; }
   dl.ax dd, dl.rx dd { overflow-wrap: break-word; }
   dl.ax dd, dl.rx dd { margin-bottom: 6px; }
@@ -923,7 +952,7 @@ html:is([data-viewer], :has(meta[name=rb-viewer])):not(:has(meta[name=rb-clone])
     --bg: #ffffff; --card: #f6f8fa; --ink: #1f2328; --dim: #59636e; --line: #d1d9e0;
     --good: #1a7f37; --bad: #cf222e; --teal: #0969da; --warn: #9a6700; --accent: #9a6700; color-scheme: light; }
   body { padding: 0; }
-  nav.nav, aside.insp, .ctl, .cp, .filterbar, .help, .skip, .app-only, .seg, .composer { display: none !important; }
+  nav.nav, nav.subrow, p.rlink, aside.insp, .ctl, .cp, .filterbar, .help, .skip, .app-only, .seg, .composer { display: none !important; }
   .acts.enh { display: grid !important; }
   .term::after { content: none; }
   details::details-content { content-visibility: visible; display: contents; }
@@ -958,6 +987,8 @@ ul.struck li { text-decoration: line-through; text-decoration-color: var(--dim);
 @media screen and (min-width: 1280px) {
   html.app:has(meta[name=rb-viewer]) { --toph: 0px; }
   html.app:has(meta[name=rb-viewer]) header.top { display: none; }
+}
+@media screen and (min-width: 960px) {
   /* the navigator is a column: the controls head it, in view on every view */
   html.app nav.nav:has(> .navctl) { flex-direction: column; }
   html.app nav.nav:has(> .navctl) > ul { flex: 1 0 auto; min-height: 0; }
@@ -967,8 +998,11 @@ ul.struck li { text-decoration: line-through; text-decoration-color: var(--dim);
   html.app:has(meta[name=rb-viewer]) { --toph: 34px; }
   html.app:has(meta[name=rb-viewer]) header.top > :not(.vcrumb), html.app:has(meta[name=rb-viewer]) header.top:has(.vcrumb:empty) { display: none; }
   html.app:has(meta[name=rb-viewer]) header.top .vcrumb::before { content: none; }
+}
+@media screen and (max-width: 959px) {
   /* the navigator is a row of tabs here: the controls end it, on its line */
-  html.app nav.nav:has(> .navctl) { align-items: center; }
-  html.app nav.nav:has(> .navctl) > ul { flex: 1 1 auto; min-width: 0; }
-  html.app .navctl { display: flex; gap: 6px; padding: 0 0 0 6px; align-items: center; }
+  /* the row's places keep one line; where the controls do not fit beside them, they take the next, at its end */
+  html.app nav.nav:has(> .navctl) { align-items: center; flex-wrap: wrap; }
+  html.app nav.nav:has(> .navctl) > ul { flex: 1 0 auto; min-width: 0; }
+  html.app .navctl { display: flex; gap: 6px; padding: 0 0 0 6px; align-items: center; margin-left: auto; }
 }

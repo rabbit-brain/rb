@@ -1161,8 +1161,8 @@
    "bytes": 17
   },
   "bundle.zip": {
-   "sha256": "91b69840cf872ae79fcb98c2e081221f9d778c40f0ab7d9fbd14f7ebfe6893e6",
-   "bytes": 147775
+   "sha256": "84aad806159a799ca64802093eec6aa82663b9114d8c12f514cd30cb9dd275d6",
+   "bytes": 150397
   },
   "bundle/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1235,10 +1235,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 144028,",
+   " \"bytes\": 146650,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506\",",
+   "  \"page.html\": \"20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -1272,8 +1272,8 @@
    ""
   ],
   "bundle/page.html": {
-   "sha256": "95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506",
-   "bytes": 125323
+   "sha256": "20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe",
+   "bytes": 127945
   },
   "bundle/record/.rb/.gitattributes": [
    "* -text",
@@ -3156,10 +3156,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 17,",
-   " \"bytes\": 105215,",
+   " \"bytes\": 107837,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"ee507aa77dbfc014a85308f2d5e755b83ec8616827b288ee1cc53ecbb6d9fd06\",",
+   "  \"page.html\": \"ea5ea690dd351dd0edecd7f86c3eb82661beabd28e5bca6dac4996cef95d1b65\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/criteria/c1.yaml\": \"347ab9bf0bee9c195eddc6be07c03ce47f697434aaa8a10837686fa77be310d5\",",
@@ -3190,8 +3190,8 @@
    ""
   ],
   "forked/page.html": {
-   "sha256": "ee507aa77dbfc014a85308f2d5e755b83ec8616827b288ee1cc53ecbb6d9fd06",
-   "bytes": 94725
+   "sha256": "ea5ea690dd351dd0edecd7f86c3eb82661beabd28e5bca6dac4996cef95d1b65",
+   "bytes": 97347
   },
   "forked/record/.rb/.gitattributes": [
    "* -text",
@@ -3504,10 +3504,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 144028,",
+   " \"bytes\": 146650,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506\",",
+   "  \"page.html\": \"20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -3541,8 +3541,8 @@
    ""
   ],
   "newer/page.html": {
-   "sha256": "95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506",
-   "bytes": 125323
+   "sha256": "20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe",
+   "bytes": 127945
   },
   "newer/record/.rb/.gitattributes": [
    "* -text",
@@ -4005,10 +4005,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 144028,",
+   " \"bytes\": 146650,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506\",",
+   "  \"page.html\": \"20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -4042,8 +4042,8 @@
    ""
   ],
   "other/page.html": {
-   "sha256": "95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506",
-   "bytes": 125323
+   "sha256": "20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe",
+   "bytes": 127945
   },
   "other/record/.rb/.gitattributes": [
    "* -text",
@@ -4463,17 +4463,17 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 125955,",
+   " \"bytes\": 128577,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"d66f874073c3154b7b339bfdc8c0ed07cf641848df47c19c26a23cdbcce493d5\"",
+   "  \"page.html\": \"39274e151fef4d091b25b82e625b26f4ce30f145f2f10d431f14800169f0285d\"",
    " }",
    "}",
    ""
   ],
   "page/page.html": {
-   "sha256": "d66f874073c3154b7b339bfdc8c0ed07cf641848df47c19c26a23cdbcce493d5",
-   "bytes": 125364
+   "sha256": "39274e151fef4d091b25b82e625b26f4ce30f145f2f10d431f14800169f0285d",
+   "bytes": 127986
   },
   "proj/.rb/.gitattributes": [
    "* -text",
@@ -5028,8 +5028,8 @@
    ""
   ],
   "pub/bundle.zip": {
-   "sha256": "e7c1a8b6ad2f8d96f4ff86a945630ba2624efbda3d53524fe00e970d8b761c65",
-   "bytes": 152334
+   "sha256": "b2f4e1ef7315701bf9bfd796750129b2dc9eb6283720b0c55ef6609d175f5add",
+   "bytes": 154956
   },
   "pub/manifest.json": [
    "{",
@@ -5044,10 +5044,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 148588,",
+   " \"bytes\": 151210,",
    " \"files\": {",
    "  \"README.md\": \"e6cf0e19d0322c60bbd65e4a17f823478f187a80608a68e49b6570badc9af542\",",
-   "  \"page.html\": \"86098ca7c5f8fec45fe883ed05212b50fec41cf5dd25394da7ca7169e837b3b4\",",
+   "  \"page.html\": \"05cb4ad3471a1c9a1677452967225977d93fa30306056da4ffc7a0efbb3bd746\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -5082,8 +5082,8 @@
    ""
   ],
   "pub/page.html": {
-   "sha256": "86098ca7c5f8fec45fe883ed05212b50fec41cf5dd25394da7ca7169e837b3b4",
-   "bytes": 129785
+   "sha256": "05cb4ad3471a1c9a1677452967225977d93fa30306056da4ffc7a0efbb3bd746",
+   "bytes": 132407
   },
   "pub/record/.rb/.gitattributes": [
    "* -text",
@@ -5547,10 +5547,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 144028,",
+   " \"bytes\": 146650,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506\",",
+   "  \"page.html\": \"20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -5584,8 +5584,8 @@
    ""
   ],
   "tampered/page.html": {
-   "sha256": "95716110c712ac3abd8569befa09cdc9d0ce5ce393f25311511c854883a57506",
-   "bytes": 125323
+   "sha256": "20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe",
+   "bytes": 127945
   },
   "tampered/record/.rb/.gitattributes": [
    "* -text",

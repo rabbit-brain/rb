@@ -119,7 +119,8 @@ const GUIDE_STEP = `(() => {
   let head = null;
   if (h1) { let last = h1; for (let n = h1.nextElementSibling; n && n.tagName === 'P' && n.getBoundingClientRect().height > 0; n = n.nextElementSibling) last = n; const a = rectOf(h1), b = rectOf(last); head = { l: Math.min(a.l, b.l), t: a.t, r: Math.max(a.r, b.r), b: b.b }; }
   const part = {
-    'Questions and experiments': () => { const st = v.querySelector('nav.strip.ov'); return rectOf(!wide && st && st.getBoundingClientRect().height > 0 ? st : document.querySelector('#nav')); },
+    // the navigator at every width (NAV-SPEC 6): the guide no longer looks for an Overview strip, which nothing draws
+    'Questions and experiments': () => rectOf(document.querySelector('#nav')),
     'What the record says': () => wide ? rectOf(document.querySelector('#main')) : head,
     'Where it came from': () => wide ? rectOf(document.querySelector('aside.insp')) : card && rectOf(card.querySelector('.part[data-id$=":runs"]') || card),
     'Your call': () => rectOf(document.querySelector('#nav a[href="#your-call"]')),
@@ -419,11 +420,11 @@ await run(async () => {
       const r = await p.clickEl(sel('#nav a[href="#runs"]'));
       let s = await st();
       check(`views: the nav opens Runs [${at}]`, r && s.view === 'runs' && s.hash === 'runs' && s.views_on === 1 && s.title.startsWith('Runs · '), j(s));
-      // from 960 the nav lists every view; under it the nav holds the sections, and All criteria is reached from the Overview
+      // from 960 the nav lists every view; under it the nav holds the sections, and Rules is reached from the Overview
       if (w >= 960) await p.clickEl(sel('#nav a[href="#criteria"]'));
       else { await p.clickEl(sel('#nav a[href="#overview"]')); await p.clickEl(sel('#overview .quiet a[href="#criteria"]')); }
       s = await st();
-      check(`views: All criteria opens [${at}]`, s.view === 'criteria' && s.hash === 'criteria' && !s.top, j(s));
+      check(`views: Rules opens [${at}]`, s.view === 'criteria' && s.hash === 'criteria' && !s.top, j(s));
       const cur = await p.ev(`(() => { const c = document.querySelector('#nav a[aria-current="page"]'), i = document.querySelector('#nav a.in'); return [c && c.getAttribute('href'), i && i.getAttribute('href')]; })()`);
       check(`views: the nav marks where you are [${at}]`, cur[0] === '#criteria' && cur[1] === '#research', j(cur));
     }

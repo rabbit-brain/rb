@@ -52,9 +52,11 @@ const FIT = `(() => { const d = document.querySelector('dialog.rerundlg'), r = d
 // what of the top bar the open panel's box lies over, the dialog's top, and the bottom of the bar's Open calls
 const OVER = `(() => { const d = document.querySelector('dialog.rerundlg').getBoundingClientRect(), hit = [];
   const over = b => b.width && b.height && b.bottom > d.top && b.top < d.bottom && b.right > d.left && b.left < d.right;
-  // the bar's leaves, and the navigator's links that sit up in the bar's band (its tabs, under 960 or in the hub's slim bar)
+  // the bar's leaves, and the navigator's links that sit up in the bar's band where the navigator is a row of tabs (under
+  // 960, or from 960 on a page an older rb wrote); a column beside the work (NAV-SPEC) is no part of the bar
+  const ul = document.querySelector('nav.nav > ul'), row = !!ul && getComputedStyle(ul).flexDirection === 'row';
   document.querySelectorAll('header.top *, nav.nav a, nav.nav a *').forEach(e => { if (!e.checkVisibility() || e.children.length) return; const b = e.getBoundingClientRect();
-    if ((e.closest('header.top') || b.top < 140) && over(b)) hit.push(e.textContent.trim()); });
+    if ((e.closest('header.top') || (row && b.top < 140)) && over(b)) hit.push(e.textContent.trim()); });
   const oc = Array.from(document.querySelectorAll('header.top a, header.top span, nav.nav a')).find(e => /Open calls|Your call/.test(e.textContent) && e.checkVisibility() && e.getBoundingClientRect().top < 140);
   return { hit: hit.slice(0, 6), top: Math.round(d.top), calls: oc ? Math.round(oc.getBoundingClientRect().bottom) : null }; })()`;
 // each command box's Copy against the box drawn round the command (the box or the first thing in it with a border): wholly

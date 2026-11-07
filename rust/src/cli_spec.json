@@ -3588,7 +3588,7 @@
              "nargs": 0,
              "const": true,
              "default": false,
-             "help": "with a CSV, TSV or JSON Lines table: record every row --where picks, each as its own run, its @<column> values from its own row"
+             "help": "with --table, or a CSV, TSV or JSON Lines table: record every row --where picks, each as its own run (a SQLite row kept by its rowid), its @<column> values from its own row"
             },
             {
              "kind": "append",

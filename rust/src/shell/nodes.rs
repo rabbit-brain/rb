@@ -2728,7 +2728,8 @@ fn big_reading(f: &Value, interval: bool) -> String {
     let iv = r.map_or("", |r| s(r, "interval_text"));
     let (lo, hi) = iv.trim_matches(|c| c == '[' || c == ']').split_once(", ").unwrap_or(("", ""));
     let n = |k: &str, text: &str| at(f, k).and_then(Value::as_f64).filter(|v| v.is_finite()).or_else(|| parsed(text));
-    let (estv, lov, hiv) = (n("reading.estimate", est), n("reading.lo", lo), n("reading.hi", hi));
+    let (sl, sh) = shown_bounds(f);
+    let (estv, lov, hiv) = (n("reading.estimate", est), sl.or_else(|| parsed(lo)), sh.or_else(|| parsed(hi)));
     let compared = compared(f);
     let d = reading_digits(f);
     let unit = &unit_of(f);
@@ -2736,15 +2737,59 @@ fn big_reading(f: &Value, interval: bool) -> String {
     let shown = estv.map(|v| parsed(&fixed(v.abs(), d, false)).unwrap_or(v.abs())).unwrap_or(0.0);
     let unit = if compared { amount_unit(f, true, shown) } else { unit.to_string() };
     let said = |v: Option<f64>, text: &str| v.map_or_else(|| esc(text), |v| nb_of(v, text, d, compared));
-    let bound = |v: Option<f64>, text: &str| if compared { said(v, text) } else { format!("{}{}", said(v, text), big_unit(&unit)) };
+    // each bound in its own digits, as rb show's line writes it (unpadded)
+    let said_b = |v: Option<f64>, text: &str| v.map_or_else(|| esc(text), |v| nb_shown(v, text, unpadded(f, v, fixed(v, d, compared))));
+    let bound = |v: Option<f64>, text: &str| if compared { said_b(v, text) } else { format!("{}{}", said_b(v, text), big_unit(&unit)) };
     let iv = if !interval || lo.is_empty() || hi.is_empty() { String::new() } else { format!("<span class=\"iv\"> ({} to {})</span>", bound(lov, lo), bound(hiv, hi)) };
     format!("<span class=\"e\">{}</span>{}{iv}", said(estv, est), big_unit(&unit))
+}
+
+/// A reading's bounds as a sentence says them: a relative change's and a difference of means' as rb show's line rounds
+/// them (`reading.interval_text`, "[+0.01004, +4.544]"), so each keeps its own digits; any other reading's, rb's numbers.
+pub(crate) fn shown_bounds(f: &Value) -> (Option<f64>, Option<f64>) {
+    let n = |k: &str| at(f, k).and_then(Value::as_f64).filter(|v| v.is_finite());
+    let (lo, hi) = (n("reading.lo"), n("reading.hi"));
+    if s(f, "reading.measure").is_empty() || lo.is_none() || hi.is_none() {
+        return (lo, hi);
+    }
+    let iv = s(f, "reading.interval_text");
+    match iv.trim().trim_start_matches('[').split(']').next().unwrap_or("").split_once(", ") {
+        Some((l, h)) => (parsed(l).or(lo), parsed(h).or(hi)),
+        None => (lo, hi),
+    }
+}
+
+/// A bound of a relative change's or a difference of means' reading, `shown` as a sentence formats it, without the
+/// trailing 0s its decimals add past rb show's line ("-22.6", never "-22.60", beside "[-22.6, -22.37]"): each bound in
+/// its own digits. Any other reading's, and a bound the line writes with an exponent, as `shown`.
+pub(crate) fn unpadded(f: &Value, v: f64, shown: String) -> String {
+    if s(f, "reading.measure").is_empty() {
+        return shown;
+    }
+    unpadded_by(s(f, "reading.interval_text"), v, shown)
+}
+
+/// unpadded, by rb show's interval text itself ("[-22.6, -22.37]").
+pub(crate) fn unpadded_by(interval_text: &str, v: f64, shown: String) -> String {
+    let line = interval_text.trim().trim_start_matches('[').split(']').next().unwrap_or("");
+    let Some(said) = line.split(", ").find(|x| !x.contains(['e', 'E']) && parsed(x) == Some(v)) else { return shown };
+    let k = said.split_once('.').map_or(0, |(_, d)| d.len());
+    match shown.split_once('.') {
+        Some((whole, frac)) if frac.len() > k && frac.chars().all(|c| c.is_ascii_digit()) && frac[k..].chars().all(|c| c == '0') => {
+            if k == 0 { whole.to_string() } else { format!("{whole}.{}", &frac[..k]) }
+        }
+        _ => shown,
+    }
 }
 
 /// A number said in `d` decimals with rb's text of it on hover where the shown number dropped digits; the number is
 /// the one the card's verdict reads, so a big number and its sentence never round one value two ways.
 fn nb_of(v: f64, text: &str, d: usize, signed: bool) -> String {
-    let shown = fixed(v, d, signed);
+    nb_shown(v, text, fixed(v, d, signed))
+}
+
+/// nb_of with the number already said (`shown`).
+fn nb_shown(v: f64, text: &str, shown: String) -> String {
     if parsed(&shown) == Some(v) && parsed(text).map_or(true, |t| t == v) { esc(&shown) } else { format!("<span class=\"nb\" title=\"{}\">{}</span>", esc(text.trim()), esc(&shown)) }
 }
 
@@ -3059,7 +3104,7 @@ fn reading_sentence(f: &Value) -> String {
 fn reading_parts(f: &Value) -> Option<(String, String)> {
     let n = |k: &str| at(f, k).and_then(Value::as_f64).filter(|v| v.is_finite());
     let est = n("reading.estimate")?;
-    let (lo, hi) = (n("reading.lo"), n("reading.hi"));
+    let (lo, hi) = shown_bounds(f);
     let unit = &unit_of(f);
     let (subject, reference) = arms(f);
     let reference = reference.as_str();
@@ -3072,7 +3117,7 @@ fn reading_parts(f: &Value) -> Option<(String, String)> {
     let level = reference.is_empty() || reference.starts_with("cited ");
     // a level's bounds keep its unit, as the page's lists say them ("13.07% (11.00% to 15.14%)"); a difference's are
     // the points or units its amount just said (FIX4)
-    let bound = |v: f64| if level { with_unit(&mark(&fixed(v, d, false)), unit) } else { mark(&fixed(v, d, compared)) };
+    let bound = |v: f64| if level { with_unit(&mark(&unpadded(f, v, fixed(v, d, false))), unit) } else { mark(&unpadded(f, v, fixed(v, d, compared))) };
     let iv = match (lo, hi) {
         (Some(lo), Some(hi)) => format!(" ({} to {})", bound(lo), bound(hi)),
         // rb gives no interval across fixed design cells, ever; elsewhere one comes from 3 units
@@ -3530,10 +3575,13 @@ pub(crate) fn cell_said(key: &str) -> String {
     key.split(DOT).map(|kv| kv.split_once('=').map_or(kv.to_string(), |(k, v)| setting_said(k, v))).collect::<Vec<_>>().join(", ")
 }
 
-/// Numbers rb wrote, in two decimals (P5) said alike across the set, as plain text: for the figure's words.
-pub(crate) fn two_decimals(texts: &[&str], signed: bool) -> Vec<String> {
-    let d = decimals(&texts.iter().filter_map(|t| parsed(t)).collect::<Vec<_>>());
-    texts.iter().map(|t| parsed(t).map_or_else(|| t.to_string(), |v| fixed(v, d, signed))).collect()
+/// A finding's amounts in the figure's words: said alike across the set, in the digits its card says its reading in
+/// (as far as the set's values need them), with the unit the card says them in where it is "%", a relative change's.
+pub(crate) fn figure_amounts(f: &Value, texts: &[&str], signed: bool) -> Vec<String> {
+    let xs: Vec<f64> = texts.iter().filter_map(|t| parsed(t)).collect();
+    let d = places_for(&xs, decimals(&xs), reading_digits(f));
+    let pct = relative(f);
+    texts.iter().map(|t| parsed(t).map_or_else(|| t.to_string(), |v| if pct { with_unit(&fixed(v, d, signed), "%") } else { fixed(v, d, signed) })).collect()
 }
 
 /// A number in a sentence, marked so the sentence drills from it (the drill law) and nowhere else is in link colour

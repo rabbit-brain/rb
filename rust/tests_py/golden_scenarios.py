@@ -1569,6 +1569,34 @@ SCENARIOS = {
         ("rb", "page"),
     ]},
     # round 6b: the four rules at one design cell (--where) and across cells, each cell on the rule's own estimand
+    # a means rule that owns a grid cell, said there in its card's estimate and bounds, and a relative rule that reads
+    # another cell otherwise, whose cell keeps its own change in nats, linked to the rule, while its card says % (P12);
+    # said.txt pins the grid's cells, the cards' sentences and the figures' legends as lines
+    "rule-cell-owner": {"steps": [
+        ("write", "paper.md", "# Paper\n\nAt batch 32 INT8 adds 0.0317 to the validation loss.\n"),
+        ("rb", "init owner --no-agents"),
+        ("rb", "metric add val_loss --minimize --unit nats"),
+        ("rb", "experiment add e --id e1 --purpose x --baseline fp32 --candidate int8 --varies precision"),
+        ("rb", "spec set e1 fp32.precision fp32 --no-verify"),
+        ("rb", "spec set e1 int8.precision int8 --no-verify"),
+        ("rb", "spec set e1 seed --per-run"),
+        ("rb", "spec set e1 batch --per-run --design-factor"),
+        ("rb", "criterion add 'INT8 adds 0.0317 at batch 32 as the paper says' -e e1 --id cm --metric change.val_loss --equals 0.0317 --tolerance 0.00005 --means --source paper.md --quote 'INT8 adds 0.0317 to the validation loss' --where batch=32"),
+        ("rb", "criterion add 'INT8 adds at most 3.5% at batch 64' -e e1 --id cr --metric change.val_loss --at-most 3.5 --relative --where batch=64"),
+        *[("rb", f"run add e1 fp32.val_loss={v} --set seed={i} --set batch=32 --produced-at 2026-05-01") for i, v in enumerate(["0.9612", "0.9655", "0.9701"], 1)],
+        *[("rb", f"run add e1 int8.val_loss={v} --set seed={i} --set batch=32 --produced-at 2026-05-01") for i, v in enumerate(["0.9931", "0.9978", "1.0003", "0.9899"], 1)],
+        *[("rb", f"run add e1 fp32.val_loss={v} --set seed={i} --set batch=64 --produced-at 2026-05-01") for i, v in enumerate(["0.9512", "0.9555", "0.9601"], 1)],
+        *[("rb", f"run add e1 int8.val_loss={v} --set seed={i} --set batch=64 --produced-at 2026-05-01") for i, v in enumerate(["0.9801", "0.9848", "0.9873", "0.9769"], 1)],
+        ("rb", "show cm"),
+        ("rb", "show cr"),
+        ("rb", "compare e1"),
+        ("rb", "page"),
+        ("sh", "python3 -c \"import re,html; h=open('rb-page.html',encoding='utf-8').read(); t=lambda x: re.sub(r'\\\\s+',' ',html.unescape(re.sub(r'<[^>]+>',' ',x))).strip(); "
+               "o=['grid: '+t(g) for g in re.findall(r'<table class=.grid.>.*?</table>',h,re.S)]; "
+               "o+=['card: '+t(c) for c in sorted(set(re.findall(r'INT8 is [^<(]*?(?:higher|lower) than the FP32 baseline \\\\([^)]*\\\\)',h)))]; "
+               "o+=['legend: '+t(l) for l in sorted(set(re.findall(r'class=.figleg[^>]*>(.*?)</',h,re.S)))]; "
+               "open('said.txt','w',encoding='utf-8').write(chr(10).join(o)+chr(10))\""),
+    ]},
     "rule-cells": {"steps": [
         ("write", "paper.md", "# Paper\n\nAt batch 32 INT8 adds 0.0045 to the validation loss.\n"),
         ("rb", "init cells --no-agents"),

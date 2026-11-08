@@ -982,12 +982,22 @@ pub fn cmd_criterion_relate(ns: &Namespace, out: &mut Out) -> R {
             out.data.insert("relation".into(), Value::Dict(Ledger::withdrawn_relation(&c, relation)));
         }
     } else if let Some(relation) = latest.filter(|r| r.retracted.is_none()) {
-        let reading = led.criterion_relation(&c, relation, &indexmap::IndexMap::new())?;
-        if let Some(Value::Str(summary)) = reading.get("summary") {
-            let said = crate::ledger::relations::relation_problems(&reading);
-            out.say(if said.is_empty() { summary.clone() } else { format!("{summary} Integrity: {said}.") });
+        // the relation is written whole, its log line with it: the write reads the two criteria, their experiments and
+        // settings, never an analysis, so its reading (the two findings) leaves out what reads a file that does not read,
+        // named after its own lines
+        let mut not_read: Vec<(String, String)> = Vec::new();
+        if let Some(reading) = led.after_write(led.criterion_relation(&c, relation, &indexmap::IndexMap::new()), &mut not_read)? {
+            if let Some(Value::Str(summary)) = reading.get("summary") {
+                let said = crate::ledger::relations::relation_problems(&reading);
+                out.say(if said.is_empty() { summary.clone() } else { format!("{summary} Integrity: {said}.") });
+            }
+            out.data.insert("relation".into(), Value::Dict(reading));
         }
-        out.data.insert("relation".into(), Value::Dict(reading));
+        led.unread_beside(&mut not_read)?;
+        say_not_read(out, "relation", &not_read);
+        if !not_read.is_empty() {
+            out.next = vec!["rb doctor".into()];
+        }
     }
     Ok(0)
 }
@@ -2653,10 +2663,14 @@ pub fn cmd_retract(ns: &Namespace, out: &mut Out) -> R {
     if !deps.is_empty() {
         out.say(format!("  it rested on: {}", deps.join(", ")));
     }
+    // the retraction is written whole, its log line with it: what follows only reads, and a record file that does not
+    // read and that the retraction never read (a criterion's, beside a note's retraction) leaves out what reads it, named
+    // after its own lines
+    let mut not_read: Vec<(String, String)> = Vec::new();
     let mut changes: Vec<Value> = Vec::new();
-    for c in led.live::<Criterion>()? {
+    for c in led.after_write(led.live::<Criterion>(), &mut not_read)?.unwrap_or_default() {
         if let Some(b) = before.get(&c.id) {
-            let after = led.finding(&c)?;
+            let Some(after) = led.after_write(led.finding(&c), &mut not_read)? else { continue };
             let bs = |k: &str| b.says.get(k).cloned();
             let as_ = |k: &str| after.says.get(k).cloned();
             // taking back a run the criterion could have been fitted to can move the timing of a reading alone
@@ -2672,6 +2686,11 @@ pub fn cmd_retract(ns: &Namespace, out: &mut Out) -> R {
         }
     }
     actor_line(out, &led)?;
+    led.unread_beside(&mut not_read)?;
+    say_not_read(out, "retraction", &not_read);
+    if !not_read.is_empty() {
+        out.next = vec!["rb doctor".into()];
+    }
     out.data.insert("object".into(), crate::obj! {"kind" => kind, "id" => sid, "retracted" => crate::obj! {"why" => why, "scope" => Value::list_of_str(scope)}});
     out.data.insert("rested_on".into(), Value::list_of_str(deps));
     out.data.insert("finding_changes".into(), Value::List(changes));

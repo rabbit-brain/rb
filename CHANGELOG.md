@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.3 (2026-11-08)
+
+The two writes 0.8.2 left half done beside a file that does not read are made whole, a broken note's own retraction names its file again, and a session is told what changed beside a broken note and after `rb reconcile --apply`.
+
+- **Two writes that wrote and then exited 2.** `rb retract` of a note (an experiment's note or a project note) beside a criterion's file that does not read, and `rb criterion relate` beside an analysis's file that does not read, record the retraction or the relation whole, exit 0 and name the file, with `rb doctor`'s fix (`data.unread_files`, `data.warnings`). Neither reads that file before it writes. rb 0.8.2 and 0.8.1 wrote them and then exited 2. 0.8.2's entry named both under "Not fixed yet".
+- **A note whose own file does not read.** `rb retract` of that note is refused with nothing written, and names the note's file, where it breaks and `rb doctor`'s fix, as rb 0.8.1 did. rb 0.8.2 said no note of that name exists. 0.8.2's entry named it under "Not fixed yet" too.
+- **What changed since the session last looked.**
+  - In an agent session, a write beside a note's file that does not read tells what it would tell on a clean record, and that the note's file changed outside rb. rb 0.8.2 told nothing there.
+  - `rb reconcile --apply` tells it too when it records runs. The `rb run add` it runs for each one tells nothing of its own. Before, that inner command marked the facts as told in a reply nobody read, so neither the apply nor the next command told them. This happened on a clean record as well.
+- **The manual names every write refused beside each kind of file.** Also refused, with nothing written, as in 0.8.2:
+  - `rb question move` of a question, and `rb decide` on it, beside its file;
+  - `rb resource locate` beside a resource's file;
+  - `rb criterion relate` beside a criterion's or a metric's file.
+- **The page's list of design cells.** A count or a best of N across fixed design cells gives each cell its estimate and its units, and no interval, as `rb show` and its figure do. rb 0.8.2 gave each cell bounds in digits shown nowhere else. The list says "3 units", never "3 unit".
+- **Words.** Where a file's `kind:` is not the kind its place holds, rb says "a file there holds an analysis", never "a analysis".
+- **A team on two versions.** rb 0.7.0, 0.7.1, 0.8.0, 0.8.1 and 0.8.2 read the files 0.8.3 writes as they read their own. 0.7.0 and 0.7.1 refuse a record that holds a format-2 file and leave it unchanged, as before.
+
 ## 0.8.2 (2026-11-08)
 
 A write beside a record file that does not read is made whole and names that file, or is refused with nothing written, but for two writes not fixed yet; a note's file that does not read no longer stops the writes beside it; and the page says each reading in `rb show`'s digits.

@@ -613,7 +613,8 @@ fn body(data: &Value, kind: &str, rel: &str) -> Result<Dict, Unreadable> {
     }
     if d.get("kind").and_then(|k| k.as_str()) != Some(kind) {
         let k = d.get("kind").map(pyjson::py_repr).unwrap_or_else(|| "None".into());
-        return Err(Unreadable::Bad(format!("{rel} says kind: {k}, and a file there holds a {kind}")));
+        let a = if kind.starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" };
+        return Err(Unreadable::Bad(format!("{rel} says kind: {k}, and a file there holds {a} {kind}")));
     }
     Ok(d.iter().filter(|(k, _)| k.as_str() != FORMAT_KEY && k.as_str() != "kind").map(|(k, v)| (k.clone(), v.clone())).collect())
 }
@@ -4177,8 +4178,27 @@ impl Ledger {
     }
 
     pub fn get(&self, id: &str) -> Res<(&'static str, Obj)> {
-        let kind = self.kind_of(id)?.ok_or_else(|| RBError::msg("E_OBJECT_NOT_FOUND", format!("Nothing called {} in this project.", repr_str(id))))?;
+        let Some(kind) = self.kind_of(id)? else {
+            // a note a write left out because its file does not read is there all the same: name its file, where it
+            // breaks and doctor's fix, never "nothing called"
+            return Err(self.note_left_out(id).unwrap_or_else(|| RBError::msg("E_OBJECT_NOT_FOUND", format!("Nothing called {} in this project.", repr_str(id)))));
+        };
         Ok((kind, self.load_kind(kind, id)?))
+    }
+
+    /// While a write runs, the refusal for a note it left out of its experiment or the project because the note's file
+    /// does not read (with_parts): that file and where it breaks, as every read outside a write says it.
+    pub fn note_left_out(&self, id: &str) -> Option<RBError> {
+        if !id_ok(id) || !NOTES_BESIDE.with(|b| b.get()) {
+            return None;
+        }
+        let named = |p: &str| {
+            let p = Path::new(p);
+            p.file_stem().and_then(|s| s.to_str()) == Some(id) && p.parent().and_then(|d| d.file_name()).and_then(|d| d.to_str()) == Some("notes")
+        };
+        NOTES_LEFT.with(|l| l.borrow().iter().find(|(p, _)| named(p)).map(|(_, why)| {
+            RBError::msg_fix("E_STATE_CORRUPT", format!("{why}."), "rb doctor lists every such file; rb doctor --restore puts back what rb last wrote.")
+        }))
     }
 
     /// A record by its global uid (an experiment, a run, an analysis, a resource), or None.

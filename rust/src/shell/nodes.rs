@@ -362,6 +362,8 @@ fn term(key: &str, inner: &str) -> String {
 
 /// The head of a finding's design cells where each says its interval and units, as rb page always said it.
 const WITHIN_CELL_UNITS: &str = "Within-cell units: each cell's interval over its own units";
+/// The same where no cell has an interval (a count or a best of N reads each cell's units, not their mean).
+const WITHIN_CELL_UNITS_ONLY: &str = "Within-cell units: each cell's own units";
 
 /// A criterion's display noun on a screen (PLAIN-WORDS-PASS-1): a card says "rule", with the glossary's line that
 /// says what commands call it ("rule"). Commands, flags, kinds and anchors keep "criterion".
@@ -1024,7 +1026,7 @@ impl Doc<'_> {
                 // its interval and its own units, where the document gives them
                 let iv = s(c, "interval_text");
                 let iv = if iv.is_empty() { String::new() } else { format!("<span class=\"iv\">{}</span>", esc(iv)) };
-                let n = at(c, "n").and_then(Value::as_i64).map(|n| format!("<span class=\"u\">{n} {}</span>", esc(s(c, "unit")))).unwrap_or_default();
+                let n = at(c, "n").and_then(Value::as_i64).map(|n| format!("<span class=\"u\">{n} {}</span>", esc(&crate::assess::plural(s(c, "unit"), n)))).unwrap_or_default();
                 li += &format!(
                     "<li{}><span class=\"k\">{}</span><span class=\"v\">{}</span>{iv}{n}{}<span class=\"rs\">{}</span></li>",
                     if out { " class=\"out\"" } else { "" },
@@ -1035,7 +1037,8 @@ impl Doc<'_> {
                 );
             }
             // within each cell, its own units: the rule reads every cell apart
-            let units = if cells.iter().any(|c| at(c, "n").is_some()) { format!("<p class=\"dim sm\">{}</p>", WITHIN_CELL_UNITS) } else { String::new() };
+            let said = if cells.iter().any(|c| !s(c, "interval_text").is_empty()) { WITHIN_CELL_UNITS } else { WITHIN_CELL_UNITS_ONLY };
+            let units = if cells.iter().any(|c| at(c, "n").is_some()) { format!("<p class=\"dim sm\">{said}</p>") } else { String::new() };
             body += &format!("{units}<ul class=\"cells\">{li}</ul>");
         } else if !obs.is_empty() {
             // each run by the per-run values that tell it apart, in the UI font (P2, P4); a reason shared by more than

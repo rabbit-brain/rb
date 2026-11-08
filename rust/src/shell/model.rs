@@ -2276,6 +2276,9 @@ fn finding_graph(led: &Ledger, h: &Home, c: &Criterion, f: &Finding) -> Res<Dict
                 Some(_) => format!("[{}, {}]", said.next().unwrap_or_default(), said.next().unwrap_or_default()),
                 None => String::new(),
             };
+            // a count or a best of N reads each cell's units, never an interval of their mean: rb show and the figure
+            // give a cell none, so the list gives none either
+            let interval_text = if matches!(c.over.as_str(), "count" | "best") { String::new() } else { interval_text };
             // a relative change's or a difference of means' cell is a reading of its own, said as rb show says one (a
             // rule with --where on that cell reads "+0.5625 [+0.545, +0.58]"), never in the digits of the cells' range
             let (estimate_text, interval_text) = match x.filter(|_| !c.measure.is_empty()) {

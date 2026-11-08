@@ -61,7 +61,11 @@ pub fn run_captured(argv: Vec<String>) -> (i32, String) {
 
 /// The same, with standard error dropped or left to the terminal.
 pub fn run_capturing(argv: Vec<String>, drop_stderr: bool) -> (i32, String) {
+    // a command line run inside another (rb reconcile --apply recording a run) tells nothing since the session last
+    // looked: its reply is the enclosing command's to read, so what it told would reach no one and be remembered as told
+    let was = INNER.with(|i| i.replace(true));
     let (code, out, _) = capture_run(argv, if drop_stderr { ErrTo::Dropped } else { ErrTo::Terminal });
+    INNER.with(|i| i.set(was));
     (code, out)
 }
 
@@ -506,6 +510,8 @@ thread_local! {
     /// What the fault said and where, while a guard on this thread is waiting for it.
     static FAULT: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
     static GUARDS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// While a command line runs inside another command (run_capturing): it computes no rb_delta.
+    static INNER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 static FAULT_HOOK: std::sync::Once = std::sync::Once::new();
 
@@ -758,8 +764,21 @@ fn run(argv: Vec<String>) -> i32 {
         Ok(code) => {
             out.notes.extend(latex);
             // a preview tells nothing of what changed since the session last looked, and remembers nothing of it
-            if delta_command(&command) && !dry {
-                out.delta = crate::delta::for_command(&command, out.told.as_deref(), out.told_lines.as_deref());
+            if delta_command(&command) && !dry && !INNER.with(|i| i.get()) {
+                // a write beside a note whose file does not read tells what it tells on a clean record: the delta's
+                // reading leaves that note out as the write did (a note is in no open item), and names nothing new
+                let delta = || crate::delta::for_command(&command, out.told.as_deref(), out.told_lines.as_deref());
+                out.delta = if beside {
+                    let enclosing_left = crate::ledger::notes_left();
+                    let was = crate::ledger::notes_beside(true);
+                    let d = delta();
+                    let _ = crate::ledger::notes_left();
+                    crate::ledger::notes_left_again(enclosing_left);
+                    crate::ledger::notes_beside(was);
+                    d
+                } else {
+                    delta()
+                };
             }
             out.emit(code == EXIT_OK || code == EXIT_CHECK_FAILED, Vec::new());
             // for rb installed with pip, one quiet line at most once a day when a newer rb is out

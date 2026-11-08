@@ -773,7 +773,7 @@ def test_a_relative_rule_s_cells_list_says_each_cell_as_rb_show_says_its_reading
     lists = [re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", m))) for m in re.findall(r'<ul class="cells">(.*?)</ul>', raw_page(rb), re.S)]
     assert any(f"batch 32 {est} [{lo}, {hi}]" in x for x in lists), (est, lo, hi, lists)
     assert any("batch 64 +0.1 [" in x for x in lists), lists
-    assert any("batch 32 0.8045 [" in x for x in lists), lists                              # the count's, as its legend
+    assert any("batch 32 0.8045 3 units" in x for x in lists), lists                       # the count's, as its legend (MP-1108-0609)
     assert not any("0.545033" in x or "+0.56 " in x for x in lists), lists
 
 
@@ -791,3 +791,20 @@ def test_a_grid_cell_no_rule_owns_says_its_change_as_its_legend_does(rb):
     assert "batch 32: +0.027" in legend, legend
     assert "0.027 nats higher than FP32" in grid and "0.03 nats higher" not in grid, grid
     assert "%" not in grid, grid
+
+
+def test_the_cells_list_says_a_count_s_cells_as_its_legend_and_units_in_the_plural(rb):
+    """MP-1108-0609 laters: across design cells, the page's cells list gave a count rule per-cell bounds
+    ("[0.779659, 0.829341]") that no legend and no rb show line gives, since a count reads each cell's units and no
+    interval of their mean; and it said "3 unit"."""
+    rb("spec", "set", "e1", "batch", "--per-run", "--design-factor")
+    rb("criterion", "add", "INT8 adds at most 0.5%", "-e", "e1", "--metric", "change.val_loss", "--at-most", "0.5", "--relative", "--id", "cr")
+    rb("criterion", "add", "4 of 6 at most 0.81", "-e", "e1", "--metric", "int8.val_loss", "--at-most", "0.81", "--count", "4", "--of", "6", "--id", "c4")
+    batches(rb, CELLS)
+    rb("page", "--out", "page.html")
+    text = Path("page.html").read_text(encoding="utf-8")
+    lists = dict(re.findall(r'<section class="part" id="c-(\w+):runs">.*?<ul class="cells">(.*?)</ul>', text))
+    assert '<span class="v"><a href="#run-' in lists["c4"] and "0.8045</a>" in lists["c4"], lists["c4"]
+    assert 'class="iv"' not in lists["c4"] and "0.779659" not in text, lists["c4"]
+    assert "[+0.545, +0.58]" in lists["cr"], lists["cr"]
+    assert lists["c4"].count("3 units</span>") == 2 and lists["cr"].count("3 units</span>") == 2 and "3 unit<" not in text, lists

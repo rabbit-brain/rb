@@ -300,7 +300,7 @@ def test_every_row_and_reconcile_name_an_unreadable_file_beside_the_runs_they_re
     assert [u["path"] for u in env.data["unread_files"]] == [broken] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
     assert sum(broken in w for w in env.data["warnings"]) == 1, env.data["warnings"]
     code, env = rbj(capsys, "reconcile", "--apply")
-    assert code == 0 and env.ok and env.data["recorded"], (env.errors, env.data.get("recorded"), env.data.get("not_recorded"))
+    assert code == 0 and env.ok and env.data["recorded"], (env.errors, {k: v for k, v in env.data.items() if k in ("unplaced", "found", "proposed", "runs", "not_recorded")})
     assert [u["path"] for u in env.data["unread_files"]] == [broken] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
 
 
@@ -740,3 +740,124 @@ def test_a_session_s_gate_beside_an_unreadable_criterion_file_is_made_whole(repo
     assert [u["path"] for u in env.data["unread_files"]] == [rel] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
     lines = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").splitlines()[log:]
     assert [json.loads(x)["op"] for x in lines if json.loads(x)["op"] != "session"] == ["gate"], lines
+
+
+@pytest.mark.parametrize("where", ["experiment", "project"])
+def test_a_note_s_retraction_beside_an_unreadable_criterion_file_is_made_whole(repo, capsys, where):
+    """MP-1108-0425 should 1 (in rb 0.8.1 too): rb retract of a note beside a criterion's file that does not read wrote
+    the retraction and its log line, then read the criteria to say which findings moved and exited 2. A note is in no
+    finding, so the retraction reads no criterion before it writes: it is made whole, exits 0 and names the file."""
+    import rabbit_brain as rb
+
+    seed(capsys)
+    on = ["-e", "e1"] if where == "experiment" else []
+    nid = ok(capsys, "note", "add", "the held-out set is not in the pretraining data", *on).data["object"]["id"]
+    nid2 = ok(capsys, "note", "add", "the calibration set matches the eval distribution", *on).data["object"]["id"]
+    p = repo / CRITERIA / "c0.yaml"
+    p.write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    rel = p.relative_to(repo).as_posix()
+    log = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n")
+    code, env = rbj(capsys, "retract", nid, "--why", "written on the wrong experiment")
+    assert code == 0 and env.ok, (code, env.errors)
+    assert env.data["object"]["id"] == nid and env.data["finding_changes"] == []
+    assert [u["path"] for u in env.data["unread_files"]] == [rel] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
+    assert any(rel in w and "rb doctor --restore" in w for w in env.data["warnings"]), env.data["warnings"]
+    assert (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n") == log + 1
+    # the SDK's retract, which reads nothing after it writes, succeeds as before
+    rb.open().retract(nid2, why="written on the wrong experiment")
+    held = repo / ".rb" / (f"experiments/e1/notes/{nid2}.yaml" if where == "experiment" else f"notes/{nid2}.yaml")
+    assert "retracted:" in held.read_text(encoding="utf-8")
+    # a retraction that reads the criteria before it writes (a run's) stays refused, with every file as it was
+    run = sorted((repo / ".rb/experiments/e1/runs").glob("*.yaml"))[0].stem
+    before = files_of(repo)
+    code, env = rbj(capsys, "retract", run, "--why", "wrong config")
+    assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT" and files_of(repo) == before, env.errors
+
+
+def test_a_relation_beside_an_unreadable_analysis_file_is_made_whole(repo, capsys):
+    """MP-1108-0425 should 1 (in rb 0.8.1 too): rb criterion relate beside an analysis's file that does not read wrote
+    the relation, then read the two findings for its reply and exited 2. The relation reads the two criteria, their
+    experiments and settings, never an analysis: it is made whole, exits 0 and names the file."""
+    broken = broken_beside(capsys, repo)
+    log = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n")
+    code, env = rbj(capsys, "criterion", "relate", "c0", "reverses", "c9", "--orientation", "same", "--why", "the same comparison at two batch sizes")
+    assert code == 0 and env.ok, (code, env.errors)
+    assert env.data["object"]["id"] == "c0" and "relation" not in env.data
+    assert [u["path"] for u in env.data["unread_files"]] == [broken] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
+    lines = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").splitlines()[log:]
+    assert [json.loads(x)["op"] for x in lines] == ["relate"], lines
+
+
+@pytest.mark.parametrize("how", ["yaml", "invalid", "raised"])
+@pytest.mark.parametrize("where", ["experiment", "project"])
+def test_a_retraction_of_a_note_whose_file_does_not_read_names_the_file(repo, capsys, where, how):
+    """MP-1108-0425 should 2: a write leaves out a note whose file does not read, so rb retract of that note said
+    "Nothing called '<id>' in this project.", where rb 0.8.1 named the file. It names the file, where it breaks and
+    doctor's fix, with nothing written."""
+    seed(capsys)
+    nid = ok(capsys, "note", "add", "the held-out set is not in the pretraining data", *(["-e", "e1"] if where == "experiment" else [])).data["object"]["id"]
+    p = repo / ".rb" / (f"experiments/e1/notes/{nid}.yaml" if where == "experiment" else f"notes/{nid}.yaml")
+    text = p.read_text(encoding="utf-8")
+    p.write_text({"yaml": "rb: 1\nkind: [\n", "invalid": text.replace("kind: note", "kind: question"), "raised": text.replace("rb: 1\n", "rb: 2\n", 1)}[how], encoding="utf-8")
+    rel, before = p.relative_to(repo).as_posix(), files_of(repo)
+    code, env = rbj(capsys, "retract", nid, "--why", "wrong")
+    assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT", env.errors
+    assert env.errors[0].message.startswith(rel) and "Nothing called" not in env.errors[0].message, env.errors[0].message
+    assert "rb doctor --restore" in env.errors[0].fix
+    assert files_of(repo) == before
+
+
+def test_a_session_s_write_beside_an_unreadable_note_tells_what_changed(repo, capsys, monkeypatch):
+    """MP-1108-0425 later: in an agent session, a write beside a note's file that does not read told nothing since the
+    session last looked (rb_delta []), where a clean record tells the open items and how to say the model. It tells
+    them, and that the note's file changed outside rb."""
+    seed(capsys)
+    nid = ok(capsys, "note", "add", "the held-out set is not in the pretraining data", "-e", "e1").data["object"]["id"]
+    (repo / f".rb/experiments/e1/notes/{nid}.yaml").write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-delta-4e21")
+    code, env = rbj(capsys, "spec", "set", "e1", "optim.lr", "0.1", "--no-verify")
+    assert code == 0 and env.ok, env.errors
+    told = {f["code"]: f for f in env.rb_delta}
+    assert "model_unsaid" in told and nid in told["edited_outside_rb"]["text"], env.rb_delta
+
+
+def test_a_file_that_holds_another_kind_says_an_analysis(repo, capsys):
+    """MP-1108-0425 later (older): a file whose kind is not the one its place holds said "holds a analysis"."""
+    broken_beside(capsys, repo)
+    p = next((repo / ".rb/experiments/e1/analyses").glob("*.yaml"))
+    p.write_text("rb: 1\nkind: note\nid: n1\ntext: hi\nby: human:ana\nat: '2026-10-01T12:00:00.000+00:00'\n", encoding="utf-8")
+    code, env = rbj(capsys, "status")
+    assert code == 2 and "a file there holds an analysis" in env.errors[0].message, env.errors[0].message
+
+
+@pytest.mark.parametrize("note", ["reads", "broken"])
+def test_reconcile_apply_in_a_session_tells_what_the_runs_it_records_saw(repo, capsys, monkeypatch, note):
+    """Codex S4 should: rb reconcile --apply runs rb run add inside itself; the inner command told the session what had
+    changed, remembered it as told, and its reply was dropped, so neither the apply nor the next command told it (on
+    a clean record too). A command run inside another tells nothing: the enclosing one tells it."""
+    seed(capsys)
+    ok(capsys, "question", "add", "Does INT8 cost?", "--id", "q1")
+    nid = ok(capsys, "note", "add", "the held-out set is not in the pretraining data", "-e", "e1").data["object"]["id"]
+    Path("results/r1").mkdir(parents=True)
+    Path("results/r1/metrics.json").write_text('{"fp32": {"val_loss": 0.9}, "int8": {"val_loss": 0.95}}', encoding="utf-8")
+    Path("results/r1/config.yaml").write_text("seed: 13\n", encoding="utf-8")
+    ok(capsys, "run", "add", "e1", "--from", "results/r1/metrics.json", "--set", "seed=13", "--config", "results/r1/config.yaml")
+    subprocess.run(["git", "add", "-A"], check=True)
+    subprocess.run(["git", "commit", "-qm", "r"], check=True)
+    session = {"CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "sess-apply-7c02"}
+    with monkeypatch.context() as m:
+        for k, v in session.items():
+            m.setenv(k, v)
+        ok(capsys, "spec", "set", "e1", "warmup", "1", "--no-verify")
+    ok(capsys, "question", "reword", "q1", "Does INT8 cost accuracy?", "--why", "the held-out set")
+    Path("results/r1/next.json").write_text('{"fp32": {"val_loss": 0.91}, "int8": {"val_loss": 0.96}}', encoding="utf-8")
+    if note == "broken":
+        (repo / f".rb/experiments/e1/notes/{nid}.yaml").write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    for k, v in session.items():
+        monkeypatch.setenv(k, v)
+    code, env = rbj(capsys, "reconcile", "--apply")
+    assert code == 0 and env.ok and env.data["recorded"], (env.errors, {k: v for k, v in env.data.items() if k in ("unplaced", "found", "proposed", "runs", "not_recorded")})
+    told = [f["code"] for f in env.rb_delta]
+    assert "reword" in told, env.rb_delta
+    assert ("edited_outside_rb" in told) == (note == "broken"), env.rb_delta

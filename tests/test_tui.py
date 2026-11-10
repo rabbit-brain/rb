@@ -8,11 +8,14 @@ keys, and a rule met on evidence with a problem is never drawn green, nor counte
 question that counts it.
 """
 import asyncio
+import datetime
 import json
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 import pytest
@@ -1384,7 +1387,7 @@ def test_w_lists_the_places_and_shows_another_place_only_to_read(placed):
     asyncio.run(drive())
     c_path = rec.tree["exp-c"].as_posix()
     main_short, c_short = in_short(rec.root.resolve().as_posix()), in_short(c_path)
-    assert got["start line"] == f"main · {main_short}" and got["start keys"] == [True, True, True]
+    assert got["start line"] == "main · all record files committed" and got["start keys"] == [True, True, True]
     where = dict(got["where"])
     assert got["where"][0][0].startswith(f"main · {main_short}: this record · last write ") and got["where"][0][1] is False
     assert [t for t, off in got["where"] if off] == [t for t in where if t.startswith(("exp-b · ", "exp-g · ", "exp-n · "))]
@@ -1426,12 +1429,18 @@ def test_w_names_each_place_in_short_with_its_whole_path_in_the_detail(tmp_path,
             got["detail"] = str(app.screen.query_one("#where-detail").render())
 
     asyncio.run(drive())
-    assert got["line"] == "main · ~/clone/p"
+    assert got["line"] == "main · all record files committed"
     assert got["where"][0].startswith("main · ~/clone/p: this record · ")
     assert any(t.startswith("exp-b · .worktrees/b: no record of its own: it writes to this record") for t in got["where"])
     assert any(t.startswith("exp-c · ~/clone/wt-c: its own record") for t in got["where"])
     listed = [l[len("worktree "):] for l in rec.git("worktree", "list", "--porcelain").splitlines() if l.startswith("worktree ")]
-    assert got["detail"] == next(l for l in listed if l.endswith("/wt-c"))
+    # its whole path, then its commit in 12 hex, one step down from the words
+    head_c = rec.git("rev-parse", "HEAD", cwd=rec.tree["exp-c"])
+    path_c, *below = got["detail"].split("\n")
+    assert path_c == next(l for l in listed if l.endswith("/wt-c"))
+    # then the evidence (PARITY 5): what rb found, at the minute w opened, then the commit whole on a line of its own
+    assert re.match(rf"rb checked the record with git at \d{{4}}-\d\d-\d\d \d\d:\d\d UTC: .*commit {head_c[:12]}\.$", below[0]), got["detail"]
+    assert below[1] == head_c, got["detail"]
 
 
 def test_away_from_where_it_started_the_line_says_so_and_escape_goes_back(placed):
@@ -1458,7 +1467,7 @@ def test_away_from_where_it_started_the_line_says_so_and_escape_goes_back(placed
 
     asyncio.run(drive())
     c_short = in_short(rec.tree["exp-c"].as_posix())
-    assert got["start"] == (f"main · {in_short(rec.root.resolve().as_posix())}", False)
+    assert got["start"] == ("main · all record files committed", False)
     line, styles, bound = got["away"]
     assert line.startswith(f"exp-c · {c_short} · read only · esc: back to main · its own record · ") and bound is True
     assert any(WARN.lower() in st.lower() for st in styles), styles
@@ -1508,13 +1517,134 @@ def test_w_in_a_single_checkout_names_its_place_as_it_always_has(repo, workdir, 
             await until(pilot, lambda: isinstance(app.screen, PlacesScreen))
             await pilot.pause(0.3)
             got["where"] = _options(app.screen, "#where")
-            got["detail"] = app.screen.query_one("#where-detail").display
+            got["detail"] = str(app.screen.query_one("#where-detail").render())
 
     asyncio.run(drive())
     whole = f"{branch} · {workdir.resolve().as_posix()}"
-    assert got["line"] == branch and "/" not in got["line"]
+    assert got["line"] == f"{branch} · no commit yet" and "/" not in got["line"]
     [(text, off)] = got["where"]
-    assert text.startswith(f"{whole}: this record · ") and off is False and got["detail"] is False
+    assert text.startswith(f"{whole}: this record · ") and off is False
+    # w's lines under it: its whole path, then how its checkout holds the record
+    lines = got["detail"].split("\n")
+    assert lines[0] == workdir.resolve().as_posix()
+    assert re.fullmatch(r"rb checked the record with git at \d{4}-\d\d-\d\d \d\d:\d\d UTC: the repository has no commit yet, so no commit holds the record\.", lines[1]), lines
+    assert lines[2:4] == ["To check it yourself, in your terminal:", f"  git -C {workdir.resolve().as_posix()} status --short --untracked-files=all -- .rb"], lines
+
+
+def test_a_single_checkout_on_no_branch_is_named_no_branch(repo, workdir):
+    """A single checkout on a detached HEAD is "no branch" on the line under the head, never its folder or its commit;
+    only outside git does it keep its folder's name."""
+    from rabbit_brain.tui import place_line, places_view
+    subprocess.run(["git", "add", "-A"], check=True)
+    subprocess.run(["git", "commit", "-qm", "the record"], check=True)
+    subprocess.run(["git", "checkout", "-q", "--detach"], check=True)
+    assert place_line(places_view(workdir), None, None) == "no branch · all record files committed"
+    def writable(remove, path, _err) -> None:                   # git keeps its objects read-only, and Windows deletes no read-only file
+        os.chmod(path, stat.S_IWRITE)
+        remove(path)
+    shutil.rmtree(workdir / ".git", **({"onexc": writable} if sys.version_info >= (3, 12) else {"onerror": writable}))
+    assert place_line(places_view(workdir), None, None) == f"{workdir.name} · not in git"
+
+
+def _git(*argv: str) -> str:
+    return subprocess.run(["git", *argv], check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _a_checkout(tmp_path, monkeypatch, name: str, *, git: bool = True, ignore: bool = False) -> Path:
+    """A folder `name` holding a record, as the user made it: in a repository on main (with .rb/ ignored where `ignore`
+    says), or outside git."""
+    as_the_user(monkeypatch)
+    cfg = tmp_path / "gitconfig"
+    cfg.write_text("[user]\n\temail = ana@example.com\n\tname = ana\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(cfg))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    folder = tmp_path / name
+    folder.mkdir()
+    monkeypatch.chdir(folder)
+    if git:
+        _git("init", "-q", "-b", "main")
+        if ignore:
+            (folder / ".gitignore").write_text(".rb/\n", encoding="utf-8")
+    assert main(["init", "INT8 ResNet-50", "--no-agents", "--json"]) == 0
+    return folder
+
+
+def test_the_line_under_the_head_says_how_the_checkout_holds_the_record(tmp_path, monkeypatch, capsys):
+    """At the place rb ui started on, the line under its head is the name rb open's Where button shows (the branch, "no
+    branch" on a detached HEAD, the folder's name outside git), then the words every place says: no commit yet, all
+    record files committed, 2 record files not committed (a note: its file and the log), no branch, ignored by git and
+    not in git."""
+    from rabbit_brain.tui import place_line, places_view
+    here = _a_checkout(tmp_path, monkeypatch, "int8-resnet50")
+    line = lambda: place_line(places_view(here), None, None)
+    assert line() == "main · no commit yet"
+    _git("add", "-A")
+    _git("commit", "-qm", "the record")
+    assert line() == "main · all record files committed"
+    assert main(["note", "add", "the fp32 baseline is from the paper", "--json"]) == 0
+    assert line() == "main · 2 record files not committed"
+    _git("add", "-A")
+    _git("commit", "-qm", "a note")
+    _git("checkout", "-q", "--detach")
+    assert line() == "no branch · all record files committed"
+    ignored = _a_checkout(tmp_path, monkeypatch, "ignored", ignore=True)
+    n = sum(1 for f in (ignored / ".rb").rglob("*") if f.is_file() and not {"cache", "journal"} & set(f.relative_to(ignored / ".rb").parts) and f.name != ".lock")
+    assert place_line(places_view(ignored), None, None) == f"main · {n} record files ignored by git"
+    outside = _a_checkout(tmp_path, monkeypatch, "outside", git=False)
+    assert place_line(places_view(outside), None, None) == "outside · not in git"
+    capsys.readouterr()
+
+
+def test_a_long_branch_gives_way_on_the_line_under_the_head_never_the_words():
+    """Too long for the screen, the branch gives way with an ellipsis; the words are never cut."""
+    from rabbit_brain.tui import fit_face
+    face = "int8-calibration-sweep-with-a-long-name · 2 record files not committed"
+    assert fit_face(face, "2 record files not committed", 0) == face
+    assert fit_face(face, "2 record files not committed", len(face)) == face
+    cut = fit_face(face, "2 record files not committed", 40)
+    assert cut == "int8-cal… · 2 record files not committed" and len(cut) == 40
+    assert fit_face(face, "2 record files not committed", 20) == "2 record files not committed"
+
+
+def test_observed_says_a_move_of_head_in_words_and_activity_with_its_commit(tmp_path, monkeypatch, capsys):
+    """OBSERVED says a commit rb's look saw as "new commit", with no hex and no word of the working tree; a change of
+    what the working tree changes alone writes no line. Activity (a) says the same words, then the commit in 12 hex,
+    each time in UTC."""
+    from rabbit_brain.tui import HomeScreen, OpenItemsScreen, RBApp
+    here = _a_checkout(tmp_path, monkeypatch, "int8-resnet50")
+    (here / "eval.py").write_text("print('top1')\n", encoding="utf-8")
+    _git("add", "-A")
+    _git("commit", "-qm", "the record")
+    assert main(["journal", "scan", "--json"]) == 0
+    (here / "eval.py").write_text("print('top1 and top5')\n", encoding="utf-8")
+    _git("commit", "-qam", "top5")
+    assert main(["journal", "scan", "--json"]) == 0
+    head = _git("rev-parse", "HEAD")
+    live = home(here).live
+    # the first commit after rb's first look, then the next: each a move of HEAD to a descendant
+    assert [l.split("  ", 1)[1] for l in live if "  git  " in l] == ["git  new commit", "git  new commit"], live
+    assert all(re.fullmatch(r"\d\d:\d\d  .*", l) for l in live) and not any(re.search(r"[0-9a-f]{7,}|dirty", l) for l in live), live
+    (here / "eval.py").write_text("print('top1, top5 and loss')\n", encoding="utf-8")       # the tree's flag alone moves
+    assert main(["journal", "scan", "--json"]) == 0
+    after = home(here).live
+    assert after[-1].endswith("  changed  eval.py") and all(l.endswith("  git  new commit") for l in after if "  git  " in l), after
+    capsys.readouterr()
+    got: dict = {}
+
+    async def drive():
+        app = RBApp(here)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and app.screen.query_one("#tree-list").option_count)
+            got["title"] = app.screen.query_one("#live-panel").border_title
+            await pilot.press("a")
+            await until(pilot, lambda: isinstance(app.screen, OpenItemsScreen))
+            got["activity"] = app.screen.activity
+
+    asyncio.run(drive())
+    assert got["title"] == "OBSERVED · UTC"
+    gits = [l for l in got["activity"] if "  git  " in l]
+    assert len(gits) == 2 and re.fullmatch(rf"\d\d:\d\d UTC  git  new commit · at commit {head[:12]}", gits[-1]), got["activity"]
+    assert all(re.match(r"\d\d:\d\d UTC  ", l) for l in got["activity"]), got["activity"]
 
 
 def test_the_place_line_follows_the_writes_made_there(placed):
@@ -1598,8 +1728,11 @@ def test_w_shows_a_past_version_while_rb_ui_holds_its_folder(placed, monkeypatch
 
     asyncio.run(drive())
     main_short = in_short(rec.root.resolve().as_posix())
-    assert got["unheld"] == (None, f"main · {main_short}")
-    assert got["line"].startswith(f"main · {main_short} as of {head[:12]} · ") and got["line"].endswith(" UTC · read only · esc: back to main")
+    assert got["unheld"] == (None, "main · all record files committed")
+    # the version by the UTC day it was committed (one version listed: no minute), its commit in the list alone
+    stamp = int(rec.git("log", "-1", "--format=%ct", "HEAD"))
+    day = datetime.datetime.fromtimestamp(stamp, datetime.timezone.utc).strftime("%Y-%m-%d")
+    assert got["line"] == f"main · {main_short} as of {day} · read only · esc: back to main", got["line"]
     assert got["keys"] == [False, False, False] and got["runs"] == 2 and got["kept"] == [head[:12]]
     import shutil as _shutil
     _shutil.rmtree(folder)
@@ -1856,3 +1989,56 @@ def test_a_question_s_changes_say_a_freeze_as_the_spec_and_rules_locked(repo):
     changed = home().briefs[0].changed
     assert any(line.endswith(": spec and rules locked · note: before the held-out runs") or line.endswith(": spec and rules locked: before the held-out runs") for line in changed), changed
     assert not any("criteri" in line for line in changed), changed
+
+
+def test_a_click_on_the_place_line_opens_where_as_w_does_and_its_lines_scroll(repo, workdir, monkeypatch):
+    """PARITY 5: a click on the line under the head runs w's action (the place shown highlighted), WHERE's lines under
+    the places are the bridge's evidence after the path, and at 80 columns part 1 shows while the box scrolls."""
+    from rabbit_brain.tui import HomeScreen, PlacesScreen, RBApp, places_view
+    at_home(monkeypatch, workdir.parent)
+    got: dict = {}
+
+    async def drive():
+        app = RBApp(workdir)
+        async with app.run_test(size=(80, 24)) as pilot:
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and app.screen.query_one("#tree-list").option_count)
+            got["line"] = str(app.screen.query_one("#place").render())
+            await pilot.click("#place")
+            await until(pilot, lambda: isinstance(app.screen, PlacesScreen))
+            await pilot.pause(0.3)
+            got["highlighted"] = app.screen.query_one("#where").highlighted
+            got["detail"] = str(app.screen.query_one("#where-detail").render())
+            box = app.screen.query_one("#places-box")
+            got["scrolls"] = type(box).__name__
+            d = app.screen.query_one("#where-detail")
+            got["found_on_screen"] = d.region.y < 24 and d.region.height > 0
+
+    asyncio.run(drive())
+    info = places_view(workdir, None, detail=True)
+    here = next(p for p in info.places if p.record == "this")
+    assert got["highlighted"] == info.places.index(here)
+    assert got["detail"].split("\n")[1:] == list(here.evidence), got["detail"]
+    assert got["detail"].split("\n")[1].startswith("rb checked the record with git at ")
+    assert got["scrolls"] == "VerticalScroll" and got["found_on_screen"], got
+    # the place line's words are as before, and an ask without detail carries no evidence
+    assert "evidence" not in places_view(workdir).places[0]
+
+
+def test_the_places_op_without_detail_asks_git_for_no_tree(repo, workdir, monkeypatch, tmp_path_factory):
+    """The place line repaints on every look, each ask a new rb bridge: without `detail` the places op counts no record
+    file (no git ls-tree); with it, one."""
+    import shutil
+    from rabbit_brain.tui import places_view
+    subprocess.run(["git", "add", "-A"], check=True)
+    subprocess.run(["git", "-c", "user.name=ana", "-c", "user.email=ana@example.org", "commit", "-qm", "the record"], check=True)
+    shim = tmp_path_factory.mktemp("counting-git")
+    log = shim / "calls.txt"
+    (shim / "git").write_text(f'#!/bin/sh\necho "$*" >> "{log}"\nexec {shutil.which("git")} "$@"\n', encoding="utf-8")
+    (shim / "git").chmod(0o755)
+    if sys.platform == "win32":
+        pytest.skip("a counting git is a shell script here")
+    monkeypatch.setenv("PATH", f"{shim}{os.pathsep}{os.environ['PATH']}")
+    places_view(workdir)
+    assert log.exists() and "ls-tree" not in log.read_text(encoding="utf-8")
+    places_view(workdir, None, detail=True)
+    assert "ls-tree" in log.read_text(encoding="utf-8")

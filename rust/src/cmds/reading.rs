@@ -127,7 +127,7 @@ fn finding_block_without(f: &Value, limit: Option<usize>, said: &[String]) -> Ve
             }
             if !uncommitted.is_empty() {
                 let many = items(f, "caveats").iter().any(|c| gs(c, "code") == "uncommitted_code" && gs(c, "text").contains("; "));
-                parts.push(if many { "runs it counts ran on code with uncommitted changes" } else { "a run it counts ran on code with uncommitted changes" });
+                parts.push(if many { "runs it counts have configs that say the code had uncommitted changes when they ran" } else { "a run it counts has a config that says the code had uncommitted changes when it ran" });
             }
             if !unchecked.is_empty() {
                 parts.push("no run config was compared");
@@ -492,6 +492,10 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
     if let Some(line) = crate::elsewhere::nested_line(&led) {
         out.say(line);
     }
+    // how the checkout holds the record, in the words alone: the terminal has no fold, and rb asks no one to commit
+    if let Some(line) = stv.get("repository").and_then(crate::checkout::Checkout::status_line_of) {
+        out.say(line);
+    }
     // a clone: what it takes to run the parent again, said under the title
     let rerun = crate::reproduce::rerun(led)?;
     if let Some(v) = &rerun {
@@ -510,7 +514,7 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
     };
     if let Some(last) = stv.get("repository").filter(|r| r.truthy()).and_then(|r| r.get("last_reconcile")).filter(|l| l.truthy()) {
         let at: String = gs(last, "at").chars().take(16).collect::<String>().replace('T', " ");
-        out.say(format!("Last reconcile, {at}{}: {}", by_writer(&gs(last, "by")), gs(last, "line")));
+        out.say(format!("Last reconcile, {at} UTC{}: {}", by_writer(&gs(last, "by")), gs(last, "line")));
         // the one write rb status prints, which it tells a session
         let row = led.log_entries()?.iter().rev().find(|r| r.get("op").and_then(|o| o.as_str()) == Some("reconciled")).map(crate::ledger::line_digest);
         out.told_lines = Some(row.into_iter().collect());
@@ -642,6 +646,11 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
     let scope = crate::journal::Scope::of(&led);
     out.say("");
     out.say(scope.said());
+    // how rb found the checkout holds the record, one step down from the line under the title (PARITY 6): printed
+    // from data.repository, so the text and the JSON say the same
+    for l in crate::checkout::evidence_of(stv.get("repository"), &["found", "git", "files", "check"]) {
+        out.say(&l);
+    }
     st.insert("scope".into(), scope.to_value());
     let places = crate::elsewhere::elsewhere(&led, experiment).unwrap_or_default();
     if !places.is_empty() {
@@ -1232,6 +1241,12 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             if let Some(g) = &given {
                 out.say(format!("  {}", g.line()));
             }
+            // your checkout against the code that made it, said under the line that names that code: the code rb's
+            // journal watched make the numbers, else the checkout the run was recorded in; none where the receipt does
+            // not hold the code (a run made before it was recorded)
+            let recipes = crate::reproduce::Recipes::new(&led, crate::shell::tier::Tier::Live)?.with_viewer(Some(crate::checkout::Viewer::here(&led.root)));
+            let checkouts = recipes.run_checkouts(r)?;
+            let yours = |anchor: &str| -> Vec<String> { checkouts.iter().filter(|c| gs(c, "anchor") == anchor).map(|c| format!("    {}", gs(c, "said"))).collect() };
             let pcommit = rc.produced.get("commit").filter(|v| v.truthy()).map(pyjson::py_str).unwrap_or_default();
             let p12 = cut(&pcommit, 12);
             let ptree = rc.produced.get("tree").filter(|v| v.truthy()).map(pyjson::py_str);
@@ -1247,6 +1262,7 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                     None => String::new(),
                 },
             );
+            out.say_all(yours("produced"));
             if let Some(d) = rc.config.as_ref().and_then(|c| crate::repo::config_dirty_line(&led.root, &c.path, c.sha256.as_deref())) {
                 out.say(format!("  {d}"));
                 data.insert("config_dirty".into(), Value::Str(d));
@@ -1258,13 +1274,13 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                 }
             }
             if let Some(att) = rc.attached.as_ref().filter(|a| !a.is_empty()) {
-                let commit = att.get("commit").filter(|v| v.truthy()).map(|c| cut(&pyjson::py_str(c), 12)).unwrap_or_else(|| "no commit yet".into());
                 let dirty = att.get("dirty").map_or(false, |v| v.truthy());
                 out.say(format!(
-                    "  repository when recorded{}: {commit}{}",
+                    "  repository when recorded{}: {}",
                     if made_before { ", not when run" } else { "" },
-                    if dirty { " with uncommitted changes" } else { "" }
+                    crate::view::attached_said(&Value::Dict(att.clone()))
                 ));
+                out.say_all(yours("recorded"));
                 if dirty {
                     out.say_all(crate::cmds::exact_code_at(&led.root, att, made_before, watched));
                 }
@@ -1288,6 +1304,10 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             if !r.note.trim().is_empty() {
                 out.say(format!("  note: {}", view::run_note(&r.note, &r.created_by)));
             }
+            // what a rerun of this run needs, as an experiment's is given, its code row with your checkout
+            let mut rerun = crate::reproduce::rerunnability(&led, &[r])?;
+            attach_checkouts(&mut rerun, checkouts);
+            data.insert("rerunnability".into(), Value::List(rerun.into_iter().map(Value::Dict).collect()));
         }
         Obj::Resource(res) => {
             let av = led.availability(res);
@@ -1702,7 +1722,7 @@ fn show_setting(led: &Ledger, subject: &str, out: &mut Out) -> R {
                 + &match &src.resolved {
                     Some(r) => {
                         format!(" · read {}", pyjson::repr_str(&r.text))
-                            + &r.commit.as_ref().filter(|c| !c.is_empty()).map(|c| format!(" @{}", cut(c, 7))).unwrap_or_default()
+                            + &r.commit.as_ref().filter(|c| !c.is_empty()).map(|c| format!(" @{}", cut(c, 12))).unwrap_or_default()
                     }
                     None => String::new(),
                 },
@@ -1811,7 +1831,7 @@ fn show_experiment(led: &Ledger, exp: &Experiment, out: &mut Out, data: &mut Dic
                 + &match &exp.indexed {
                     Some(idx) => {
                         format!(" · indexed {}{}", cut(&idx.at, 16).replace('T', " "), by_writer(&idx.by))
-                            + &idx.commit.as_ref().filter(|c| !c.is_empty()).map(|c| format!(" at {}", cut(c, 7))).unwrap_or_default()
+                            + &idx.commit.as_ref().filter(|c| !c.is_empty()).map(|c| format!(" at {}", cut(c, 12))).unwrap_or_default()
                     }
                     None => String::new(),
                 },
@@ -1929,13 +1949,20 @@ fn show_experiment(led: &Ledger, exp: &Experiment, out: &mut Out, data: &mut Dic
     if !analyses.is_empty() {
         out.say("  analyses: ".to_string() + &analyses.iter().map(|a| format!("{}{}", a.id, if a.retracted.is_some() { " (retracted)" } else { "" })).collect::<Vec<_>>().join(", "));
     }
-    let rerun = led.rerunnability(exp)?;
+    let mut rerun = led.rerunnability(exp)?;
+    // under the code row, each runnable code step's label with your checkout against that code (rb open's Reproduce
+    // line), and where it differs the diff and the rebuild, each a command that changes nothing here
+    let checkouts = if rerun.is_empty() { Vec::new() } else { crate::reproduce::Recipes::new(led, crate::shell::tier::Tier::Live)?.with_viewer(Some(crate::checkout::Viewer::here(&led.root))).checkouts(exp) };
     if !rerun.is_empty() {
         out.say("  to run it again:");
         for row in &rerun {
             out.say(format!("    {:<12} {:<8} {}", get_s(row, "what"), get_s(row, "state"), get_s(row, "detail")));
+            if get_s(row, "what") == "code" && !row.contains_key("resource") {
+                out.say_all(checkout_lines(&checkouts));
+            }
         }
     }
+    attach_checkouts(&mut rerun, checkouts);
     data.insert("design".into(), design.to_value());
     data.insert("freeze_sha256".into(), Value::Str(freeze_sha));
     data.insert("spec_sha256".into(), Value::Str(led.spec_sha(exp)));
@@ -1948,6 +1975,33 @@ fn show_experiment(led: &Ledger, exp: &Experiment, out: &mut Out, data: &mut Dic
     data.insert("rerunnability".into(), Value::List(rerun.into_iter().map(Value::Dict).collect()));
     Ok(())
 }
+/// rb show's lines for each code step compared with your checkout, under the line that names that code: the step's
+/// label and the comparison, and where it differs the diff and the rebuild (a run says the comparison alone).
+fn checkout_lines(checkouts: &[Value]) -> Vec<String> {
+    let mut out = Vec::new();
+    for c in checkouts {
+        out.push(format!("      {}", gs(c, "label")));
+        out.push(format!("      {}", gs(c, "said")));
+        if gs(c, "state") == "differs" {
+            out.push("      show code diff:".into());
+            out.push(format!("        {}", gs(c, "diff")));
+            out.push("      rebuild:".into());
+            out.extend(gs(c, "rebuild").lines().map(|l| format!("        {l}")));
+        }
+    }
+    out
+}
+
+/// rerunnability's code row with each code step compared with your checkout (`checkout`), where any is.
+fn attach_checkouts(rows: &mut [Dict], checkouts: Vec<Value>) {
+    if checkouts.is_empty() {
+        return;
+    }
+    if let Some(row) = rows.iter_mut().find(|r| get_s(r, "what") == "code" && !r.contains_key("resource")) {
+        row.insert("checkout".into(), Value::List(checkouts));
+    }
+}
+
 /// The rules, words and reporting example `rb context` opens with, after the title and who you are.
 /// What leads the tally of rules, as the page says it (R's strings.rs RULES_LEAD): "Rules: 1 met · 1 not reproduced".
 const RULES_LEAD: &str = crate::shell::strings::RULES_LEAD;
@@ -2851,9 +2905,16 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
     {
         l.push("## The repository".into());
         l.push(String::new());
+        // how the checkout holds the record: the words and the commit, then one step down, nested (PARITY 7)
+        if let Some(head) = crate::checkout::Checkout::context_head_of(&rp) {
+            l.push(format!("- {head}"));
+            for e in crate::checkout::evidence_md(Some(&rp)) {
+                l.push(format!("  - {e}"));
+            }
+        }
         if let Some(last) = rp.get("last_reconcile").filter(|x| x.truthy()) {
             l.push(format!(
-                "- last rb reconcile --apply, {}{}: {}",
+                "- last rb reconcile --apply, {} UTC{}: {}",
                 cut(&opt_str(last, "at", ""), 16).replace('T', " "),
                 by_writer(&opt_str(last, "by", "")),
                 opt_str(last, "line", "")

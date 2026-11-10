@@ -393,6 +393,7 @@
    "exit": 0,
    "out": [
     "Does width help? \u00b7 does-width-help",
+    "no commit yet",
     "",
     "Does width help? (open)",
     "  below it: 1 sub-question, 1 open \u00b7 3 planned",
@@ -431,6 +432,8 @@
     "      rb experiment add \"<what would test it>\" -q qqtdhpa --hypothesis \"<what you expect>\"",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work status --short --untracked-files=all -- .rb",
     "",
     "Experiments",
     "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
@@ -478,6 +481,7 @@
    "exit": 0,
    "out": [
     "Does width help? \u00b7 does-width-help \u00b7 experiment e1",
+    "no commit yet",
     "",
     "Does width help? (open)",
     "  below it: 1 sub-question, 1 open \u00b7 1 planned",
@@ -494,6 +498,8 @@
     "      rb criterion add \"<what it should show>\" -e e1 -q q1 --metric <name> --at-most <x>",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work status --short --untracked-files=all -- .rb",
     "",
     "Experiments",
     "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
@@ -537,6 +543,7 @@
    "exit": 0,
    "out": [
     "Does width help? \u00b7 does-width-help",
+    "no commit yet",
     "",
     "Does width help? (open)",
     "  below it: 1 sub-question, 1 open \u00b7 3 planned",
@@ -575,6 +582,8 @@
     "      rb experiment add \"<what would test it>\" -q qqtdhpa --hypothesis \"<what you expect>\"",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work status --short --untracked-files=all -- .rb",
     "",
     "Experiments",
     "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
@@ -597,6 +606,7 @@
    "exit": 0,
    "out": [
     "Does width help? \u00b7 does-width-help",
+    "no commit yet",
     "",
     "Does width help? (open)",
     "  below it: 1 sub-question, 1 open \u00b7 3 planned",
@@ -635,6 +645,8 @@
     "      rb experiment add \"<what would test it>\" -q qqtdhpa --hypothesis \"<what you expect>\"",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work status --short --untracked-files=all -- .rb",
     "",
     "Experiments",
     "  e1      wide vs base \u00b7 planned \u00b7 base (baseline) vs wide (candidate) vs narrow (ablation) \u00b7 varies model.width \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 0",
@@ -686,6 +698,7 @@
    "out": [
     "rb-page.html written: the project as one file, readable anywhere; send it to anyone.",
     "It is the record as computed now; regenerate after new runs. If it ever disagrees with rb status, rb status is right.",
+    "The page says: no commit yet.",
     ""
    ],
    "err": [
@@ -1104,8 +1117,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "2d196c49dfdef71895f2fd9a530d2fd2c86527de7749263072ada700b2aa2dd0",
-   "bytes": 198126
+   "sha256": "5bbbb53841a1a2e39147957cd97ca26203734e68fa831756753398d7b423af49",
+   "bytes": 199429
   }
  }
 }

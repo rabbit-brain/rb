@@ -585,6 +585,10 @@ ol.steps > li::before { counter-increment: step; content: counter(step); font: 1
 ol.steps > li > * { grid-column: 2; min-width: 0; }
 ol.steps .sl b { font-weight: 600; }
 ol.steps .unk { color: var(--dim); }
+/* your checkout, directly under the code it was compared with: the words carry the state, never a colour */
+.yours { margin: 2px 0 4px; font-size: 13px; overflow-wrap: break-word; }
+.yours code { font: 12px var(--mono); }
+.ydiff > summary { font-size: 12.5px; }
 .perrun { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 10px; font-size: 12.5px; margin-top: 4px; }
 .perrun .arm { color: var(--dim); font-family: var(--mono); }
 .perrun > span:not(.arm) { overflow-wrap: break-word; }
@@ -635,8 +639,11 @@ a.term { cursor: pointer; }
 .gloss { display: grid; grid-template-columns: minmax(8em, 13em) 1fr; gap: 5px 16px; margin: 0; font-size: 13.5px; }
 .gloss dt { font-weight: 600; }
 .gloss dd { margin: 0; color: var(--dim); }
-footer.foot { margin-top: 40px; color: var(--dim); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 4px; }
-footer.foot details > summary { cursor: pointer; width: fit-content; }
+.foot { margin-top: 40px; color: var(--dim); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 4px; overflow-wrap: break-word; }
+.foot details > summary { cursor: pointer; width: fit-content; }
+/* a grid item's min-width: auto would take a command's one-line width: the box scrolls instead (S6c) */
+#in-git { min-width: 0; }
+#in-git p { margin: 2px 0; }
 :target { scroll-margin-top: calc(var(--barh) + 16px); }
 /* what a link lands on is framed where it is one thing on the screen (a card, a row, a part); a section a link names
    (#overview, #reproduce and the rest) is a view or a place in one, and gets no frame (Look 7) */
@@ -668,7 +675,7 @@ ul.oi li { padding: 3px 0; font-size: 13.5px; overflow-wrap: break-word; }
 /* plain words pass 4: Your call's line that opens what else is open, in the inspector (P12); a question's notes that name it */
 h2.oilink { font-size: 14px; font-weight: 500; margin: 18px 0 0; }
 h2.qnh { font-size: 15px; margin: 22px 0 6px; }
-footer.foot .honest1 { margin: 0 0 2px; color: var(--ink); }
+.foot .honest1, #in-git > :first-child { margin: 0 0 2px; color: var(--ink); }
 
 /* ==================== app mode (the enhancement script adds html.app before the body parses) ==================== */
 @media screen {

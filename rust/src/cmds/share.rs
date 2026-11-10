@@ -38,9 +38,18 @@ pub fn cmd_page(ns: &Namespace, out: &mut Out) -> R {
     crate::owned::wrote(&led.root, crate::owned::scope_of(&led.root, &dest), &dest, "output", before.as_deref(), &made, Dict::new());
     out.say(format!("{} written: the project as one file, readable anywhere; send it to anyone.", shown_path(&dest)));
     out.say("It is the record as computed now; regenerate after new runs. If it ever disagrees with rb status, rb status is right.");
+    page_says(&led, out);
     out.data.insert("path".into(), Value::Str(crate::sys::slashed(&dest)));
     out.data.insert("bytes".into(), Value::Int(text.len() as i64));
     Ok(0)
+}
+
+/// "The page says: <About's line 2>.", of the checkout that holds the record (never a bundle's copy), and
+/// data.page_says.
+pub fn page_says(led: &Ledger, out: &mut Out) {
+    let line = crate::checkout::Checkout::of_page(&led.root).page_says();
+    out.say(line.clone());
+    out.data.insert("page_says".into(), Value::Str(line));
 }
 
 pub fn cmd_export(ns: &Namespace, out: &mut Out) -> R {
@@ -59,30 +68,20 @@ pub fn cmd_export(ns: &Namespace, out: &mut Out) -> R {
         out.say(format!("{shown} written: the project's page, and a manifest hashing it."));
         out.say("It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.");
     }
+    page_says(&led, out);
     if let Some(r) = rv.get("repo").filter(|r| r.truthy()) {
         let commit = r.get("commit").filter(|c| c.truthy()).map(pyjson::py_str);
+        let at = commit.as_deref().map(crate::checkout::short).unwrap_or_default();
         out.say(
             format!("Code repository recorded: {}", r.get("url").map(pyjson::py_str).unwrap_or_default())
-                + &commit.as_deref().map(|c| format!(" at {}", c.chars().take(10).collect::<String>())).unwrap_or_default()
+                + &if at.is_empty() { String::new() } else { format!(" at {at}") }
                 + ". Pass --no-repo to leave it out.",
         );
-        let at = commit.as_deref().map(|c| c.chars().take(10).collect::<String>()).unwrap_or_default();
         // what the checkout changes of that commit, which a rerun does not get (export.rs's repo.changed)
-        if let Some(Value::List(changed)) = r.get("changed").filter(|c| c.truthy()) {
-            let paths: Vec<String> = changed.iter().take(10).map(pyjson::py_str).collect();
-            let more = if changed.len() > 10 { format!(" and {} more", changed.len() - 10) } else { String::new() };
-            let n = if changed.len() == 1 { "1 file".to_string() } else { format!("{} files", changed.len()) };
-            if at.is_empty() {
-                // no commit yet: nothing a rerun can get
-                out.say(format!("This checkout has no commit yet: {n} not committed: {}{more}.", paths.join(", ")));
-                out.say("A rerun gets no code until it is committed.");
-            } else {
-                out.say(format!("This checkout changes the code at {at}: {n} not committed: {}{more}.", paths.join(", ")));
-                out.say(if changed.len() == 1 {
-                    "A rerun gets the commit without it; commit it first to share it."
-                } else {
-                    "A rerun gets the commit without them; commit them first to share them."
-                });
+        if let Some(Value::List(changed)) = r.get("changed") {
+            let paths: Vec<String> = changed.iter().map(pyjson::py_str).collect();
+            if let Some(line) = crate::export::not_committed_said(&paths) {
+                out.say(line);
             }
         }
         // origin, as this clone last saw it, lacks the commit (export.rs's repo.at_origin, written only when false)
@@ -100,7 +99,7 @@ pub fn cmd_export(ns: &Namespace, out: &mut Out) -> R {
     }
     if let Some(Value::List(kept)) = rv.get("sources_at_commit").filter(|m| m.truthy()) {
         let named: Vec<String> =
-            kept.iter().map(|k| format!("{} at {}", get_s(&dict_of(k), "path"), get_s(&dict_of(k), "commit").chars().take(10).collect::<String>())).collect();
+            kept.iter().map(|k| format!("{} at {}", get_s(&dict_of(k), "path"), crate::checkout::short(&get_s(&dict_of(k), "commit")))).collect();
         out.say(format!("Sources read at a commit, included as they stood there: {}.", named.join(", ")));
     }
     if let Some(url) = rv.get("url").filter(|u| u.truthy()).map(pyjson::py_str) {

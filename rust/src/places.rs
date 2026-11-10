@@ -4,7 +4,8 @@
 //! version is read from a checkout of its commit that rb keeps in its own folder of the clone
 //! (`<git common dir>/rb/views/`) only while a screen that holds it is open.
 
-use crate::elsewhere::{self, Worktree};
+use crate::checkout::Checkout;
+use crate::elsewhere;
 use crate::ledger::{DIR, ROOT_FILE};
 use crate::pyjson;
 use crate::sources::{self, git, git_top, rel_to, resolve_path};
@@ -29,8 +30,11 @@ pub struct Place {
     pub path: PathBuf,
     pub branch: Option<String>,
     pub head: Option<String>,
-    /// uncommitted changes outside the record
+    /// changes outside the record not committed, by a receipt's own rule (sources::code_pathspec)
     pub dirty: bool,
+    /// the paths its status lists outside the record (from its top, as git gives them): their sizes and times key what
+    /// rb open compares of your checkout, so an edit to one is compared again
+    pub changed: Vec<String>,
     /// this (the record shown first), own (a record of its own, of the same project), shared (no record of its own:
     /// it writes to this record), separate (a separate project's record) or none
     pub record: &'static str,
@@ -38,8 +42,10 @@ pub struct Place {
     pub root: Option<PathBuf>,
     /// the record's directory there as git lists the place (its path, then the record's place below it)
     pub record_dir: String,
-    /// record files there not committed
+    /// record files there not committed (its checkout's count)
     pub uncommitted: usize,
+    /// how the checkout that holds its record stands in git, for a place whose record a screen can read
+    pub checkout: Option<Checkout>,
     /// when the last write there was made (the log's `at`), or, for shared, the last write from it to this record
     pub last_write: Option<String>,
     /// runs recorded from it in this record (shared)
@@ -57,6 +63,27 @@ pub struct Place {
 pub struct Version {
     pub sha: String,
     pub committed: String,
+}
+
+/// The files git moves when a worktree's HEAD or index moves (a commit, a checkout, a reset, an add), read where they
+/// stand, never through git: its HEAD, the ref HEAD names and the packed refs, HEAD's log, and its index. A screen
+/// keyed on them follows such a move on its next look.
+pub fn git_files(top: &Path) -> Vec<PathBuf> {
+    let dot = top.join(".git");
+    let dir = if dot.is_dir() {
+        dot
+    } else {
+        match std::fs::read_to_string(&dot).ok().and_then(|t| t.trim().strip_prefix("gitdir:").map(|d| d.trim().to_string())) {
+            Some(d) => top.join(d),
+            None => return Vec::new(),
+        }
+    };
+    let common = std::fs::read_to_string(dir.join("commondir")).map(|c| dir.join(c.trim())).unwrap_or_else(|_| dir.clone());
+    let mut out = vec![dir.join("HEAD"), common.join("packed-refs"), dir.join("logs").join("HEAD"), dir.join("index")];
+    if let Some(r) = std::fs::read_to_string(dir.join("HEAD")).ok().and_then(|h| h.trim().strip_prefix("ref:").map(|r| r.trim().to_string())) {
+        out.push(common.join(r));
+    }
+    out
 }
 
 /// A place's id: p_ and the first 10 hex of the sha256 of its resolved path.
@@ -94,8 +121,9 @@ impl Place {
     }
 
     /// What the place is, in rb's words, with its counts: "its own record · 2 record files not committed · last write
-    /// ..." ("2 not committed" in a single checkout, as it always was). A place
-    /// removed since says only that, and what this record keeps of it: what it held is not there to read.
+    /// ...", its checkout's words where git ignores record files or cannot say ("12 record files ignored by git", "not
+    /// in git"). A place removed since says only that, and what this record keeps of it: what it held is not there to
+    /// read.
     pub fn said(&self) -> String {
         let mut parts: Vec<String> = vec![match (self.gone, self.record) {
             (true, _) => "removed since",
@@ -106,8 +134,8 @@ impl Place {
             _ => "no record",
         }
         .to_string()];
-        if self.uncommitted > 0 {
-            parts.push(if self.many { format!("{} not committed", plural(self.uncommitted, "record file", "record files")) } else { format!("{} not committed", self.uncommitted) });
+        if let Some(words) = self.checkout.as_ref().and_then(Checkout::place_said) {
+            parts.push(words);
         }
         if self.runs > 0 {
             parts.push(format!("{} recorded from it", plural(self.runs, "run", "runs")));
@@ -138,7 +166,8 @@ impl Place {
             "head" => opt(&self.head), "dirty" => self.dirty, "record" => self.record, "root" => self.root.as_ref().map(crate::sys::slashed).map(Value::Str).unwrap_or(Value::Null),
             "record_dir" => self.record_dir.clone(), "uncommitted" => self.uncommitted as i64, "last_write" => opt(&self.last_write),
             "runs" => self.runs as i64, "gone" => self.gone, "readable" => self.readable(), "label_short" => self.label_short(),
-            "why_not" => if self.readable() { String::new() } else { Self::not_shown_as(self.gone, self.record, &self.label_short()) }
+            "why_not" => if self.readable() { String::new() } else { Self::not_shown_as(self.gone, self.record, &self.label_short()) },
+            "checkout" => self.checkout.as_ref().map(Checkout::to_value).unwrap_or(Value::Null)
         }
     }
 }
@@ -190,6 +219,16 @@ impl Version {
     /// As the user's screens say it while it is shown: "main · ~/p as of f44a1430abcd · 2026-10-12 14:20 UTC · read only".
     pub fn shown_short(&self, place: &Place) -> String {
         format!("{} as of {} · {} · read only", place.label_short(), self.sha.chars().take(12).collect::<String>(), minute(&self.committed))
+    }
+
+    /// As rb ui's line under the head says it while it is shown: "main · ~/p as of 2026-10-12 · read only", the UTC day
+    /// it was committed, with the minute where another listed version was committed that day too. Its commit is in w's
+    /// VERSION list alone.
+    pub fn shown_day(&self, place: &Place, listed: &[Version]) -> String {
+        let at = minute(&self.committed);
+        let day = at.get(..10).unwrap_or(&at).to_string();
+        let same = listed.iter().filter(|v| minute(&v.committed).get(..10) == Some(day.as_str())).count();
+        format!("{} as of {} \u{b7} read only", place.label_short(), if same > 1 { at } else { day })
     }
 
     /// As a screen's data carries a version of `place`'s record: `label` in a list, `shown` while it is shown (and
@@ -259,21 +298,24 @@ fn written_from(root: &Path) -> Vec<(PathBuf, usize, Option<String>)> {
     out
 }
 
-/// The pathspec of a worktree's code: all of it but the record's directory and the worktrees nested in it.
-fn code_spec(tree: &Path, rb_dir: &str, trees: &[Worktree]) -> Vec<String> {
-    let mut spec = vec!["--".to_string(), ":(top)".to_string(), format!(":(top,exclude){rb_dir}")];
-    for t in trees.iter().filter(|t| t.path != tree) {
-        if let Some(rel) = rel_to(&t.path, tree).filter(|r| !r.is_empty()) {
-            spec.push(format!(":(top,exclude,literal){rel}"));
+/// The tracked paths `git status --porcelain -z` lists, as git gives them: a rename's or a copy's new path once. An
+/// untracked file is left out: it is never a difference from the code a run ran, and a file being written there (a log)
+/// would otherwise redraw rb open on every look.
+fn status_paths(st: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut fields = st.split('\0').filter(|f| !f.is_empty());
+    while let Some(e) = fields.next() {
+        if e.len() < 4 {
+            continue;
+        }
+        if e[..2].contains('R') || e[..2].contains('C') {
+            fields.next();
+        }
+        if &e[..2] != "??" {
+            out.push(e[3..].to_string());
         }
     }
-    spec
-}
-
-/// How many files git lists as changed or new under a worktree's record directory.
-fn uncommitted_in(tree: &Path, rb_dir: &str) -> usize {
-    let spec = format!(":(top){rb_dir}");
-    git(tree, &["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", &spec]).map_or(0, |s| s.split('\0').filter(|e| e.len() > 3).count())
+    out
 }
 
 /// The record's directory in a place, as git lists the place.
@@ -291,16 +333,17 @@ pub fn list(root: &Path) -> Vec<Place> {
     let root = resolve_path(root);
     let lone = || {
         let listed = crate::sys::slashed(&root);
+        let c = Checkout::of(&root);
         vec![Place {
-            id: id_of(&root), record_dir: listed.clone(), short: short_path(&listed, &root, &root), listed, path: root.clone(), branch: None, head: None,
-            dirty: false, record: "this", root: Some(root.clone()), uncommitted: 0, last_write: last_at(&root.join(DIR).join("log.jsonl")), runs: 0,
-            gone: false, many: false,
+            id: id_of(&root), record_dir: listed.clone(), short: short_path(&listed, &root, &root), listed, path: root.clone(), branch: c.branch.clone(),
+            head: c.commit.clone(), dirty: c.changes_outside_record, changed: Vec::new(), record: "this", root: Some(root.clone()), uncommitted: c.record_files_not_committed,
+            checkout: Some(c), last_write: last_at(&root.join(DIR).join("log.jsonl")), runs: 0, gone: false, many: false,
         }]
     };
     let Some(top) = git_top(&root) else { return lone() };
     let rel = rel_to(&root, &top).unwrap_or_default();
-    let rb_dir = if rel.is_empty() { DIR.to_string() } else { format!("{rel}/{DIR}") };
     let trees = elsewhere::worktrees(&top);
+    let paths: Vec<PathBuf> = trees.iter().map(|t| t.path.clone()).collect();
     if !trees.iter().any(|t| t.path == top) {
         return lone();
     }
@@ -324,23 +367,35 @@ pub fn list(root: &Path) -> Vec<Place> {
         } else {
             ("none", None)
         };
-        let dirty = !w.gone && {
-            let spec = code_spec(&w.path, &rb_dir, &trees);
-            let mut args: Vec<&str> = vec!["status", "--porcelain", "--untracked-files=normal"];
+        // the place's one status of its whole tree: its code by a receipt's own rule, so what a screen says of it is what
+        // the next run recorded there keeps
+        let (dirty, changed) = if w.gone {
+            (false, Vec::new())
+        } else {
+            let spec = sources::code_pathspec_in(&there, DIR, &w.path, &paths);
+            let mut args: Vec<&str> = vec!["status", "--porcelain", "-z", "--untracked-files=normal"];
             args.extend(spec.iter().map(|s| s.as_str()));
-            git(&w.path, &args).map_or(false, |s| !s.trim().is_empty())
+            let st = git(&w.path, &args).unwrap_or_default();
+            (!st.is_empty(), status_paths(&st))
         };
-        let holds = record_root.is_some() && !w.gone;
+        let head = w.head.clone().filter(|h| !h.chars().all(|c| c == '0'));
+        // its checkout asks git of the record's own files alone: HEAD, the branch and the code are said above
+        let checkout = match &record_root {
+            Some(r) if !w.gone => Some(Checkout::in_tree(r, &w.path, head.clone(), w.branch.clone(), dirty)),
+            _ => None,
+        };
         out.push(Place {
             id: id_of(&w.path),
             listed: w.listed.clone(),
             path: w.path.clone(),
             branch: w.branch.clone(),
-            head: w.head.clone().filter(|h| !h.chars().all(|c| c == '0')),
+            head,
             dirty,
+            changed,
             record,
             record_dir: record_dir_of(&w.listed, &rel),
-            uncommitted: if holds { uncommitted_in(&w.path, &rb_dir) } else { 0 },
+            uncommitted: checkout.as_ref().map_or(0, |c| c.record_files_not_committed),
+            checkout,
             last_write: match &record_root {
                 Some(r) if !w.gone => last_at(&r.join(DIR).join("log.jsonl")),
                 _ => last,
@@ -560,6 +615,23 @@ pub struct Chosen {
 /// The root of the record the screen started on, as the last choice of a place was made against it (a screen serves
 /// one record, so its choices name one): the places are listed from it, whatever place is shown.
 static STARTED: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// The folder rb open was started in, which may be a worktree with no record of its own that writes to this one.
+static STARTED_IN: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// Keeps the folder a screen was started in (rb open's working folder), so its places can say which is yours.
+pub fn set_started_in(dir: &Path) {
+    *STARTED_IN.lock().unwrap_or_else(|e| e.into_inner()) = Some(resolve_path(dir));
+}
+
+/// The place of `listed` a screen was started in, where it is a worktree with no record of its own (it writes to the
+/// record shown): the deepest place whose folder holds the folder it was started in. None where it was started in the
+/// record's own checkout, or nothing says where it was started.
+pub fn started_here<'a>(listed: &'a [Place]) -> Option<&'a Place> {
+    let dir = STARTED_IN.lock().unwrap_or_else(|e| e.into_inner()).clone()?;
+    let here = listed.iter().filter(|p| !p.gone && dir.starts_with(&p.path)).max_by_key(|p| p.path.components().count())?;
+    (here.record == "shared").then_some(here)
+}
 
 impl Chosen {
     /// The root of the record the screen started on: this one's at the start place, live; else the one the screen's
@@ -873,8 +945,8 @@ mod tests {
 
     fn place(listed: &str, branch: Option<&str>, head: Option<&str>, short: &str) -> Place {
         Place {
-            id: id_of(Path::new(listed)), listed: listed.into(), path: listed.into(), branch: branch.map(Into::into), head: head.map(Into::into), dirty: false,
-            record: "own", root: Some(listed.into()), record_dir: listed.into(), uncommitted: 0, last_write: None, runs: 0, gone: false, short: short.into(), many: true,
+            id: id_of(Path::new(listed)), listed: listed.into(), path: listed.into(), branch: branch.map(Into::into), head: head.map(Into::into), dirty: false, changed: Vec::new(),
+            record: "own", root: Some(listed.into()), record_dir: listed.into(), uncommitted: 0, checkout: None, last_write: None, runs: 0, gone: false, short: short.into(), many: true,
         }
     }
 
@@ -944,7 +1016,8 @@ mod tests {
         assert_eq!(here.get("quiet").and_then(Value::as_str), Some("1 call waits on you: rb status lists it with its command."));
     }
 
-    /// Two places never read the same: where their labels in short would, both are named by their whole paths.
+    /// Two places never read the same: where their labels in short would, both are named by their whole paths. A
+    /// detached one is "no branch", never its commit.
     #[test]
     fn two_places_that_would_read_the_same_in_short_are_told_apart() {
         let sha = Some("a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0");
@@ -956,7 +1029,7 @@ mod tests {
         ];
         tell_apart(&mut places);
         let labels: Vec<String> = places.iter().map(Place::label_short).collect();
-        assert_eq!(labels, ["main · ~/p", "detached at a1b2c3d4e5f6 · /home/ana/p/~/wt", "detached at a1b2c3d4e5f6 · /home/ana/wt", "detached at a1b2c3d4e5f6 · ~/wt2"]);
+        assert_eq!(labels, ["main · ~/p", "no branch · /home/ana/p/~/wt", "no branch · /home/ana/wt", "no branch · ~/wt2"]);
     }
     /// The shell's document of the INT8 example at `chosen`: a call with its lines, what waits with its confirm, and
     /// two runs, one recorded here and one in the other place.
@@ -967,7 +1040,7 @@ mod tests {
                "pending": {{"rows": [{{"id": "dec9", "confirm": "rb confirm dec9"}}], "confirm_all": {{"line": "", "confirm": "rb confirm dec9"}}}},
                "experiments": [{{"id": "int8", "design": {{"standing": "not_confirmed", "confirm": "rb confirm int8@0a1b"}}}}],
                "runs": {{"runs1": {{"observed_in": null}},
-                        "runs2": {{"observed_in": {{"place": "{other}", "label_short": "recorded in exp-b · .worktrees/b at 4364dc8c1a2b"}}}}}}}}"#
+                        "runs2": {{"observed_in": {{"place": "{other}", "label_short": "recorded in exp-b · .worktrees/b"}}}}}}}}"#
         ))
         .unwrap()
     }
@@ -995,7 +1068,7 @@ mod tests {
         assert!(get(&doc, "runs.runs1.recorded_in").is_null());
         let r = get(&doc, "runs.runs2.recorded_in");
         assert_eq!(r.get("href").and_then(Value::as_str), Some(format!("#run-runs2&place={}", listed[1].id).as_str()));
-        assert_eq!(r.get("label").and_then(Value::as_str), Some("recorded in exp-b · .worktrees/b at 4364dc8c1a2b"));
+        assert_eq!(r.get("label").and_then(Value::as_str), Some("recorded in exp-b · .worktrees/b"));
         // what waits keeps its command at the place it started on, live
         assert_eq!(get(&doc, "pending.rows").as_list().unwrap()[0].get("confirm").and_then(Value::as_str), Some("rb confirm dec9"));
         assert_eq!(get(&doc, "calls").as_list().unwrap()[0].get("actions").and_then(Value::as_list).map(Vec::len), Some(1));

@@ -936,10 +936,19 @@ impl Ledger {
                 }
             }
         }
-        Ok(crate::dict! {
+        let mut out = crate::dict! {
             "unindexed" => Value::list_of_str(unindexed), "experiments" => Value::Dict(reads), "project_checks" => Value::List(project_checks),
             "last_reconcile" => repo::last_reconcile(self)?.map(Value::Dict), "commit" => gv.commit.clone(), "branch" => gv.branch.clone()
-        })
+        };
+        // how the checkout holds the record, in the words every surface prints
+        let checkout = crate::checkout::Checkout::from_view(&self.root, &gv);
+        let co = checkout.to_value();
+        for k in CHECKOUT_KEYS {
+            out.insert((*k).into(), co.get(k).cloned().unwrap_or(Value::Null));
+        }
+        // and the evidence one step down, made once in checkout.rs for every surface (PARITY 10)
+        checkout.add_evidence(&crate::checkout::When::now(), &mut out);
+        Ok(out)
     }
 
     /// The whole record, read the way anyone starts their day.
@@ -2036,6 +2045,10 @@ pub(crate) const FAILED_CHECK_ACTIONS: &[&str] = &["investigate", "park", "stop"
 pub(crate) const SEEN_ACTIONS: &[&str] = &["accept"];
 
 /// The slots a call's command leaves for the user to fill, as a screen shows them.
+/// The keys data.repository carries of how the checkout holds the record (checkout.rs makes them).
+pub const CHECKOUT_KEYS: &[&str] = &[
+    "state", "said", "line", "on_branch", "record_files_not_committed", "record_files_ignored", "ignored_by", "record_held", "changes_outside_record", "why",
+];
 pub const WHY_SLOT: &str = "‹why›";
 pub const REVISIT_SLOT: &str = "‹when to look again›";
 pub const DAY_SLOT: &str = "‹day›";

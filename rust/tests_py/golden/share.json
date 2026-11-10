@@ -159,7 +159,7 @@
    "out": [
     "runp5h4s6 on e1: base.top1=0.7, wide.top1=0.74",
     "  read evalset (eval) \u00b7 made far (checkpoint)",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
     "  c1 criterion undetermined \u00b7 point only: top1: 0.74 \u00b7 mean, 1 run (rb)",
     "  c2 estimate meets criterion \u00b7 point only: change.top1: +0.04 \u00b7 paired difference, 1 run (rb)",
@@ -193,6 +193,7 @@
    "out": [
     "rb-export written: the project's page, and a manifest hashing it.",
     "It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.",
+    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
     ""
    ],
    "err": [
@@ -208,9 +209,10 @@
     " \"rb_version\": \"0.0.0\",",
     " \"command\": \"export\",",
     " \"data\": {",
+    "  \"page_says\": \"The page says: all record files committed \\u00b7 at commit 007c91c44b65.\",",
     "  \"path\": \"@BASE@/work/rb-export\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 138404,",
+    "  \"bytes\": 138949,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
@@ -265,6 +267,7 @@
    "out": [
     "share",
     "Kept with rb since 2026-10-01. 1 run was recorded afterwards, not as it happened.",
+    "16 record files not committed",
     "",
     "Does width help? (open)",
     "  No criterion is linked directly to this question.",
@@ -284,6 +287,9 @@
     "      rb spec set e1 schedule cosine --source <file#key that states it>   (or vouch for it: rb decide e1/schedule accept --why \"...\")",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: all 16 record files are new, changed or deleted since commit 007c91c44b65, which does not hold the record.",
+    "Not committed: .rb/.gitattributes (new), .rb/.gitignore (new), .rb/experiments/e1/analyses/a1.yaml (new) and 13 more",
+    "To check it yourself, in your terminal: git -C @BASE@/work/rb-export/record status --short --untracked-files=all -- .rb",
     "",
     "Rules",
     "  On every e1 criterion:",
@@ -334,6 +340,7 @@
    "out": [
     "rb-export.zip written: the project's page, and a manifest hashing it.",
     "It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.",
+    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
     ""
    ],
    "err": [
@@ -346,6 +353,7 @@
    "out": [
     "bundles/b1 written: the project's page, and a manifest hashing it.",
     "It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.",
+    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
     ""
    ],
    "err": [
@@ -395,9 +403,9 @@
     "published written: the whole record, the page, and a manifest hashing every file.",
     "Readable without rb; rb status inside record/ reopens it. Regenerate after new runs.",
     "The record keeps who made each write (human:<name> or agent:<name>, and the channel it came through), an agent's chat session, name, version, provider and model, the user's words passed with --words, and each run's host, platform and branch. Anyone who can read the bundle can read all of it.",
-    "Code repository recorded: https://example.org/team/repo.git at 007c91c44b. Pass --no-repo to leave it out.",
-    "This checkout changes the code at 007c91c44b: 1 file not committed: notours/file.txt.",
-    "A rerun gets the commit without it; commit it first to share it.",
+    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
+    "Code repository recorded: https://example.org/team/repo.git at 007c91c44b65. Pass --no-repo to leave it out.",
+    "Not committed, so a rerun does not get it: notours/file.txt.",
     "Cited sources no longer on disk, so not included: papers/gone.txt.",
     "Publish the directory at the address you gave; page.html is the reading surface and anyone reproduces it with: rb clone https://example.org/share/bundle.zip",
     "Not in this bundle, so a reader cannot rerun with them from it alone: evalset (present here; in the bundle lost); far (remote, train it again); named (lost).",
@@ -416,9 +424,10 @@
     " \"rb_version\": \"0.0.0\",",
     " \"command\": \"export\",",
     " \"data\": {",
+    "  \"page_says\": \"The page says: all record files committed \\u00b7 at commit 007c91c44b65.\",",
     "  \"path\": \"@BASE@/work/pub.zip\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 143237,",
+    "  \"bytes\": 144026,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
@@ -476,6 +485,7 @@
    "out": [
     "plain written: the project's page, and a manifest hashing it.",
     "It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.",
+    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
     ""
    ],
    "err": [
@@ -922,17 +932,17 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 123701,",
+   " \"bytes\": 124246,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"8b9e68a5fa7e74fcc821341d92a59f922e655d38b0b2a507d9b16cfb7803004f\"",
+   "  \"page.html\": \"0e2193cb530c56c87c9e982b63561118d73fdcae4bf54edc6a29e09262ec8982\"",
    " }",
    "}",
    ""
   ],
   "bundles/b1/page.html": {
-   "sha256": "8b9e68a5fa7e74fcc821341d92a59f922e655d38b0b2a507d9b16cfb7803004f",
-   "bytes": 123110
+   "sha256": "0e2193cb530c56c87c9e982b63561118d73fdcae4bf54edc6a29e09262ec8982",
+   "bytes": 123655
   },
   "configs/train.json": [
    "{\"optim\": {\"lr\": 0.0003, \"betas\": [0.9, 0.999]}, \"model\": {\"depth\": 18, \"width\": 64}, \"name\": \"base\"}",
@@ -981,21 +991,21 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 123701,",
+   " \"bytes\": 124246,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"8b9e68a5fa7e74fcc821341d92a59f922e655d38b0b2a507d9b16cfb7803004f\"",
+   "  \"page.html\": \"0e2193cb530c56c87c9e982b63561118d73fdcae4bf54edc6a29e09262ec8982\"",
    " }",
    "}",
    ""
   ],
   "plain/page.html": {
-   "sha256": "8b9e68a5fa7e74fcc821341d92a59f922e655d38b0b2a507d9b16cfb7803004f",
-   "bytes": 123110
+   "sha256": "0e2193cb530c56c87c9e982b63561118d73fdcae4bf54edc6a29e09262ec8982",
+   "bytes": 123655
   },
   "pub.zip": {
-   "sha256": "408db6c4abf5aba9d6f5be1840bfe5b11afeee443da73beee414729bd0cb223c",
-   "bytes": 146820
+   "sha256": "580ae2659bce1fa4dc8f7e1b4fef197ed1e902b9394064dec7dd9d7b3e704580",
+   "bytes": 147609
   },
   "published/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1060,8 +1070,8 @@
    ""
   ],
   "published/bundle.zip": {
-   "sha256": "5dc3cde116c3fa06f405fbff38581a80d4758824508e8097d55e3c0933e217d4",
-   "bytes": 146915
+   "sha256": "c9a2498cf67f5a33e22feee86a0b5a7ed94ebc349cf3fc0011cef26a762687d8",
+   "bytes": 147704
   },
   "published/manifest.json": [
    "{",
@@ -1076,10 +1086,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 143281,",
+   " \"bytes\": 144070,",
    " \"files\": {",
    "  \"README.md\": \"fb3d38898e893f4588356c9f5015eca9d468bcd5f12881be5ac63effc32759cf\",",
-   "  \"page.html\": \"d148a101e6beaa56ccb08b9e9a35111336e814244652bc2fed12186a63bdc7b2\",",
+   "  \"page.html\": \"aed1c7eb985c348f6f23b5dd73b00ce66b4cfe6e17c3caa2f5b5ba2d5eae6406\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
@@ -1122,8 +1132,8 @@
    ""
   ],
   "published/page.html": {
-   "sha256": "d148a101e6beaa56ccb08b9e9a35111336e814244652bc2fed12186a63bdc7b2",
-   "bytes": 127879
+   "sha256": "aed1c7eb985c348f6f23b5dd73b00ce66b4cfe6e17c3caa2f5b5ba2d5eae6406",
+   "bytes": 128668
   },
   "published/record/.rb/.gitattributes": [
    "* -text",
@@ -1479,8 +1489,8 @@
    ""
   ],
   "rb-export.zip": {
-   "sha256": "60b72eba19e9bce99fa00b8f8bb816707f5010e6874a0f2157b2b617da741efc",
-   "bytes": 124209
+   "sha256": "37e3a19e2a210d23cf3798253675f4d2ce05a18a98c6a91f3cccc5ffbd9173e1",
+   "bytes": 124754
   },
   "rb-export/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1553,10 +1563,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 138404,",
+   " \"bytes\": 138949,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"1a6a31e5010c1ea96d9e753ea90dfadf35d845570ac5a2af6fe72a0068fada40\",",
+   "  \"page.html\": \"603c65000efbf32b82786a078593326930c1e00a2e626a57156d901b50375109\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
@@ -1591,8 +1601,8 @@
    ""
   ],
   "rb-export/page.html": {
-   "sha256": "1a6a31e5010c1ea96d9e753ea90dfadf35d845570ac5a2af6fe72a0068fada40",
-   "bytes": 123101
+   "sha256": "603c65000efbf32b82786a078593326930c1e00a2e626a57156d901b50375109",
+   "bytes": 123646
   },
   "rb-export/record/.rb/.gitattributes": [
    "* -text",

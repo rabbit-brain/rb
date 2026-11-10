@@ -65,7 +65,8 @@
       if ((inp && inp.value) || box.dataset.chosen) k.why.push({ at: locate(box, '.decide'), value: inp ? inp.value : '', chosen: box.dataset.chosen || '' });
     }
     const a = document.activeElement;
-    if (a && a !== document.body && a.closest('#main, #nav, aside')) {
+    // in the top bar's Where too, whose children are swapped in with the rest (its pickers keep their folds by data-fold)
+    if (a && a !== document.body && a.closest('#main, #nav, aside, #where')) {
       k.focus = { at: locate(a, kind(a)), sel: typeof a.selectionStart === 'number' ? [a.selectionStart, a.selectionEnd] : null };
     }
     return k;
@@ -142,6 +143,19 @@
     }
   }
 
+  // the Where list's "rb checked the record with git just now": true while rb open answers (it asks git every 10 s),
+  // older once it stops, from when it last answered
+  let answered = Date.now();
+  function age() {
+    const s = (Date.now() - answered) / 1000, d = new Date(answered), m = Math.floor(s / 60), h = Math.floor(s / 3600);
+    const utc = d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+    const words = s < 60 ? 'just now' : s < 3600 ? (m === 1 ? '1 minute ago' : m + ' minutes ago') : s < 86400 ? (h === 1 ? '1 hour ago' : h + ' hours ago') : 'at ' + utc;
+    for (const t of $$('time[data-checked]')) {
+      if (t.textContent !== words) t.textContent = words;
+      t.title = utc; t.dateTime = d.toISOString();
+    }
+  }
+
   async function poll() {
     if (busy) return;
     busy = true;
@@ -152,10 +166,12 @@
       const j = await r.json();
       if (r.ok && typeof j.key === 'string') {
         ok = true;
+        answered = Date.now();
         if (q === query && mine === asked) { said(j); if (j.key !== key) ok = await show(q, j.key); }
       } else failed(j && j.error, q);
     } catch (_) {}
     busy = false;
+    age();
     // every 5 s while the page is in view; less often while it is hidden or rb open does not answer
     wait = ok && !document.hidden ? EVERY : Math.min(Math.max(wait, EVERY) * 2, MOST);
     clearTimeout(timer);
@@ -170,6 +186,7 @@
       wait = EVERY; clearTimeout(timer); timer = setTimeout(poll, 0);
     });
     timer = setTimeout(poll, EVERY);
+    setInterval(age, 15000);
   }
 
   window.rbLive = { show: q => show(q).catch(() => false) };

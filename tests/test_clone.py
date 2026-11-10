@@ -668,7 +668,7 @@ def test_rb_export_says_what_a_rerun_does_not_get_of_the_code(workdir, monkeypat
     out = tmp_path_factory.mktemp("exports")
     # no commit yet: no "at" with nothing after it
     first = said("export", "--with-record", "--out", str(out / "first"))
-    assert "This checkout has no commit yet: 2 files not committed: configs/sweep.yaml, eval.py.\nA rerun gets no code until it is committed.\n" in first, first
+    assert "Not committed, so a rerun does not get them: configs/sweep.yaml and eval.py.\n" in first, first
     assert "changes the code at" not in first, first
     git("remote", "remove", "origin")
     git("add", "-A")
@@ -679,28 +679,27 @@ def test_rb_export_says_what_a_rerun_does_not_get_of_the_code(workdir, monkeypat
     git("fetch", "-q", "origin")
     capsys.readouterr()
     clean = said("export", "--with-record", "--out", str(out / "clean"))
-    assert "This checkout changes the code" not in clean and "does not hold commit" not in clean, clean
+    assert "Not committed, so a rerun" not in clean and "does not hold commit" not in clean, clean
     # one file changed: "1 file"
     Path("configs/sweep.yaml").write_text("lr: 0.2\n", encoding="utf-8")
-    head = git("rev-parse", "HEAD")[:10]
+    head = git("rev-parse", "HEAD")[:12]
     one = said("export", "--with-record", "--out", str(out / "one"))
-    assert f"This checkout changes the code at {head}: 1 file not committed: configs/sweep.yaml.\n" in one, one
-    assert "A rerun gets the commit without it; commit it first to share it.\n" in one and "without them" not in one, one
+    assert f"Code repository recorded: {SERVED} at {head}. Pass --no-repo to leave it out.\nNot committed, so a rerun does not get it: configs/sweep.yaml.\n" in one, one
+    assert "commit it first" not in one, one
     assert "does not hold commit" not in one, one
     # eleven: the first ten, then how many more
     for i in range(10):
         Path(f"tool{i:02}.py").write_text("x = 1\n", encoding="utf-8")
     many = said("export", "--with-record", "--out", str(out / "many"))
     named = ", ".join(["configs/sweep.yaml", *[f"tool{i:02}.py" for i in range(9)]])
-    assert f"This checkout changes the code at {head}: 11 files not committed: {named} and 1 more.\n" in many, many
-    assert "A rerun gets the commit without them; commit them first to share them.\n" in many, many
+    assert f"Not committed, so a rerun does not get them: {named} and 1 more.\n" in many, many
     # code committed here and never pushed: origin, as this clone last saw it, lacks the commit
     git("add", "-A")
     git("commit", "-qm", "top5 too")
-    head = git("rev-parse", "HEAD")[:10]
+    head = git("rev-parse", "HEAD")[:12]
     gone = said("export", "--with-record", "--out", str(out / "ahead"))
     assert f"origin, as this clone last saw it, does not hold commit {head}: a rerun cannot get the code from {SERVED} until it is pushed there.\n" in gone, gone
-    assert "This checkout changes the code" not in gone, gone
+    assert "Not committed, so a rerun" not in gone, gone
     # origin at a path of this machine: no address is named, and the export says so in one line
     git("remote", "set-url", "origin", str(bare))
     local = said("export", "--with-record", "--out", str(out / "local"))

@@ -31,7 +31,7 @@ pub fn page(doc: &Value, surface: Surface) -> String {
         p.card_ids.insert("open-items".to_string());
     }
     p.ids = p.card_ids.clone();
-    let words = glossary();
+    let words = glossary(surface);
     ids_in(&words, &mut p.ids);
     let mut parts = p.views();
     let mut ids = p.ids.clone();
@@ -78,8 +78,9 @@ pub fn page(doc: &Value, surface: Surface) -> String {
 
 /// The glossary, folded: each term the page draws with a hint, and rb's line for it at its anchor, which the term names
 /// as what describes it.
-fn glossary() -> String {
-    let rows: String = w::HINTS.iter().map(|(t, line)| format!("<dt>{}</dt><dd id=\"{}\">{}</dd>", esc(t), w::glossary_id(t), esc(line))).collect();
+fn glossary(surface: Surface) -> String {
+    // your checkout is rb open's alone: a page has none to compare
+    let rows: String = w::HINTS.iter().filter(|(t, _)| surface == Surface::Open || *t != w::YOUR_CHECKOUT).map(|(t, line)| format!("<dt>{}</dt><dd id=\"{}\">{}</dd>", esc(t), w::glossary_id(t), esc(line))).collect();
     // in the About view, its fold open: the view is where the words are read (design pass 1, P10)
     format!("<details class=\"fold words\" data-fold=\"words\" open><summary>{}</summary><div id=\"words\"><dl class=\"gloss\">{rows}</dl></div></details>", w::WORDS)
 }
@@ -152,7 +153,7 @@ fn squeeze(css: &str) -> String {
 }
 
 /// CSS with no whitespace a browser does not read: none at either end of a run of it next to `{`, `}`, `;`, `,` or
-/// `>`, or after a `:`, and no `;` before a `}`. A run between two words (a descendant selector, `and (`, `1px solid`)
+/// `>`, before a `!` (`!important`), or after a `:`, and no `;` before a `}`. A run between two words (a descendant selector, `and (`, `1px solid`)
 /// stays one space, and what a quoted string holds stays as written.
 fn tight(css: &str) -> String {
     let mut out = String::with_capacity(css.len());
@@ -169,7 +170,7 @@ fn tight(css: &str) -> String {
         } else if c.is_whitespace() {
             while chars.next_if(|n| n.is_whitespace()).is_some() {}
             let before = out.chars().last().map_or(true, |p| ":;{},>".contains(p));
-            if !before && !chars.peek().map_or(true, |n| "{};,>".contains(*n)) {
+            if !before && !chars.peek().map_or(true, |n| "{};,>!".contains(*n)) {
                 out.push(' ');
             }
         } else if c == '}' && out.ends_with(';') {
@@ -324,6 +325,41 @@ fn whole_words(s: &str) -> String {
 /// A command to copy: selected whole by one click without script; the script adds its button at `data-copybtn`.
 fn cmdbox(cmd: &str) -> String {
     format!("<div class=\"cmdbox\" data-copybtn><pre class=\"cmd\">{}</pre></div>", esc(cmd))
+}
+
+/// Your checkout against the code a step names (a code step's `checkout`, rb open only), drawn directly under the line
+/// that names that code: rb's words as made (dim where it has this code), the files as git gives them in monospace,
+/// and where it differs the fold `fold` with the diff to copy. It changes nothing, and never offers git checkout or
+/// git restore. Nothing where no checkout is compared.
+pub(crate) fn yours(c: Option<&Value>, fold: &str) -> String {
+    let Some(c) = c.filter(|c| c.is_dict()) else { return String::new() };
+    let (state, said) = (text(c, "state"), text(c, "said"));
+    let mut words = esc(said);
+    // each name after the colon, in monospace (the line names three at most)
+    if let Some(colon) = words.find(": ") {
+        let (head, mut tail) = (words[..colon + 2].to_string(), words[colon + 2..].to_string());
+        for f in texts(c, "files").iter().take(3) {
+            let f = esc(f);
+            if let Some(i) = tail.find(&f) {
+                tail = format!("{}<code>{f}</code>{}", &tail[..i], &tail[i + f.len()..]);
+            }
+        }
+        words = head + &tail;
+    }
+    // the experiment's Reproduce carries the term's line on hover; a run card, of which a record holds hundreds, points
+    // at the same glossary entry without repeating the line (the page's size budget)
+    let term_said = if fold.starts_with("run-") {
+        format!("<span class=\"term\" aria-describedby=\"{}\">{}</span>", w::glossary_id(w::YOUR_CHECKOUT), w::YOUR_CHECKOUT)
+    } else {
+        term(w::YOUR_CHECKOUT, w::YOUR_CHECKOUT)
+    };
+    let words = words.replacen(w::YOUR_CHECKOUT, &term_said, 1);
+    let mut out = format!("<p class=\"yours{}\">{words}</p>", if state == "same" { " dim" } else { "" });
+    let diff = text(c, "diff");
+    if state == "differs" && !diff.is_empty() {
+        out += &format!("<details class=\"fold ydiff\" data-fold=\"{}\"><summary>{}</summary>{}</details>", esc(fold), w::SHOW_CODE_DIFF, cmdbox(diff));
+    }
+    out
 }
 
 /// The words each viewer of the export reads (OWNER-READER). The hub names the viewer with its rb-viewer meta: owner
@@ -497,15 +533,15 @@ fn top_bar(doc: &Value, surface: Surface, pickers: &str, rerun: &str) -> String 
     )
 }
 
-/// The snapshot's moment in short form ("2026-10-19 09:41 UTC" reads "19 Oct 09:41"), which the bar says under 960 in
-/// place of the whole (NAV-SPEC 5); none where the moment is not in that form.
+/// The snapshot's moment in short form ("2026-10-19 09:41 UTC" reads "19 Oct 09:41 UTC"), which the bar says under 960
+/// in place of the whole (NAV-SPEC 5), still saying its time is UTC's; none where the moment is not in that form.
 fn stamp_short(at: &str) -> Option<String> {
     const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     let (day, rest) = at.split_once(' ')?;
     let time = rest.strip_suffix(" UTC")?;
     let mut ymd = day.split('-');
     let (_, m, d) = (ymd.next()?, ymd.next()?.parse::<usize>().ok()?, ymd.next()?.parse::<u32>().ok()?);
-    (time.len() == 5 && time.as_bytes()[2] == b':' && (1..=12).contains(&m)).then(|| format!("{d} {} {time}", MONTHS[m - 1]))
+    (time.len() == 5 && time.as_bytes()[2] == b':' && (1..=12).contains(&m)).then(|| format!("{d} {} {time} UTC", MONTHS[m - 1]))
 }
 
 /// About and, where the page carries the script, the theme and keyboard controls it drives: in the top bar on rb page and
@@ -636,7 +672,13 @@ fn nav(doc: &Value, surface: Surface) -> String {
 fn footer(doc: &Value, surface: Surface) -> String {
     let made = match surface {
         Surface::Open => format!("<span>{}</span><span>{}</span>", w::OPEN_MADE, w::OPEN_WHERE),
-        _ => format!("<span>{}{}</span>", w::PAGE_MADE, esc(text(doc, "at"))),
+        // line 1, rb's mark of its own page, first; line 2 how the checkout the page was made from held the record, and
+        // its commit (the document's checkout.line: no branch, no path), on its own line; a page an older rb made has none
+        _ => {
+            let held = text(doc, "checkout.line");
+            let held = if held.is_empty() { String::new() } else { format!("<span>{}</span>{}", phrase_linked(doc, held), git_block(doc, surface)) };
+            format!("<span>{}{}</span>{held}", w::PAGE_MADE, esc(text(doc, "at")))
+        }
     };
     let computed = if surface == Surface::Open { String::new() } else { format!("<p>{}</p>", w::HOW_TO_READ_COMPUTED) };
     format!(
@@ -646,6 +688,126 @@ fn footer(doc: &Value, surface: Surface) -> String {
         w::HOW_TO_READ,
         w::HOW_TO_READ_AXES
     )
+}
+
+/// The id of About's block under line 2, which the phrase links to (PARITY 9.2): reached as any part of a view is,
+/// by its anchor, on a page from disk with no script and with the hub's copy of the script alike.
+const GIT_BLOCK: &str = "in-git";
+
+/// `line` (About's line 2, or the owner's header span's words) with the phrase it starts with linked to the block.
+fn phrase_linked(doc: &Value, line: &str) -> String {
+    let said = text(doc, "checkout.said");
+    match line.strip_prefix(said).filter(|_| !said.is_empty()) {
+        Some(rest) => format!("<a href=\"#{GIT_BLOCK}\">{}</a>{}", esc(said), esc(rest)),
+        None => esc(line),
+    }
+}
+
+/// The host link to the record's folder at a commit at a code address rb names (github.com, gitlab.com, codeberg.org
+/// over https): the address's path with any trailing / and .git taken off. No other host gets one.
+fn record_link(address: &str, sha: &str, record_dir: &str) -> Option<(String, &'static str)> {
+    let rest = address.strip_prefix("https://")?;
+    let (host, path) = rest.split_once('/')?;
+    let path = path.trim_end_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path).trim_end_matches('/');
+    let parts: Vec<&str> = path.split('/').collect();
+    if parts.iter().any(|p| p.is_empty()) || sha.len() != 40 {
+        return None;
+    }
+    let dir = if record_dir.is_empty() { ".rb" } else { record_dir };
+    match host.to_ascii_lowercase().as_str() {
+        "github.com" if parts.len() == 2 => Some((format!("https://github.com/{path}/tree/{sha}/{dir}"), "github.com")),
+        "gitlab.com" if parts.len() >= 2 => Some((format!("https://gitlab.com/{path}/-/tree/{sha}/{dir}"), "gitlab.com")),
+        "codeberg.org" if parts.len() == 2 => Some((format!("https://codeberg.org/{path}/src/commit/{sha}/{dir}"), "codeberg.org")),
+        _ => None,
+    }
+}
+
+/// An evidence line's text, each part it draws in monospace (`code`) in a span.
+fn evidence_html(l: &Value) -> String {
+    let code = texts(l, "code");
+    crate::checkout::segments(text(l, "text"), &code).iter().map(|(m, p)| if *m { format!("<span class=\"mono\">{}</span>", esc(p)) } else { esc(p) }).collect()
+}
+
+/// About's block under line 2 (PARITY 9.3): checkout.rs's page evidence (what rb found and what it means for this
+/// page, the commit whole, which files, what record files are), from the checkout the page was made from, never a
+/// bundle's copy; and, on a page published with its record at an address (reproduce_repo), the code's address part,
+/// drawn as the Rerun panel's parts are (rrun rrx). Never a branch, a place path or git's words.
+fn git_block(doc: &Value, surface: Surface) -> String {
+    let lines = at(doc, "checkout.page_evidence").and_then(Value::as_list).cloned().unwrap_or_default();
+    if lines.is_empty() {
+        return String::new();
+    }
+    let of = |k: &'static str| lines.iter().filter(move |l| text(l, "kind") == k);
+    let mut first: Vec<String> = of("found").map(evidence_html).collect();
+    first.extend(of("page").map(evidence_html));
+    let mut out = format!("<p>{}</p>", first.join(" "));
+    let sha = of("found").next().map(|l| text(l, "sha").to_string()).unwrap_or_default();
+    if !sha.is_empty() {
+        out.push_str(&format!("<p class=\"mono\">{}</p>", esc(&sha)));
+    }
+    for l in of("files") {
+        out.push_str(&format!("<p>{}</p>", evidence_html(l)));
+    }
+    out.push_str(&address_part(doc, surface, &sha));
+    for l in of("define") {
+        out.push_str(&format!("<p class=\"dim\">{}</p>", esc(text(l, "text"))));
+    }
+    // styled by its id alone: the small page has little room left (guarantee 29)
+    format!("<div id=\"{GIT_BLOCK}\" tabindex=\"-1\">{out}</div>")
+}
+
+/// The code's address part of About's block (PARITY 2.10): only on a page published with its record at an address,
+/// where the commit holds the record and git ignores none of it.
+fn address_part(doc: &Value, surface: Surface, sha: &str) -> String {
+    let repo = text(doc, "reproduce_repo.url");
+    let state = text(doc, "checkout.state");
+    let held = state == "committed" || (state == "not_committed" && !at(doc, "checkout.page_evidence").and_then(Value::as_list).map_or(false, |l| l.iter().any(|x| text(x, "text").ends_with("has no record."))));
+    if surface != Surface::Export || repo.is_empty() || text(doc, "reproduce_url").is_empty() || sha.is_empty() || !held {
+        return String::new();
+    }
+    let c12 = crate::checkout::short(sha);
+    let record_dir = text(doc, "checkout.record_dir");
+    let mut parts = Vec::new();
+    match at(doc, "checkout.origin_holds").and_then(Value::as_bool) {
+        Some(true) => {
+            if let Some((link, host)) = record_link(repo, sha, record_dir) {
+                parts.push(format!("<p><a href=\"{}\">{}</a>{}</p>", esc(&link), esc(&w::host_link(&c12)), esc(&w::host_opens(host))).replace(&format!(" on {host} "), &format!(" on {} ", au(host))));
+            }
+            let folder = text(doc, "project.id");
+            let dir = record_dir.strip_suffix("/.rb").unwrap_or("");
+            parts.push(format!(
+                "<p>{}</p>{}<div class=\"cmdbox\" data-copybtn><pre class=\"cmd\">git clone {} {}</pre></div><div class=\"cmdbox\" data-copybtn><pre class=\"cmd\">cd {} &amp;&amp; git checkout {}</pre></div><p>{}</p>",
+                w::CHECK_IT,
+                cmdbox("pip install rabbit-brain"),
+                au(repo),
+                au(folder),
+                au(folder),
+                esc(sha),
+                esc(&w::then_status_says(dir, w::CLONE_LINE))
+            ));
+            let changed = texts(doc, "reproduce_repo.changed");
+            if !changed.is_empty() {
+                let shown: Vec<String> = changed.iter().take(5).map(|p| format!("<span class=\"mono\">{}</span>", esc(p))).collect();
+                let names = if changed.len() > 5 { format!("{} {}", shown.join(", "), w::and_more(changed.len() - 5)) } else { crate::next_step::and_list(&shown) };
+                parts.push(format!("<p>{}{names}.</p>", w::not_committed_no_rerun(changed.len())));
+            }
+        }
+        Some(false) => {
+            let (lead, tail) = w::origin_lacks(&c12);
+            let mut said = format!("{}{}{}", esc(&lead), au(repo), esc(&tail));
+            let older = text(doc, "reproduce_repo.commit");
+            if !older.is_empty() && older != sha {
+                said = format!("{said} {}", esc(&w::same_code(&crate::checkout::short(older))));
+            }
+            parts.push(format!("<p>{said}</p>"));
+        }
+        None => {
+            let (lead, tail) = w::origin_unseen(&c12);
+            parts.push(format!("<p>{}{}{}</p>", esc(&lead), au(repo), esc(&tail)));
+        }
+    }
+    format!("<div class=\"rrun rrx\">{}</div>", parts.join(""))
 }
 
 /// The About view (design pass 1, P10, target 11): what made the page, the honesty line, how to read the record and the
@@ -772,17 +934,6 @@ fn pending_said(line: &str) -> &str {
 fn capitalised(s: &str) -> String {
     let mut c = s.chars();
     c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
-}
-
-/// A place as the Overview's header names it: its branch, the label's first part ("main" of "main · ~/p"); a detached
-/// checkout is "detached", its commit left to the Where picker; a record outside git, with no branch or commit, none.
-fn place_name(label: &str) -> &str {
-    let name = label.split(" \u{b7} ").next().unwrap_or("").trim();
-    match name.strip_prefix("detached at") {
-        Some(commit) if commit.trim().is_empty() => "",
-        Some(_) => "detached",
-        None => name,
-    }
 }
 
 /// A state as plain text for a label.
@@ -2216,7 +2367,9 @@ impl<'a> Page<'a> {
                     Some(rest) => format!("{b}{}", self.linked(rest, &texts(s, "refs"))),
                     None => format!("{b} \u{b7} {}", self.linked(label, &texts(s, "refs"))),
                 };
-                format!("<li><div class=\"sl\">{head}</div>{cmd}{from}</li>")
+                // your checkout, directly under the code it was compared with
+                let mine = if self.past { String::new() } else { yours(at(s, "checkout"), &format!("{xid}:code-diff:{}", text(s, "n"))) };
+                format!("<li><div class=\"sl\">{head}</div>{mine}{cmd}{from}</li>")
             })
             .collect();
         steps.extend(self.per_run(r));
@@ -3629,18 +3782,11 @@ impl<'a> Page<'a> {
         section("overview", title, w::OVERVIEW, "insp-none", &h.concat())
     }
 
-    /// "main · 22 recorded runs · changed 2026-10-20 01:09 UTC": the place (rb open's own screen only), the runs, and
-    /// when the record last changed, linked to History. The other counts live in the nav.
+    /// "22 recorded runs · changed 2026-10-20 01:09 UTC": the runs, and when the record last changed, linked to
+    /// History. The other counts live in the nav; on rb open the place is the bar's Where button's, said once.
     fn overview_line(&self) -> String {
         let d = self.doc;
         let mut parts = Vec::new();
-        if self.surface == Surface::Open {
-            // the place by its name ("main"), never its id (p_...) nor its path: the label's first part, its branch
-            let place = place_name(text(d, "places.place.label"));
-            if !place.is_empty() {
-                parts.push(format!("<span class=\"place\">{}</span>", esc(place)));
-            }
-        }
         if let Some(r) = count(d, "home.counts.runs") {
             let (one, many) = w::RECORDED_RUNS_N;
             parts.push(a("runs", &plural(r, one, many), ""));
@@ -3657,7 +3803,12 @@ impl<'a> Page<'a> {
         if parts.is_empty() {
             return String::new();
         }
-        format!("<p class=\"counts ovh\">{}</p>", parts.join(DOT))
+        // how the checkout the page was made from held the record, to the record's owner alone (the hub's rb-viewer
+        // meta says owner): readers, and a page opened with no viewer named, read it in About only. Never on rb open,
+        // whose bar says it
+        let held = text(d, "checkout.said");
+        let owner = if self.surface == Surface::Open || held.is_empty() { String::new() } else { by_viewer("span", " class=\"held\"", "", &format!("{DOT_TEXT}{}", phrase_linked(d, held)), "") };
+        format!("<p class=\"counts ovh\">{}{owner}</p>", parts.join(DOT))
     }
 
     /// One standing card per top-level question: the question in the user's words, rb's state word, rb's line on why,
@@ -4317,18 +4468,19 @@ impl<'a> Page<'a> {
             w::CODE_UNNAMED.to_string()
         } else {
             let shown = if repo.starts_with("http://") || repo.starts_with("https://") { format!("<a href=\"{}\">{}</a>", esc(repo), esc(repo)) } else { esc(repo) };
-            let commit: String = text(self.doc, "reproduce_repo.commit").chars().take(10).collect();
+            let commit = crate::checkout::short(text(self.doc, "reproduce_repo.commit"));
             let at = if commit.is_empty() { String::new() } else { format!("{}<span class=\"oid\">{}</span>", w::AT_COMMIT, esc(&commit)) };
-            // what the copy had not committed when it was exported (C's `repo.changed`, read where the manifest has it)
+            // what the checkout had not committed when it was exported (C's `repo.changed`, read where the manifest has
+            // it), which a rerun does not get: "a, b and c", or "a, b, c, d, e and 3 more"
             let changed = texts(self.doc, "reproduce_repo.changed");
             let changed = if changed.is_empty() {
                 String::new()
             } else {
                 let shown: Vec<String> = changed.iter().take(5).map(|p| format!("<span class=\"mono\">{}</span>", esc(p))).collect();
-                let more = if changed.len() > 5 { format!(" {}", w::and_more(changed.len() - 5)) } else { String::new() };
-                format!("{}{}{more}", w::WITH_CHANGES_NOT_COMMITTED, shown.join(", "))
+                let names = if changed.len() > 5 { format!("{} {}", shown.join(", "), w::and_more(changed.len() - 5)) } else { crate::next_step::and_list(&shown) };
+                format!(". {}{names}", w::not_committed_no_rerun(changed.len()))
             };
-            format!("{}{shown}{at}{changed}{}", w::CODE_THE_RUNS_USED, w::CODE_TRAVELS)
+            format!("{}{shown}{at}{changed}{}", w::CODE_WHEN_MADE, w::CODE_TRAVELS)
         };
         let folder = text(self.doc, "project.id");
         format!(
@@ -5139,17 +5291,15 @@ mod tests {
         &html[at..end]
     }
 
-    /// Look 3, film pass 1: the Overview's header names the place by its branch ("main"), never by rb's id nor its path.
+    /// Round 12: the Overview's header on rb open no longer names the place, which the bar's Where button names once;
+    /// never rb's id nor its path either.
     #[test]
-    fn the_overviews_header_names_the_place_main_never_its_id() {
+    fn the_overviews_header_leaves_the_place_to_the_bar() {
         let (_, html) = live_open();
         let line = &html[html.find("<p class=\"counts ovh\">").unwrap()..];
         let line = &line[..line.find("</p>").unwrap()];
-        assert!(line.contains("<span class=\"place\">main</span>"), "{line}");
+        assert!(!line.contains("class=\"place\"") && !line.contains(">main<") && line.contains("recorded runs"), "{line}");
         assert!(!html.contains("p_9e48e7a24e") && !line.contains("~/"), "{line}");
-        assert_eq!(place_name("detached at 4364dc8c1a2b \u{b7} ~/p"), "detached");
-        // a record outside git: no branch and no commit, so no name rather than words cut short
-        assert_eq!(place_name("detached at  \u{b7} /tmp/e/nogit"), "");
     }
 
     /// Look 3, film pass 3: Elsewhere, with a worktree's absolute path and its cd ... && rb status, sits inside the fold
@@ -5200,8 +5350,8 @@ mod tests {
     #[test]
     fn the_bar_keeps_the_snapshot_s_moment_in_short_form() {
         // NAV-SPEC 5: under 960 the bar says the moment in short form; one not in rb's form gets none
-        assert_eq!(stamp_short("2026-10-19 09:41 UTC").as_deref(), Some("19 Oct 09:41"));
-        assert_eq!(stamp_short("2026-01-02 00:05 UTC").as_deref(), Some("2 Jan 00:05"));
+        assert_eq!(stamp_short("2026-10-19 09:41 UTC").as_deref(), Some("19 Oct 09:41 UTC"));
+        assert_eq!(stamp_short("2026-01-02 00:05 UTC").as_deref(), Some("2 Jan 00:05 UTC"));
         assert_eq!(stamp_short("2026-13-02 00:05 UTC"), None);
         assert_eq!(stamp_short("a while ago"), None);
     }
@@ -5270,7 +5420,7 @@ mod tests {
         let repo = crate::pyjson::loads(r#"{"url": "https://github.com/ana/int8-resnet.git", "commit": "5f04ee1180aa"}"#).unwrap();
         live.as_dict_mut().unwrap().insert("reproduce_repo".into(), repo);
         let html = page(&live, Surface::Export);
-        let said = "The code the runs used: <a href=\"https://github.com/ana/int8-resnet.git\">https://github.com/ana/int8-resnet.git</a> at commit <span class=\"oid\">5f04ee1180</span>";
+        let said = "The code when this page was made: <a href=\"https://github.com/ana/int8-resnet.git\">https://github.com/ana/int8-resnet.git</a> at commit <span class=\"oid\">5f04ee1180aa</span>";
         assert!(html.contains(&format!("{said}. The record and")) && !html.contains(w::CODE_UNNAMED) && !html.contains("played against"), "{html}");
         // and step 2 of every prompt says the bundle names the code, rb clone getting it at the record's commit
         assert!(html.contains(&esc(&w::rerun_prompt("https://example.org/int8/", at, &id, true, None))), "{html}");
@@ -5279,7 +5429,17 @@ mod tests {
         let repo = crate::pyjson::loads(r#"{"url": "https://github.com/ana/int8-resnet.git", "commit": "5f04ee1180aa", "changed": ["configs/sweep.yaml"]}"#).unwrap();
         live.as_dict_mut().unwrap().insert("reproduce_repo".into(), repo);
         let html = page(&live, Surface::Export);
-        assert!(html.contains(&format!("{said}, with changes not committed: <span class=\"mono\">configs/sweep.yaml</span>. The record and")), "{html}");
+        assert!(html.contains(&format!("{said}. Not committed, so a rerun does not get it: <span class=\"mono\">configs/sweep.yaml</span>. The record and")), "{html}");
+        // several: the last joined with "and", past five the rest counted
+        let repo = crate::pyjson::loads(r#"{"url": "https://github.com/ana/int8-resnet.git", "commit": "5f04ee1180aa", "changed": ["a.py", "b.py", "c.py"]}"#).unwrap();
+        live.as_dict_mut().unwrap().insert("reproduce_repo".into(), repo);
+        let m = |p: &str| format!("<span class=\"mono\">{p}</span>");
+        assert!(page(&live, Surface::Export).contains(&format!("does not get them: {}, {} and {}. The record and", m("a.py"), m("b.py"), m("c.py"))));
+        let names: Vec<String> = (1..=8).map(|i| format!("f{i}.py")).collect();
+        let repo = crate::obj! {"url" => "https://github.com/ana/int8-resnet.git", "commit" => "5f04ee1180aa", "changed" => Value::list_of_str(names)};
+        live.as_dict_mut().unwrap().insert("reproduce_repo".into(), repo);
+        let shown: Vec<String> = (1..=5).map(|i| m(&format!("f{i}.py"))).collect();
+        assert!(page(&live, Surface::Export).contains(&format!("does not get them: {} and 3 more. The record and", shown.join(", "))));
         let repo = crate::pyjson::loads(r#"{"url": "https://github.com/ana/int8-resnet.git", "commit": "5f04ee1180aa", "changed": []}"#).unwrap();
         live.as_dict_mut().unwrap().insert("reproduce_repo".into(), repo);
         assert!(page(&live, Surface::Export).contains(&format!("{said}. The record and")));

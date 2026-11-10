@@ -48,10 +48,12 @@ fn stamp_of(root: &Path) -> Stamp {
 
 /// The logs of the record at `root` and of every other record of the places `list` names: a write to any of them
 /// lists the places and Elsewhere again at once, so a page shown at another place, and the home's Elsewhere, follow a
-/// write there in the same poll too, never again when the listing lapses.
+/// write there in the same poll too, never again when the listing lapses. So does a move of any place's HEAD or index
+/// (a commit, a checkout, a reset), which changes what the Where button says with no write to a record.
 fn stamps(root: &Path, list: &[Place]) -> Vec<Stamp> {
     let others = list.iter().filter_map(|p| p.root.as_deref()).filter(|r| *r != root);
-    std::iter::once(stamp_of(root)).chain(others.map(stamp_of)).collect()
+    let git = list.iter().filter(|p| !p.gone).flat_map(|p| places::git_files(&p.path)).map(|f| crate::dry::size_time(&f));
+    std::iter::once(stamp_of(root)).chain(others.map(stamp_of)).chain(git).collect()
 }
 
 /// The places of the clone the record at `root` is in, as listed at most PLACES_EVERY ago and since the last write to
@@ -280,6 +282,12 @@ pub(crate) fn live_key(led: &Ledger, chosen: &Chosen, listed: &[Place]) -> Res<S
     if chosen.start && listed.len() > 1 {
         said.insert("elsewhere".into(), elsewhere_rows(led, listed));
     }
+    // what Reproduce compares with your checkout: the size and time of each path its status lists, so an edit to one
+    // (or putting it back) redraws, as the compare's memo keys it
+    if let Some(v) = crate::shell::model::your_checkout(led, chosen, listed) {
+        let stats = v.listed.unwrap_or_default().iter().map(|p| crate::list![p.clone(), format!("{:?}", crate::dry::size_time(&v.dir.join(p)))]).collect();
+        said.insert("your_checkout".into(), Value::List(stats));
+    }
     Ok(placed_digest(keyed(led, said)?, chosen))
 }
 
@@ -290,7 +298,12 @@ pub(crate) fn live_key(led: &Ledger, chosen: &Chosen, listed: &[Place]) -> Res<S
 /// for every key that follows them.
 fn found_said(led: &Ledger) -> Res<Dict> {
     let (asks, unplaced, uncited, line) = crate::view::found(led);
-    let status = led.status(None)?;
+    let mut status = led.status(None)?;
+    // the minute rb asked git moves at every look, and the evidence says it: the counts and names stay in the key
+    if let Some(Value::Dict(r)) = status.get_mut("repository") {
+        r.shift_remove("checked_at");
+        r.shift_remove("evidence");
+    }
     Ok(crate::dict! {
         "status" => Value::Dict(status),
         "found" => Value::List(asks.iter().map(|a| crate::list![a.request_id.clone(), a.title.clone(), a.asked_at.clone(), Value::list_of_str(a.argv.iter().cloned())]).collect()),
@@ -1084,8 +1097,8 @@ mod tests {
     #[test]
     fn a_page_asks_for_its_place_and_version_again() {
         let place = |id: &str, record: &'static str| Place {
-            id: id.into(), listed: String::new(), path: PathBuf::new(), branch: None, head: None, dirty: false, record, root: None,
-            record_dir: String::new(), uncommitted: 0, last_write: None, runs: 0, gone: false, short: String::new(), many: true,
+            id: id.into(), listed: String::new(), path: PathBuf::new(), branch: None, head: None, dirty: false, changed: Vec::new(), record, root: None,
+            record_dir: String::new(), uncommitted: 0, checkout: None, last_write: None, runs: 0, gone: false, short: String::new(), many: true,
         };
         let shown = |p: Place, sha: Option<&str>, start: bool| Shown {
             chosen: Chosen { root: PathBuf::new(), place: p, version: sha.map(|s| Version { sha: s.into(), committed: String::new() }), start },

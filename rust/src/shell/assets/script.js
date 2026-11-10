@@ -805,7 +805,8 @@
       // its box, or the box its row sits under (the composer's)
       const row = b.closest('.cmprow'), box = b.closest('.cmdbox') || (row && row.previousElementSibling);
       const src = b.dataset.from ? findCopy(b, b.dataset.from) : (box && $('.cmd', box));
-      if (src) copyText(src.textContent.replace(/\s+$/, '') + '\n', b, src);
+      // a commit is copied as it is; a command with the line's end, ready to run
+      if (src) copyText(src.textContent.replace(/\s+$/, '') + (src.classList.contains('sha') ? '' : '\n'), b, src);
     }
     else if (act === 'rerun-close') { e.preventDefault(); if (rerunDlg && rerunDlg.open) rerunDlg.close(); }
     else if (act === 'pick') { e.preventDefault(); choose(b.closest('.decide'), b.dataset.action); }
@@ -1006,6 +1007,9 @@
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === 'Escape') {
       if (helpBox && !helpBox.hidden) { closeHelp(); return; }
+      // an open picker closes first, focus back on its button, before the inspector
+      const pick = $('#where details.pick[open]');
+      if (pick) { e.preventDefault(); pick.open = false; const b = $(':scope > summary', pick); if (b) b.focus({ preventScroll: true }); return; }
       // Esc closes a term's meaning, not the inspector
       if (e.target.closest && e.target.closest('.term[data-hint]')) { e.preventDefault(); hush(e.target.closest('.term')); return; }
       if (st.s.length) { e.preventDefault(); go({ c: st.c, s: [], f: null }); }
@@ -1019,6 +1023,11 @@
     if (k === '[') { e.preventDefault(); if (st.s.length && history.state && Array.isArray(history.state.p)) history.back(); else back(); }
     else if (k === ']') { history.forward(); }
     else if (k === '/') { const f = $('main .view.on .filterbar input'); if (f) { e.preventDefault(); f.focus(); } }
+    // w opens and closes Where (rb open's), as w does in rb ui; focus on its button either way
+    else if (k === 'w') {
+      const d = $('#where details.pick[data-pick="where"]');
+      if (d) { e.preventDefault(); d.open = !d.open; const b = $(':scope > summary', d); if (b) b.focus({ preventScroll: true }); }
+    }
     else if (k === 'j' || k === 'k') { e.preventDefault(); if (!moveQueue(k === 'j' ? 1 : -1)) moveRow(k === 'j' ? 1 : -1); }
     else if (k === 'a' || k === 'r' || k === 'i') {
       // only a call that shows: under the sheet width the root is drawn in the centre
@@ -1108,7 +1117,7 @@
       helpBox = document.createElement('div');
       helpBox.className = 'help'; helpBox.setAttribute('role', 'dialog'); helpBox.setAttribute('aria-label', 'Keyboard');
       helpBox.innerHTML = (byId('words') ? '<p class="hw"><a href="#words">What the words on this page mean →</a></p>' : '') + '<b>Keyboard</b><dl>' +
-        '<dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>back and forward through the inspector</dd><dt><kbd>Esc</kbd></dt><dd>close the inspector; focus goes back to where it was</dd>' +
+        '<dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>back and forward through the inspector</dd><dt><kbd>Esc</kbd></dt><dd>' + ($('#where details.pick') ? 'close an open list in the bar, else the inspector' : 'close the inspector') + '; focus goes back to where it was</dd>' +
         // a reader's keys only read: no call to make and nothing to copy
         (VIEWER === 'reader'
           ? '<dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>next or previous row, opened in the inspector; on the Overview, the next or previous item still open, and <kbd>Enter</kbd> opens it</dd>'
@@ -1116,6 +1125,7 @@
             '<dt><kbd>a</kbd> <kbd>r</kbd> <kbd>i</kbd></dt><dd>on a call: accept, reject, investigate</dd>' +
             '<dt><kbd>c</kbd></dt><dd>copy the card’s recipe or command</dd>') +
         '<dt><kbd>/</kbd></dt><dd>filter this list</dd>' +
+        ($('#where details.pick[data-pick="where"]') ? '<dt><kbd>w</kbd></dt><dd>open and close Where: the place shown, its commit, and the other places</dd>' : '') +
         '<dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>move in the navigation</dd>' +
         '<dt><kbd>?</kbd></dt><dd>this list</dd></dl>' +
         '<label><input type="checkbox" class="keys-on"' + (KEYS ? ' checked' : '') + '> Single-key shortcuts</label>';

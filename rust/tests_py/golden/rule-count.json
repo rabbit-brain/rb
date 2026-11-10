@@ -96,7 +96,7 @@
    "exit": 0,
    "out": [
     "runp5h4s6 on e1: fp32.val_loss=0.871, int8.val_loss=0.881 \u00b7 seed=1",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion undetermined \u00b7 point only: int8.val_loss: 0.881 nats \u00b7 mean, 1 seed (rb)",
     "",
@@ -112,7 +112,7 @@
    "exit": 0,
    "out": [
     "runqtdhpa on e1: fp32.val_loss=0.872, int8.val_loss=0.887 \u00b7 seed=2",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion undetermined \u00b7 point only: int8.val_loss: 0.884 nats \u00b7 mean, 2 seeds (rb)",
     "",
@@ -128,7 +128,7 @@
    "exit": 0,
    "out": [
     "run4teabd on e1: fp32.val_loss=0.873, int8.val_loss=0.893 \u00b7 seed=3",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion undetermined \u00b7 measured: int8.val_loss: 0.887 [0.8721, 0.9019] nats \u00b7 mean, t interval, 3 seeds, 95% (rb)",
     "",
@@ -144,7 +144,7 @@
    "exit": 0,
    "out": [
     "runf3hlli on e1: fp32.val_loss=0.874, int8.val_loss=0.884 \u00b7 seed=4",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion undetermined \u00b7 measured: int8.val_loss: 0.8862 [0.8781, 0.8944] nats \u00b7 mean, t interval, 4 seeds, 95% (rb)",
     "",
@@ -185,7 +185,7 @@
    "exit": 0,
    "out": [
     "runedhdx7 on e1: fp32.val_loss=0.875, int8.val_loss=0.886 \u00b7 seed=5",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 recorded values meet criterion \u00b7 measured: int8.val_loss: 0.8862 [0.8807, 0.8917] nats \u00b7 mean, t interval, 5 seeds, 95% (rb)",
     "",
@@ -444,6 +444,7 @@
    "out": [
     "count",
     "Kept with rb since 2026-10-01. All 5 runs were recorded afterwards, not as they happened.",
+    "no commit yet",
     "",
     "Not filed under a question",
     "  c1      4 of 5 seeds below 0.890. int8.val_loss: 0.8862 [0.8807, 0.8917] nats \u00b7 mean, t interval, 5 seeds, 95% (rb); measured: int8 on its own, with its interval, so neither better nor worse; recorded values meet criterion: 4 of 5 seeds at most 0.89; the rule asks for 4; declared after the evidence existed: all 5 units were produced before it was declared.",
@@ -455,6 +456,8 @@
     "  - e1: runs report fp32.val_loss, which no recorded criterion reads",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work status --short --untracked-files=all -- .rb",
     "",
     "Rules",
     "  c1      4 of 5 seeds below 0.890",
@@ -484,6 +487,7 @@
    "out": [
     "rb-page.html written: the project as one file, readable anywhere; send it to anyone.",
     "It is the record as computed now; regenerate after new runs. If it ever disagrees with rb status, rb status is right.",
+    "The page says: no commit yet.",
     ""
    ],
    "err": [
@@ -877,8 +881,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "159bb209d81a32e0d2a529fbc8233f79db3d8271766149f8e67a112e00157930",
-   "bytes": 210575
+   "sha256": "a07cd265500a7b7a7584374e002b4732cc93166b8dadbc1ccc57c6eed307a134",
+   "bytes": 211828
   }
  }
 }

@@ -1,9 +1,8 @@
-/* rb open's parts of the frame (open.rs): the place line and its pickers, the scope bar, what a past version
+/* rb open's parts of the frame (open.rs): the Where and Version pickers, the scope bar, what a past version
    withholds, and the Overview's Elsewhere. Drawn on rb open only, after the shell's own styles. */
 
-/* the place line and the Where and Version pickers, in the top bar */
+/* the Where and Version pickers, in the top bar */
 .where { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; font-size: 12.5px; color: var(--dim); }
-.where .pl { overflow-wrap: anywhere; }
 .where .failed:empty { display: none; }
 .where .failed { color: var(--warn); overflow-wrap: anywhere; }
 details.pick { position: relative; }
@@ -14,6 +13,9 @@ details.pick > summary::after { content: " \25BE"; color: var(--dim); }
 details.pick > summary { display: flex; align-items: baseline; gap: .3em; }
 details.pick > summary .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 details.pick > summary::after, details.pick > summary > .dim { flex: none; }
+/* the words after the place's name: never cut, in ink, and dim where every record file is committed */
+details.pick > summary .gs { flex: none; white-space: nowrap; color: var(--ink); }
+details.pick > summary .gs[data-state="committed"] { color: var(--dim); }
 /* a place's label in a list breaks after a ' · ' or a '/', never at a hyphen inside a name */
 ul.picks .nw { white-space: nowrap; }
 details.pick > summary .dim { color: var(--dim); }
@@ -21,12 +23,32 @@ ul.picks { list-style: none; margin: 4px 0 0; padding: 4px 0; background: var(--
 details.pick:not([open]) > ul.picks { display: none; }
 details.pick[open] > ul.picks { position: absolute; z-index: 60; left: 0; top: 100%; }
 ul.picks li { padding: 0; }
+ul.picks .cmdbox { margin: 2px 12px 4px; }
+ul.picks li.here .fl.dim { color: var(--dim); }
 ul.picks a, ul.picks .off { display: block; padding: 5px 12px; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
 ul.picks a:hover, ul.picks a:focus-visible { background: var(--card); }
 ul.picks a[aria-current="true"] { font-weight: 600; }
 ul.picks a[aria-current="true"]::before { content: "\2713  "; color: var(--mark); }
 ul.picks .off { color: var(--dim); padding-bottom: 0; }
 ul.picks .why { display: block; padding: 0 12px 5px; font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+/* the Where list: the place shown first, its lines one step down (its commit with Copy), then each other place with
+   rb's line for it; paths, the hex and git's own words in monospace */
+ul.picks li.here { border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-bottom: 4px; }
+ul.picks li.here > a { padding-bottom: 2px; }
+ul.picks .fls:empty { display: none; }
+ul.picks .fl { margin: 0; padding: 0 12px 4px; font-size: 12px; line-height: 1.45; color: var(--dim); overflow-wrap: anywhere; }
+ul.picks li.here .fl { color: var(--ink); }
+ul.picks .fl.pth { font-family: var(--mono); color: var(--dim); }
+ul.picks .fl code { font-size: 1em; }
+ul.picks .cprow { margin: 0; padding: 0 12px 6px; }
+#where ul.picks .cp { position: static; display: inline-flex; }
+/* Copy sits under the command's box at every width, never over the command's end (S6c) */
+#where ul.picks .cmdbox > .cp { position: static; margin-top: 4px; }
+@media (pointer: coarse) {
+  details.pick > summary { min-height: 44px; align-items: center; }
+  ul.picks a { min-height: 44px; box-sizing: border-box; padding-top: 12px; padding-bottom: 12px; }
+  #where ul.picks .cp { min-height: 44px; min-width: 44px; justify-content: center; }
+}
 
 /* the scope bar: where you are, in words, away from the live start place; it stays in view as the page scrolls */
 .scope:empty, .past:empty { display: none; }
@@ -51,41 +73,44 @@ ul.picks .why { display: block; padding: 0 12px 5px; font-size: 12px; color: var
   html.app .scope { grid-area: scope; position: static; }
   html.app .scope .bar { max-width: none; padding: 6px 18px; }
   html.app .past .withheld { max-width: none; padding: 0 0 10px; }
-  /* the place line and the pickers give way first, each cut short with an ellipsis (a picker no shorter than its
-     name and a few letters), so the project's id and the clock beside them keep one line each */
-  html.app header.top .where { flex: 0 100 auto; min-width: 0; flex-wrap: nowrap; overflow: visible; }
+  /* the title gives way first, then the Where button's branch label (with an ellipsis); its words are never cut, so
+     the project's id and the clock beside them keep one line each */
+  html.app header.top .ttl { flex-shrink: 1000; }
+  html.app header.top .where { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; overflow: visible; }
   html.app header.top .where > * { flex: 0 1 auto; min-width: 0; }
-  html.app header.top .where > details.pick { min-width: 8.5em; }
+  html.app header.top .where > details.pick[data-pick="version"] { flex: none; }
   html.app header.top > :not(.where):not(.ttl) { flex-shrink: 0; }
-  html.app header.top .where .pl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   html.app header.top details.pick > summary { max-width: 100%; }
-  /* from 1280 the bar says the place once, in the Where button, cut by nothing: the place line's counts are in its
-     tooltip */
-  html.app header.top .where:has(details.pick[data-pick="where"]) .pl { display: none; }
-  html.app header.top .where > details.pick { flex-shrink: 0; min-width: 0; }
-  html.app header.top details.pick > summary { max-width: none; }
   /* the last picker beside the clock opens its list leftward, inside the screen */
   html.app header.top details.pick[data-pick="version"][open] > ul.picks { left: auto; right: 0; }
 }
 @media screen and (max-width: 1279px) {
-  html.app body { grid-template-rows: auto auto auto minmax(0, 1fr); grid-template-areas: "top top" "scope scope" "nav nav" "main insp"; }
+  /* 960 to 1279: the scope bar under the bar, then the navigator beside the working view (the inspector is a sheet) */
+  html.app body { grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "top top" "scope scope" "nav main"; }
   /* under 1280 the pickers take a line of their own below the bar's first, which keeps the frame's own line */
   html.app header.top { flex-wrap: wrap; height: auto; min-height: var(--toph); row-gap: 0; padding-top: 6px; }
   html.app header.top .where { order: 5; flex: 1 0 100%; flex-wrap: wrap; padding-bottom: 6px; }
   html.app header.top .where > details.pick { min-width: 0; }
-  html.app header.top .where .pl { display: inline; }
   html.app header.top > :not(.where):not(.ttl) { flex-shrink: 1; }
-  /* an open picker's list takes its place in the bar, under its summary, never past the screen's edge */
-  details.pick[open] { flex: 1 0 100%; }
-  details.pick[open] > ul.picks { position: static; max-width: none; min-width: 0; }
-  html.app header.top .where .pl { white-space: normal; overflow-wrap: anywhere; }
+  /* the Where list floats over the page under its button, as from 1280: it starts the line, so it opens rightward and
+     pushes neither the page down nor Version along. Version's list, which a long place can put at the line's end,
+     takes its place in the bar, under its summary, never past the screen's edge */
+  details.pick[data-pick="version"][open] { flex: 1 0 100%; }
+  details.pick[data-pick="version"][open] > ul.picks { position: static; max-width: none; min-width: 0; }
 }
 @media screen and (max-width: 959px) {
   html.app body { grid-template-rows: auto auto auto minmax(0, 1fr); grid-template-areas: "top" "scope" "nav" "main"; }
+  /* an open picker's list takes its place in the bar, under its summary, never past the screen's edge */
+  details.pick[open] { flex: 1 0 100%; }
+  details.pick[open] > ul.picks { position: static; max-width: none; min-width: 0; }
   details.pick > summary { max-width: calc(100vw - 40px); }
+  /* the branch label gives way first; where even that leaves too little room, the words wrap, never cut */
+  details.pick > summary .gs { white-space: normal; max-width: calc(100vw - 9em); }
 }
 /* a past version: a command is shown as text, never selected whole by one click */
 html:has(#withheld .withheld) pre.cmd { user-select: text; -webkit-user-select: text; }
+/* printed, the Where button keeps its words, its list closed; the Version picker and the ▾ marks are the screen's */
 @media print {
-  .where details.pick { display: none; }
+  .where details.pick[data-pick="version"], .where ul.picks, .where .failed { display: none !important; }
+  .where details.pick > summary::before, .where details.pick > summary::after { content: none !important; }
 }

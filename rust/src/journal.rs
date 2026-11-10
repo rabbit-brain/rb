@@ -31,7 +31,7 @@ fn strip(s: &str) -> &str {
 // ---------------------------------------------------------------- the journal itself
 
 /// (the clone's shared git directory, this worktree's own, the project's place in the worktree), or None outside git.
-fn git_dirs(root: &Path) -> Option<(PathBuf, PathBuf, String)> {
+pub(crate) fn git_dirs(root: &Path) -> Option<(PathBuf, PathBuf, String)> {
     let out = git(root, &["rev-parse", "--git-common-dir", "--git-dir", "--show-prefix"])?;
     let lines: Vec<&str> = py_splitlines(&out);
     if lines.len() < 2 || strip(lines[0]).is_empty() {
@@ -2391,8 +2391,12 @@ fn found_in(led: &Ledger, st: &Dict, all_entries: &[Dict], dismissed: &HashSet<S
         .collect();
     let mut git_line: Option<String> = None;
     if let Some(g) = st.get("git").filter(|v| v.truthy()) {
-        let commit = g.get("commit").filter(|v| v.truthy()).map(|c| pyjson::py_str(c).chars().take(10).collect::<String>()).unwrap_or_else(|| "none".into());
-        git_line = Some(format!("seen at commit {commit}{}", if g.get("dirty").map_or(false, |v| v.truthy()) { ", tree dirty" } else { ", tree clean" }));
+        // the commit HEAD named when rb saw it; the look's own flag (tracked files changed) is no receipt's rule, so it
+        // is not said
+        git_line = Some(match g.get("commit").filter(|v| v.truthy()) {
+            Some(c) => format!("seen at commit {}", crate::checkout::short(&pyjson::py_str(c))),
+            None => "seen with no commit yet".into(),
+        });
     }
     let mut commands: HashMap<String, String> = HashMap::new();
     // everything the watched run that wrote a file last wrote, while that is the file's last change
@@ -2939,7 +2943,7 @@ impl Uncited {
         } else {
             "changed"
         };
-        let since = if self.since.is_empty() { self.start.to_string() } else { self.since.chars().take(7).collect() };
+        let since = if self.since.is_empty() { self.start.to_string() } else { crate::checkout::short(&self.since) };
         format!("{}: {what} since {since}{}; nothing in the record cites it", self.path, if self.git && !self.committed { ", not committed" } else { "" })
     }
 

@@ -84,7 +84,7 @@ def test_a_run_recorded_from_uncommitted_code_keeps_its_exact_code(repo, capsys)
     # and rb show says where it is and how to see it
     assert main(["show", env.data["object"]["id"]]) == 0
     text = capsys.readouterr().out
-    assert f"git tree {tree[:12]}" in text and f"git diff {attached['commit'][:12]} {tree[:12]}" in text
+    assert f"git tree {tree[:12]}" in text and f"git diff {attached['commit']} {tree}" in text
 
 
 def test_a_watched_command_keeps_the_code_it_ran_with(repo, capsys):

@@ -536,6 +536,7 @@ pub fn cmd_sync(hub_flag: Option<String>, with_record: bool, out: &mut Out) -> R
     for line in synced_words(&led, with_record, sent.code.as_ref(), false) {
         out.say(line);
     }
+    crate::cmds::share::page_says(&led, out);
     for (k, v) in sent.said {
         out.data.insert(k, v);
     }
@@ -569,7 +570,7 @@ fn synced_words(led: &Ledger, with_record: bool, code: Option<&Dict>, watching: 
     said
 }
 
-/// What a record sent says of its code: in the Rerun panel's words, the code the runs used, at its commit; or, where it
+/// What a record sent says of its code: in the Rerun panel's words, the code when the page was made, at its commit; or, where it
 /// names none, the line rb export says then (`export::CODE_UNNAMED`), so the two say one thing in one wording.
 fn code_words(code: Option<&Dict>) -> String {
     use crate::shell::strings as w;
@@ -577,9 +578,15 @@ fn code_words(code: Option<&Dict>) -> String {
     if url.is_empty() {
         return crate::export::CODE_UNNAMED.to_string();
     }
-    let commit: String = code.and_then(|c| c.get("commit")).map(py_str).unwrap_or_default().chars().take(10).collect();
+    let commit = crate::checkout::short(&code.and_then(|c| c.get("commit")).map(py_str).unwrap_or_default());
     let at = if commit.is_empty() { String::new() } else { format!("{}{commit}", w::AT_COMMIT) };
-    format!("{}{}{at}. Readers who rerun it get the code with the record.", w::CODE_THE_RUNS_USED, if at.is_empty() { crate::cli::address_said(&url) } else { url })
+    let mut said = format!("{}{}{at}. Readers who rerun it get the code with the record.", w::CODE_WHEN_MADE, if at.is_empty() { crate::cli::address_said(&url) } else { url });
+    // what the checkout changes of that commit, which a rerun does not get, as rb export says it
+    let changed: Vec<String> = code.and_then(|c| c.get("changed")).and_then(Value::as_list).map(|l| l.iter().map(py_str).collect()).unwrap_or_default();
+    if let Some(line) = crate::export::not_committed_said(&changed) {
+        said.push_str(&format!(" {line}"));
+    }
+    said
 }
 
 /// Whether a record sent names the code: by rb export's one rule (`export::readable_code_address`), over origin's
@@ -795,6 +802,7 @@ pub fn cmd_sync_watch(hub_flag: Option<String>, with_record: bool, out: &mut Out
     eprintln_err("Watching the record: rb sync sends it, privately, each time it changes, at most once a minute. Ctrl-C ends it.");
     let (mut sent, mut last, mut failed) = (None::<(Shown, Option<String>)>, None::<Instant>, 0usize);
     let mut looks = 0u32;
+    let mut said: Option<String> = None;
     loop {
         tick_test_clock(looks);
         looks += 1;
@@ -809,6 +817,12 @@ pub fn cmd_sync_watch(hub_flag: Option<String>, with_record: bool, out: &mut Out
                 continue;
             }
             Looked::Sent(shown, record) => {
+                // what the page says of the checkout, once, and again only when it changes
+                let line = crate::checkout::Checkout::of_page(&root).page_says();
+                if said.as_ref() != Some(&line) {
+                    eprintln_err(&format!("  {line}"));
+                    said = Some(line);
+                }
                 (sent, last, failed) = (Some((shown, record)), Some(Instant::now()), 0);
                 WATCH_EVERY
             }

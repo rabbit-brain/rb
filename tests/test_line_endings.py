@@ -6,6 +6,7 @@ verified setting moved, every indexed folder changed, every quote gone, every fi
 same text, and rb reads it as the same files: nothing is said to have changed, and what rb writes there does not flip
 the record for the next user on another system. Every name and number is synthetic (tests/fixtures/repo_study.py)."""
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -78,6 +79,15 @@ def said(rb) -> dict:
     status.pop("root")
     status["scope"].pop("looked_at")          # when rb looked, in each checkout
     status["scope"].pop("said")
+    # the evidence says when rb checked the record with git and the folder its command runs git in, in each checkout
+    repo = status["repository"]
+    repo.pop("checked_at")
+    repo.pop("check")
+    # rb prints the folder slashed on every OS (sys::slashed); json.dumps would double a backslash form's separators
+    cwd = str(Path.cwd().resolve())
+    folder = "|".join(re.escape(f) for f in {cwd.replace("\\", "/"), json.dumps(cwd)[1:-1]})
+    repo["evidence"] = json.loads(re.sub(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|\+00:00| UTC)?", "<when>",
+                                         re.sub(folder, "<the record's folder>", json.dumps(repo["evidence"]))))
     return {"status": status, "reconcile": rb("reconcile").data["repository"], "warm": rb("show", "warm").data,
             "transfer": rb("show", "warmup_transfer").data}
 

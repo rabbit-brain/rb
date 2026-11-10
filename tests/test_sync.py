@@ -169,6 +169,7 @@ def test_sync_uploads_the_page_alone_marked_private(hub, monkeypatch):
     monkeypatch.setenv("RB_HUB_TOKEN", "rb_testtoken")
     code, env = hub("sync")
     assert code == 0 and env.data["with_record"] is False
+    assert env.data["page_says"] == "The page says: no commit yet."
     assert env.data["url"].endswith("/u/t/sync-proj") and env.data["handle"] == "t" and "clone" not in env.data
     assert "visibility=private" in _Hub.received["path"]
     man = _Hub.received["manifest"]
@@ -194,6 +195,7 @@ def test_sync_with_the_record_uploads_the_bundle_with_its_real_address_and_says_
     assert ("The record keeps who made each write (human:<name> or agent:<name>, and the channel it came through), an agent's chat "
             "session, name, version, provider and model, the user's words passed with --words, and each run's host, platform and "
             "branch. Anyone who can open the copy can read all of it.") in said
+    assert "The page says: no commit yet.\n" in said
     assert main(["sync"]) == 0
     assert "Its page went alone" in capsys.readouterr().out
 
@@ -455,14 +457,18 @@ def test_a_record_synced_names_its_code_only_at_an_https_origin(hub, monkeypatch
             assert man["repo"]["url"] == named[origin] and man["repo"]["commit"] == head, (origin, man.get("repo"))
             page = next(b for n, b in files.items() if n.endswith("page.html")).decode("utf-8")
             assert named[origin] in page and "The runs need the code; this bundle doesn&#x27;t say where it is." not in page
-            assert f"The code the runs used: {named[origin]} at commit {head[:10]}. Readers who rerun it get the code with the record." in said
+            assert f"The code when this page was made: {named[origin]} at commit {head[:12]}. Readers who rerun it get the code with the record." in said
+            # the Rerun panel in the same words, and About's line 2 of this checkout, never of the copy rb sync built
+            # under $TMPDIR, which no git holds
+            assert f'The code when this page was made: <a href="{named[origin]}">{named[origin]}</a> at commit <span class="oid">{head[:12]}</span>. The record and' in page
+            assert f'<span><a href="#in-git">all record files committed</a> \u00b7 at commit {head[:12]}</span>' in page and "not in git" not in page
             assert "without the code" not in said
         else:
             assert "repo" not in man, (origin, man["repo"])
             assert b"github.com/ana" not in everything, origin
             assert ("The bundle names no address for the code: origin is not an https address a reader can fetch. A reader gets "
                     "the code with rb clone --code <address>.") in said, said
-            assert "The code the runs used" not in said
+            assert "The code when this page was made" not in said
     code, env = hub("sync", "--with-record")
     assert code == 0 and env.data["repo"] is None
     subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/ana/int8-resnet50.git"], check=True)
@@ -686,6 +692,11 @@ def test_watch_uploads_only_on_change(hub, monkeypatch):
         taken = _taken()
         assert all(b - a >= MINUTE * 0.95 for a, b in zip(taken, taken[1:])), taken
         assert len(w.said("Synced at")) == len(taken) and len(w.said("  Share it from")) == 1
+        # what the page says of the checkout: with the first sync, then only when it changes (a note's file, a commit),
+        # never for a results file the record does not hold
+        says = w.said("  The page says: ")
+        assert says[0].endswith(" record files not committed \u00b7 at commit " + says[0].rsplit(" ", 1)[1]) and len(says) >= 2, says
+        assert all(a != b for a, b in zip(says, says[1:])) and len(says) < len(taken), (says, taken)
     finally:
         w.end()
 

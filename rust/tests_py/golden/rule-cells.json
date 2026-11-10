@@ -130,7 +130,7 @@
    "exit": 0,
    "out": [
     "runp5h4s6 on e1: fp32.val_loss=0.8, int8.val_loss=0.8045 \u00b7 seed=1, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion not met \u00b7 point only: change.val_loss [where batch=32]: +0.5625 % \u00b7 relative change of the means, paired, 1 unit (rb)",
     "  c2 criterion not met \u00b7 point only: change.val_loss: +0.5625 % \u00b7 relative change of the means, paired, 1 unit (rb)",
@@ -150,7 +150,7 @@
    "exit": 0,
    "out": [
     "runqtdhpa on e1: fp32.val_loss=0.81, int8.val_loss=0.8145 \u00b7 seed=2, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion not met \u00b7 point only: change.val_loss [where batch=32]: +0.559 % \u00b7 relative change of the means, paired, 2 units (rb)",
     "  c2 criterion not met \u00b7 point only: change.val_loss: +0.559 % \u00b7 relative change of the means, paired, 2 units (rb)",
@@ -169,7 +169,7 @@
    "exit": 0,
    "out": [
     "run4teabd on e1: fp32.val_loss=0.79, int8.val_loss=0.7945 \u00b7 seed=3, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion not met \u00b7 loss: change.val_loss [where batch=32]: +0.5625 [+0.545, +0.58] % \u00b7 relative change of the means, paired, delta-method t interval, 3 units, 95% (rb)",
     "  c2 criterion not met \u00b7 loss: change.val_loss: +0.5625 [+0.545, +0.58] % \u00b7 relative change of the means, paired, delta-method t interval, 3 units, 95% (rb)",
@@ -188,7 +188,7 @@
    "exit": 0,
    "out": [
     "runf3hlli on e1: fp32.val_loss=0.8, int8.val_loss=0.8008 \u00b7 seed=1, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion not met \u00b7 loss: change.val_loss [where batch=32]: +0.5625 [+0.545, +0.58] % \u00b7 relative change of the means, paired, delta-method t interval, 3 units, 95% (rb)",
     "  c2 criterion undetermined \u00b7 point only: change.val_loss: +0.3312 % \u00b7 relative change of the means, descriptive mean across fixed design cells, 2 design cells (rb)",
@@ -207,7 +207,7 @@
    "exit": 0,
    "out": [
     "runedhdx7 on e1: fp32.val_loss=0.81, int8.val_loss=0.8108 \u00b7 seed=2, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion not met \u00b7 loss: change.val_loss [where batch=32]: +0.5625 [+0.545, +0.58] % \u00b7 relative change of the means, paired, delta-method t interval, 3 units, 95% (rb)",
     "  c2 criterion undetermined \u00b7 point only: change.val_loss: +0.3309 % \u00b7 relative change of the means, descriptive mean across fixed design cells, 2 design cells (rb)",
@@ -226,7 +226,7 @@
    "exit": 0,
    "out": [
     "runprswmo on e1: fp32.val_loss=0.79, int8.val_loss=0.7908 \u00b7 seed=3, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion not met \u00b7 loss: change.val_loss [where batch=32]: +0.5625 [+0.545, +0.58] % \u00b7 relative change of the means, paired, delta-method t interval, 3 units, 95% (rb)",
     "  c2 criterion undetermined \u00b7 point only: change.val_loss: +0.3312 % \u00b7 relative change of the means, descriptive mean across fixed design cells, 2 design cells (rb)",
@@ -607,6 +607,7 @@
    "out": [
     "cells",
     "Kept with rb since 2026-10-01. All 6 runs were recorded afterwards, not as they happened.",
+    "no commit yet",
     "",
     "Not filed under a question",
     "  c1      at most 0.5% at batch 32. change.val_loss [where batch=32]: +0.5625 [+0.545, +0.58] % \u00b7 relative change of the means, paired, delta-method t interval, 3 units, 95% (rb); loss: the interval clear of 0 on the worse side (lower is better); criterion not met: estimate +0.5625% > 0.5%; declared after the evidence existed: all 3 units were produced before it was declared.",
@@ -626,6 +627,8 @@
     "  - e1: 4 criteria were declared after their evidence existed",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work status --short --untracked-files=all -- .rb",
     "",
     "Rules",
     "  On every e1 criterion:",
@@ -687,6 +690,7 @@
    "out": [
     "rb-page.html written: the project as one file, readable anywhere; send it to anyone.",
     "It is the record as computed now; regenerate after new runs. If it ever disagrees with rb status, rb status is right.",
+    "The page says: no commit yet.",
     ""
    ],
    "err": [
@@ -1260,8 +1264,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "6f4e61405ebc2525661e75e785c60df954a58a16dbd6401492d1943d47d7221f",
-   "bytes": 271170
+   "sha256": "95beff6a47d4c1081ce2bc09b29d0c6dd590e62484303065603d4a7ff063854c",
+   "bytes": 272467
   }
  }
 }

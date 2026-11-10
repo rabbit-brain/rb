@@ -84,7 +84,7 @@
    "exit": 0,
    "out": [
     "runp5h4s6 on e1: base.val_bpb=1.4635, int8.val_bpb=1.1346 \u00b7 seed=1",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion not met \u00b7 point only: change.val_bpb: -22.47 % \u00b7 relative change of the means, paired, 1 seed (rb)",
     "",
@@ -123,7 +123,7 @@
    "exit": 0,
    "out": [
     "runqtdhpa on e1: base.val_bpb=1.4602, int8.val_bpb=1.1311 \u00b7 seed=2",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 estimate meets criterion \u00b7 point only: change.val_bpb: -22.51 % \u00b7 relative change of the means, paired, 2 seeds (rb)",
     "",
@@ -139,7 +139,7 @@
    "exit": 0,
    "out": [
     "run4teabd on e1: base.val_bpb=1.4651, int8.val_bpb=1.1362 \u00b7 seed=3",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion not met \u00b7 gain: change.val_bpb: -22.49 [-22.6, -22.37] % \u00b7 relative change of the means, paired, delta-method t interval, 3 seeds, 95% (rb)",
     "",
@@ -393,6 +393,7 @@
    "out": [
     "relative",
     "Kept with rb since 2026-10-01. All 3 runs were recorded afterwards, not as they happened.",
+    "no commit yet",
     "",
     "Not filed under a question",
     "  c1      INT8 improves val_bpb by 22.5% over base. change.val_bpb: -22.49 [-22.6, -22.37] % \u00b7 relative change of the means, paired, delta-method t interval, 3 seeds, 95% (rb); gain: the interval clear of 0 on the better side (lower is better); criterion not met: estimate -22.49% > -22.5%; declared after the evidence existed: all 3 units were produced before it was declared.",
@@ -407,6 +408,8 @@
     "  - e1: 1 criterion was declared after its evidence existed",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work status --short --untracked-files=all -- .rb",
     "",
     "Rules",
     "  c1      INT8 improves val_bpb by 22.5% over base",
@@ -439,6 +442,7 @@
    "out": [
     "rb-page.html written: the project as one file, readable anywhere; send it to anyone.",
     "It is the record as computed now; regenerate after new runs. If it ever disagrees with rb status, rb status is right.",
+    "The page says: no commit yet.",
     ""
    ],
    "err": [
@@ -729,8 +733,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "5605363c12ac12bd36c061dfcc59a69d8400dd24b042d6cbb416f3983e95173d",
-   "bytes": 211133
+   "sha256": "e5f71aeb71fb8d1c398ef81b173ccf113a61b2129d083dc095a1f70aeca368e3",
+   "bytes": 212406
   }
  }
 }

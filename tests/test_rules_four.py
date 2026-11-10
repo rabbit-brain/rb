@@ -808,3 +808,21 @@ def test_the_cells_list_says_a_count_s_cells_as_its_legend_and_units_in_the_plur
     assert 'class="iv"' not in lists["c4"] and "0.779659" not in text, lists["c4"]
     assert "[+0.545, +0.58]" in lists["cr"], lists["cr"]
     assert lists["c4"].count("3 units</span>") == 2 and lists["cr"].count("3 units</span>") == 2 and "3 unit<" not in text, lists
+
+
+def test_the_cells_list_says_a_best_of_n_s_cells_are_means(rb):
+    """MP-1108-1008 later 2: across design cells, the page's cells list for a best of N gave each cell's mean
+    ("batch 64 0.8008 3 units") under "each cell's own units", where the rule reads that cell's best unit, so a reader
+    could take the mean for the best. The list says its number is the mean, and what the rule reads; its digits stay
+    those of rb show's range and the figure."""
+    rb("spec", "set", "e1", "batch", "--per-run", "--design-factor")
+    rb("criterion", "add", "the best of 3 at most 0.81", "-e", "e1", "--metric", "int8.val_loss", "--at-most", "0.81", "--best", "--of", "3", "--id", "cb")
+    rb("criterion", "add", "4 of 6 at most 0.81", "-e", "e1", "--metric", "int8.val_loss", "--at-most", "0.81", "--count", "4", "--of", "6", "--id", "c4")
+    batches(rb, CELLS)
+    rb("page", "--out", "page.html")
+    text = Path("page.html").read_text(encoding="utf-8")
+    heads = dict(re.findall(r'<section class="part" id="c-(\w+):runs">.*?<p class="dim sm">(Within-cell units:[^<]*)</p><ul class="cells">', text))
+    assert heads["cb"] == "Within-cell units: each cell's mean over its own units; the rule reads each cell's best unit", heads
+    assert heads["c4"] == "Within-cell units: each cell's mean over its own units; the rule counts the units that meet it", heads
+    lists = dict(re.findall(r'<section class="part" id="c-(\w+):runs">.*?<ul class="cells">(.*?)</ul>', text))
+    assert "0.8045</a>" in lists["cb"], lists["cb"]

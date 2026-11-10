@@ -270,7 +270,7 @@ def test_a_reading_whose_runs_ran_other_code_says_which_from_the_receipts(repo, 
     import urllib.request
     from rbtest import Open
     fx = code_note_fixture(repo, capsys, monkeypatch)
-    at = f"{fx['commit'][:12]}, with uncommitted changes"
+    at = f"{fx['commit'][:12]}, with changes outside the record not committed"
     note = f"1 of 2 runs ran other code: exp-b · {listed_path('exp-b')} at {at}"
     [f] = rb(capsys, "status").data["findings"]
     assert f["other_code"] == note and f["observed"].startswith("1 of 2 runs was recorded in exp-b · ")
@@ -314,7 +314,7 @@ def test_the_notes_on_a_reading_say_a_worktree_removed_since_as_its_runs_do(repo
     fx = code_note_fixture(repo, capsys, monkeypatch)
     listed = listed_path("exp-b")
     git("worktree", "remove", "--force", str(fx["wt"]), cwd=repo)
-    at = f"{fx['commit'][:12]}, with uncommitted changes"
+    at = f"{fx['commit'][:12]}, with changes outside the record not committed"
     [f] = rb(capsys, "status").data["findings"]
     assert f["observed"] == f"1 of 2 runs was recorded in exp-b · {listed} (removed since)"
     assert f["other_code"] == f"1 of 2 runs ran other code: exp-b · {listed} (removed since) at {at}"
@@ -327,7 +327,7 @@ def test_the_notes_on_a_reading_say_a_worktree_removed_since_as_its_runs_do(repo
         server.close()
     [line] = [x for b in state["home"]["briefs"] for e in b["experiments"] for x in e["findings"] if x["criterion_id"] == "c1"]
     [run] = [r for r in state["home"]["runs"] if r["run_id"] == fx["there"]]
-    assert run["observed_in"]["label_short"] == f"recorded in exp-b · .worktrees/b at {at} (removed since)"
+    assert run["observed_in"]["label_short"] == "recorded in exp-b · .worktrees/b (removed since)"
     assert line["observed_short"] == "1 of 2 runs was recorded in exp-b · .worktrees/b (removed since)" and line["observed_places"] == []
     assert line["other_code"] == f"1 of 2 runs ran other code: exp-b · .worktrees/b (removed since) at {at}"
     assert f"1 of 2 runs ran other code: commit {at}" in page and "removed since" not in page
@@ -460,7 +460,7 @@ def test_runs_from_three_places_say_each_place_s_code(repo, capsys, monkeypatch)
     monkeypatch.chdir(repo)
     c_head = git("rev-parse", "HEAD", cwd=wt).strip()
     [f] = rb(capsys, "status").data["findings"]
-    assert f["other_code"] == (f"2 of 3 runs ran other code: 1 in exp-b · {listed_path('exp-b')} at {fx['commit'][:12]}, with uncommitted changes; "
+    assert f["other_code"] == (f"2 of 3 runs ran other code: 1 in exp-b · {listed_path('exp-b')} at {fx['commit'][:12]}, with changes outside the record not committed; "
                                f"1 in exp-c · {listed_path('exp-c')} at {c_head[:12]}")
 
 
@@ -481,7 +481,7 @@ def test_a_live_journal_run_on_changed_code_in_a_worktree_says_it_ran_other_code
     [f] = rb(capsys, "status").data["findings"]
     commit = git("rev-parse", "HEAD").strip()
     assert f["observed"].startswith("1 of 2 runs was recorded in exp-b · ")
-    assert f["other_code"] == f"1 of 2 runs ran other code: exp-b · {listed_path('exp-b')} at {commit[:12]}, with uncommitted changes"
+    assert f["other_code"] == f"1 of 2 runs ran other code: exp-b · {listed_path('exp-b')} at {commit[:12]}, with changes outside the record not committed"
 
 
 EVAL_PY = """import json, sys
@@ -547,7 +547,7 @@ def test_what_the_runs_wrote_is_not_code(repo, capsys, monkeypatch):
 
 def test_a_watched_command_on_changed_code_that_writes_a_file_says_it_ran_other_code(repo, capsys, monkeypatch):
     """A command rb journal run watched in a nested worktree with changed code ran the code the journal saw when it
-    started, whatever it wrote then: the reading says it ran other code, with uncommitted changes."""
+    started, whatever it wrote then: the reading says it ran other code, with changes outside the record not committed."""
     eval_committed(repo, capsys)
     rb(capsys, "run", "add", "e1", "fp32.top1=0.761", "int8.top1=0.758")
     wt = nested(repo)
@@ -558,7 +558,7 @@ def test_a_watched_command_on_changed_code_that_writes_a_file_says_it_ran_other_
     assert (wt / "eval.log").is_file()
     [f] = rb(capsys, "status").data["findings"]
     commit = git("rev-parse", "HEAD").strip()
-    assert f["other_code"] == f"1 of 2 runs ran other code: exp-b · {listed_path('exp-b')} at {commit[:12]}, with uncommitted changes"
+    assert f["other_code"] == f"1 of 2 runs ran other code: exp-b · {listed_path('exp-b')} at {commit[:12]}, with changes outside the record not committed"
 
 
 def test_runs_tied_across_places_are_said_by_the_code_they_ran(repo, capsys, monkeypatch):
@@ -1101,7 +1101,7 @@ def test_rb_open_and_rb_ui_name_a_file_in_a_linked_worktree_by_its_path_inside_i
         (f"{place}/out/config.yaml", "out/config.yaml", short, True), (f"{place}/out/metrics.json", "out/metrics.json", short, True)]
     row = runs[by_row]["receipt"]["row"]
     assert (row["path"], row["inside"], row["in_place"], row["recorded_there"]) == (f"{place}/results.db", "results.db", short, True)
-    assert runs[by_file]["observed_in"]["label_short"].startswith(f"recorded in {short} at ")      # the place, said once
+    assert runs[by_file]["observed_in"]["label_short"] == f"recorded in {short}"      # the place, said once, with no commit
     assert any(f.startswith("file: out/metrics.json · sha256 ") for f in card["facts"])
     assert f"paths as recorded: {place}/out/config.yaml, {place}/out/metrics.json" in card["facts"]
     assert any(f.startswith("row: read from results.db, table evals") for f in row_card["facts"]) and f"path as recorded: {place}/results.db" in row_card["facts"]
@@ -1140,11 +1140,11 @@ def test_shell_run_receipt_says_its_short_place_and_keeps_recorded_paths(repo, c
     try:
         doc = _shell(server.url)
         receipt = doc.at("run-" + by_file)
-        assert receipt.text.count("recorded in exp-wide · .worktrees/wide-sweep at ") == 1
+        assert receipt.text.count("recorded in exp-wide · .worktrees/wide-sweep") == 1
         assert ".worktrees/wide-sweep/out/config.yaml" in receipt.text
         assert ".worktrees/wide-sweep/out/metrics.json" in receipt.text
         row = doc.at("run-" + by_row)
-        assert row.text.count("recorded in exp-wide · .worktrees/wide-sweep at ") == 1
+        assert row.text.count("recorded in exp-wide · .worktrees/wide-sweep") == 1
         assert ".worktrees/wide-sweep/results.db" in row.text
     finally:
         server.close()

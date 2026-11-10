@@ -13,13 +13,14 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
 import pytest
 
 from rabbit_brain.models import Envelope
-from rbtest import Open, as_the_user, command, main
+from rbtest import Open, as_the_user, command, main, now
 
 HERE = Path(__file__).parent / "fixtures" / "shell"
 SCHEMA = Path(__file__).resolve().parents[1] / "schema" / "rb-v2.schema.json"
@@ -395,9 +396,239 @@ def test_a_checkout_is_only_of_the_code_a_receipt_holds(int8):
         s9 = int8.of_run(tier, "seed9")
         assert "git worktree" not in flat(s9) and later[:7] not in flat(s9), flat(s9)
         assert not s9["steps"][0]["runnable"] and s9["steps"][0]["what"] == "code"
-        assert [r["text"] for r in s9["ready"] if r["label"] == "code"] == [f"ok · commit {earlier[:10]}"]
+        assert [r["text"] for r in s9["ready"] if r["label"] == "code"] == [f"ok · commit {earlier[:12]}"]
         s10 = int8.of_run(tier, "seed10")
         assert s10["steps"][0]["command"] == f"git worktree add --detach ../e1-{later[:7]} {later}" and s10["steps"][0]["runnable"]
+
+
+class Yours:
+    """A repository with code (train.py, eval.py, quant/calibrate.py), the INT8 record and e1's run recorded from a
+    committed results file at a clean tree: rb show and rb open compare the checkout with the code that run ran."""
+
+    def __init__(self, run, tmp: Path) -> None:
+        self.run, self.tmp, self._n = run, tmp, 0
+
+    def ok(self, *argv: str, env: dict = None) -> dict:
+        r = self.run(*argv, "--json", env=env)
+        assert r.returncode in (0, 1), r.stderr
+        return json.loads(r.stdout)["data"]
+
+    def checkout(self, of: str = "e1", env: dict = None) -> list:
+        """rb show's checkout entries on the code row of what it takes to run `of` again."""
+        rows = [r for r in self.ok("show", of, env=env)["rerunnability"] if r["what"] == "code"]
+        return rows[0].get("checkout", []) if rows else []
+
+    def said(self, of: str = "e1", env: dict = None) -> list:
+        return [c["said"] for c in self.checkout(of, env)]
+
+    def document(self, tier: str, env: dict = None) -> dict:
+        self._n += 1
+        dump = self.tmp / f"{tier}-{self._n}.json"
+        e = {**(env or {}), "RB_TEST_SHELL": "1", "RB_TEST_SHELL_DUMP": str(dump)}
+        if tier == "owner":
+            self.run("page", "--out", str(self.tmp / f"page-{self._n}.html"), env=e)
+        else:
+            old = {k: os.environ.get(k) for k in e}
+            os.environ.update(e)
+            try:
+                server = Open()
+                try:
+                    urllib.request.urlopen(server.url + "/", timeout=60).read()
+                finally:
+                    server.close()
+            finally:
+                for k, v in old.items():
+                    os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+        return json.loads(dump.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def yours(workdir, monkeypatch, tmp_path_factory):
+    if not HAS_GIT:
+        pytest.skip("the record is played in a git repository")
+    as_the_user(monkeypatch, "RB_HUB_TOKEN", "RB_HUB_URL", "RB_TEST_SHELL", "RB_TEST_SHELL_DUMP", "RB_TEST_SHELL_MODEL")
+    cfg = tmp_path_factory.mktemp("gitconfig") / "config"
+    cfg.write_text("", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(cfg))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("RB_ACTOR", "human:ana")
+    monkeypatch.setenv("RB_TEST_SHELL", "1")        # rb open's / draws the shell
+    _git("init", "-q", "-b", "main")
+    _git("config", "user.email", "ana@example.org")
+    _git("config", "user.name", "ana")
+
+    def run(*argv, env=None):
+        return subprocess.run([*command(), *argv], env={**os.environ, **(env or {})}, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+
+    Path("quant").mkdir()
+    for f in ("train.py", "eval.py", "quant/calibrate.py"):
+        Path(f).write_text(f"# {f}\n", encoding="utf-8")
+    Path("results").mkdir()
+    Path("results/s1.json").write_text(json.dumps({"fp32": {"top1": 76.1}, "int8": {"top1": 75.7}}), encoding="utf-8")
+    y = Yours(run, tmp_path_factory.mktemp("documents"))
+    y.ok("init", "INT8 ResNet-50 on ImageNet")
+    y.ok("metric", "add", "top1", "--maximize")
+    y.ok("experiment", "add", "INT8 against FP32", "--id", "e1", "--purpose", "top-1 on the validation set", "--baseline", "fp32", "--candidate", "int8")
+    y.ok("criterion", "add", "INT8 loses at most a point of top-1", "-e", "e1", "--metric", "change.top1", "--at-least", "-1", "--id", "c1")
+    _git("add", "-A")
+    _git("commit", "-qm", "the code and the record")
+    y.commit = _git("rev-parse", "HEAD")
+    y.run_id = y.ok("run", "add", "e1", "--from", "results/s1.json")["object"]["id"]
+    _git("add", "-A")
+    _git("commit", "-qm", "the run")
+    return y
+
+
+def test_your_checkout_has_the_code_or_says_where_it_differs(yours):
+    """checkout_differs, every case: the same commit, clean, has this code; a tracked edit differs, naming the file;
+    put back while HEAD is a later commit of the record alone and a file added since, has it again; an untracked file
+    never counts; another commit with other code differs. rb show says it under the code step's label, with the diff and
+    the rebuild where it differs, and never offers git checkout or git restore."""
+    c = yours.commit
+    [entry] = yours.checkout()
+    assert entry["state"] == "same" and entry["said"] == "your checkout has this code" and entry["code"] == c and entry["runs"] == [yours.run_id]
+    assert entry["files"] == [] and entry["more"] == 0 and entry["diff"] == ""
+    text = yours.run("show", "e1").stdout
+    assert f"      code · commit {c[:12]}, which fp32 and int8 ran at\n      your checkout has this code\n" in text, text
+    # a tracked edit
+    Path("train.py").write_text("# train.py, edited\n", encoding="utf-8")
+    [entry] = yours.checkout()
+    diff = f'git diff {c} -- ":(top)" ":(top,exclude).rb"'
+    assert (entry["state"], entry["said"], entry["files"], entry["diff"]) == ("differs", "your checkout differs in 1 file: train.py", ["train.py"], diff)
+    text = yours.run("show", "e1").stdout
+    assert f"      your checkout differs in 1 file: train.py\n      show code diff:\n        {diff}\n      rebuild:\n        git worktree add --detach ../e1-{c[:7]} {c}\n" in text, text
+    assert "git checkout" not in text and "git restore" not in text
+    Path("eval.py").write_text("# eval.py, edited\n", encoding="utf-8")
+    Path("quant/calibrate.py").unlink()
+    assert yours.said() == ["your checkout differs in 3 files: eval.py, quant/calibrate.py and train.py"]
+    # put back, while HEAD is later: a note committed (the record alone) and a file added since
+    _git("checkout", "--", "train.py", "eval.py", "quant/calibrate.py")
+    yours.ok("note", "add", "the validation set is ImageNet-1k", "-e", "e1")
+    Path("NOTES.md").write_text("notes\n", encoding="utf-8")
+    _git("add", "-A")
+    _git("commit", "-qm", "a note and NOTES.md")
+    assert _git("rev-parse", "HEAD") != c
+    assert yours.said() == ["your checkout has this code"]
+    # untracked files never count, nor does a new results file
+    Path("scratch.py").write_text("x = 1\n", encoding="utf-8")
+    Path("results/s2.json").write_text("{}", encoding="utf-8")
+    assert yours.said() == ["your checkout has this code"]
+    # another commit with other code
+    Path("eval.py").write_text("# eval.py, v2\n", encoding="utf-8")
+    _git("commit", "-qam", "eval v2")
+    assert yours.said() == ["your checkout differs in 1 file: eval.py"]
+    # the run's own show says it under the checkout it was recorded in, which is the code it ran
+    lines = yours.run("show", yours.run_id).stdout.splitlines()
+    i = next(i for i, l in enumerate(lines) if l.startswith("  repository when recorded"))
+    assert lines[i + 1] == "    your checkout differs in 1 file: eval.py", lines
+    [entry] = yours.checkout(yours.run_id)
+    assert entry["anchor"] == "recorded" and entry["said"] == "your checkout differs in 1 file: eval.py"
+
+
+def test_past_three_files_your_checkout_names_three_and_counts_the_rest(yours):
+    """Fourteen files differ: three are named, then "and 11 more"; the data names ten and counts the rest."""
+    names = [f"m{i:02d}.py" for i in range(14)]
+    for n in names:
+        Path(n).write_text("v1\n", encoding="utf-8")
+    _git("add", "-A")
+    _git("commit", "-qm", "fourteen modules")
+    new = _git("rev-parse", "HEAD")
+    run = yours.ok("run", "add", "e1", "int8.top1=75.5", "fp32.top1=76.0", "--produced-at", now())["object"]["id"]
+    for n in names:
+        Path(n).write_text("v2\n", encoding="utf-8")
+    [entry] = yours.checkout(run)
+    assert entry["code"] == new
+    assert entry["said"] == "your checkout differs in 14 files: m00.py, m01.py, m02.py and 11 more"
+    assert entry["files"] == names[:10] and entry["more"] == 4
+
+
+def test_your_checkout_is_said_under_the_code_a_watched_run_ran(yours):
+    """A run rb journal run watched, during which a commit changed train.py: its receipt is at the later commit, and its
+    held code is the commit it started at. rb show <run> says your checkout under "code that made it", never under the
+    recording commit; rb open's run card draws the run's own code step and the line under it."""
+    Path("mid.py").write_text(
+        "import json, pathlib, subprocess\n"
+        "pathlib.Path('train.py').write_text('# train.py, changed while it ran\\n')\n"
+        "subprocess.run(['git', 'commit', '-qam', 'mid-run'], check=True)\n"
+        "print(json.dumps({'metrics': {'int8.top1': 75.2, 'fp32.top1': 76.0}}))\n", encoding="utf-8")
+    _git("add", "mid.py")
+    _git("commit", "-qm", "mid.py")
+    start = _git("rev-parse", "HEAD")
+    r = yours.run("journal", "run", "--", sys.executable, "mid.py")
+    assert r.returncode == 0, r.stderr
+    later = _git("rev-parse", "HEAD")
+    assert later != start
+    yours.ok("reconcile", "--apply")
+    runs = yours.ok("status")["runs"]
+    watched = next(x["id"] for x in runs if x["id"] != yours.run_id)
+    lines = yours.run("show", watched).stdout.splitlines()
+    i = next(i for i, l in enumerate(lines) if l.startswith("  code that made it:"))
+    assert start[:12] in lines[i] and lines[i + 1] == "    your checkout differs in 1 file: train.py", lines
+    j = next(i for i, l in enumerate(lines) if l.startswith("  repository when recorded"))
+    assert later[:12] in lines[j] and not any(l.startswith("    your checkout") for l in lines[j + 1:]), lines
+    [entry] = yours.checkout(watched)
+    assert (entry["anchor"], entry["code"]) == ("produced", start)
+    doc = yours.document("live")
+    step = doc["runs"][watched]["reproduce"]["code_step"]
+    assert step["label"] == f"code · commit {start[:12]}, which this run ran at" and step["checkout"]["said"] == "your checkout differs in 1 file: train.py"
+    page = urllib.request.urlopen  # the card as rb open draws it: the line directly under the run's own code step
+    server = Open()
+    try:
+        card = page(server.url + f"/o/run-{watched}.html", timeout=60).read().decode("utf-8")
+    finally:
+        server.close()
+    k = card.index(f"<p class=\"sm codestep\">{step['label']}</p>")
+    assert card[k:].split("</p>", 1)[1].startswith("<p class=\"yours\">"), card[k:k + 400]
+    assert 'data-fold="run-' in card[k:] and ":code-diff\"><summary>Show code diff</summary>" in card[k:]
+
+
+def test_your_checkout_on_rb_open_and_never_on_a_page(yours):
+    """rb open at its start place compares each runnable code step with your checkout (steps[].checkout, the line under
+    the step's label, a fold with the diff); a page has no viewer's checkout: no key, no line, no glossary entry."""
+    Path("train.py").write_text("# train.py, edited\n", encoding="utf-8")
+    live = yours.document("live")
+    [code] = [s for s in next(e for e in live["experiments"] if e["id"] == "e1")["reproduce"]["steps"] if s["what"] == "code"]
+    assert code["checkout"]["said"] == "your checkout differs in 1 file: train.py" and code["checkout"]["state"] == "differs"
+    assert all("checkout" in s for s in next(e for e in live["experiments"] if e["id"] == "e1")["reproduce"]["steps"])
+    owner = yours.document("owner")
+    assert not any("checkout" in s for e in owner["experiments"] for s in e["reproduce"]["steps"])
+    assert not any("code_step" in r["reproduce"] for r in owner["runs"].values())
+    html = next(yours.tmp.glob(f"page-{yours._n}.html")).read_text(encoding="utf-8")
+    assert "your checkout" not in html and "Show code diff" not in html
+
+
+def test_a_failing_git_is_said_and_never_read_as_the_same_code(yours, tmp_path):
+    """git fails on the comparison: rb says it could not compare your checkout, never nothing, never the same code."""
+    real = shutil.which("git")
+    wrap = tmp_path / "bin"
+    wrap.mkdir()
+    (wrap / "git").write_text(f'#!/bin/sh\ncase " $* " in *" diff "*"--name-status"*) echo "fatal: broken" >&2; exit 128;; esac\nexec "{real}" "$@"\n')
+    (wrap / "git").chmod(0o755)
+    if sys.platform == "win32":
+        pytest.skip("a shell script stands in for git")
+    env = {"PATH": f"{wrap}{os.pathsep}{os.environ['PATH']}"}
+    [entry] = yours.checkout(env=env)
+    assert (entry["state"], entry["said"]) == ("unknown", "rb could not compare your checkout")
+
+
+def test_a_reverted_edit_reads_as_the_same_code_again_on_rb_open(yours):
+    """rb open keys what it compared on the files its status lists: an edit, then the file put back, reads as this code
+    again once the places are listed again (about 15 s)."""
+    Path("train.py").write_text("# train.py, edited\n", encoding="utf-8")
+    server = Open()
+    try:
+        def line():
+            return urllib.request.urlopen(server.url + "/", timeout=60).read().decode("utf-8")
+        assert "differs in 1 file: <code>train.py</code>" in line()
+        key = json.loads(urllib.request.urlopen(server.url + "/digest.json", timeout=60).read())["key"]
+        _git("checkout", "--", "train.py")
+        deadline = time.monotonic() + 40
+        while json.loads(urllib.request.urlopen(server.url + "/digest.json", timeout=60).read())["key"] == key:
+            assert time.monotonic() < deadline, "the key never moved"
+            time.sleep(0.5)
+        assert "your checkout</span> has this code" in line()
+    finally:
+        server.close()
 
 
 def test_readiness_is_computed_on_each_read(int8):

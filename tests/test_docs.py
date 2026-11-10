@@ -533,7 +533,7 @@ def test_the_manual_says_which_writes_beside_an_unreadable_file_succeed_and_whic
     # MP-1108-0010 shoulds 1 and 2: criterion add and freeze beside an analysis's file succeed; a note's file refuses
     # only a write to that note; experiment.yaml refuses every write to its experiment; a metric's file refuses
     # numbers that name no variant as a criterion's does
-    assert "`rb criterion add`, `rb criterion relate` and `rb freeze` beside an analysis's file" in said and "already recorded (nothing written)" in said
+    assert "`rb criterion add`, `rb criterion relate` (a withdrawal with `--remove` too) and `rb freeze` beside an analysis's file" in said and "already recorded (nothing written)" in said
     assert "beside an experiment's note or a project note that does not read, every write leaves that note out" in said
     assert "only a write to that note itself (`rb retract <note>`) is refused" in said
     assert "beside an experiment's `experiment.yaml`, which declares its variants, every write to that experiment" in said
@@ -542,7 +542,7 @@ def test_the_manual_says_which_writes_beside_an_unreadable_file_succeed_and_whic
     assert "`rb question add --parent` of it succeeds" in said and "a write that links that question" not in said
     # MP-1108-0425: criterion relate beside an analysis's file and a note's retraction beside a criterion's are made
     # whole; the refused list names question move, decide on a question, resource locate and criterion relate
-    assert "`rb criterion add`, `rb criterion relate` and `rb freeze` beside an analysis's file" in said
+    assert "`rb criterion add`, `rb criterion relate` (a withdrawal with `--remove` too) and `rb freeze` beside an analysis's file" in said
     assert "`rb retract` of a note beside a criterion's file" in said and "(a note's retraction aside)" in said
     assert "`rb question reword` and `rb question move` of it, and `rb decide` on it" in said
     assert "`rb resource expose` and `rb resource locate` of it" in said and "`rb criterion file`, `rb criterion relate`, `rb spec set`" in said
@@ -552,4 +552,13 @@ def test_the_manual_says_which_writes_beside_an_unreadable_file_succeed_and_whic
 def test_the_manual_says_a_command_run_inside_another_tells_nothing_of_its_own():
     """Codex S4 should: the run add that rb reconcile --apply runs told the session's facts into a reply nobody read."""
     assert "A command rb runs inside another (the `rb run add` that `rb reconcile --apply` runs for each run it records) tells nothing of its own" in DOC
-    assert "which tells what it would tell were that note readable, and that the note's file changed outside rb" in DOC
+    assert "tells what it would tell were that note readable, and that the note's file changed outside rb" in DOC
+
+
+def test_the_manual_says_two_rules_of_what_changed_apart():
+    """MP-1108-0809 later 3: the manual joined "the enclosing command tells it" and a write beside a broken note with
+    "and so does", which read as if that write told the inner command's facts. Each is its own sentence, and a read
+    beside such a note is said too."""
+    assert "the enclosing command tells it, and so does" not in DOC
+    assert "the enclosing command tells it. A command beside a note's file that does not read" in DOC
+    assert "a read that stops at that file fails, and tells nothing" in DOC

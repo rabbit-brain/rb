@@ -2,7 +2,7 @@
 
 Promises pinned here:
 
-- Each worktree git lists is one place, named by its branch and path as git gives them (a detached one by its commit),
+- Each worktree git lists is one place, named by its branch and path as git gives them (a detached one "no branch"),
   with an id that is its path's, and what its record is to the record shown first: this, its own, none of its own (it
   writes to this record), a separate project's, or none; and whether it is gone. Each says its own counts: record
   files not committed, the last write (the log's time, never who made it), and for a place that writes to this
@@ -14,7 +14,9 @@ Promises pinned here:
 """
 import hashlib
 import json
+import re
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -22,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from rabbit_brain import _rb
-from rbtest import PLACES_AGENT, as_the_user, places_record
+from rbtest import PLACES_AGENT, Places, as_the_user, command, places_record
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="places are git's worktrees")
 
@@ -95,12 +97,14 @@ def test_a_record_s_versions_are_its_commits_by_sha_and_time(rec):
     answer = places(rec.root)
     [v] = answer["versions"]                                     # one commit changed .rb/ on main
     sha = rec.git("rev-parse", "HEAD")
-    assert set(v) == {"sha", "committed", "label", "shown", "shown_short", "note"} and v["sha"] == sha and v["note"] == ""
+    assert set(v) == {"sha", "committed", "label", "shown", "shown_short", "shown_day", "note"} and v["sha"] == sha and v["note"] == ""
     # git's own time, with UTC written +00:00 whichever way this git writes it
     made = rec.git("show", "-s", "--format=%cI", sha)
     assert v["committed"] == (made[:-1] + "+00:00" if made.endswith("Z") else made)
     assert v["label"].startswith(sha[:12] + " · 20") and v["shown"].startswith(f"main · {rec.root.resolve().as_posix()} at {sha[:12]}, 20")
     assert v["label"].endswith(" UTC") and v["shown"].endswith(" UTC: a past version, read only")
+    # rb ui's line names it by the UTC day it was committed, with no commit: one version listed, so no minute
+    assert v["shown_day"] == f"main · {rec.root.resolve().as_posix()} as of {v['label'].split(' · ')[1][:10]} · read only"
     text = json.dumps(answer["versions"])
     assert "the record, as of" not in text and "ana" not in text           # never a commit's subject or its author
     # a place's versions are its own record's: the sibling's branch has the same commit, the separate project none
@@ -158,16 +162,74 @@ def test_three_worktrees_are_listed_quickly(tmp_path, monkeypatch):
     assert min(took) < (1.5 if sys.platform == "win32" else 0.3), took
 
 
-def test_a_single_checkout_says_its_counts_as_it_always_has(tmp_path, monkeypatch):
-    """With more than one place, each says what its counts count (record files not committed); a single checkout says
-    its own as it always has, since its screens read exactly as before places were listed."""
+def test_a_single_checkout_says_its_counts_in_the_same_words(tmp_path, monkeypatch):
+    """Every place says what its counts count in the same words (record files not committed), a single checkout too:
+    a note is 2, its file and the log."""
     as_the_user(monkeypatch)
     rec = places_record(tmp_path)
     rec.rb("note", "add", "the fp32 baseline is from the paper")
-    [main] = [p for p in places(rec.root)["places"] if p["record"] == "this"]
+    listed = places(rec.root)["places"]
+    [main] = [p for p in listed if p["record"] == "this"]
     assert main["said"].startswith("this record · 2 record files not committed · last write ")
+    # rb ui prints the strings rb made: the face under its head, the row in w, the fold under w's list
+    assert main["face"] == "main · 2 record files not committed"
+    assert main["row"] == f"{main['label_short']}: {main['said']}"
+    head = rec.git("rev-parse", "HEAD")
+    assert main["fold"] == [main["path"], f"at commit {head[:12]}"]
+    assert all(p["face"] == "" for p in listed if p["checkout"] is None)
     for branch in ("exp-b", "exp-c", "exp-s", "exp-n"):
         rec.git("worktree", "remove", "--force", str(rec.tree[branch]))
     rec.git("worktree", "prune")
     [alone] = places(rec.root)["places"]
-    assert alone["said"].startswith("this record · 2 not committed · last write "), alone
+    assert alone["said"].startswith("this record · 2 record files not committed · last write "), alone
+    assert alone["checkout"]["said"] == "2 record files not committed" and alone["checkout"]["name"] == "main"
+    assert alone["face"] == "main · 2 record files not committed" and alone["row"] == f"{alone['label']}: {alone['said']}"
+
+
+def test_a_rename_counts_once_and_a_deletion_counts(rec):
+    """One count of a place's record files: a record file renamed and staged is one file, a deleted one counts."""
+    rec.git("mv", ".rb/metrics/top1.yaml", ".rb/metrics/top1-old.yaml")
+    main = by_branch(places(rec.root))["main"]
+    assert (main["uncommitted"], main["checkout"]["said"]) == (1, "1 record file not committed")
+    assert main["said"].startswith("this record · 1 record file not committed · last write ")
+    rec.git("mv", ".rb/metrics/top1-old.yaml", ".rb/metrics/top1.yaml")
+    (rec.root / ".rb" / "log.jsonl").rename(rec.base / "log.jsonl")
+    main = by_branch(places(rec.root))["main"]
+    assert (main["uncommitted"], main["checkout"]["said"]) == (1, "1 record file not committed")
+
+
+def test_rb_remove_and_elsewhere_count_as_the_place_does(rec):
+    """The sibling's run not committed is 2 record files (the run's and the log) on its place, in rb status's
+    Elsewhere and in rb remove's plan, in the same words."""
+    c = by_branch(places(rec.root))["exp-c"]
+    assert (c["uncommitted"], c["checkout"]["said"]) == (2, "2 record files not committed")
+    status = rec.rb("status")
+    [there] = [e for e in status["elsewhere"] if e.get("branch") == "exp-c"]
+    assert there["uncommitted"] == 2
+    text = subprocess.run([*command(), "status"], cwd=rec.root, env=rec.env, capture_output=True, text=True).stdout
+    assert f"  exp-c · {there['path']} at " in text and "1 run on e1 (int8 against fp32) · 2 record files not committed" in text, text
+    plan = rec.rb("remove", "--dry-run", cwd=rec.tree["exp-c"])
+    assert plan["uncommitted"] == 2
+    out = subprocess.run([*command(), "remove", "--dry-run"], cwd=rec.tree["exp-c"], env=rec.env, capture_output=True, text=True).stdout
+    assert "\n2 record files not committed. To keep a copy first, run: rb export --with-record " in out, out
+
+
+def test_a_detached_place_is_no_branch(rec):
+    """A detached worktree is named "no branch" and its path, never by its commit."""
+    rec.git("checkout", "-q", "--detach", cwd=rec.tree["exp-c"])
+    [c] = [p for p in places(rec.root)["places"] if p["path"] == rec.tree["exp-c"].as_posix()]
+    assert c["branch"] is None and c["label"] == f"no branch · {c['path']}" and c["checkout"]["name"] == "no branch"
+    assert rec.git("rev-parse", "HEAD", cwd=rec.tree["exp-c"])[:12] not in c["label_short"]
+
+
+def test_a_record_git_ignores_is_said_ignored(tmp_path, monkeypatch):
+    """A .rb/ the repository's .gitignore keeps out of git is said as ignored on its place, never as committed."""
+    as_the_user(monkeypatch)
+    rec = Places(tmp_path)
+    rec.root.mkdir()
+    rec.git("init", "-q")
+    rec.rb("init", "INT8 ResNet-50 on ImageNet", "--no-agents")
+    (rec.root / ".gitignore").write_text(".rb/\n", encoding="utf-8")
+    [alone] = places(rec.root)["places"]
+    assert re.match(r"this record · \d+ record files ignored by git · last write ", alone["said"]), alone
+    assert alone["checkout"]["state"] == "ignored" and alone["checkout"]["ignored_by"] == ".gitignore:1:.rb/"

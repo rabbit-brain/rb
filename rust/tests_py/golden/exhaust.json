@@ -147,7 +147,7 @@
    "exit": 0,
    "out": [
     "runp5h4s6 on e1: base.top1=0.7, wide.top1=0.74",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
     "  c1 estimate meets criterion \u00b7 point only: wide.top1: 0.74 \u00b7 mean, 1 run (rb)",
     "  rb put the code in git at refs/rb/snapshots/87390d922376c91b74ab0a5fc455b62542ea44b0, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/87390d922376c91b74ab0a5fc455b62542ea44b0 removes it.",
@@ -164,7 +164,7 @@
    "exit": 0,
    "out": [
     "runqtdhpa on e1: base.top1=0.7, wide.top1=0.74",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runqtdhpa --why \"<when they were made>\"",
     "  c1 estimate meets criterion \u00b7 point only: wide.top1: 0.74 \u00b7 mean, 2 runs (rb)",
     "  --command is kept as given and reads as a command given later, not observed: when it was made is unknown, and neither rb's journal nor a log line written then shows this command made it. A command from a README, a paper or a script is a recipe: put it in a note with its file and line. A log line written when it ran that records the launch is cited with --command-source <file>:<line>.",

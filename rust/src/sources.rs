@@ -234,6 +234,74 @@ pub fn run(program: &str, args: &[&str], cwd: Option<&Path>, env: &[(&str, &str)
     }
 }
 
+/// How a git call went, when it could not be asked at all: git is not there to run, or it did not answer in time.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GitFail {
+    NotFound,
+    TimedOut,
+}
+
+/// A git call's whole answer: its exit code, its output and its first line on standard error.
+pub struct GitRan {
+    pub code: i32,
+    pub stdout: Vec<u8>,
+    pub first_err: String,
+}
+
+/// A git command run in `cwd` that says why it failed: git missing, git out of time, or git's exit code with its first
+/// line on standard error, as git gives it. GIT_OPTIONAL_LOCKS=0, as for every git rb runs. Never memoised.
+pub fn git_full(cwd: &Path, args: &[&str], input: Option<&[u8]>) -> Result<GitRan, GitFail> {
+    let mut c = Command::new("git");
+    c.arg("-C").arg(cwd).args(args).stdout(Stdio::piped()).stderr(Stdio::piped()).env("GIT_OPTIONAL_LOCKS", "0");
+    c.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() });
+    let mut child = c.spawn().map_err(|_| GitFail::NotFound)?;
+    if let Some(data) = input {
+        if let Some(mut stdin) = child.stdin.take() {
+            let data = data.to_vec();
+            std::thread::spawn(move || {
+                let _ = stdin.write_all(&data);
+            });
+        }
+    }
+    let mut out = child.stdout.take().ok_or(GitFail::NotFound)?;
+    let mut err = child.stderr.take().ok_or(GitFail::NotFound)?;
+    let reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = out.read_to_end(&mut buf);
+        buf
+    });
+    let ereader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = err.read_to_end(&mut buf);
+        buf
+    });
+    let start = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let stdout = reader.join().unwrap_or_default();
+                let stderr = ereader.join().unwrap_or_default();
+                let first_err = String::from_utf8_lossy(&stderr).lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("").to_string();
+                return Ok(GitRan { code: status.code().unwrap_or(-1), stdout, first_err });
+            }
+            Ok(None) => {
+                if start.elapsed() > git_timeout() {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(GitFail::TimedOut);
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            Err(_) => return Err(GitFail::NotFound),
+        }
+    }
+}
+
+/// How long rb waits for git: 30 s (RB_TEST_GIT_TIMEOUT_MS in rb's own tests).
+fn git_timeout() -> Duration {
+    std::env::var("RB_TEST_GIT_TIMEOUT_MS").ok().and_then(|v| v.parse::<u64>().ok()).map(Duration::from_millis).unwrap_or(Duration::from_secs(30))
+}
+
 thread_local! {
     /// What git answered while this command line ran, and what it would not answer: a question asked again is not put
     /// to git again.
@@ -446,21 +514,38 @@ pub fn git_state(root: &Path, exclude: &str) -> Option<Dict> {
     Some(state)
 }
 
+/// Whether the checkout at `root` has changes outside the record (`exclude`, its folder) not committed, by a receipt's
+/// own rule: what git_state calls dirty, asked alone. None where git cannot say.
+pub fn code_changed(root: &Path, exclude: &str) -> Option<bool> {
+    let top = git_top(root)?;
+    let spec = code_pathspec(root, exclude, &top);
+    let mut args = vec!["status", "--porcelain", "--untracked-files=all"];
+    args.extend(spec.iter().map(|s| s.as_str()));
+    git(root, &args).map(|s| !s.trim().is_empty())
+}
+
 /// What a receipt's code is: the whole worktree from its top, but the record's own directory and the other worktrees of
 /// this clone nested in it, which are checkouts of their own, not this one's code.
-fn code_pathspec(root: &Path, exclude: &str, top: &Path) -> Vec<String> {
+pub fn code_pathspec(root: &Path, exclude: &str, top: &Path) -> Vec<String> {
+    let trees: Vec<PathBuf> = git(top, &["worktree", "list", "--porcelain"])
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| l.strip_prefix("worktree "))
+        .map(|listed| resolve_path(Path::new(listed)))
+        .collect();
+    code_pathspec_in(root, exclude, top, &trees)
+}
+
+/// code_pathspec where the caller already has the clone's worktrees (resolved), as rb's places do.
+pub fn code_pathspec_in(root: &Path, exclude: &str, top: &Path, trees: &[PathBuf]) -> Vec<String> {
     let skip = rel_to(&resolve_path(&root.join(exclude)), top).unwrap_or_else(|| exclude.to_string());
     let mut spec = vec!["--".to_string(), ":(top)".to_string(), format!(":(top,exclude){skip}")];
     for rel in rb_written(root, top) {
         spec.push(format!(":(top,exclude,literal){rel}"));
     }
-    for line in git(top, &["worktree", "list", "--porcelain"]).unwrap_or_default().lines() {
-        let Some(listed) = line.strip_prefix("worktree ") else { continue };
-        let path = resolve_path(Path::new(listed));
-        if path != top {
-            if let Some(rel) = rel_to(&path, top).filter(|r| !r.is_empty()) {
-                spec.push(format!(":(top,exclude,literal){rel}"));
-            }
+    for path in trees.iter().filter(|p| p.as_path() != top) {
+        if let Some(rel) = rel_to(path, top).filter(|r| !r.is_empty()) {
+            spec.push(format!(":(top,exclude,literal){rel}"));
         }
     }
     spec

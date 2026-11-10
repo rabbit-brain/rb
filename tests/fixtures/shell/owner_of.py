@@ -15,6 +15,11 @@ QUOTED = re.compile(r' · "[^"]*"$')  # the user's own words at the end of a cal
 doc["tier"], doc["surface"] = "owner", "page"                # the envelope: who it is for, and where it is drawn
 doc.pop("digest", None)
 doc.pop("places", None)                                      # place line, pickers, scope bar, Elsewhere: Live only
+c = doc["checkout"]                                          # a page's checkout: its words and commit, no branch or rule
+doc["checkout"] = {"state": c["state"], "said": c["said"], "commit": c["commit"], "line": c["page_line"]}
+for k in ("record_files", "page_evidence"):                  # About's block; the evidence, check and names: Live only
+    if k in c:
+        doc["checkout"][k] = c[k]
 for f in doc["findings"].values():
     f["your_words"] = ""                                     # the user's words: never on a page
     f["observed"], f["observed_short"], f["observed_places"] = "", "", []  # a place's path and name: Live only
@@ -32,6 +37,13 @@ for r in doc["runs"].values():
         if k in r:
             r[k] = None
     r["receipt_rows"] = [row for row in r["receipt_rows"] if row[0] != "platform"]  # the OS string: Live only
+for x in doc["experiments"]:                                 # your checkout against the code a step names: rb open only
+    for st in x["reproduce"]["steps"]:
+        st.pop("checkout", None)
+for r in doc["runs"].values():                               # the run's own code step and your checkout under it: rb open only
+    r["reproduce"].pop("code_step", None)
+    for st in r["reproduce"]["steps"]:
+        st.pop("checkout", None)
 for c in doc.get("citations", {}).values():
     c["open_url"] = ""                                       # a link to the file on this machine: rb open only
 for res in doc["resources"].values():

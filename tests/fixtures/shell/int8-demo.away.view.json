@@ -1,5 +1,5 @@
 {
- "contract": "rb-shell-view/1.14",
+ "contract": "rb-shell-view/1.16",
  "surface": "open",
  "tier": "live",
  "rb_version": "0.6.0",
@@ -2254,7 +2254,8 @@
       ],
       "command": "python get_data.py --split val",
       "from": "scripts/README.md:5",
-      "runnable": true
+      "runnable": true,
+      "checkout": null
      },
      {
       "n": 2,
@@ -2265,7 +2266,8 @@
       ],
       "command": "python get_data.py --calib 512",
       "from": "scripts/README.md:6",
-      "runnable": true
+      "runnable": true,
+      "checkout": null
      },
      {
       "n": 3,
@@ -2277,7 +2279,8 @@
       ],
       "command": "python quantize.py --seed 1 --calib 512",
       "from": "scripts/README.md:8",
-      "runnable": true
+      "runnable": true,
+      "checkout": null
      },
      {
       "n": 4,
@@ -2289,7 +2292,8 @@
       ],
       "command": "",
       "from": "",
-      "runnable": false
+      "runnable": false,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -2492,7 +2496,7 @@
    ],
    "muted": [],
    "folder": "results/calib/",
-   "repo_brief": "commit 3f2a9c1 · tree dirty",
+   "repo_brief": "commit 3f2a9c1, with changes outside the record not committed",
    "design": {
     "standing": "design not confirmed",
     "pending": true,
@@ -2861,7 +2865,7 @@
     },
     {
      "state": "unknown",
-     "what": "code: commit 3f2a9c1, tree dirty"
+     "what": "code: commit 3f2a9c1, with changes outside the record not committed"
     }
    ],
    "reproduce": {
@@ -2878,7 +2882,7 @@
      {
       "state": "unknown",
       "label": "code",
-      "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty",
+      "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed",
       "refs": []
      }
     ],
@@ -2892,7 +2896,8 @@
       ],
       "command": "python get_data.py --split val",
       "from": "scripts/README.md:5",
-      "runnable": true
+      "runnable": true,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -2944,7 +2949,7 @@
       "line": "fp32 and int8 · calib images 512: the same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1."
      }
     ],
-    "script": "# Recipe, from what the record holds. rb did not run these commands.\n# code: commit 3f2a9c1 · tree dirty (when recorded, not when run)\npython get_data.py --split val\n# command (as given): not recorded\n",
+    "script": "# Recipe, from what the record holds. rb did not run these commands.\n# code: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\npython get_data.py --split val\n# command (as given): not recorded\n",
     "commands": [],
     "prompt": "run one more top1 measurement on calibration set size, at calib_images=256, and record it in rb"
    },
@@ -3000,7 +3005,7 @@
     ],
     [
      "repository",
-     "when recorded, not when run: commit 3f2a9c1 · tree clean",
+     "when recorded, not when run: commit 3f2a9c1",
      []
     ],
     [
@@ -3073,8 +3078,8 @@
    ],
    "retracted": null,
    "observed_in": {
-    "label": "recorded in main · /home/ana/int8-resnet50 at 3f2a9c1",
-    "label_short": "recorded in main · ~/int8-resnet50 at 3f2a9c1",
+    "label": "recorded in main · /home/ana/int8-resnet50",
+    "label_short": "recorded in main · ~/int8-resnet50",
     "commit": "3f2a9c1",
     "dirty": false,
     "gone": false,
@@ -3128,7 +3133,8 @@
       "command": "python get_data.py --split val",
       "from": "scripts/README.md:5",
       "runnable": true,
-      "n": 1
+      "n": 1,
+      "checkout": null
      },
      {
       "what": "get the calibration images",
@@ -3139,7 +3145,8 @@
       "command": "python get_data.py --calib 512",
       "from": "scripts/README.md:6",
       "runnable": true,
-      "n": 2
+      "n": 2,
+      "checkout": null
      },
      {
       "what": "make the int8 model",
@@ -3151,7 +3158,8 @@
       "command": "python quantize.py --seed 1 --calib 512",
       "from": "scripts/README.md:8",
       "runnable": true,
-      "n": 3
+      "n": 3,
+      "checkout": null
      },
      {
       "what": "evaluate both arms",
@@ -3162,7 +3170,8 @@
       "command": "",
       "from": "",
       "runnable": false,
-      "n": 4
+      "n": 4,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -3239,7 +3248,8 @@
     ],
     "script": "# Reproduce a run of e1 · fp32 and int8 · seed 1\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# training data · imagenet-calib-512 · scripts/README.md:6\npython get_data.py --calib 512\n# per run: seed 1 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n# fp32 and int8 · seed 1: made ckpt-int8-s1. How to get it again:\npython quantize.py --seed 1 --calib 512\n",
     "commands": [],
-    "prompt": ""
+    "prompt": "",
+    "code_step": null
    }
   },
   "runs2": {
@@ -3306,8 +3316,8 @@
     "why": "evaluated on the train split"
    },
    "observed_in": {
-    "label": "recorded in main · /home/ana/int8-resnet50 at 3f2a9c1",
-    "label_short": "recorded in main · ~/int8-resnet50 at 3f2a9c1",
+    "label": "recorded in main · /home/ana/int8-resnet50",
+    "label_short": "recorded in main · ~/int8-resnet50",
     "commit": "3f2a9c1",
     "dirty": false,
     "gone": false,
@@ -3344,7 +3354,8 @@
       "command": "",
       "from": "",
       "runnable": false,
-      "n": 1
+      "n": 1,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -3412,7 +3423,8 @@
     "made": [],
     "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
     "commands": [],
-    "prompt": ""
+    "prompt": "",
+    "code_step": null
    }
   },
   "runs2b": {
@@ -3481,8 +3493,8 @@
    "made": [],
    "retracted": null,
    "observed_in": {
-    "label": "recorded in main · /home/ana/int8-resnet50 at 3f2a9c1",
-    "label_short": "recorded in main · ~/int8-resnet50 at 3f2a9c1",
+    "label": "recorded in main · /home/ana/int8-resnet50",
+    "label_short": "recorded in main · ~/int8-resnet50",
     "commit": "3f2a9c1",
     "dirty": false,
     "gone": false,
@@ -3527,7 +3539,8 @@
       "command": "python get_data.py --split val",
       "from": "scripts/README.md:5",
       "runnable": true,
-      "n": 1
+      "n": 1,
+      "checkout": null
      },
      {
       "what": "evaluate both arms",
@@ -3538,7 +3551,8 @@
       "command": "",
       "from": "",
       "runnable": false,
-      "n": 2
+      "n": 2,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -3606,7 +3620,8 @@
     "made": [],
     "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2, recorded 2026-10-13 14:12 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
     "commands": [],
-    "prompt": ""
+    "prompt": "",
+    "code_step": null
    }
   },
   "runs3": {
@@ -3710,7 +3725,8 @@
       "command": "python get_data.py --split val",
       "from": "scripts/README.md:5",
       "runnable": true,
-      "n": 1
+      "n": 1,
+      "checkout": null
      },
      {
       "what": "evaluate both arms",
@@ -3721,7 +3737,8 @@
       "command": "python train.py --seed 3 --quant int8",
       "from": "runs3",
       "runnable": true,
-      "n": 2
+      "n": 2,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -3795,7 +3812,8 @@
       "observed": true
      }
     ],
-    "prompt": ""
+    "prompt": "",
+    "code_step": null
    }
   },
   "runsql7": {
@@ -3867,8 +3885,8 @@
    "made": [],
    "retracted": null,
    "observed_in": {
-    "label": "recorded in main · /home/ana/int8-resnet50 at 3f2a9c1",
-    "label_short": "recorded in main · ~/int8-resnet50 at 3f2a9c1",
+    "label": "recorded in main · /home/ana/int8-resnet50",
+    "label_short": "recorded in main · ~/int8-resnet50",
     "commit": "3f2a9c1",
     "dirty": false,
     "gone": false,
@@ -3905,7 +3923,8 @@
       "command": "python bench.py --t4",
       "from": "runsql7",
       "runnable": true,
-      "n": 1
+      "n": 1,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -3961,7 +3980,8 @@
       "observed": false
      }
     ],
-    "prompt": ""
+    "prompt": "",
+    "code_step": null
    }
   },
   "runc128": {
@@ -4013,8 +4033,8 @@
    "made": [],
    "retracted": null,
    "observed_in": {
-    "label": "recorded in main · /home/ana/int8-resnet50 at 3f2a9c1",
-    "label_short": "recorded in main · ~/int8-resnet50 at 3f2a9c1",
+    "label": "recorded in main · /home/ana/int8-resnet50",
+    "label_short": "recorded in main · ~/int8-resnet50",
     "commit": "3f2a9c1",
     "dirty": false,
     "gone": false,
@@ -4039,7 +4059,7 @@
      {
       "state": "unknown",
       "label": "code",
-      "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty",
+      "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed",
       "refs": []
      }
     ],
@@ -4053,7 +4073,8 @@
       "command": "python get_data.py --split val",
       "from": "scripts/README.md:5",
       "runnable": true,
-      "n": 1
+      "n": 1,
+      "checkout": null
      },
      {
       "what": "evaluate both arms",
@@ -4064,7 +4085,8 @@
       "command": "",
       "from": "",
       "runnable": false,
-      "n": 2
+      "n": 2,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -4095,9 +4117,10 @@
      "line": "the run records no command (as given)"
     },
     "made": [],
-    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 128\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 128\n# command (as given): not recorded\n",
+    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 128\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 128\n# command (as given): not recorded\n",
     "commands": [],
-    "prompt": ""
+    "prompt": "",
+    "code_step": null
    }
   },
   "runc512": {
@@ -4158,8 +4181,8 @@
    "made": [],
    "retracted": null,
    "observed_in": {
-    "label": "recorded in main · /home/ana/int8-resnet50 at 3f2a9c1",
-    "label_short": "recorded in main · ~/int8-resnet50 at 3f2a9c1",
+    "label": "recorded in main · /home/ana/int8-resnet50",
+    "label_short": "recorded in main · ~/int8-resnet50",
     "commit": "3f2a9c1",
     "dirty": false,
     "gone": false,
@@ -4184,7 +4207,7 @@
      {
       "state": "unknown",
       "label": "code",
-      "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty",
+      "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed",
       "refs": []
      }
     ],
@@ -4198,7 +4221,8 @@
       "command": "python get_data.py --split val",
       "from": "scripts/README.md:5",
       "runnable": true,
-      "n": 1
+      "n": 1,
+      "checkout": null
      },
      {
       "what": "evaluate both arms",
@@ -4209,7 +4233,8 @@
       "command": "",
       "from": "",
       "runnable": false,
-      "n": 2
+      "n": 2,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -4249,9 +4274,10 @@
       "line": "The same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1."
      }
     ],
-    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 512\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 512\n# command (as given): not recorded\n# the same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1\n# how to get it again · scripts/README.md:8\npython quantize.py --seed 1 --calib 512\n",
+    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 512\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 512\n# command (as given): not recorded\n# the same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1\n# how to get it again · scripts/README.md:8\npython quantize.py --seed 1 --calib 512\n",
     "commands": [],
-    "prompt": ""
+    "prompt": "",
+    "code_step": null
    }
   },
   "runc1024": {
@@ -4303,8 +4329,8 @@
    "made": [],
    "retracted": null,
    "observed_in": {
-    "label": "recorded in main · /home/ana/int8-resnet50 at 3f2a9c1",
-    "label_short": "recorded in main · ~/int8-resnet50 at 3f2a9c1",
+    "label": "recorded in main · /home/ana/int8-resnet50",
+    "label_short": "recorded in main · ~/int8-resnet50",
     "commit": "3f2a9c1",
     "dirty": false,
     "gone": false,
@@ -4329,7 +4355,7 @@
      {
       "state": "unknown",
       "label": "code",
-      "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty",
+      "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed",
       "refs": []
      }
     ],
@@ -4343,7 +4369,8 @@
       "command": "python get_data.py --split val",
       "from": "scripts/README.md:5",
       "runnable": true,
-      "n": 1
+      "n": 1,
+      "checkout": null
      },
      {
       "what": "evaluate both arms",
@@ -4354,7 +4381,8 @@
       "command": "",
       "from": "",
       "runnable": false,
-      "n": 2
+      "n": 2,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -4385,9 +4413,10 @@
      "line": "the run records no command (as given)"
     },
     "made": [],
-    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 1024\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 1024\n# command (as given): not recorded\n",
+    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 1024\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 1024\n# command (as given): not recorded\n",
     "commands": [],
-    "prompt": ""
+    "prompt": "",
+    "code_step": null
    }
   },
   "runc2048": {
@@ -4439,8 +4468,8 @@
    "made": [],
    "retracted": null,
    "observed_in": {
-    "label": "recorded in main · /home/ana/int8-resnet50 at 3f2a9c1",
-    "label_short": "recorded in main · ~/int8-resnet50 at 3f2a9c1",
+    "label": "recorded in main · /home/ana/int8-resnet50",
+    "label_short": "recorded in main · ~/int8-resnet50",
     "commit": "3f2a9c1",
     "dirty": false,
     "gone": false,
@@ -4465,7 +4494,7 @@
      {
       "state": "unknown",
       "label": "code",
-      "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty",
+      "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed",
       "refs": []
      }
     ],
@@ -4479,7 +4508,8 @@
       "command": "python get_data.py --split val",
       "from": "scripts/README.md:5",
       "runnable": true,
-      "n": 1
+      "n": 1,
+      "checkout": null
      },
      {
       "what": "evaluate both arms",
@@ -4490,7 +4520,8 @@
       "command": "",
       "from": "",
       "runnable": false,
-      "n": 2
+      "n": 2,
+      "checkout": null
      }
     ],
     "per_run": {
@@ -4521,9 +4552,10 @@
      "line": "the run records no command (as given)"
     },
     "made": [],
-    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 2048\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 2048\n# command (as given): not recorded\n",
+    "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 2048\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 2048\n# command (as given): not recorded\n",
     "commands": [],
-    "prompt": ""
+    "prompt": "",
+    "code_step": null
    }
   }
  },
@@ -5989,6 +6021,127 @@
    }
   ]
  },
+ "checkout": {
+  "state": "not_committed",
+  "said": "1 record file not committed",
+  "line": "1 record file not committed · at commit 5d1e0a7c4b3a",
+  "commit": "5d1e0a7c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e",
+  "on_branch": true,
+  "name": "exp-b",
+  "record_files_not_committed": 1,
+  "record_files_ignored": 0,
+  "ignored_by": null,
+  "record_held": true,
+  "changes_outside_record": false,
+  "why": null,
+  "page_line": "1 record file not committed · at commit 5d1e0a7c4b3a",
+  "fold": [
+   {
+    "text": "at commit 5d1e0a7c4b3a",
+    "kind": "commit",
+    "sha": "5d1e0a7c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e"
+   }
+  ],
+  "record_files": 42,
+  "not_committed_files": [
+   {
+    "path": ".rb/log.jsonl",
+    "change": "changed",
+    "from": null
+   }
+  ],
+  "ignored_files": [],
+  "checked_at": "2026-10-19T09:41:07.000+00:00",
+  "check": "git -C /home/ana/int8-resnet50/.worktrees/b status --short --untracked-files=all -- .rb",
+  "evidence": [
+   {
+    "kind": "found",
+    "text": "rb checked the record with git just now: 1 of its 42 record files is new, changed or deleted since commit 5d1e0a7c4b3a.",
+    "code": [],
+    "sha": "5d1e0a7c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e",
+    "when": "just now",
+    "at": "2026-10-19T09:41:07.000+00:00",
+    "cmd": null,
+    "says": null
+   },
+   {
+    "kind": "files",
+    "text": "Not committed: .rb/log.jsonl (changed)",
+    "code": [
+     ".rb/log.jsonl"
+    ],
+    "sha": null,
+    "when": null,
+    "at": null,
+    "cmd": null,
+    "says": null
+   },
+   {
+    "kind": "check",
+    "text": "To check it yourself, in your terminal:",
+    "code": [],
+    "sha": null,
+    "when": null,
+    "at": null,
+    "cmd": "git -C /home/ana/int8-resnet50/.worktrees/b status --short --untracked-files=all -- .rb",
+    "says": "It lists each record file not committed, and prints nothing when all are."
+   },
+   {
+    "kind": "define",
+    "text": "Record files are the files rb keeps for this project next to its code, such as its questions, rules, runs, notes and log.",
+    "code": [],
+    "sha": null,
+    "when": null,
+    "at": null,
+    "cmd": null,
+    "says": null
+   }
+  ],
+  "page_evidence": [
+   {
+    "kind": "found",
+    "text": "rb checked the record with git when this page was made, 2026-10-19 09:41 UTC: 1 of its 42 record files is new, changed or deleted since commit 5d1e0a7c4b3a.",
+    "code": [],
+    "sha": "5d1e0a7c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e",
+    "when": "when this page was made, 2026-10-19 09:41 UTC",
+    "at": null,
+    "cmd": null,
+    "says": null
+   },
+   {
+    "kind": "page",
+    "text": "This page shows the record as it stood on disk; a clone of commit 5d1e0a7c4b3a has the record as that commit holds it.",
+    "code": [],
+    "sha": null,
+    "when": null,
+    "at": null,
+    "cmd": null,
+    "says": null
+   },
+   {
+    "kind": "files",
+    "text": "Not committed: .rb/log.jsonl (changed)",
+    "code": [
+     ".rb/log.jsonl"
+    ],
+    "sha": null,
+    "when": null,
+    "at": null,
+    "cmd": null,
+    "says": null
+   },
+   {
+    "kind": "define",
+    "text": "Record files are the files rb keeps for this project next to its code, such as its questions, rules, runs, notes and log.",
+    "code": [],
+    "sha": null,
+    "when": null,
+    "at": null,
+    "cmd": null,
+    "says": null
+   }
+  ]
+ },
  "places": {
   "place": {
    "id": "exp-b",
@@ -6004,13 +6157,17 @@
     "id": "main",
     "label": "main · ~/int8-resnet50",
     "can_show": true,
-    "why_not": ""
+    "why_not": "",
+    "said": "this record · 2 record files not committed · last write 2026-10-19 09:40 UTC",
+    "started_here": null
    },
    {
     "id": "exp-b",
     "label": "exp-b · .worktrees/b",
     "can_show": true,
-    "why_not": ""
+    "why_not": "",
+    "said": "its own record · 1 record file not committed · last write 2026-10-18 16:02 UTC",
+    "started_here": null
    }
   ],
   "versions": [],

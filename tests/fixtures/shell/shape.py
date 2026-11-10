@@ -14,6 +14,16 @@ sys.stdout.reconfigure(encoding="utf-8", newline="\n")  # UTF-8 with LF, as the 
 PHASE = [  # (path prefix, phase, where today's code computes it, or what builds it)
     ("home.witness", "WIT", "WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the record's line as facts: when rb began keeping it, and of runs, analyses, calls and notes how many stand and how many were recorded afterwards (runs: how many were made before it began, and at a time nobody knows)"), ("history.log[].witness", "WIT", "WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the write a log line records"),
     ("contract", "c", "new: shell/model.rs (M0)"), ("surface", "c", "new: shell/model.rs (M0)"), ("tier", "c", "new: M0 from view::Reader; shell/tier.rs holds the table in 1b"),
+    ("checkout", "1b", "contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier"),
+    *[(f"checkout.{k}", "1b", "contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only")
+      for k in ("not_committed_files", "ignored_files", "checked_at", "check", "evidence")],
+    *[(f"checkout.{k}", "1b", "contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers")
+      for k in ("record_files", "page_evidence")],
+    ("places.places[].said", "1b", "contract 1.15 (round 12): places.rs Place::said, rb's line for the place"),
+    ("experiments[].reproduce.steps[].checkout", "1b", "contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared"),
+    ("runs.{id}.reproduce.steps[].checkout", "1b", "contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared"),
+    ("runs.{id}.reproduce.code_step", "1b", "contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command"),
+    ("places.places[].started_here", "1b", "contract 1.15 (round 12): the worktree rb open was started in, with no record of its own: its commit and whether it has changes outside the record"),
     ("rb_version", "today", "webui state payload"), ("at", "today", "webui state payload"), ("digest", "today", "Ledger::state_digest; 4a adds the journal key"),
     ("escaped", "today", "webui drawn()"), ("project", "today", "Home.title, Home.project_id"),
     ("home", "today", "view::home (Home)"), ("home.counts", "1b", "status counts (ledger/views.rs), not on Home today"),
@@ -115,7 +125,14 @@ PHASE = [  # (path prefix, phase, where today's code computes it, or what builds
 ]
 LIVE_ONLY = ("places", "findings.{id}.your_words", "findings.{id}.observed", "findings.{id}.observed_short", "findings.{id}.observed_places",
              "runs.{id}.observed_in", "runs.{id}.recorded_in", "resources.{id}.where_short", "digest",
-             "questions[].overview.relations[].declarations[].words", "citations.{key}.open_url")
+             "questions[].overview.relations[].declarations[].words", "citations.{key}.open_url",
+             # contract 1.15: a page's checkout says its words and commit alone
+             "checkout.on_branch", "checkout.name", "checkout.record_files_", "checkout.ignored_by", "checkout.record_held",
+             "checkout.changes_outside_record", "checkout.why", "checkout.page_line", "checkout.fold",
+             # contract 1.16: the evidence your own screens give, and the names (a page's block is page_evidence)
+             "checkout.not_committed_files", "checkout.ignored_files", "checkout.checked_at", "checkout.check", "checkout.evidence",
+             # and your checkout, which a page has none of
+             "experiments[].reproduce.steps[].checkout", "runs.{id}.reproduce.steps[].checkout", "runs.{id}.reproduce.code_step")
 ELEMENTS = [  # element shapes of lists every example leaves empty, as rb computes them (requests applied at MP-1020-0828)
     ("home.unplaced[]", "string"), ("home.muted[]", "string"), ("home.tree[].muted[]", "string"),
     ("questions[].changed[]", "string"), ("questions[].ruled[]", "string"), ("questions[].summary[]", "string"),
@@ -142,6 +159,19 @@ ELEMENTS = [  # element shapes of lists every example leaves empty, as rb comput
     ("questions[].overview.relations[].declarations[].declared_at", "string"),
     ("questions[].overview.relations[].declarations[].why", "string"),
     ("questions[].overview.relations[].declarations[].words", "string"),
+    # contract 1.15: the checkout's keys git may leave empty (no commit, no branch, nothing ignored, git unread), and the
+    # worktree rb open was started in, which no example starts in
+    ("checkout.commit", "null"), ("checkout.ignored_by", "string"), ("checkout.record_held", "null"),
+    ("checkout.record_files", "null"), ("checkout.ignored_files[]", "string"), ("checkout.not_committed_files[].from", "string"), ("checkout.check", "null"),
+    ("checkout.evidence[].sha", "null"), ("checkout.evidence[].says", "null"), ("checkout.page_evidence[].sha", "null"),
+
+    ("checkout.why", "string"), ("places.places[].started_here", "object"), ("places.places[].started_here.commit", "string"),
+    ("places.places[].started_here.commit", "null"), ("places.places[].started_here.changes_outside_record", "bool"),
+    # contract 1.15: your checkout against a code step's code, which the example's runs (made before they were recorded) never have
+    ("experiments[].reproduce.steps[].checkout", "object"), ("experiments[].reproduce.steps[].checkout.state", "string"), ("experiments[].reproduce.steps[].checkout.said", "string"), ("experiments[].reproduce.steps[].checkout.files", "list"), ("experiments[].reproduce.steps[].checkout.files[]", "string"), ("experiments[].reproduce.steps[].checkout.more", "number"), ("experiments[].reproduce.steps[].checkout.diff", "string"),
+    ("runs.{id}.reproduce.steps[].checkout", "object"), ("runs.{id}.reproduce.steps[].checkout.state", "string"), ("runs.{id}.reproduce.steps[].checkout.said", "string"), ("runs.{id}.reproduce.steps[].checkout.files", "list"), ("runs.{id}.reproduce.steps[].checkout.files[]", "string"), ("runs.{id}.reproduce.steps[].checkout.more", "number"), ("runs.{id}.reproduce.steps[].checkout.diff", "string"),
+    ("runs.{id}.reproduce.code_step", "object"), ("runs.{id}.reproduce.code_step.label", "string"), ("runs.{id}.reproduce.code_step.checkout", "null"),
+    ("runs.{id}.reproduce.code_step.checkout", "object"), ("runs.{id}.reproduce.code_step.checkout.state", "string"), ("runs.{id}.reproduce.code_step.checkout.said", "string"), ("runs.{id}.reproduce.code_step.checkout.files", "list"), ("runs.{id}.reproduce.code_step.checkout.files[]", "string"), ("runs.{id}.reproduce.code_step.checkout.more", "number"), ("runs.{id}.reproduce.code_step.checkout.diff", "string"),
     # PIVOT: a setting the variants hold apart undeclared; the rules a cell's change is read by
     ("experiments[].table.rows[].unvaried.{key}", "string"), ("experiments[].table.rows[].metrics.{key}.run_ids[]", "string"),
     ("experiments[].table.rows[].metrics.{key}.criteria[]", "string"),

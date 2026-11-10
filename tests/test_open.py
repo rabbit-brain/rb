@@ -702,8 +702,8 @@ def test_rb_open_names_each_place_and_says_where_a_run_was_recorded(placed):
     runs = {r["run_id"]: r for r in s["home"]["runs"]}
     head = rec.git("rev-parse", "HEAD", cwd=rec.tree["exp-b"])
     assert runs[rec.run_nested]["observed_in"] == {
-        "label": f"recorded in exp-b · {p['exp-b']['path']} at {head[:12]}, with uncommitted changes", "commit": head, "dirty": True, "gone": False,
-        "label_short": f"recorded in exp-b · .worktrees/b at {head[:12]}, with uncommitted changes", "place": None}
+        "label": f"recorded in exp-b · {p['exp-b']['path']}", "commit": head, "dirty": True, "gone": False,
+        "label_short": "recorded in exp-b · .worktrees/b", "place": None}
     assert runs[rec.run_main]["observed_in"] is None
     [c1] = [f for b in s["home"]["briefs"] for e in b["experiments"] for f in e["findings"] if f["criterion_id"] == "c1"]
     assert c1["observed"] == f"1 of 2 runs was recorded in exp-b · {p['exp-b']['path']}"
@@ -746,13 +746,13 @@ def test_rb_open_names_each_place_in_short_and_keeps_the_whole_path(at_home_plac
     assert p["main"]["label_short"] == "main · ~/clone/p" and p["main"]["label"] == f"main · {p['main']['path']}"
     assert p["exp-b"]["label_short"] == "exp-b · .worktrees/b" and p["exp-c"]["label_short"] == "exp-c · ~/clone/wt-c"
     assert p["exp-far"]["label_short"] == f"exp-far · {p['exp-far']['path']}" and p["exp-far"]["path"].endswith("/far/wt")
-    detached = f"detached at {rec.start[:12]}"
-    assert sorted(t["label_short"] for t in twins) == [f"{detached} · ./~/wt", f"{detached} · ~/wt"]
+    # a detached one is "no branch", never its commit
+    assert sorted(t["label_short"] for t in twins) == ["no branch · ./~/wt", "no branch · ~/wt"]
     assert p["exp-b"]["why_not"] == "exp-b · .worktrees/b has no record of its own to show: it writes to this record."
     assert p["exp-c"]["why_not"] == "" and p["exp-g"]["why_not"] == "exp-g · ~/clone/wt-g is removed since: there is nothing there to show."
     runs = {r["run_id"]: r for r in s["home"]["runs"]}
     o = runs[rec.run_nested]["observed_in"]
-    assert o["label_short"] == "recorded in exp-b · .worktrees/b" + o["label"].split(p["exp-b"]["path"], 1)[1] and o["label"].startswith(f"recorded in exp-b · {p['exp-b']['path']} at ")
+    assert o["label_short"] == "recorded in exp-b · .worktrees/b" + o["label"].split(p["exp-b"]["path"], 1)[1] and o["label"] == f"recorded in exp-b · {p['exp-b']['path']}"
     [c1] = [f for b in s["home"]["briefs"] for e in b["experiments"] for f in e["findings"] if f["criterion_id"] == "c1"]
     assert (c1["observed"], c1["observed_short"]) == (f"1 of 2 runs was recorded in exp-b · {p['exp-b']['path']}", "1 of 2 runs was recorded in exp-b · .worktrees/b")
     _, card = _answer(f"{server.url}/card.json?ref=o:c1")
@@ -789,7 +789,7 @@ def test_a_worktree_made_since_the_places_were_listed_is_not_said_to_be_removed(
     run_e = rec.rb("run", "add", "e1", "fp32.top1=0.763", "int8.top1=0.757", cwd=e)["object"]["id"]
     _, s = _answer(server.url + "/state.json")
     [row] = [r for r in s["home"]["runs"] if r["run_id"] == run_e]
-    assert row["observed_in"]["gone"] is False and row["observed_in"]["label"].startswith(f"recorded in exp-e · {e.resolve().as_posix()} at ")
+    assert row["observed_in"]["gone"] is False and row["observed_in"]["label"] == f"recorded in exp-e · {e.resolve().as_posix()}"
     assert "removed since" not in row["observed_in"]["label"]
 
 
@@ -890,8 +890,8 @@ def test_two_places_that_hold_the_same_record_read_apart(placed):
     assert same(there["home"]) == same(s["home"]) and there["digest"] != s["digest"]
     main_at = rec.start                                              # where run_main was recorded, before the record's commit
     [row] = [r for r in there["home"]["runs"] if r["run_id"] == rec.run_main]
-    assert row["observed_in"] == {"label": f"recorded in main at {main_at[:12]}", "commit": main_at, "dirty": False, "gone": False,
-                                  "label_short": f"recorded in main at {main_at[:12]}", "place": None}
+    assert row["observed_in"] == {"label": "recorded in main", "commit": main_at, "dirty": False, "gone": False,
+                                  "label_short": "recorded in main", "place": None}
     assert _answer(server.url + "/state.json")[1]["digest"] == s["digest"]
 
 
@@ -905,14 +905,14 @@ def test_a_linked_worktree_s_record_says_which_runs_were_recorded_in_the_main_ch
     _, c = _answer(f"{server.url}/state.json?place={p['exp-c']['id']}")
     runs = {r["run_id"]: r for r in c["home"]["runs"]}
     main_at = rec.start
-    assert runs[rec.run_main]["observed_in"]["label"] == f"recorded in main at {main_at[:12]}"
-    assert runs[rec.run_nested]["observed_in"]["label"].startswith(f"recorded in exp-b · {p['exp-b']['path']} at ")
+    assert (runs[rec.run_main]["observed_in"]["label"], runs[rec.run_main]["observed_in"]["commit"]) == ("recorded in main", main_at)
+    assert runs[rec.run_nested]["observed_in"]["label"] == f"recorded in exp-b · {p['exp-b']['path']}"
     assert runs[rec.run_sibling]["observed_in"] is None
     [c1] = [f for b in c["home"]["briefs"] for e in b["experiments"] for f in e["findings"] if f["criterion_id"] == "c1"]
     assert c1["observed"].startswith("2 of 3 runs were recorded elsewhere: ")
     assert "1 in main" in c1["observed"] and f"1 in exp-b · {p['exp-b']['path']}" in c1["observed"]
     _, card = _answer(f"{server.url}/card.json?ref=o:{rec.run_main}&place={p['exp-c']['id']}")
-    assert card["card"]["facts"][-1] == f"recorded in main at {main_at[:12]}"
+    assert card["card"]["facts"][-1] == "recorded in main"
     # said by its branch alone, it links to no place, though main is listed with a record and is on that branch; the
     # manual says so where it says what links
     from rbtest import ROOT
@@ -1077,7 +1077,11 @@ def test_a_past_version_reads_as_a_checkout_of_its_commit_and_leaves_nothing(ver
         assert same(v1["home"]) == same(there["home"])
         # a card and the page of the version, and what was not listed
         assert _answer(f"{server.url}/card.json?ref=o:e1&at={shas[0]}")[0] == 200
-        assert _get(f"{server.url}/page.html?at={shas[0]}")[0] == 200
+        status, page = _get(f"{server.url}/page.html?at={shas[0]}")
+        # About's line 2 states the version's own checkout: every record file committed, at that commit; the live page
+        # states this checkout, with the note not committed
+        assert status == 200 and f'<span><a href="#in-git">all record files committed</a> \u00b7 at commit {shas[0][:12]}</span>' in page
+        assert f'<span><a href="#in-git">2 record files not committed</a> \u00b7 at commit {shas[-1][:12]}</span>' in _get(f"{server.url}/page.html")[1]
         start = git("rev-parse", "HEAD~4")
         for sha in ("0" * 40, start, shas[0][:12]):
             status, answer = _answer(f"{server.url}/state.json?at={sha}")
@@ -1460,13 +1464,12 @@ def test_shell_places_keep_short_labels_and_whole_paths(shell_placed):
         assert p["label_short"] in where.text
         if not p["readable"]:
             assert p["why_not"] in where.text
-    # the Where button names the place by its branch alone, its whole path the tooltip; the place line, where it is
-    # drawn, says only the rest
+    # the Where button names the place by its branch alone, then how its checkout holds the record; its whole path is
+    # the tooltip, and the place line is gone
     [summary] = where.all("details", **{"data-pick": "where"})[0].all("summary")
     assert summary.attrs["title"] == data["place"]["path"]
-    assert data["place"]["label_short"].split(" · ")[0] in summary.text
-    for line in where.all("span", **{"class": "pl"}):
-        assert data["place"]["label_short"] not in line.text and line.attrs["title"] == data["place"]["path"]
+    assert summary.text == f"Where {data['place']['label_short'].split(' · ')[0]} · {data['place']['checkout']['said']}"
+    assert not where.all("span", **{"class": "pl"})
 
 
 def test_shell_scope_names_away_and_past_and_returns_home(shell_placed):
@@ -1486,7 +1489,10 @@ def test_shell_scope_names_away_and_past_and_returns_home(shell_placed):
         assert link.attrs["data-at"] == "" and link.attrs["href"].startswith("#overview")
         [bar] = scope.all("p", **{"class": "bar"})
         if "at=" in query:
-            assert sha[:12] in scope.text and sha[:12] in bar.attrs["data-title"]
+            # the day it was committed on the face and in the tab's title; its commit in the Version list alone
+            assert sha[:12] not in scope.text and sha[:12] not in bar.attrs["data-title"]
+            assert re.search(r" as of \d{4}-\d{2}-\d{2}( \d{2}:\d{2} UTC)? · read only", scope.text), scope.text
+            assert re.search(r" as of \d{4}-\d{2}-\d{2}( \d{2}:\d{2} UTC)? · $", bar.attrs["data-title"]), bar.attrs["data-title"]
         else:
             # the path said by its folder alone; the tab's title keeps the place in short
             name, path = p["label_short"].split(" · ", 1)
@@ -1850,3 +1856,250 @@ def test_shell_waiting_reasons_keep_the_wrap_rule_on_their_element(shell_served,
     rules = re.findall(r"([^{}]+)\{([^{}]*)\}", css)
     assert any(".wt" in [s.strip() for s in selector.split(",")] and "overflow-wrap:break-word" in re.sub(r"\s+", "", body)
                for selector, body in rules)
+
+
+# ---------------------------------------------------------------- the Where button: how the checkout holds the record
+
+FACE_HYGIENE = re.compile(r"\b[0-9a-f]{7,40}\b|HEAD|dirty|detached|porcelain")
+
+
+def _text_outside(el, skip) -> str:
+    """An element's text without what the elements `skip` picks hold (the open lists of the bar)."""
+    return "".join(c if isinstance(c, str) else ("" if skip(c) else _text_outside(c, skip)) for c in el.children)
+
+
+def _where(url, query=""):
+    """(the Where button's text, its words' element or None, the Where list, the bar's text minus its lists) of / ."""
+    doc = _shell(url, query)
+    [pick] = doc.at("where").all("details", **{"data-pick": "where"})
+    [summary] = pick.all("summary")
+    [words] = summary.all("span", **{"class": "gs"}) or [None]
+    [picks] = pick.all("ul", **{"class": "picks"})
+    face = _text_outside(doc.at("top"), lambda e: e.tag == "ul" and "picks" in e.attrs.get("class", "").split())
+    assert not FACE_HYGIENE.search(face), face
+    return " ".join(summary.text.split()), words, picks, face
+
+
+@pytest.fixture
+def git_states(workdir, monkeypatch, tmp_path_factory):
+    """A folder to make a record in, with git's config for ana; `git` runs git here."""
+    as_the_user(monkeypatch)
+    monkeypatch.setenv("RB_ACTOR", "human:ana")
+    cfg = tmp_path_factory.mktemp("gitconfig") / "config"
+    cfg.write_text("[user]\n\temail = ana@example.org\n\tname = ana\n[init]\n\tdefaultBranch = main\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(cfg))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("RB_TEST_SHELL", "1")
+    return lambda *a: subprocess.run(["git", *a], check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _int8_record():
+    assert main(["init", "INT8 ResNet-50 on ImageNet", "--no-agents"]) == 0
+    assert main(["experiment", "add", "int8 against fp32", "--id", "e1", "--baseline", "fp32", "--candidate", "int8"]) == 0
+
+
+def test_where_says_the_record_files_not_committed_then_follows_a_commit_in_one_poll(git_states):
+    """Two record files not committed, then a commit: the next key rb open answers moves (the places stamp HEAD, its
+    ref, its log and the index), and the button says every record file is committed, its commit one step down."""
+    git = git_states
+    git("init", "-q")
+    Path("train.py").write_text("lr = 0.1\n", encoding="utf-8")
+    _int8_record()
+    git("add", "-A")
+    git("commit", "-qm", "the record")
+    assert main(["note", "add", "the held-out set is not in the pretraining data"]) == 0
+    server = Open()
+    try:
+        said, words, picks, _ = _where(server.url)
+        assert said == "Where main · 2 record files not committed" and words.attrs["data-state"] == "not_committed", said
+        key = _answer(server.url + "/digest.json")[1]["key"]
+        git("add", ".rb")
+        git("commit", "-qm", "a note")
+        assert _answer(server.url + "/digest.json")[1]["key"] != key
+        said, words, picks, _ = _where(server.url)
+        head = git("rev-parse", "HEAD")
+        assert said == "Where main · all record files committed" and words.attrs["data-state"] == "committed", said
+        # one step down (PARITY 4): what rb found, dated just now, the commit in 12 hex, Copy holding all 40; the command
+        # that checks it, with a Copy Rust draws; what record files are; and no commit on the button
+        assert re.search(rf"rb checked the record with git just now: all \d+ record files are in commit {head[:12]}\.", picks.text), picks.text
+        assert not re.search(r"[0-9a-f]{7,40}", said)
+        page = _get(server.url + "/")[1]
+        assert re.search(r'<p class="fl" id="where-found">rb checked the record with git <time datetime="[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC" data-checked>just now</time>', page), page[:2000]
+        assert 'aria-describedby="where-path where-found"' in page
+        cmd = f"git -C {Path.cwd().resolve().as_posix()} status --short --untracked-files=all -- .rb"
+        assert f'<div class="cmdbox"><pre class="cmd">{html_mod.escape(cmd, quote=False)}</pre><button type="button" class="cp" data-act="copy" aria-label="Copy the command">Copy</button></div>' in page
+        assert "It lists each record file not committed, and prints nothing when all are." in picks.text
+        assert "Record files are the files rb keeps for this project next to its code" in picks.text
+        [sha] = picks.all("span", **{"class": "sha"})
+        assert sha.text == head and sha.attrs["id"] == "where-sha"
+        [copy] = picks.all("button", **{"data-from": "where-sha"})
+        assert copy.text == "Copy"
+        # the Overview's header says the runs and the time, never the place: the bar names it
+        [ovh] = _shell(server.url).at("overview").all("p", **{"class": "counts ovh"})
+        assert "main" not in ovh.text.split(" · ")
+    finally:
+        server.close()
+
+
+def test_where_says_no_commit_yet(git_states):
+    git_states("init", "-q")
+    _int8_record()
+    server = Open()
+    try:
+        said, words, picks, _ = _where(server.url)
+        assert said == "Where main · no commit yet" and words.attrs["data-state"] == "no_commit"
+        assert "rb checked the record with git just now: the repository has no commit yet, so no commit holds the record." in picks.text
+    finally:
+        server.close()
+
+
+def test_where_says_not_in_git_or_git_not_found(git_states, monkeypatch, tmp_path_factory):
+    """No .git: not in git, with or without git to run; a .git with no git to run: git not found. The folder names the
+    place where git cannot."""
+    _int8_record()
+    folder, path_now = Path.cwd().name, os.environ["PATH"]
+    nothing = tmp_path_factory.mktemp("no-git-here")
+    for path in (path_now, str(nothing)):
+        monkeypatch.setenv("PATH", path)
+        server = Open()
+        try:
+            said, words, picks, _ = _where(server.url)
+            assert said == f"Where {folder} · not in git" and words.attrs["data-state"] == "not_in_git", said
+            assert picks.text.endswith("rb looked for a git repository just now: the project's folder is not in one, so no commit holds the record."), picks.text
+        finally:
+            server.close()
+    monkeypatch.setenv("PATH", path_now)
+    subprocess.run(["git", "init", "-q"], check=True, capture_output=True)
+    monkeypatch.setenv("PATH", str(nothing))
+    server = Open()
+    try:
+        said, words, picks, _ = _where(server.url)
+        assert said == f"Where {folder} · git not found", said
+        assert picks.text.endswith("rb could not find git just now, so it could not say what is committed."), picks.text
+    finally:
+        server.close()
+
+
+def test_where_says_rb_could_not_read_git_with_git_s_own_line(git_states, monkeypatch, tmp_path_factory):
+    git_states("init", "-q")
+    _int8_record()
+    shim = tmp_path_factory.mktemp("failing-git")
+    (shim / "git").write_text("#!/bin/sh\necho \"fatal: detected dubious ownership in repository at '$PWD'\" >&2\nexit 128\n", encoding="utf-8")
+    (shim / "git").chmod(0o755)
+    if sys.platform == "win32":
+        pytest.skip("a git that fails is a shell script here")
+    monkeypatch.setenv("PATH", f"{shim}{os.pathsep}{os.environ['PATH']}")
+    server = Open()
+    try:
+        said, words, picks, _ = _where(server.url)
+        assert said == f"Where {Path.cwd().name} · rb could not read git", said
+        [line] = picks.all("code")
+        assert line.text.startswith("fatal: detected dubious ownership in repository at ")
+        assert "rb asked git just now, and git failed, so rb could not say what is committed." in picks.text
+        assert "To ask git yourself, in your terminal:" in picks.text
+    finally:
+        server.close()
+
+
+def test_where_says_no_branch_and_a_commit_that_does_not_hold_the_record(git_states):
+    """A checkout of a commit the record was never committed in, detached, with a run left untracked: no branch, the
+    record files not committed on the face, and in the list the commit and that it does not hold the record."""
+    git = git_states
+    git("init", "-q")
+    Path("train.py").write_text("lr = 0.1\n", encoding="utf-8")
+    git("add", "train.py")
+    git("commit", "-qm", "start")
+    first = git("rev-parse", "HEAD")
+    _int8_record()
+    assert main(["run", "add", "e1", "fp32.top1=0.761", "int8.top1=0.758"]) == 0
+    Path("train.py").write_text("lr = 0.2\n", encoding="utf-8")
+    git("commit", "-qam", "lr")
+    git("checkout", "-q", "--detach", first)
+    server = Open()
+    try:
+        said, words, picks, face = _where(server.url)
+        assert re.fullmatch(r"Where no branch · \d+ record files not committed", said), said
+        assert first[:12] not in face
+        assert re.search(rf"record files are new, changed or deleted since commit {first[:12]}, which does not hold the record\.", picks.text), picks.text
+        assert "Not committed: " in picks.text and "(new)" in picks.text
+    finally:
+        server.close()
+
+
+@pytest.mark.parametrize("committed", [False, True])
+def test_where_says_record_files_ignored_by_git_with_the_rule(git_states, committed):
+    git = git_states
+    git("init", "-q")
+    Path(".gitignore").write_text(".rb/\n", encoding="utf-8")
+    if committed:
+        git("add", ".gitignore")
+        git("commit", "-qm", "ignore")
+    _int8_record()
+    server = Open()
+    try:
+        said, words, picks, _ = _where(server.url)
+        assert re.fullmatch(r"Where main · \d+ record files ignored by git", said) and words.attrs["data-state"] == "ignored", said
+        [rule] = [c for c in picks.all("code") if c.text == ".gitignore:1:.rb/"]
+        assert "so a commit leaves them out" in picks.text
+        assert ("the repository has no commit yet, and git ignores" in picks.text) == (not committed)
+        assert "Ignored by git: .rb/" in picks.text and "check-ignore -v .rb/project.yaml" in picks.text
+    finally:
+        server.close()
+
+
+def test_where_names_another_worktree_by_its_branch_with_its_own_words(shell_placed):
+    rec, server = shell_placed
+    data = _answer(server.url + "/state.json")[1]
+    c = next(p for p in data["places"] if p["branch"] == "exp-c")
+    said, words, picks, face = _where(server.url, f"?place={c['id']}")
+    assert said == f"Where exp-c · {c['checkout']['said']}" and "not committed" in said, said
+    assert f"since commit {c['head'][:12]}." in picks.text
+    # its own evidence: its command names its own folder
+    assert f"git -C {c['path']} status" in picks.text or f"git -C '{c['path']}' status" in picks.text, picks.text
+    # each other place in the list says rb's line for it
+    main_row = next(p for p in data["places"] if p["branch"] == "main")
+    assert main_row["said"] in picks.text
+
+
+def test_where_says_the_worktree_rb_open_was_started_in_as_yours(placed, monkeypatch, tmp_path):
+    """Started in .worktrees/b, which has no record of its own, rb open shows the record it writes to; that worktree's
+    row in the Where list says its commit as yours, and that it has changes outside the record."""
+    rec, server = placed
+    server.close()
+    monkeypatch.setenv("RB_TEST_SHELL", "1")
+    dump = tmp_path / "doc.json"
+    monkeypatch.setenv("RB_TEST_SHELL_DUMP", str(dump))
+    b = rec.tree["exp-b"]
+    there = Open(b)
+    try:
+        said, _, picks, _ = _where(there.url)
+        assert said.startswith("Where main · "), said
+        mine = f"your checkout · at commit {rec.start[:12]}, with changes outside the record not committed"
+        assert mine in picks.text
+        doc = json.loads(dump.read_text(encoding="utf-8"))
+        rows = {p["label"].split(" · ")[0]: p for p in doc["places"]["places"]}
+        assert rows["exp-b"]["started_here"] == {"commit": rec.start, "changes_outside_record": True}
+        assert all(p["started_here"] is None for k, p in rows.items() if k != "exp-b")
+        assert doc["checkout"]["name"] == "main" and doc["checkout"]["said"] in said
+    finally:
+        there.close()
+
+
+def test_the_minute_rb_asked_git_moves_no_key(git_states, monkeypatch):
+    """PARITY 10: the evidence carries the minute rb asked git, which moves at every look; rb open's key leaves it out,
+    so two looks a minute apart with no write between them give the same key (and the counts still move it)."""
+    git = git_states
+    git("init", "-q")
+    _int8_record()
+    git("add", "-A")
+    git("commit", "-qm", "the record")
+    keys = []
+    for now in ("2026-11-09T09:41:07Z", "2026-11-09T09:42:30Z"):
+        monkeypatch.setenv("RB_TEST_NOW", now)
+        server = Open()
+        try:
+            keys.append(_answer(server.url + "/digest.json")[1]["key"])
+            assert f'title="{now[:10]} {now[11:16]} UTC" data-checked>just now</time>' in _get(server.url + "/")[1]
+        finally:
+            server.close()
+    assert keys[0] == keys[1], keys

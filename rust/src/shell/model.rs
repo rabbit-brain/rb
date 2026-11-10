@@ -1,4 +1,4 @@
-//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.14` of a record for one tier
+//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.16` of a record for one tier
 //! and place, from view::home and the per-object fields the build plan adds. It holds the fields rb computes today
 //! (M0), each object in the contract's shape and nothing outside it; the later phases add theirs. It names no writer:
 //! no actor, session, channel or "by <name>" enters it, and the Owner tier holds none of the Live tier's own values.
@@ -16,7 +16,7 @@ use crate::view::{self, ExperimentBrief, FindingLine, Home};
 use indexmap::IndexMap;
 
 /// The contract's version, as the document's `contract` names it.
-pub const CONTRACT: &str = "rb-shell-view/1.14";
+pub const CONTRACT: &str = "rb-shell-view/1.16";
 
 /// The document of `led` for `tier`, at `place` (rb open's chosen place and version; none on a page): drawn on rb open
 /// for the Live tier, on rb page for the Owner tier.
@@ -66,6 +66,20 @@ pub fn build_on(led: &Ledger, surface: Surface, place: Option<&Chosen>) -> Res<V
     }
 }
 
+/// The checkout rb open compares the code the runs ran with: at the place it started on, now, the folder it was started
+/// in (a worktree with no record of its own, or the record's own checkout), with the paths its status lists. None away
+/// and at a past version, whose screens show no such line.
+pub(crate) fn your_checkout(led: &Ledger, chosen: &Chosen, listed: &[Place]) -> Option<crate::checkout::Viewer> {
+    if !chosen.start || chosen.version.is_some() {
+        return None;
+    }
+    let place = places::started_here(listed).or_else(|| listed.iter().find(|p| p.record == "this"));
+    Some(match place {
+        Some(p) => crate::checkout::Viewer { dir: p.path.clone(), listed: Some(p.changed.clone()) },
+        None => crate::checkout::Viewer { dir: led.root.clone(), listed: Some(Vec::new()) },
+    })
+}
+
 /// Where rb open shows the record: the place and version chosen, and every place of the clone.
 struct At<'a> {
     chosen: &'a Chosen,
@@ -80,7 +94,8 @@ fn document(led: &Ledger, surface: Surface, at: Option<&At>, served: Option<&str
         let st = Value::Dict(led.status(None)?);
         // Reproduce (BP 1c, reproduce.rs): one Recipes reads git, the files and each resource's availability once a document
         // each experiment's request asks for the run rb status suggests for it (P's with_open)
-        let recipes = crate::reproduce::Recipes::new(led, tier)?.with_open(list(&st, "open"));
+        // and compares each runnable code step with your checkout, on rb open at the place it started on, now
+        let recipes = crate::reproduce::Recipes::new(led, tier)?.with_open(list(&st, "open")).with_viewer(at.and_then(|at| your_checkout(led, at.chosen, at.listed)));
         // what rests on what, both ways, read once
         let graph = Graph::of(led)?;
         let mut doc = Dict::new();
@@ -181,12 +196,31 @@ fn document(led: &Ledger, surface: Surface, at: Option<&At>, served: Option<&str
             h.insert("log".into(), log_rows(led, &held, &names)?);
         }
         doc.insert("history".into(), history_v);
+        // the page's own minute, which About's line 1 says and its block's evidence is dated by
+        let minute = doc.get("at").and_then(Value::as_str).unwrap_or("").to_string();
         match at {
             Some(at) => {
+                // how the checkout of the place shown holds the record, now, every key of it; none at a past version,
+                // which is a commit, not a checkout
+                let shown = at.chosen.place.checkout.as_ref().filter(|_| at.chosen.version.is_none());
+                // but its branch, which the document never keeps under that key (the tier table's Branch row): the
+                // place's name is `name`, as the Where button says it
+                let mut checkout = shown.map_or(Value::Null, crate::checkout::Checkout::to_value);
+                if let (Value::Dict(c), Some(k)) = (&mut checkout, shown) {
+                    c.shift_remove("branch");
+                    // the evidence one step down, as rb open's Where list draws it, dated "just now" (PARITY 4); and what
+                    // a page's About block says of it, so the Owner document is the Live one with its tier's rows applied
+                    k.add_evidence(&crate::checkout::When::Live(crate::pytime::now()), c);
+                    k.add_page_facts(&minute, c);
+                }
+                doc.insert("checkout".into(), checkout);
                 doc.insert("places".into(), places_value(at));
             }
             // the address rb export --url names, from which Reproduce this project is served
             None => {
+                // a page carries the words and the commit alone: no branch, no path, no rule (rb export reads a
+                // bundle's from the checkout it was exported from), asked as a page asks it (Checkout::of_page)
+                doc.insert("checkout".into(), crate::checkout::Checkout::of_page(&led.root).page_value_at(&minute));
                 doc.insert("reproduce_url".into(), served.unwrap_or("").into());
             }
         }
@@ -1375,7 +1409,7 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
                 None => path.clone(),
             };
             if !commit.is_empty() {
-                said += &format!(" · read at commit {}", commit.chars().take(7).collect::<String>());
+                said += &format!(" · read at commit {}", crate::checkout::short(&commit));
             }
             if !sha.is_empty() {
                 said += &format!(" · sha256 {}", sha.chars().take(12).collect::<String>());
@@ -2788,8 +2822,8 @@ fn log_rows(led: &Ledger, held: &std::collections::HashSet<String>, names: &Inde
 
 /// Where rb open shows the record (Live only): the place, in short and by its whole path, whether it is the place rb
 /// open started on and whether it is a past version, read only, and the line the top bar says of it; every place of
-/// the clone and whether it can be shown; the versions of the place's record. A commit's subject is never read: it can
-/// name a writer.
+/// the clone, whether it can be shown and rb's line for it, and which is the worktree rb open was started in where that
+/// has no record of its own; the versions of the place's record. A commit's subject is never read: it can name a writer.
 fn places_value(at: &At) -> Value {
     let (c, listed) = (at.chosen, at.listed);
     let p = &c.place;
@@ -2807,6 +2841,7 @@ fn places_value(at: &At) -> Value {
     };
     let version = c.version.as_ref().map_or(Value::Null, |v| crate::obj! {"sha" => v.sha.clone(), "at" => minute(&v.committed), "subject" => "", "shown" => v.shown_short(p)});
     let versions = p.root.as_ref().map(|r| places::versions(r)).unwrap_or_default();
+    let here = places::started_here(listed);
     crate::obj! {
         "place" => crate::obj! {
             "id" => p.id.clone(), "label" => short, "path" => p.listed.clone(), "start" => c.start, "read_only" => c.version.is_some(), "version" => version,
@@ -2814,7 +2849,14 @@ fn places_value(at: &At) -> Value {
         },
         "places" => Value::List(listed.iter().map(|x| crate::obj! {
             "id" => x.id.clone(), "label" => if many { x.label_short() } else { alone_label(x) }, "can_show" => x.readable(),
-            "why_not" => if x.readable() { String::new() } else { x.not_shown() }
+            "why_not" => if x.readable() { String::new() } else { x.not_shown() }, "said" => x.said(),
+            // the worktree rb open was started in, where it has no record of its own: its own commit, which the Where
+            // list says as yours
+            "started_here" => if here.is_some_and(|h| h.id == x.id) {
+                crate::obj! {"commit" => x.head.clone().map_or(Value::Null, Value::Str), "changes_outside_record" => x.dirty}
+            } else {
+                Value::Null
+            }
         }).collect()),
         "versions" => Value::List(versions.iter().map(|v| crate::obj! {"sha" => v.sha.clone(), "at" => minute(&v.committed), "subject" => ""}).collect()),
         // rb open's own rows of what waits in each other place come with its wiring (A's)
@@ -2822,11 +2864,14 @@ fn places_value(at: &At) -> Value {
     }
 }
 
-/// A single checkout as its top bar names it: its branch, else its folder's name. Its path, whole, is said apart.
+/// A single checkout as its top bar names it: its branch, "no branch" on a detached HEAD, and its folder's name only
+/// outside git, where git is not found, or where rb could not read git (its checkout's name). Its path, whole, is said
+/// apart.
 fn alone_label(p: &Place) -> String {
-    match &p.branch {
-        Some(b) => b.clone(),
-        None => p.listed.trim_end_matches('/').rsplit('/').next().unwrap_or(&p.listed).to_string(),
+    match (&p.checkout, &p.branch) {
+        (Some(c), _) => c.name(),
+        (None, Some(b)) => b.clone(),
+        (None, None) => p.listed.trim_end_matches('/').rsplit('/').next().unwrap_or(&p.listed).to_string(),
     }
 }
 
@@ -2893,6 +2938,26 @@ mod tests {
     }
 
     use super::*;
+
+    /// A single checkout on a detached HEAD is "no branch" on its top bar, never its folder; outside git it keeps its
+    /// folder's name.
+    #[test]
+    fn a_single_checkout_on_no_branch_is_named_no_branch() {
+        let d = std::env::temp_dir().join(format!("rb-alone-{}-{:08x}", std::process::id(), crate::rng::os_randbits(32)));
+        std::fs::create_dir_all(d.join("int8-resnet50/.rb")).unwrap();
+        let d = crate::sys::canonicalize(&d.join("int8-resnet50")).unwrap();
+        std::fs::write(d.join(".rb/project.yaml"), "rb: 1\nkind: project\n").unwrap();
+        assert_eq!(alone_label(&places::list(&d)[0]), "int8-resnet50");
+        let git = |args: &[&str]| assert!(std::process::Command::new("git").arg("-C").arg(&d).args(["-c", "user.name=ana", "-c", "user.email=ana@example.org"]).args(args).output().unwrap().status.success());
+        git(&["init", "-q", "-b", "main"]);
+        git(&["add", "-A"]);
+        git(&["commit", "-q", "-m", "x"]);
+        assert_eq!(alone_label(&places::list(&d)[0]), "main");
+        git(&["checkout", "-q", "--detach"]);
+        crate::sources::forget_git(); // a new command line asks git afresh
+        assert_eq!(alone_label(&places::list(&d)[0]), "no branch");
+        let _ = std::fs::remove_dir_all(d.parent().unwrap());
+    }
 
     fn finding_of(experiment: &str, state: &str, label: &str, baseline: bool) -> Value {
         crate::obj! {"experiment" => experiment, "state" => state, "subject_label" => label, "reads_baseline" => baseline}

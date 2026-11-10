@@ -282,14 +282,24 @@ struct Step {
     command: String,
     from: String,
     runnable: bool,
+    /// a code step's: the commit in full and the tree rb kept of its uncommitted changes, and your checkout against
+    /// that code, where a checkout is compared (rb open at the place it started on, now; rb show)
+    code: Option<(String, Option<String>)>,
+    checkout: Option<crate::checkout::Compared>,
 }
 
 impl Step {
-    fn value(&self, n: usize) -> Value {
-        crate::obj! {
+    /// The step as the document holds it; `yours` (a tier that compares your checkout) adds `checkout`, null where none
+    /// is compared.
+    fn value(&self, n: usize, yours: bool) -> Value {
+        let mut v = crate::obj! {
             "n" => n, "what" => self.what.clone(), "label" => self.label.clone(), "refs" => Value::list_of_str(self.refs.clone()),
             "command" => self.command.clone(), "from" => self.from.clone(), "runnable" => self.runnable
+        };
+        if let (true, Value::Dict(d)) = (yours, &mut v) {
+            d.insert("checkout".into(), self.checkout.as_ref().map_or(Value::Null, crate::checkout::Compared::to_value));
         }
+        v
     }
 
     /// The step as the copied script gives it: a comment saying what it is and where it comes from, then its command,
@@ -343,10 +353,14 @@ pub struct Recipes<'a> {
     /// what tells a run apart from another of the record whose name reads the same (", recorded <minute>", as the
     /// shell's `named` says it), by run id; none for a run whose name is its own
     apart: HashMap<String, String>,
+    /// the tier the recipes are drawn for: rb open's own (Live) names each run's code step apart (`code_step`)
+    tier: Tier,
+    /// the checkout each runnable code step is compared with (`with_viewer`); none on a page, away and at a past version
+    viewer: Option<crate::checkout::Viewer>,
 }
 
 impl<'a> Recipes<'a> {
-    pub fn new(led: &'a Ledger, _tier: Tier) -> Res<Recipes<'a>> {
+    pub fn new(led: &'a Ledger, tier: Tier) -> Res<Recipes<'a>> {
         let runs = led.all::<Run>()?;
         let mut makers: IndexMap<String, Vec<String>> = IndexMap::new();
         for r in runs.iter().filter(|r| standing(r)) {
@@ -374,7 +388,16 @@ impl<'a> Recipes<'a> {
             listings: RefCell::new(HashMap::new()),
             open: Vec::new(),
             apart,
+            tier,
+            viewer: None,
         })
+    }
+
+    /// Your checkout, which each runnable code step is compared with: rb open's at the place it started on, now, and
+    /// the folder rb show runs in. Never on a page, which has no viewer's checkout.
+    pub fn with_viewer(mut self, viewer: Option<crate::checkout::Viewer>) -> Self {
+        self.viewer = viewer.filter(|_| self.tier.has(crate::shell::tier::Row::YourCheckout));
+        self
     }
 
     /// rb status's open items (its `open`), so each experiment's request asks for the run rb suggests for it, as the
@@ -664,10 +687,18 @@ impl<'a> Recipes<'a> {
             .iter()
             .map(|(label, text, state, refs)| crate::obj! {"state" => state.clone(), "label" => label.clone(), "text" => text.clone(), "refs" => Value::list_of_str(refs.clone())})
             .collect();
-        Ok(crate::obj! {
+        // rb open's run card draws the run's own code step, and your checkout under it: never under the receipt's code
+        // row, which can name the commit the run was only recorded at
+        let yours = self.tier.has(crate::shell::tier::Row::YourCheckout);
+        let code_step = one.filter(|_| yours).map(|_| match steps.iter().find(|s| s.what == "code" && s.runnable && s.code.is_some()) {
+            // the card is one run's: "which this run ran at", where the experiment's step names its runs
+            Some(s) => crate::obj! {"label" => s.label.rsplit_once(", which ").filter(|(_, w)| w.ends_with(" ran at")).map_or_else(|| s.label.clone(), |(head, _)| format!("{head}, which this run ran at")), "checkout" => s.checkout.as_ref().map_or(Value::Null, crate::checkout::Compared::to_value)},
+            None => Value::Null,
+        });
+        let mut v = crate::obj! {
             "ready_line" => ready_line(&ready),
             "ready" => Value::List(ready_values),
-            "steps" => Value::List(steps.iter().enumerate().map(|(i, s)| s.value(i + 1)).collect()),
+            "steps" => Value::List(steps.iter().enumerate().map(|(i, s)| s.value(i + 1, yours)).collect()),
             "per_run" => per_run,
             "settings" => settings,
             "command_as_given" => crate::obj! {"recorded" => given.len(), "runs" => runs.len(), "line" => as_given},
@@ -678,7 +709,11 @@ impl<'a> Recipes<'a> {
             "script" => text,
             "commands" => Value::List(commands),
             "prompt" => if one.is_some() { String::new() } else { self.prompt(exp) }
-        })
+        };
+        if let (Some(c), Value::Dict(d)) = (code_step, &mut v) {
+            d.insert("code_step".into(), c);
+        }
+        Ok(v)
     }
 
     /// The code a run made before it was recorded names (--commit, --tree), `dirty` when its tree is not its commit's:
@@ -946,23 +981,89 @@ impl<'a> Recipes<'a> {
                     let (label, command) = match &tree {
                         None => {
                             let dir = format!("../{}-{}", exp.id, short(&c, 7));
-                            (format!("code · commit {}, which {who} ran at", short(&c, 10)), format!("git worktree add --detach {dir} {c}"))
+                            (format!("code · commit {}, which {who} ran at", short(&c, 12)), format!("git worktree add --detach {dir} {c}"))
                         }
                         Some(t) => {
                             let dir = format!("../{}-{}-{}", exp.id, short(&c, 7), short(t, 7));
                             (
-                                format!("code · commit {} with the uncommitted changes rb kept as git tree {}, which {who} ran at", short(&c, 10), short(t, 10)),
+                                format!("code · commit {}, with changes outside the record not committed that rb kept as git tree {}, which {who} ran at", short(&c, 12), short(t, 12)),
                                 format!("git worktree add --detach {dir} {c}\ngit -C {dir} read-tree -u --reset {t}"),
                             )
                         }
                     };
-                    Step { what: "code".into(), label, refs: ids, command, from: String::new(), runnable: true }
+                    let checkout = self.your_checkout(&c, tree.as_deref(), &ids);
+                    Step { what: "code".into(), label, refs: ids, command, from: String::new(), runnable: true, code: Some((c, tree)), checkout }
                 })
                 .collect();
         }
         let row = rows.iter().find(|r| r.what == "code" && r.resource.is_none());
         let label = row.map_or_else(|| "code: unknown".to_string(), |r| format!("code · {}: {}", r.state, r.detail));
         vec![Step { what: "code".into(), label, ..Default::default() }]
+    }
+
+    /// Your checkout against the code the runs `ids` ran (the commit `commit`, or the tree rb kept of their uncommitted
+    /// changes), by code_key's rule: each file the commit holds, the record's folder and the files the runs name left
+    /// out. None where no checkout is compared, or there is nothing to compare with (checkout::compare).
+    fn your_checkout(&self, commit: &str, tree: Option<&str>, ids: &[String]) -> Option<crate::checkout::Compared> {
+        let viewer = self.viewer.as_ref()?;
+        let root = &self.led.root;
+        let top = sources::git_top(root)?;
+        let record = sources::rel_to(&sources::resolve_path(&root.join(crate::ledger::DIR)), &top)?;
+        let holds = self.tree_files(&top, commit)?;
+        let named: HashSet<String> = ids.iter().filter_map(|id| self.run_by(id)).flat_map(|r| self.named_paths(r)).collect();
+        crate::checkout::compare(viewer, tree.unwrap_or(commit), &record, &holds, &named)
+    }
+
+    /// Where a run's held code is named: `produced` where it is the code rb journal run watched make the numbers, which
+    /// rb show says on "code that made it", `recorded` where it is the checkout the run was recorded in ("repository
+    /// when recorded"). None where its receipt does not hold the code that made it.
+    fn held_from(&self, r: &Run) -> Option<&'static str> {
+        let watched = made_code(r).is_some() && support::run_command(r).map_or(false, |g| g.given == "observed");
+        self.held_code(r).map(|_| if watched { "produced" } else { "recorded" })
+    }
+
+    /// Each runnable code step of the experiment's recipe compared with your checkout, as rb show says them: the
+    /// commit in full, the tree rb kept, the runs, the step's label and rebuild command, and the comparison. Empty
+    /// where no checkout is compared.
+    pub fn checkouts(&self, exp: &Experiment) -> Vec<Value> {
+        let runs: Vec<&Run> = self.runs.iter().filter(|r| r.experiment == exp.id && standing(r)).collect();
+        self.checkouts_of(exp, &runs)
+    }
+
+    /// One run's, with `anchor`: produced or recorded (held_from).
+    pub fn run_checkouts(&self, r: &Run) -> Res<Vec<Value>> {
+        let exp = match self.experiments.get(&r.experiment) {
+            Some(e) => e.clone(),
+            None => self.led.load::<Experiment>(&r.experiment)?,
+        };
+        let anchor = self.held_from(r).unwrap_or("recorded");
+        Ok(self
+            .checkouts_of(&exp, &[r])
+            .into_iter()
+            .map(|mut v| {
+                if let Value::Dict(d) = &mut v {
+                    d.insert("anchor".into(), anchor.into());
+                }
+                v
+            })
+            .collect())
+    }
+
+    fn checkouts_of(&self, exp: &Experiment, runs: &[&Run]) -> Vec<Value> {
+        if self.viewer.is_none() || runs.is_empty() {
+            return Vec::new();
+        }
+        self.code_steps(exp, runs, &[])
+            .into_iter()
+            .filter_map(|s| {
+                let ((code, tree), c) = (s.code?, s.checkout?);
+                let mut v = crate::obj! {"code" => code, "tree" => tree.map_or(Value::Null, Value::Str), "runs" => Value::list_of_str(s.refs), "label" => s.label, "rebuild" => s.command};
+                if let (Value::Dict(d), Value::Dict(more)) = (&mut v, c.to_value()) {
+                    d.extend(more);
+                }
+                Some(v)
+            })
+            .collect()
     }
 
     /// The inputs the runs read, in the made-by order: an input a run recorded as its output brings what that run read
@@ -1032,7 +1133,7 @@ impl<'a> Recipes<'a> {
                         }
                         at.insert(key, steps.len());
                     }
-                    Step { what: words.clone(), label: said(&rid, ""), refs, command: g.command.clone(), from: g.from.clone(), runnable: true }
+                    Step { what: words.clone(), label: said(&rid, ""), refs, command: g.command.clone(), from: g.from.clone(), runnable: true, ..Default::default() }
                 }
                 (None, Some(r)) if r.retracted.is_some() => Step { what: words.clone(), label: said(&rid, ": retracted"), refs, ..Default::default() },
                 (None, Some(r)) => {
@@ -1064,7 +1165,7 @@ impl<'a> Recipes<'a> {
                 _ if g.made_it() => g.label().to_string(),
                 _ => format!("{}: {}", g.label(), g.text),
             };
-            return Step { what, label, refs, command: g.text.clone(), from: String::new(), runnable: g.made_it() };
+            return Step { what, label, refs, command: g.text.clone(), from: String::new(), runnable: g.made_it(), ..Default::default() };
         }
         let (k, n) = (given.len(), runs.len());
         let later = given.iter().filter(|(_, g)| !g.made_it()).count();
@@ -1411,15 +1512,15 @@ fn code_here(led: &Ledger, code: Option<(&str, &str)>, failed: bool, differs: &d
     let root = &led.root;
     let full = (!commit.is_empty()).then(|| sources::git(root, &["rev-parse", "--verify", "-q", &format!("{commit}^{{commit}}")])).flatten().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
     let Some(full) = full else {
-        return ("elsewhere", format!("{at}, which this checkout does not hold"), again(&crate::cli::shlex_quote(url)), false);
+        return ("elsewhere", format!("{at}, which your checkout does not hold"), again(&crate::cli::shlex_quote(url)), false);
     };
     let Some(differ) = differs(&full) else {
-        return ("elsewhere", format!("{at}, which this checkout does not hold"), again(&crate::cli::shlex_quote(url)), false);
+        return ("elsewhere", format!("{at}, which your checkout does not hold"), again(&crate::cli::shlex_quote(url)), false);
     };
     let differ: Vec<String> = differ.into_iter().map(|(_, p)| p).collect();
     if differ.is_empty() {
         let aside = if !taken { "the record aside" } else { "the record and the parent's results aside" };
-        return ("here", format!("{at}, here: this checkout's code is commit {short}'s, {aside}"), String::new(), true);
+        return ("here", format!("{at}, here: your checkout's code is commit {short}'s, {aside}"), String::new(), true);
     }
     let n = differ.len();
     let files = if n == 1 { "1 file differs".to_string() } else { format!("{n} files differ") };
@@ -1596,18 +1697,18 @@ fn command_said(c: &Value) -> String {
     }
     if let Some(code) = c.get_str("code").filter(|x| !x.is_empty()) {
         let short: String = code.chars().take(12).collect();
-        let tree = c.get_str("tree").filter(|t| !t.is_empty()).map(|t| format!(" with the uncommitted changes rb kept as git tree {}", t.chars().take(12).collect::<String>())).unwrap_or_default();
+        let tree = c.get_str("tree").filter(|t| !t.is_empty()).map(|t| format!(", with changes outside the record not committed that rb kept as git tree {}", t.chars().take(12).collect::<String>())).unwrap_or_default();
         parts.push(if c.get("code_reported").map_or(false, Value::truthy) { format!("made at {short}{tree}, as reported") } else { format!("ran at {short}{tree}") });
         let here = c.get("code_here").cloned().unwrap_or(Value::empty_dict());
         // the commit or tree by its name, never "that commit": the briefing names more than one
         let that = if tree.is_empty() { format!("commit {short}") } else { format!("tree {}", c.get_str("tree").unwrap_or("").chars().take(12).collect::<String>()) };
         let files = |k: &str| here.get(k).and_then(Value::as_list).map(|l| l.iter().map(|x| one_line(&pyjson::py_str(x))).collect::<Vec<_>>()).unwrap_or_default();
         match here.get_str("state") {
-            Some("same") => parts.push(format!("this checkout's code is {that}'s")),
-            Some("absent") => parts.push(format!("{} this checkout does not hold", if tree.is_empty() { "a commit" } else { "a tree" })),
+            Some("same") => parts.push(format!("your checkout's code is {that}'s")),
+            Some("absent") => parts.push(format!("{} your checkout does not hold", if tree.is_empty() { "a commit" } else { "a tree" })),
             Some("differs") => {
                 let (held, extra, untracked) = (files("differs"), files("extra"), files("untracked"));
-                let mut said = format!("this checkout's code is not {that}'s");
+                let mut said = format!("your checkout's code is not {that}'s");
                 // a few files are named, more are counted after the first three
                 let named = |fs: &[String]| if fs.len() <= 3 { next_step::and_list(fs) } else { crate::assess::first_three(fs, ", ") };
                 if !held.is_empty() {
@@ -2316,10 +2417,10 @@ mod tests {
         assert!(text(code, "what") == "code" && !get(code, "runnable").truthy(), "{code:?}");
         // what a rerun needs is the code it names, as rb status and rb show will say it
         let row = list(&v9, "ready").iter().find(|x| text(x, "label") == "code").cloned().unwrap();
-        assert_eq!(text(&row, "text"), format!("ok · commit {}", &earlier[..10]));
+        assert_eq!(text(&row, "text"), format!("ok · commit {}", &earlier[..12]));
         let v10 = r.run(&rec.load_run("seed10")).unwrap();
         assert_eq!(text(&list(&v10, "steps")[0], "command"), format!("git worktree add --detach ../e1-{} {later}", &later[..7]));
-        assert_eq!(text(&list(&v10, "steps")[0], "label"), format!("code · commit {}, which fp32 and int8 · seed 10 ran at", &later[..10]));
+        assert_eq!(text(&list(&v10, "steps")[0], "label"), format!("code · commit {}, which fp32 and int8 · seed 10 ran at", &later[..12]));
     }
 
     #[test]
@@ -2386,7 +2487,7 @@ mod tests {
         let code = &list(&v, "steps")[0];
         let dir = format!("../e3-{}-{}", &head[..7], &tree[..7]);
         assert_eq!(text(code, "command"), format!("git worktree add --detach {dir} {head}\ngit -C {dir} read-tree -u --reset {tree}"));
-        assert_eq!(text(code, "label"), format!("code · commit {} with the uncommitted changes rb kept as git tree {}, which int8{apart} ran at", &head[..10], &tree[..10]));
+        assert_eq!(text(code, "label"), format!("code · commit {}, with changes outside the record not committed that rb kept as git tree {}, which int8{apart} ran at", &head[..12], &tree[..12]));
         // run as given, the recipe gives back the code the run ran with
         let made = rec.root.join(&dir);
         for line in text(code, "command").lines() {
@@ -3059,17 +3160,17 @@ mod tests {
         let v = rerun(&led).unwrap().expect("a clone");
         let short: String = first.chars().take(12).collect();
         assert_eq!(text(&v, "code.state"), "here", "{v:?}");
-        assert_eq!(text(&v, "code.text"), format!("{url} at {short}, here: this checkout's code is commit {short}'s, the record aside"));
+        assert_eq!(text(&v, "code.text"), format!("{url} at {short}, here: your checkout's code is commit {short}'s, the record aside"));
         assert_eq!(text(&v, "code.get"), "");
         let e1 = &list(&v, "experiments")[0];
         assert_eq!(text(e1, "first"), "rb journal run -- python eval.py --seed 1");
         assert_eq!(rerun_next(&v), vec!["rb journal run -- python eval.py --seed 1".to_string()]);
         let lines = rerun_lines(&v);
         assert_eq!(lines[0], format!("- parent: INT8 ResNet-50 on ImageNet (cloned {} from <https://example.org/ana/int8/bundle.zip>)", &crate::pytime::now()[..10]));
-        assert_eq!(lines[1], format!("- code: {url} at {short}, here: this checkout's code is commit {short}'s, the record aside"));
+        assert_eq!(lines[1], format!("- code: {url} at {short}, here: your checkout's code is commit {short}'s, the record aside"));
         assert_eq!(
             lines.last().unwrap(),
-            &format!("- e1, first, for c1: `rb journal run -- python eval.py --seed 1` (the parent's run run1abcde of fp32 and int8, its command as given; per run seed=1; ran at {short}; this checkout's code is commit {short}'s); no run recorded here yet")
+            &format!("- e1, first, for c1: `rb journal run -- python eval.py --seed 1` (the parent's run run1abcde of fp32 and int8, its command as given; per run seed=1; ran at {short}; your checkout's code is commit {short}'s); no run recorded here yet")
         );
         // a changed file is said with its name
         std::fs::write(code.join("eval.py"), "print('top1 at last')\n").unwrap();
@@ -3099,7 +3200,7 @@ mod tests {
         }
         let taken = fork_with(&checkout, Some(crate::obj! {"url" => url, "commit" => at.clone(), "taken_out" => Value::list_of_str(["results/s1/".to_string()])}), plan2);
         let v = rerun(&taken).unwrap().unwrap();
-        assert_eq!(text(&v, "code.text"), format!("{url} at {short}, here: this checkout's code is commit {short}'s, the record and the parent's results aside"));
+        assert_eq!(text(&v, "code.text"), format!("{url} at {short}, here: your checkout's code is commit {short}'s, the record and the parent's results aside"));
         // the parent's run ran at the second commit: this checkout's eval.py is not that commit's, and it holds a file
         // that commit does not; the command that puts that commit's files here comes before the run's own
         let ran_short: String = second.chars().take(12).collect();
@@ -3114,7 +3215,7 @@ mod tests {
         // never offers it
         assert_eq!(rerun_next(&v), vec!["rb journal run -- python eval.py --seed 1".to_string()]);
         assert!(rerun_lines(&v).last().unwrap().contains(&format!(
-            "ran at {ran_short}; this checkout's code is not commit {ran_short}'s: it differs in eval.py, and holds results/s2.json the commit does not; `{restore}` makes it commit {ran_short}'s: it writes over eval.py and deletes results/s2.json here and keeps no copy"
+            "ran at {ran_short}; your checkout's code is not commit {ran_short}'s: it differs in eval.py, and holds results/s2.json the commit does not; `{restore}` makes it commit {ran_short}'s: it writes over eval.py and deletes results/s2.json here and keeps no copy"
         )), "{:?}", rerun_lines(&v));
         // one diff per commit on each read, however many of the parent's runs ran it
         let mut twice = plan.clone();
@@ -3169,7 +3270,7 @@ mod tests {
         let other = fork(&scratch("elsewhere"), Some((url, "0123456789abcdef0123456789abcdef01234567")), plan.clone());
         let v = rerun(&other).unwrap().unwrap();
         assert_eq!(text(&v, "code.state"), "elsewhere");
-        assert_eq!(text(&v, "code.text"), format!("{url} at 0123456789ab, which this checkout does not hold"));
+        assert_eq!(text(&v, "code.text"), format!("{url} at 0123456789ab, which your checkout does not hold"));
         assert_eq!(text(&v, "code.get"), format!("rb clone https://example.org/ana/int8/bundle.zip <new folder> --code {url}"));
         // the runs' commands run in the folder the code is got into, whose own Next names them: none here
         assert_eq!(rerun_next(&v), vec![text(&v, "code.get")]);
@@ -3278,7 +3379,7 @@ mod tests {
         assert_eq!(text(get(c, "code_here"), "state"), "absent", "{c:?}");
         let line = rerun_lines(&v).last().unwrap().clone();
         let (cs, ts): (String, String) = (commit.chars().take(12).collect(), tree.chars().take(12).collect());
-        assert!(line.contains(&format!("ran at {cs} with the uncommitted changes rb kept as git tree {ts}; a tree this checkout does not hold")), "{line}");
+        assert!(line.contains(&format!("ran at {cs}, with changes outside the record not committed that rb kept as git tree {ts}; a tree your checkout does not hold")), "{line}");
         // where the tree is here, the code is compared with it
         let here = fork_root_in(&rec.root, &commit, plans["e4"].clone());
         let v = rerun(&here).unwrap().unwrap();

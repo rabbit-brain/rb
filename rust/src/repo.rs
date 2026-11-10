@@ -390,7 +390,8 @@ fn zsplit(s: Option<String>) -> HashSet<String> {
 pub fn git_view(root: &Path) -> GitView {
     let Some(listed) = git(root, &["ls-files", "-z", "--cached"]) else { return GitView::default() };
     let head = git(root, &["rev-parse", "--verify", "-q", "HEAD"]);
-    let branch = git(root, &["rev-parse", "--abbrev-ref", "HEAD"]);
+    // the branch HEAD names, one with no commit yet too; none on a detached HEAD
+    let branch = git(root, &["symbolic-ref", "--short", "-q", "HEAD"]);
     let mut gv = GitView {
         commit: head.map(|h| strip(&h).to_string()).filter(|h| !h.is_empty()),
         branch: branch.map(|h| strip(&h).to_string()).filter(|h| !h.is_empty()),

@@ -29,8 +29,8 @@ def test_rbs_own_files_make_no_tree_dirty(tmp_path, monkeypatch, capsys):
     capsys.readouterr()
     assert main(["run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6"], typed=True) == 0
     out = capsys.readouterr().out
-    assert "uncommitted changes when recorded" not in out
-    assert "Only rb's own files are uncommitted" in out
+    assert "not committed when recorded" not in out
+    assert "Only rb's own files are not committed" in out
     # the only ref the receipt keeps is the commit's own tree, as for any clean tree: no snapshot of rb's files
     refs = subprocess.run(["git", "-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/rb/snapshots/"], capture_output=True, text=True).stdout.split()
     head_tree = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True).stdout.strip()
@@ -38,7 +38,7 @@ def test_rbs_own_files_make_no_tree_dirty(tmp_path, monkeypatch, capsys):
     # a change of the user's own is code again
     (root / "eval.py").write_text("print('top5')\n", encoding="utf-8")
     assert main(["run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.5"], typed=True) == 0
-    assert "uncommitted changes when recorded" in capsys.readouterr().out
+    assert "not committed when recorded" in capsys.readouterr().out
 
 
 def test_rbs_section_in_a_file_git_keeps_with_other_line_endings_is_still_rbs(tmp_path, monkeypatch, capsys):
@@ -63,7 +63,7 @@ def test_rbs_section_in_a_file_git_keeps_with_other_line_endings_is_still_rbs(tm
     capsys.readouterr()
     assert main(["run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6"], typed=True) == 0
     out = capsys.readouterr().out
-    assert "uncommitted changes when recorded" not in out and "Only rb's own files are uncommitted" in out, out
+    assert "not committed when recorded" not in out and "Only rb's own files are not committed" in out, out
     refs = subprocess.run(["git", "-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/rb/snapshots/"], capture_output=True, text=True).stdout.split()
     assert refs == [subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True).stdout.strip()]
 
@@ -88,9 +88,9 @@ def test_rbs_own_page_and_export_make_no_tree_dirty(tmp_path, monkeypatch, capsy
     assert (root / "rb-page.html").is_file() and (root / "rb-export").is_dir() and (root / "rb-export.zip").is_file()
     assert main(["run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6"], typed=True) == 0
     out = capsys.readouterr().out
-    assert "uncommitted changes when recorded" not in out, out
+    assert "not committed when recorded" not in out, out
     refs = subprocess.run(["git", "-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/rb/snapshots/"], capture_output=True, text=True).stdout.split()
     assert refs == [subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True).stdout.strip()]
     (root / "rb-export" / "page.html").write_text("my notes\n", encoding="utf-8")
     assert main(["run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.5"], typed=True) == 0
-    assert "uncommitted changes when recorded" in capsys.readouterr().out
+    assert "not committed when recorded" in capsys.readouterr().out

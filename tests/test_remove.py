@@ -120,7 +120,7 @@ def test_dry_run_removes_nothing_and_its_text_names_no_writer(repo):
     assert r.returncode == 0 and repo.files() == before
     assert r.stdout.startswith("Dry run: nothing was removed. rb remove would do this in ")
     for part in ("Will remove:\n  .rb/: the record (", "\n  AGENTS.md: rb's section, as rb added it: the file goes back to what it was, byte for byte",
-                 "\nNot rb's to touch: ", "\nListed, not removed:\n", "pip uninstall rabbit-brain", " files of the record have uncommitted changes. To keep a copy first, run: rb export --with-record "):
+                 "\nNot rb's to touch: ", "\nListed, not removed:\n", "pip uninstall rabbit-brain", " record files not committed. To keep a copy first, run: rb export --with-record "):
         assert part in r.stdout, part
     for writer in ("human:", "ana", "agent:"):
         assert writer not in r.stdout.split(" would do this in ", 1)[1].split("\n", 1)[1], writer
@@ -600,7 +600,7 @@ def test_a_record_outside_git_is_said_to_be_in_no_commit(tmp_path):
     rec.rb("experiment", "add", "int8 against fp32", "--id", "e1", "--baseline", "fp32", "--candidate", "int8")
     plan = _plan(rec)
     text = rec.run("remove", "--dry-run").stdout
-    assert f"\n{plan['uncommitted']} files of the record are in no commit, since this folder is not in git. To keep a copy first, run: {plan['copy_first']}\n" in text
+    assert f"\n{plan['uncommitted']} record files not committed (not in git). To keep a copy first, run: {plan['copy_first']}\n" in text
 
 
 def test_a_checkout_at_the_home_folder_keeps_the_skill_every_project_reads(tmp_path):

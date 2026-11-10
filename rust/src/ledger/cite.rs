@@ -196,7 +196,7 @@ impl Reader<'_> {
                 Some((_, size)) if *size > MOST_BYTES => none(true, true, format!("{path} is larger than 16 MB, and rb quotes no line of it")),
                 Some(_) => match rel.as_ref().and_then(|rel| crate::sources::git_bytes(self.root, &["cat-file", "blob", &format!("{commit}:{rel}")])) {
                     Some(b) => Read { tracked: true, bytes: Some(b), at_commit: true, changed: false, why_not: String::new() },
-                    None => none(true, true, format!("{path} could not be read at commit {}", commit.chars().take(7).collect::<String>())),
+                    None => none(true, true, format!("{path} could not be read at commit {}", crate::checkout::short(commit))),
                 },
             }
         };
@@ -238,7 +238,7 @@ impl Reader<'_> {
             None => (String::new(), sp.path.clone()),
         };
         let label = if sp.last == sp.line { format!("{} · line {}", sp.path, sp.line) } else { format!("{} · lines {}-{}", sp.path, sp.line, sp.last) };
-        let short: String = commit.chars().take(7).collect();
+        let short: String = crate::checkout::short(commit);
         let mut d = Dict::new();
         d.insert("key".into(), sp.key.clone().into());
         d.insert("raw".into(), Value::List(Vec::new()));

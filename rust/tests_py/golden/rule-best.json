@@ -84,7 +84,7 @@
    "exit": 0,
    "out": [
     "runp5h4s6 on e1: int8.val_loss=0.8941 \u00b7 seed=1",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion undetermined \u00b7 point only: val_loss: 0.8941 nats \u00b7 best unit seed 1, 1 seed (rb)",
     "",
@@ -100,7 +100,7 @@
    "exit": 0,
    "out": [
     "runqtdhpa on e1: int8.val_loss=0.8912 \u00b7 seed=2",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion undetermined \u00b7 point only: val_loss: 0.8912 nats \u00b7 best unit seed 2, 2 seeds (rb)",
     "",
@@ -116,7 +116,7 @@
    "exit": 0,
    "out": [
     "run4teabd on e1: int8.val_loss=0.8887 \u00b7 seed=3",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion undetermined \u00b7 point only: val_loss: 0.8887 nats \u00b7 best unit seed 3, 3 seeds (rb)",
     "",
@@ -132,7 +132,7 @@
    "exit": 0,
    "out": [
     "runf3hlli on e1: int8.val_loss=0.8957 \u00b7 seed=4",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 criterion undetermined \u00b7 point only: val_loss: 0.8887 nats \u00b7 best unit seed 3, 4 seeds (rb)",
     "",
@@ -148,7 +148,7 @@
    "exit": 0,
    "out": [
     "runedhdx7 on e1: int8.val_loss=0.893 \u00b7 seed=5",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  c1 recorded values meet criterion \u00b7 point only: val_loss: 0.8887 nats \u00b7 best unit seed 3, 5 seeds (rb)",
     "",
@@ -406,6 +406,7 @@
    "out": [
     "best",
     "Kept with rb since 2026-10-01. All 5 runs were recorded afterwards, not as they happened.",
+    "no commit yet",
     "",
     "Not filed under a question",
     "  c1      best of 5 seeds reaches 0.889. val_loss: 0.8887 nats \u00b7 best unit seed 3, 5 seeds (rb); point only: a best of N is one unit's own value, with no interval; recorded values meet criterion: best of 5 seeds, seed 3: 0.8887 \u2264 0.889; declared after the evidence existed: all 5 units were produced before it was declared.",
@@ -416,6 +417,8 @@
     "  - e1: 1 criterion was declared after its evidence existed",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work status --short --untracked-files=all -- .rb",
     "",
     "Rules",
     "  c1      best of 5 seeds reaches 0.889",
@@ -445,6 +448,7 @@
    "out": [
     "rb-page.html written: the project as one file, readable anywhere; send it to anyone.",
     "It is the record as computed now; regenerate after new runs. If it ever disagrees with rb status, rb status is right.",
+    "The page says: no commit yet.",
     ""
    ],
    "err": [
@@ -813,8 +817,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "553296dd5c5c3fc8ab20a4156e3a2c77caab4fd383c3a8f02563f7bf31ae9505",
-   "bytes": 206676
+   "sha256": "55e3eca9fef049d5374f1364daaa844847133998bfa3a744062c88269320e234",
+   "bytes": 207929
   }
  }
 }

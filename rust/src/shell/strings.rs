@@ -364,12 +364,43 @@ pub const FOUND_HOW: &str = "record it from your screen, or with the command rb 
 pub const FOUND_HOW_NONE: &str = "to record it: rb ui, or the command rb reconcile gives for it";
 /// The top bar's words for a project cloned from a published one.
 pub const A_FORK_OF: &str = "a fork of ";
-/// The Rerun panel's code line: the code the runs used, at its commit, with what the copy had not committed when the
-/// manifest names it (`repo.changed`), then what travels.
-pub const CODE_THE_RUNS_USED: &str = "The code the runs used: ";
+/// The Rerun panel's code line: the code when the page was made (the exporter's HEAD, or origin's commit with the same
+/// code; never a run's commit), at its commit, then what the checkout had not committed when the manifest names it
+/// (`repo.changed`), which a rerun does not get, then what travels.
+pub const CODE_WHEN_MADE: &str = "The code when this page was made: ";
 pub const AT_COMMIT: &str = " at commit ";
-pub const WITH_CHANGES_NOT_COMMITTED: &str = ", with changes not committed: ";
+pub const NOT_COMMITTED_NO_RERUN: &str = "Not committed, so a rerun does not get it: ";
+/// The same, for several files.
+pub const NOT_COMMITTED_NO_RERUN_THEM: &str = "Not committed, so a rerun does not get them: ";
+/// The one or the other, by how many files a rerun does not get.
+pub fn not_committed_no_rerun(n: usize) -> &'static str {
+    if n == 1 { NOT_COMMITTED_NO_RERUN } else { NOT_COMMITTED_NO_RERUN_THEM }
+}
 pub const CODE_TRAVELS: &str = ". The record and the files its checks read travel in this bundle; rb clone gets the code at that commit and puts the record in it.";
+/// About's block (PARITY 2.10): what a page published with its code's address says of it. The rest of the block is
+/// checkout.rs's evidence, made once for every surface.
+pub fn host_link(c12: &str) -> String {
+    format!("The record's files at commit {c12}")
+}
+pub fn host_opens(host: &str) -> String {
+    format!(" open on {host} for anyone who can see the repository.")
+}
+pub const CHECK_IT: &str = "To check it yourself, in your terminal:";
+pub fn then_status_says(dir: &str, line: &str) -> String {
+    let in_dir = if dir.is_empty() { String::new() } else { format!(" in {dir}") };
+    format!("Then rb status{in_dir} says \u{201c}{line}\u{201d} in its first lines.")
+}
+/// What rb status says under the title in a clone of the commit, checked out at it.
+pub const CLONE_LINE: &str = "no branch \u{b7} all record files committed";
+pub fn origin_lacks(c12: &str) -> (String, String) {
+    (format!("When this page was made, commit {c12} was on no branch git had fetched from "), ", so a clone of it may not have that commit.".into())
+}
+pub fn same_code(older12: &str) -> String {
+    format!("Commit {older12} there holds the same code; the commits after it change only the record, the results files rb reads and files rb wrote.")
+}
+pub fn origin_unseen(c12: &str) -> (String, String) {
+    ("When this page was made, git had fetched no branch from ".into(), format!(", so rb could not tell whether a clone of it has commit {c12}."))
+}
 /// The Rerun panel's way out with no script: back to the Overview (A's script draws its own Close in the dialog).
 pub const CLOSE: &str = "Close";
 /// The fold of a computed comparison's declarations, as rb page always titled it.
@@ -621,7 +652,7 @@ pub fn and_more(n: usize) -> String {
 /// The glossary (SHELL-SPEC sections 7.5 and 12, row 32): each term the page draws with a hint, with rb's own line for
 /// it (rb context's Words, rb page's, AGENTS.md's, the freeze help). The fold "What the words on this page mean" holds
 /// the same lines, so the document has them with no script.
-pub const HINTS: [(&str, &str); 40] = [
+pub const HINTS: [(&str, &str); 41] = [
     ("open (question)", "no call has closed it. A call on the question closes it: answered (accept), dropped (reject), parked, stopped, pivoted or shipped; investigate and continue keep it open. A finding or an interpretation does not make that call."),
     ("note (on a question)", "recorded words on what meeting a rule would mean for the question. A note counts only while its rule is met; rb computes the finding and never asserts the inverse."),
     ("Computed comparison", "rb's reading of a declared reversal between two rules: both numbers and intervals stay visible, and it makes no call on the question."),
@@ -666,7 +697,13 @@ pub const HINTS: [(&str, &str); 40] = [
     ("question link", "the question a rule's finding bears on, with the recorded words on what meeting the rule would mean for it."),
     ("identity", "how exactly a resource is named: exact (the hash of its bytes), version (a release) or name only."),
     ("amended", "changed after the rules and settings were locked; the change, its reason and what it changed from are kept."),
+    // rb open's alone: a page has no viewer's checkout (the glossary on a page leaves it out)
+    (YOUR_CHECKOUT, "the folder rb open started in, as git sees it now, compared file by file with the code the runs ran. The record and the files the runs name are left out, and so are files that code never held. Show code diff still lists those, with any file added since."),
 ];
+
+/// Reproduce's subject on rb open (the term, its line in HINTS) and the fold that holds the diff to copy.
+pub const YOUR_CHECKOUT: &str = "your checkout";
+pub const SHOW_CODE_DIFF: &str = "Show code diff";
 
 /// The glossary fold's summary, and the anchor of each line: `g-` and the term in lower case, each run of other
 /// characters one hyphen ("g-open-question", "g-rb-s-interval").

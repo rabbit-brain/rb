@@ -537,6 +537,13 @@ experiments[].reproduce.steps[].refs[]	string	1c	new: reproduce.rs; rerunnabilit
 experiments[].reproduce.steps[].command	string	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.steps[].from	string	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.steps[].runnable	bool	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.steps[].checkout	null|object	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+experiments[].reproduce.steps[].checkout.state	string	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+experiments[].reproduce.steps[].checkout.said	string	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+experiments[].reproduce.steps[].checkout.files	list	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+experiments[].reproduce.steps[].checkout.files[]	string	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+experiments[].reproduce.steps[].checkout.more	number	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+experiments[].reproduce.steps[].checkout.diff	string	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
 experiments[].reproduce.per_run	object	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.per_run.keys	list	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.per_run.keys[]	string	1c	new: reproduce.rs; rerunnability today	both
@@ -661,6 +668,13 @@ runs.{id}.reproduce.steps[].command	string	1c	new: reproduce.rs, the recipe narr
 runs.{id}.reproduce.steps[].from	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.steps[].runnable	bool	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.steps[].n	number	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.steps[].checkout	null|object	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+runs.{id}.reproduce.steps[].checkout.state	string	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+runs.{id}.reproduce.steps[].checkout.said	string	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+runs.{id}.reproduce.steps[].checkout.files	list	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+runs.{id}.reproduce.steps[].checkout.files[]	string	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+runs.{id}.reproduce.steps[].checkout.more	number	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
+runs.{id}.reproduce.steps[].checkout.diff	string	1b	contract 1.15 (round 12): checkout.rs compare, your checkout against the code a runnable code step names, at rb open's start place, now; null where none is compared	live
 runs.{id}.reproduce.per_run	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.per_run.keys	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.per_run.keys[]	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
@@ -703,6 +717,15 @@ runs.{id}.reproduce.made[].line	string	1c	new: reproduce.rs, the recipe narrowed
 runs.{id}.reproduce.script	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.commands	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.prompt	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.code_step	null|object	1b	contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command	live
+runs.{id}.reproduce.code_step.label	string	1b	contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command	live
+runs.{id}.reproduce.code_step.checkout	null|object	1b	contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command	live
+runs.{id}.reproduce.code_step.checkout.state	string	1b	contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command	live
+runs.{id}.reproduce.code_step.checkout.said	string	1b	contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command	live
+runs.{id}.reproduce.code_step.checkout.files	list	1b	contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command	live
+runs.{id}.reproduce.code_step.checkout.files[]	string	1b	contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command	live
+runs.{id}.reproduce.code_step.checkout.more	number	1b	contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command	live
+runs.{id}.reproduce.code_step.checkout.diff	string	1b	contract 1.15 (round 12): reproduce.rs, the run's own code step (its label) and your checkout under it; null where the run's code is no command	live
 runs.{id}.retracted.at	string	today	retraction_words	both
 runs.{id}.retracted.line	string	today	retraction_words	both
 runs.{id}.retracted.why	string	today	retraction_words	both
@@ -798,6 +821,57 @@ history.sittings[].lines[].refs[]	string	5H	new: history.rs over delta::wrote	bo
 history.sittings[].lines[].why	string	5H	new: history.rs over delta::wrote	both
 history.sittings[].lines[].note	string	5H	history.rs: a session's reason apart from why (contract 1.2)	both
 history.sittings[].lines[].log_index	number	5H	new: history.rs over delta::wrote	both
+checkout	null|object	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	both
+checkout.state	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	both
+checkout.said	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	both
+checkout.line	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	both
+checkout.commit	null|string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	both
+checkout.on_branch	bool	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.name	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.record_files_not_committed	number	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.record_files_ignored	number	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.ignored_by	null|string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.record_held	bool|null	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.changes_outside_record	bool	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.why	null|string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.page_line	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.fold	list	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.fold[]	object	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.fold[].text	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.fold[].kind	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.fold[].sha	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
+checkout.record_files	null|number	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.not_committed_files	list	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.not_committed_files[]	object	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.not_committed_files[].path	string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.not_committed_files[].change	string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.not_committed_files[].from	null|string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.ignored_files	list	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.ignored_files[]	string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.checked_at	string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.check	null|string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence	list	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[]	object	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[].kind	string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[].text	string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[].code	list	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[].sha	null|string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[].when	null|string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[].at	null|string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[].cmd	null|string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[].says	null|string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.evidence[].code[]	string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
+checkout.page_evidence	list	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[]	object	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[].kind	string	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[].text	string	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[].code	list	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[].sha	null|string	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[].when	null|string	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[].at	null	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[].cmd	null	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[].says	null	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.page_evidence[].code[]	string	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
 places	object	today	webui place, places, versions, elsewhere	live
 places.place	object	today	webui place, places, versions, elsewhere	live
 places.place.id	string	today	webui place, places, versions, elsewhere	live
@@ -813,6 +887,10 @@ places.places[].id	string	today	webui place, places, versions, elsewhere	live
 places.places[].label	string	today	webui place, places, versions, elsewhere	live
 places.places[].can_show	bool	today	webui place, places, versions, elsewhere	live
 places.places[].why_not	string	today	webui place, places, versions, elsewhere	live
+places.places[].said	string	1b	contract 1.15 (round 12): places.rs Place::said, rb's line for the place	live
+places.places[].started_here	null|object	1b	contract 1.15 (round 12): the worktree rb open was started in, with no record of its own: its commit and whether it has changes outside the record	live
+places.places[].started_here.commit	null|string	1b	contract 1.15 (round 12): the worktree rb open was started in, with no record of its own: its commit and whether it has changes outside the record	live
+places.places[].started_here.changes_outside_record	bool	1b	contract 1.15 (round 12): the worktree rb open was started in, with no record of its own: its commit and whether it has changes outside the record	live
 places.versions	list	today	webui place, places, versions, elsewhere	live
 places.versions[]	object	today	webui place, places, versions, elsewhere	live
 places.versions[].sha	string	today	webui place, places, versions, elsewhere	live

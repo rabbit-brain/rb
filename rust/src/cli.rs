@@ -765,20 +765,15 @@ fn run(argv: Vec<String>) -> i32 {
             out.notes.extend(latex);
             // a preview tells nothing of what changed since the session last looked, and remembers nothing of it
             if delta_command(&command) && !dry && !INNER.with(|i| i.get()) {
-                // a write beside a note whose file does not read tells what it tells on a clean record: the delta's
-                // reading leaves that note out as the write did (a note is in no open item), and names nothing new
-                let delta = || crate::delta::for_command(&command, out.told.as_deref(), out.told_lines.as_deref());
-                out.delta = if beside {
-                    let enclosing_left = crate::ledger::notes_left();
-                    let was = crate::ledger::notes_beside(true);
-                    let d = delta();
-                    let _ = crate::ledger::notes_left();
-                    crate::ledger::notes_left_again(enclosing_left);
-                    crate::ledger::notes_beside(was);
-                    d
-                } else {
-                    delta()
-                };
+                // a command beside a note whose file does not read (a write made whole, or a read that never reads
+                // notes, rb reconcile) tells what it tells on a clean record: the delta's reading leaves that note out
+                // (a note is in no open item), and names nothing new
+                let enclosing_left = crate::ledger::notes_left();
+                let was = crate::ledger::notes_beside(true);
+                out.delta = crate::delta::for_command(&command, out.told.as_deref(), out.told_lines.as_deref());
+                let _ = crate::ledger::notes_left();
+                crate::ledger::notes_left_again(enclosing_left);
+                crate::ledger::notes_beside(was);
             }
             out.emit(code == EXIT_OK || code == EXIT_CHECK_FAILED, Vec::new());
             // for rb installed with pip, one quiet line at most once a day when a newer rb is out

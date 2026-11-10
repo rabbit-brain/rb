@@ -42,6 +42,7 @@ pub mod http;
 pub mod hub;
 pub mod elsewhere;
 pub mod places;
+pub mod checkout;
 pub mod view;
 pub mod graph;
 pub mod reproduce;
@@ -57,7 +58,7 @@ pub mod telemetry;
 pub mod usage;
 pub mod cmds;
 
-pub const VERSION: &str = "0.8.3";
+pub const VERSION: &str = "0.8.4";
 
 /// The version rb says it is: VERSION, or RB_TEST_VERSION when the tests pin it (as RB_TEST_NOW pins the clock and
 /// RB_TEST_SEED the ids), so what they expect outlives a release.

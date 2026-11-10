@@ -140,11 +140,13 @@ pub fn worktrees(top: &Path) -> Vec<Worktree> {
     trees
 }
 
-/// A place as rb names it: its branch and its path, as git gives them; a detached one by its commit.
+/// A place as rb names it: its branch and its path, as git gives them; a detached one as "no branch" (its commit is
+/// one step down, never in its name); one with neither branch nor commit (a record outside git) by its path alone.
 pub fn label(branch: Option<&str>, path: &str, head: Option<&str>) -> String {
-    match branch {
-        Some(b) => format!("{b} · {path}"),
-        None => format!("detached at {} · {path}", head.map(|h| h.chars().take(12).collect::<String>()).unwrap_or_default()),
+    match (branch, head.filter(|h| !h.is_empty())) {
+        (Some(b), _) => format!("{b} · {path}"),
+        (None, Some(_)) => format!("no branch · {path}"),
+        (None, None) => path.to_string(),
     }
 }
 
@@ -289,7 +291,9 @@ struct Place {
     path: Option<String>,
     head: Option<String>,
     changes: IndexMap<String, char>,
-    local: HashSet<String>,
+    /// its record files not committed, as its checkout counts them, and in its words
+    local: usize,
+    counted: Option<String>,
     same_project: bool,
     gone: bool,
 }
@@ -298,6 +302,8 @@ struct Place {
 pub struct Elsewhere {
     pub value: Value,
     pub label: String,
+    /// its record files no commit keeps, in the words its own screens say them ("2 record files not committed")
+    pub counted: Option<String>,
 }
 
 fn opt(s: &Option<String>) -> Value {
@@ -341,14 +347,23 @@ pub fn elsewhere(led: &Ledger, experiment: Option<&str>) -> Res<Vec<Elsewhere>> 
         };
         // a worktree removed without git worktree prune: what it committed is still in git, and nothing else is
         let local = if wt.gone { IndexMap::new() } else { uncommitted(&wt.path, &prefix) };
-        let local_keys: HashSet<String> = local.keys().cloned().collect();
         for (k, v) in local {
             changes.insert(k, v);
         }
+        // counted as its own screens count it: every record file no commit keeps there, a note's file and the log alike
+        let (n_local, counted) = if wt.gone {
+            (0, None)
+        } else {
+            let root = wt.path.join(&prefix);
+            let root = root.parent().unwrap_or(&wt.path);
+            let head = wt.head.clone().filter(|h| !h.is_empty() && !h.chars().all(|c| c == '0'));
+            let c = crate::checkout::Checkout::in_tree(root, &wt.path, head, wt.branch.clone(), false);
+            (c.count(), c.count_said())
+        };
         let same_project = same(uid_at(&top, (!wt.gone).then_some(wt.path.as_path()), wt.head.as_deref(), &prefix));
         let name = wt.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         places.push(Place {
-            branch: wt.branch.clone(), worktree: Some(name), path: Some(wt.listed.clone()), head: wt.head.clone(), changes, local: local_keys,
+            branch: wt.branch.clone(), worktree: Some(name), path: Some(wt.listed.clone()), head: wt.head.clone(), changes, local: n_local, counted,
             same_project, gone: wt.gone,
         });
     }
@@ -365,7 +380,7 @@ pub fn elsewhere(led: &Ledger, experiment: Option<&str>) -> Res<Vec<Elsewhere>> 
         if !changes.is_empty() {
             let same_project = same(uid_at(&top, None, Some(tip), &prefix));
             places.push(Place {
-                branch: Some(name.to_string()), worktree: None, path: None, head: Some(tip.to_string()), changes, local: HashSet::new(), same_project,
+                branch: Some(name.to_string()), worktree: None, path: None, head: Some(tip.to_string()), changes, local: 0, counted: None, same_project,
                 gone: false,
             });
         }
@@ -374,7 +389,6 @@ pub fn elsewhere(led: &Ledger, experiment: Option<&str>) -> Res<Vec<Elsewhere>> 
     for p in &places {
         let mut added: IndexMap<String, IndexMap<String, Vec<String>>> = IndexMap::new();
         let mut changed: Vec<String> = Vec::new();
-        let mut n_local = 0i64;
         let mut items: Vec<(&String, &char)> = p.changes.iter().collect();
         items.sort();
         for (rel, status) in items {
@@ -383,9 +397,6 @@ pub fn elsewhere(led: &Ledger, experiment: Option<&str>) -> Res<Vec<Elsewhere>> 
                 if exp != e {
                     continue;
                 }
-            }
-            if p.local.contains(rel) {
-                n_local += 1;
             }
             if *status == 'A' {
                 added.entry(exp).or_default().entry(kind.to_string()).or_default().push(id);
@@ -409,20 +420,19 @@ pub fn elsewhere(led: &Ledger, experiment: Option<&str>) -> Res<Vec<Elsewhere>> 
                 "head" => opt(&p.head),
                 "added" => Value::Dict(a),
                 "changed" => Value::List(changed.into_iter().map(Value::Str).collect()),
-                "uncommitted" => n_local,
+                "uncommitted" => p.local as i64,
                 "path" => opt(&p.path),
                 "same_project" => p.same_project,
                 "gone" => p.gone,
             };
             let at = p.head.as_deref().filter(|h| !h.is_empty()).map(|h| h.chars().take(12).collect::<String>());
             let named = match (&p.path, &p.branch, &at) {
-                (Some(path), None, _) => label(None, path, at.as_deref()),
-                (Some(path), Some(b), Some(h)) => format!("{} at {h}", label(Some(b), path, None)),
-                (Some(path), Some(b), None) => label(Some(b), path, None),
+                (Some(path), b, Some(h)) => format!("{} at {h}", label(b.as_deref(), path, Some(h))),
+                (Some(path), b, None) => label(b.as_deref(), path, None),
                 (None, Some(b), Some(h)) => format!("{b} at {h}"),
                 (None, b, _) => b.clone().unwrap_or_default(),
             } + if p.gone { " (removed since)" } else { "" };
-            out.push(Elsewhere { value, label: named });
+            out.push(Elsewhere { value, label: named, counted: p.counted.clone() });
         }
     }
     out.truncate(MAX_PLACES);
@@ -434,9 +444,9 @@ pub fn lines(led: &Ledger, places: &[Elsewhere]) -> Res<Vec<String>> {
     Ok(said(led, places)?
         .into_iter()
         .zip(places)
-        .map(|((adds, n_local), Elsewhere { label, value })| match value.get("same_project") {
+        .map(|((adds, _), Elsewhere { label, value, counted })| match value.get("same_project") {
             Some(Value::Bool(false)) => format!("  {label}: a separate project, with its own record"),
-            _ => format!("  {label}: {adds}") + &if n_local > 0 { format!(" · {n_local} record file{} not committed", if n_local == 1 { "" } else { "s" }) } else { String::new() },
+            _ => format!("  {label}: {adds}") + &counted.as_ref().map(|c| format!(" \u{b7} {c}")).unwrap_or_default(),
         })
         .collect())
 }
@@ -522,7 +532,7 @@ mod tests {
         let place = |kinds: Value| {
             let mut a = Dict::new();
             a.insert("int8".into(), kinds);
-            Elsewhere { value: crate::obj! {"added" => Value::Dict(a), "changed" => Value::List(vec![]), "uncommitted" => 0i64, "same_project" => true}, label: "exp-b".into() }
+            Elsewhere { value: crate::obj! {"added" => Value::Dict(a), "changed" => Value::List(vec![]), "uncommitted" => 0i64, "same_project" => true}, label: "exp-b".into(), counted: None }
         };
         let mut two = Dict::new();
         two.insert("criterion".into(), ids(&["c1", "c2"]));
@@ -553,7 +563,7 @@ mod tests {
         kinds.insert("run".into(), Value::List(vec![Value::Str("r1".into())]));
         let mut a = Dict::new();
         a.insert("e1".into(), Value::Dict(kinds));
-        let places = [Elsewhere { value: crate::obj! {"added" => Value::Dict(a), "changed" => Value::List(vec![]), "uncommitted" => 0i64, "same_project" => true}, label: "exp-b".into() }];
+        let places = [Elsewhere { value: crate::obj! {"added" => Value::Dict(a), "changed" => Value::List(vec![]), "uncommitted" => 0i64, "same_project" => true}, label: "exp-b".into(), counted: None }];
         let status: Vec<String> = said(&led, &places).unwrap().into_iter().map(|(s, _)| s).collect();
         let screen: Vec<String> = said_on_screen(&led, &places).unwrap().into_iter().map(|(s, _)| s).collect();
         let _ = std::fs::remove_dir_all(&dir);

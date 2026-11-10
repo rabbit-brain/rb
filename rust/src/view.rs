@@ -651,8 +651,9 @@ impl Observed {
 
 /// Where a run was recorded, where its receipt names a worktree other than the place shown: the place's label (its
 /// branch and path when recorded, as git lists the path while it is there), and `observed_in` {label, commit, dirty,
-/// gone, label_short, place}, the label saying "recorded in <place> at <commit>, with uncommitted changes (removed
-/// since)", label_short the same with the place named in short, and place its id where a screen can show it.
+/// gone, label_short, place}, the label saying "recorded in <place> (removed since)" with no commit (a run's commit and
+/// code are its receipt's, in Source details), label_short the same with the place named in short, and place its id
+/// where a screen can show it.
 pub fn observed_in(run: &Run, shown: &PlaceShown) -> Option<Observed> {
     let at = run.receipt.attached.as_ref()?;
     let Some(path) = at.get("worktree").and_then(|w| w.get("path")).and_then(|p| p.as_str()) else { return observed_on_branch(at, shown) };
@@ -669,11 +670,7 @@ pub fn observed_in(run: &Run, shown: &PlaceShown) -> Option<Observed> {
     let dirty = at.get("dirty").map_or(false, |d| d.truthy());
     let place = crate::elsewhere::label(branch, &shown_path, commit);
     let short = crate::elsewhere::label(branch, &shown.short_of(&resolved, &shown_path), commit);
-    let tail = match (branch, commit) {
-        (Some(_), Some(c)) => format!(" at {}", c.chars().take(12).collect::<String>()),
-        _ => String::new(),
-    } + if dirty { ", with uncommitted changes" } else { "" }
-        + if gone { GONE } else { "" };
+    let tail = if gone { GONE } else { "" };
     let id = if gone { None } else { shown.id_of(&resolved, branch) };
     let value = crate::obj! {
         "label" => format!("recorded in {place}{tail}"), "commit" => commit.map(|c| Value::Str(c.to_string())).unwrap_or(Value::Null), "dirty" => dirty,
@@ -684,7 +681,7 @@ pub fn observed_in(run: &Run, shown: &PlaceShown) -> Option<Observed> {
 
 /// Where a run whose receipt keeps no worktree was recorded, shown at a linked worktree's record: such a receipt was
 /// written in the clone's main worktree (a write from a linked one keeps its path) or by a build that kept none, so it
-/// says the branch and commit it keeps ("recorded in main at 1cb5fd140e6e"), where that branch is not the place's.
+/// says the branch it keeps ("recorded in main"), where that branch is not the place's; its commit is its receipt's.
 fn observed_on_branch(at: &Dict, shown: &PlaceShown) -> Option<Observed> {
     let branch = at.get("branch").and_then(|b| b.as_str()).filter(|b| !b.is_empty())?;
     let commit = at.get("commit").and_then(|c| c.as_str()).filter(|c| !c.is_empty())?;
@@ -692,7 +689,7 @@ fn observed_on_branch(at: &Dict, shown: &PlaceShown) -> Option<Observed> {
         return None;
     }
     let dirty = at.get("dirty").map_or(false, |d| d.truthy());
-    let label = format!("recorded in {branch} at {}", commit.chars().take(12).collect::<String>()) + if dirty { ", with uncommitted changes" } else { "" };
+    let label = format!("recorded in {branch}");
     // rb cannot tell which checkout such a receipt was written in, so it links to none
     let value = crate::obj! {"label" => label.clone(), "commit" => commit, "dirty" => dirty, "gone" => false, "label_short" => label, "place" => Value::Null};
     Some(Observed { place: branch.to_string(), short: branch.to_string(), id: None, gone: false, value })
@@ -787,8 +784,8 @@ pub(crate) struct RunCode {
 
 /// What a reading's runs ran, where they were recorded in more than one place and did not all run the same code, as
 /// rb's text says it (`text`, each place by its branch and path), as the user's screens do (`short`), and as a page
-/// does (`page`, by commits alone): "1 of 2 runs ran other code: exp-b · .worktrees/b at 4364dc8c1a2b, with
-/// uncommitted changes". "" in each where they all ran the same code, or rb cannot tell.
+/// does (`page`, by commits alone): "1 of 2 runs ran other code: exp-b · .worktrees/b at 4364dc8c1a2b, with changes
+/// outside the record not committed". "" in each where they all ran the same code, or rb cannot tell.
 #[derive(Debug, Clone, Default)]
 pub struct CodeNote {
     pub text: String,
@@ -877,7 +874,7 @@ impl CodeNotes {
         let tops: Vec<&String> = held.iter().filter(|(_, n)| **n == most).map(|(p, _)| p).collect();
         let reference = if held.contains_key("") { Some(String::new()) } else if tops.len() == 1 { Some(tops[0].clone()) } else { None };
         let short_of = |r: &String| self.observed.get(r).map(|o| o.named(true)).unwrap_or_default();
-        let at = |commit: &str, dirty: bool| commit.chars().take(12).collect::<String>() + if dirty { ", with uncommitted changes" } else { "" };
+        let at = |commit: &str, dirty: bool| commit.chars().take(12).collect::<String>() + if dirty { ", with changes outside the record not committed" } else { "" };
         let k = ran.len();
         let Some(p) = reference else { return tied(&ran, &short_of, &at) };
         let same: Vec<&String> = ran.iter().filter(|x| x.place == p).map(|x| &x.key).collect();
@@ -2860,15 +2857,21 @@ fn tally_of(st: &Value) -> Vec<(String, i64)> {
 /// lockfile, a CI or tool config, its own page), which rb journal still lists.
 fn live(led: &Ledger, last: usize) -> Vec<String> {
     let mut out = Vec::new();
-    for e in crate::journal::entries(&led.root, Some(last + 40)) {
+    let entries = crate::journal::entries(&led.root, Some(last + 40));
+    // a git line only for a move of HEAD, in words, from the git entry before it: never a commit's hex or the tree's flag
+    let moves = crate::checkout::head_moves(&entries, 0);
+    for (e, moved) in entries.into_iter().zip(moves) {
         let ev = Value::Dict(e);
-        let at: String = get_or(&ev, "at", "").chars().skip(11).take(5).collect();
+        // the minute in UTC, as the panel's title says
+        let raw = get_or(&ev, "at", "");
+        let at = crate::pytime::parse_iso(&raw).map_or_else(|| raw.chars().skip(11).take(5).collect(), |t| t.with_timezone(&chrono::Utc).format("%H:%M").to_string());
         match ev.get("op").and_then(|v| v.as_str()) {
             Some("file") if crate::journal::left_alone(&get_or(&ev, "path", "")) => {}
             Some("file") => out.push(format!("{at}  {}  {}", get_or(&ev, "change", ""), get_or(&ev, "path", ""))),
             Some("git") => {
-                let commit = get_truthy(&ev, "commit").unwrap_or_else(|| "no commit".into());
-                out.push(format!("{at}  git  {}", commit.chars().take(9).collect::<String>()) + if ev.get("dirty").map_or(false, |d| d.truthy()) { " · tree dirty" } else { "" });
+                if let Some(words) = moved.and_then(|(was, now, seen)| crate::checkout::move_words_seen(&led.root, was.as_deref(), now.as_deref(), seen)) {
+                    out.push(format!("{at}  git  {words}"));
+                }
             }
             Some("run") => out.push(format!("{at}  ran  {} · exit {}", get_or(&ev, "command", ""), ev.get("exit").map(py_str).unwrap_or_else(|| "None".into()))),
             _ => {}
@@ -3548,15 +3551,8 @@ pub fn run_parts(run: &Run, rc: &Value) -> Vec<RunPart> {
     }
     let at = rc.get("attached").cloned().unwrap_or(Value::empty_dict());
     if at.truthy() {
-        let parts: Vec<String> = [
-            if at.get("commit").map_or(false, |v| v.truthy()) { format!("commit {}", cut(&get_or(&at, "commit", ""), 10)) } else { "no commit".into() },
-            if at.get("dirty").map_or(false, |v| v.truthy()) { "tree dirty".into() } else { "tree clean".into() },
-        ]
-        .into_iter()
-        .filter(|x| !x.is_empty())
-        .collect();
         let when = if rc.get("made_before").map_or(false, |v| v.truthy()) { "repository when recorded, not when run" } else { "repository when recorded" };
-        out.push(part("repository", when, parts.join(" · ")));
+        out.push(part("repository", when, attached_said(&at)));
     }
     if let Some(cfg) = rc.get("config").filter(|v| v.truthy()) {
         let absent: Vec<String> = list_of(cfg, "absent").iter().map(py_str).collect();
@@ -4168,6 +4164,18 @@ impl Card {
             "kind" => self.kind.clone(), "facts" => strs(&self.facts), "dismiss_key" => self.dismiss_key.clone(), "who_line" => self.who_line.clone(),
             "bars_label" => self.bars_label.clone(), "reports" => self.reports.clone(), "sentences" => strs(&self.sentences),
             "runs" => Value::List(self.runs.iter().map(|(label, id)| crate::obj! {"label" => label.clone(), "id" => id.clone()}).collect())
+        }
+    }
+}
+
+/// A receipt's repository in the shared words: "commit 3f2a9c1e8d0b", "commit 3f2a9c1e8d0b, with changes outside the
+/// record not committed" (the receipt's own rule), or "no commit yet".
+pub fn attached_said(at: &Value) -> String {
+    match at.get("commit").filter(|v| v.truthy()) {
+        None => "no commit yet".into(),
+        Some(c) => {
+            let dirty = at.get("dirty").map_or(false, |v| v.truthy());
+            format!("commit {}", crate::checkout::short(&py_str(c))) + if dirty { ", with changes outside the record not committed" } else { "" }
         }
     }
 }

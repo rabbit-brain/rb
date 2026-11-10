@@ -354,6 +354,10 @@ pub fn research_doctor(ns: &Namespace, out: &mut Out, led: &Ledger) -> R {
             }
         }
     }
+    // how git keeps the record: files it ignores, or git that cannot be found or read
+    if let Some((check, detail, fix)) = crate::checkout::Checkout::of(&led.root).doctor_problem() {
+        problems.push(problem(check, detail, fix));
+    }
     checks.extend(problems.iter().cloned());
     for c in &checks {
         let ok = c.get("ok").map_or(false, |v| v.truthy());
@@ -419,7 +423,11 @@ fn journal_line(ev: &Value) -> Result<Option<String>, ()> {
         return Ok(None);
     }
     let Some(Value::Str(at)) = ev.get("at") else { return Err(()) };
-    let at: String = at.chars().skip(11).take(5).collect();
+    // the minute in UTC, said as such
+    let at = match crate::pytime::parse_iso(at) {
+        Some(t) => t.with_timezone(&chrono::Utc).format("%H:%M UTC").to_string(),
+        None => format!("{} UTC", at.chars().skip(11).take(5).collect::<String>()),
+    };
     let text = |k: &str| text_or_absent(ev, k).ok_or(());
     Ok(Some(match op {
         Some("file") => {
@@ -432,25 +440,28 @@ fn journal_line(ev: &Value) -> Result<Option<String>, ()> {
             format!("  {at}  {change:<8} {path}{when}")
         }
         Some("git") => {
-            let commit = text("commit")?;
+            text("commit")?;
             // checked as rb writes it, never said: a branch's name often names an agent (--json keeps it)
             text("branch")?;
-            let commit = if commit.is_empty() { "none".to_string() } else { commit.chars().take(10).collect() };
+            // a move of HEAD alone writes a line, its words worked out with the entry before it (`said`); a change of
+            // the branch alone, or of what the working tree changes, writes none
+            let Some(said) = ev.get("said").and_then(|v| v.as_str()) else { return Ok(None) };
             // the paths the move changed, counted: rb journal --json lists them, the first 4000 where git listed more
             let moved = match (ev.get("from").and_then(|f| f.as_str()), ev.get("changed").and_then(|c| c.as_list())) {
                 (Some(from), Some(paths)) if !paths.is_empty() => {
                     let more = if ev.get("cut").map_or(false, |c| c.truthy()) && paths.len() >= jr::MAX_FILES { " or more" } else { "" };
-                    format!(" · {}{more} {} changed since {}", paths.len(), plural(paths.len(), "path", "paths"), from.chars().take(10).collect::<String>())
+                    format!(" · {}{more} {} changed since commit {}", paths.len(), plural(paths.len(), "path", "paths"), crate::checkout::short(from))
                 }
                 _ => String::new(),
             };
-            format!("  {at}  git      commit {commit}") + if ev.get("dirty").map_or(false, |d| d.truthy()) { ", tree dirty" } else { "" } + &moved
+            format!("  {at}  git      {said}{moved}")
         }
         Some("run") => {
             let Some(Value::Str(command)) = ev.get("command") else { return Err(()) };
             let Some(exit @ Value::Int(_)) = ev.get("exit") else { return Err(()) };
-            let Some(secs @ (Value::Int(_) | Value::Float(_))) = ev.get("secs") else { return Err(()) };
-            format!("  {at}  ran      {command} (exit {}, {}s)", pyjson::py_str(exit), pyjson::py_str(secs))
+            // the seconds stay in --json
+            let Some(Value::Int(_) | Value::Float(_)) = ev.get("secs") else { return Err(()) };
+            format!("  {at}  ran      {command} (exit {})", pyjson::py_str(exit))
         }
         Some("dismiss") => {
             let Some(Value::Str(key)) = ev.get("key") else { return Err(()) };
@@ -470,7 +481,12 @@ fn journal_line(ev: &Value) -> Result<Option<String>, ()> {
 pub fn cmd_journal(ns: &Namespace, out: &mut Out) -> R {
     let led = Ledger::open(None)?;
     let n = arg(ns, "n").as_i64().unwrap_or(20);
-    let rows = py_last(jr::entries(&led.root, None), n);
+    let mut all = jr::entries(&led.root, None);
+    // each git entry shown says its move of HEAD (`said`, null where HEAD did not move), worked out from the entry before
+    // it, whether or not that one is shown: the first rb saw is no move
+    let start = py_last((0..all.len()).collect::<Vec<_>>(), n).first().copied().unwrap_or(all.len());
+    crate::checkout::say_moves(&led.root, &mut all, start);
+    let rows = py_last(all, n);
     if rows.is_empty() {
         // said from when rb last looked: a look that found nothing to write down writes nothing
         let first = match jr::Scope::of(&led).looked_at {
@@ -621,12 +637,16 @@ fn quote_line(q: &Quote, folder: &str) -> String {
     format!("  {label}: \"{text}\" ({})", repo::where_of(q, folder)) + if q.cut { " (continues in the file)" } else { "" }
 }
 
-/// The repository by its commit: a branch's name often names an agent, which rb's words never do (data.repository
-/// keeps the branch).
-fn head_line(plan: &repo::Plan) -> String {
+/// The repository by its commit, 12 hex: a branch's name often names an agent, which rb's words never do
+/// (data.repository keeps the branch). With no commit, the checkout's own words say why: "no commit yet", "not in
+/// git", "git not found" or "rb could not read git".
+fn head_line(plan: &repo::Plan, root: &Path) -> String {
     match &plan.commit {
-        Some(c) => format!("The repository at {}", c.chars().take(7).collect::<String>()),
-        None => "The repository (no commit yet)".to_string(),
+        Some(c) => format!("The repository at commit {}", crate::checkout::short(c)),
+        None => {
+            let co = crate::checkout::Checkout::of(root);
+            format!("The repository, {}", if co.in_git() { "no commit yet".to_string() } else { co.said() })
+        }
     }
 }
 
@@ -807,7 +827,7 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
     // file a recorded run read whole as read by it: never "0 results folders" once its runs are in
     let loose_files: Vec<repo::LooseFile> = repo::loose_results(&led.root, &plan_folders);
     let read_whole: std::collections::HashSet<String> = loose_files.iter().filter(|f| read_files.contains(&f.path) && !rows_recorded.contains_key(&f.path)).map(|f| f.path.clone()).collect();
-    out.say(format!("{}: {}.", head_line(&plan), folders_line(&plan, &loose_files)));
+    out.say(format!("{}: {}.", head_line(&plan, &led.root), folders_line(&plan, &loose_files)));
     if let Some(a) = &applied {
         // the runs it recorded count in its headline with what it indexed
         let line = get_s(a, "line");
@@ -957,8 +977,8 @@ pub fn cmd_reconcile(ns: &Namespace, out: &mut Out) -> R {
         out.say("");
         out.say(format!(
             "Changed .json, .yaml and .toml files are counted from {}. This clone does not hold {}, where the count started, or any commit before it.",
-            head.chars().take(7).collect::<String>(),
-            gone.chars().take(7).collect::<String>()
+            crate::checkout::short(head),
+            crate::checkout::short(gone)
         ));
     }
     let usual = result_roots();
@@ -1226,7 +1246,7 @@ fn reconcile_unrecorded(ns: &Namespace, out: &mut Out) -> R {
     let gv = repo::git_view(&root);
     let plan_folders: Vec<String> = plan.folders.iter().map(|fp| fp.folder.clone()).collect();
     let loose_files = repo::loose_results(&root, &plan_folders);
-    out.say(format!("{}: {}. No record here yet.", head_line(&plan), folders_line(&plan, &loose_files)));
+    out.say(format!("{}: {}. No record here yet.", head_line(&plan, &root), folders_line(&plan, &loose_files)));
     let mut reads = Dict::new();
     let loose: Vec<String> = plan.folders.iter().filter(|fp| !fp.adds()).map(|fp| fp.folder.clone()).collect();
     if !loose.is_empty() {

@@ -138,7 +138,7 @@ def test_rb_status_keeps_the_note_its_integrity_line_points_to(rb):
     code, out = rb("status", text=True)
     block = out[out.index("\n  c6      INT8 loses at most 1 point\n") + 1 :]
     block = "\n".join([block.splitlines()[0]] + [line for line in block.splitlines()[1:]][: next((i for i, line in enumerate(block.splitlines()[1:]) if not line.startswith("          ")), None)])
-    assert "ran on code with uncommitted changes, as said below" in block, block
+    assert "has a config that says the code had uncommitted changes when it ran, as said below" in block, block
     assert "says dirty: true: the code had uncommitted changes when it ran" in block, block
 
 

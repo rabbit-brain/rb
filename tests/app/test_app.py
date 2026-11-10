@@ -323,7 +323,8 @@ def _guide_block() -> str:
 def v2_walked() -> dict:
     """One walk of tests/app/overview-v2.html (the Overview of OVERVIEW-V2, with C's card levels and rb open's live
     module) by tests/app/v2.mjs, shared by the tests below as `walked` is."""
-    parts = (SCRIPT, GUIDE_CSS, SCRIPT.with_name("live.js"), APP / "overview-v2.html", APP / "v2.mjs", APP / "cdp.mjs")
+    parts = (SCRIPT, GUIDE_CSS, SCRIPT.with_name("live.js"), SCRIPT.with_name("open.css"), SCRIPT.with_name("shell.css"), APP / "overview-v2.html", APP / "v2.mjs",
+             APP / "cdp.mjs")
     key = hashlib.sha256(b"".join(p.read_bytes() for p in parts)).hexdigest()[:16]
     cache = Path(tempfile.gettempdir()) / f"rb-app-v2-{key}.json"
     with _one_browser_at_a_time():
@@ -347,8 +348,8 @@ def test_j_and_k_move_through_the_queue_and_enter_opens(v2_walked):
     _passes(v2_walked, "v2: j and k move", "v2: Enter opens", "v2: on Your call, j opens", at_least=12)
 
 
-def test_rb_open_s_top_bar_says_the_place_with_or_without_a_where_picker(v2_walked):
-    _passes(v2_walked, "v2: from 1280 the top bar", at_least=1)
+def test_rb_open_s_where_button_never_cuts_its_words(v2_walked):
+    _passes(v2_walked, "v2: the Where button's words are never cut", at_least=6)
 
 
 def test_source_details_stay_as_they_were_across_a_live_reload(v2_walked):
@@ -574,6 +575,23 @@ def _places(said: dict, wired: bool) -> None:
         assert (f"places: a past version offers no command to copy [{at}]" in names) == wired, at
     for w in (1280, 1440):
         assert f"places: a space between the Version picker and the clock [{w}]" in names, w
+    for w in (960, 1000, 1050, 1100, 1279, 1280, 1440):
+        assert f"places: a long branch and title cut the branch, never the words [{w}]" in names, w
+    for w in (960, 1100, 1279):
+        assert f"places: the working view sits beside the navigator, wider than it [{w}]" in names, w
+    for w in (390, 1100, 1280):
+        for c in ("a click on the words opens the Where list, its commit with Copy", "Copy says Copied",
+                  "Esc closes the Where list and gives focus back to its button", "w opens and closes Where"):
+            assert f"places: {c} [{w}]" in names, (c, w)
+    for w in (1100, 1280):
+        assert f"places: the open Where list floats, moving neither the page nor Version [{w}]" in names, w
+    for w in (390, 1100, 1280):
+        for c in ("the Where list gives the evidence and scrolls inside 60vh", "Tab goes from the place to the commit's Copy, then the command's",
+                  "the command's Copy says Copied"):
+            assert f"places: {c} [{w}]" in names, (c, w)
+    assert "places: once rb open stops answering, the time reads 1 minute ago" in names
+    assert "places: a live redraw keeps the Where list open, focus in it" in names
+    assert "places: printed, the Where button keeps its words, its list closed" in names
 
 
 def test_rb_open_s_places_are_chosen_by_real_clicks(two_places):

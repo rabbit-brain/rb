@@ -31,7 +31,7 @@ shape_py = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(shape_py)
 
 
-CONTRACT = "rb-shell-view/1.14"   # a minor bump adds fields only (section 1.8), so a document of an earlier minor still meets it
+CONTRACT = "rb-shell-view/1.16"   # a minor bump adds fields only (section 1.8), so a document of an earlier minor still meets it
 
 
 def same_major(contract) -> bool:
@@ -206,6 +206,26 @@ def test_the_checks_catch_a_broken_example():
     quoted = example("owner")
     quoted["made_calls"][0]["line"] = example("live")["made_calls"][0]["line"]
     assert any("Live-only value" in p for p in writer_problems(quoted, live=example("live")))
+
+
+def test_no_page_carries_your_checkout():
+    """Your checkout (tier.rs: Live yes, Owner no): an Owner document whose recipe step or run card holds a checkout
+    fails the shape, whatever it says; the Live example holds the key on every step and run, null where none is
+    compared."""
+    said = {"state": "differs", "said": "your checkout differs in 1 file: train.py", "files": ["train.py"], "more": 0,
+            "diff": 'git diff 3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0 -- ":(top)" ":(top,exclude).rb"'}
+    live = example("live")
+    assert all("checkout" in st for x in live["experiments"] for st in x["reproduce"]["steps"])
+    assert all("code_step" in r["reproduce"] for r in live["runs"].values())
+    assert not shape_problems(live, shape())[0]
+    for put in ("step", "card"):
+        doc = example("owner")
+        if put == "step":
+            doc["experiments"][0]["reproduce"]["steps"][0]["checkout"] = said
+        else:
+            next(iter(doc["runs"].values()))["reproduce"]["code_step"] = {"label": "code · commit 3f2a9c1e8d, which this run ran at", "checkout": said}
+        problems = shape_problems(doc, shape())[0]
+        assert any("Live only, and not empty on the Owner tier" in p for p in problems), (put, problems)
 
 
 def test_the_fixtures_are_what_their_generators_give():
@@ -536,6 +556,20 @@ def test_live_only_never_on_a_page(record):
     page = said(drawn_or_pending(record, "page", "owner", "R1"))
     hits = [v for v in live_only_values(example("live")) if said(v) in page]
     assert not hits, hits
+
+
+def test_a_page_never_carries_the_evidence_or_the_check(request, tmp_path):
+    """PARITY 10: a page's checkout carries About's block (page_evidence, record_files) and never what only your own
+    screens say: the evidence lines, the command that checks it, the names' lists or the minute rb asked git."""
+    needs("M0", "M4")
+    owner = model_document(int8_root(request), "owner", tmp_path)
+    c = owner.get("checkout") or {}
+    assert "page_evidence" in c and "record_files" in c, sorted(c)
+    leaked = [k for k in ("evidence", "check", "checked_at", "not_committed_files", "ignored_files", "fold", "why", "ignored_by") if k in c]
+    assert not leaked, leaked
+    assert not any(line.get("kind") in ("git", "check", "code") for line in c["page_evidence"]), c["page_evidence"]
+    assert "checkout" in example("live") and "evidence" in example("live")["checkout"]
+    assert not {"evidence", "check"} & set(example("owner")["checkout"])
 
 
 @pytest.mark.parametrize("surface", ["page", "export"])

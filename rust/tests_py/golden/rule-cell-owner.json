@@ -126,7 +126,7 @@
    "exit": 0,
    "out": [
     "runp5h4s6 on e1: fp32.val_loss=0.9612 \u00b7 seed=1, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm criterion untested \u00b7 untested: change.val_loss [where batch=32]: no reading yet",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -144,7 +144,7 @@
    "exit": 0,
    "out": [
     "runqtdhpa on e1: fp32.val_loss=0.9655 \u00b7 seed=2, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm criterion untested \u00b7 untested: change.val_loss [where batch=32]: no reading yet",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -161,7 +161,7 @@
    "exit": 0,
    "out": [
     "run4teabd on e1: fp32.val_loss=0.9701 \u00b7 seed=3, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm criterion untested \u00b7 untested: change.val_loss [where batch=32]: no reading yet",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -178,7 +178,7 @@
    "exit": 0,
    "out": [
     "runf3hlli on e1: int8.val_loss=0.9931 \u00b7 seed=1, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 point only: change.val_loss [where batch=32]: +0.0275 nats \u00b7 difference of means, as cited, 3 units (rb)",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -195,7 +195,7 @@
    "exit": 0,
    "out": [
     "runedhdx7 on e1: int8.val_loss=0.9978 \u00b7 seed=2, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 point only: change.val_loss [where batch=32]: +0.02985 nats \u00b7 difference of means, as cited, 3 units (rb)",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -212,7 +212,7 @@
    "exit": 0,
    "out": [
     "runprswmo on e1: int8.val_loss=1.0003 \u00b7 seed=3, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 loss: change.val_loss [where batch=32]: +0.03147 [+0.02209, +0.04084] nats \u00b7 difference of means, as cited, Welch interval, 3 units, 95% (rb)",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -229,7 +229,7 @@
    "exit": 0,
    "out": [
     "run6pqyge on e1: int8.val_loss=0.9899 \u00b7 seed=4, batch=32",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 loss: change.val_loss [where batch=32]: +0.02968 [+0.0205, +0.03885] nats \u00b7 difference of means, as cited, Welch interval, 4 units, 95% (rb)",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -246,7 +246,7 @@
    "exit": 0,
    "out": [
     "run7pjy2o on e1: fp32.val_loss=0.9512 \u00b7 seed=1, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 loss: change.val_loss [where batch=32]: +0.02968 [+0.0205, +0.03885] nats \u00b7 difference of means, as cited, Welch interval, 4 units, 95% (rb)",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -263,7 +263,7 @@
    "exit": 0,
    "out": [
     "run4zuz4h on e1: fp32.val_loss=0.9555 \u00b7 seed=2, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 loss: change.val_loss [where batch=32]: +0.02968 [+0.0205, +0.03885] nats \u00b7 difference of means, as cited, Welch interval, 4 units, 95% (rb)",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -280,7 +280,7 @@
    "exit": 0,
    "out": [
     "runeszfgw on e1: fp32.val_loss=0.9601 \u00b7 seed=3, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 loss: change.val_loss [where batch=32]: +0.02968 [+0.0205, +0.03885] nats \u00b7 difference of means, as cited, Welch interval, 4 units, 95% (rb)",
     "  cr criterion untested \u00b7 untested: change.val_loss [where batch=64]: no reading yet",
@@ -297,7 +297,7 @@
    "exit": 0,
    "out": [
     "run3rosg3 on e1: int8.val_loss=0.9801 \u00b7 seed=1, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 loss: change.val_loss [where batch=32]: +0.02968 [+0.0205, +0.03885] nats \u00b7 difference of means, as cited, Welch interval, 4 units, 95% (rb)",
     "  cr estimate meets criterion \u00b7 point only: change.val_loss [where batch=64]: +2.564 % \u00b7 relative change of the means, unpaired, 3 units (rb)",
@@ -314,7 +314,7 @@
    "exit": 0,
    "out": [
     "runscsfau on e1: int8.val_loss=0.9848 \u00b7 seed=2, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 loss: change.val_loss [where batch=32]: +0.02968 [+0.0205, +0.03885] nats \u00b7 difference of means, as cited, Welch interval, 4 units, 95% (rb)",
     "  cr estimate meets criterion \u00b7 point only: change.val_loss [where batch=64]: +2.81 % \u00b7 relative change of the means, unpaired, 3 units (rb)",
@@ -331,7 +331,7 @@
    "exit": 0,
    "out": [
     "rundk5ekt on e1: int8.val_loss=0.9873 \u00b7 seed=3, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 loss: change.val_loss [where batch=32]: +0.02968 [+0.0205, +0.03885] nats \u00b7 difference of means, as cited, Welch interval, 4 units, 95% (rb)",
     "  cr criterion met \u00b7 loss: change.val_loss [where batch=64]: +2.979 [+2.662, +3.296] % \u00b7 relative change of the means, paired, delta-method t interval, 3 units, 95% (rb)",
@@ -348,7 +348,7 @@
    "exit": 0,
    "out": [
     "runqscttb on e1: int8.val_loss=0.9769 \u00b7 seed=4, batch=64",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: 2026-05-01 00:00:00 (reported)",
     "  cm not reproduced \u00b7 loss: change.val_loss [where batch=32]: +0.02968 [+0.0205, +0.03885] nats \u00b7 difference of means, as cited, Welch interval, 4 units, 95% (rb)",
     "  cr estimate meets criterion \u00b7 loss: change.val_loss [where batch=64]: +2.791 [+1.205, +4.378] % \u00b7 relative change of the means, unpaired, delta-method t interval, 4 units, 95% (rb)",
@@ -449,6 +449,7 @@
    "out": [
     "rb-page.html written: the project as one file, readable anywhere; send it to anyone.",
     "It is the record as computed now; regenerate after new runs. If it ever disagrees with rb status, rb status is right.",
+    "The page says: no commit yet.",
     ""
    ],
    "err": [
@@ -1472,8 +1473,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "11b45d2f321a28d58a4d8e316b6fd10182606640cae747be76d9190d16bc788c",
-   "bytes": 274793
+   "sha256": "938c0f8d202e2a14bf9a90ebc351dbcee9bb3a2bdc104974b4337296f679da9a",
+   "bytes": 275956
   },
   "said.txt": [
    "grid: FP32 baseline INT8 Difference Batch: 32 0.966 \u00b7 3 seeds 0.995 \u00b7 4 seeds 0.02968 nats higher than FP32 (+0.0205 to +0.03885) Batch: 64 0.956 \u00b7 3 seeds 0.982 \u00b7 4 seeds 0.027 nats higher than FP32",

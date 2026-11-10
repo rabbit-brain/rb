@@ -1461,7 +1461,7 @@ def test_status_says_what_is_in_other_worktrees_and_branches(repo, capsys, monke
     places = {p["branch"]: p for p in st["elsewhere"]}
     assert set(places) == {"agent/wide", "agent/depth"}
     wide = places["agent/wide"]
-    assert wide["worktree"] == wt.name and wide["uncommitted"] == 1
+    assert wide["worktree"] == wt.name and wide["uncommitted"] == 2           # the note's file and the log
     assert (wide["path"], wide["same_project"], wide["gone"]) == (listed_paths()[wt.resolve()], True, False)
     assert {k: len(v) for k, v in wide["added"]["e1"].items()} == {"variant": 1, "run": 2, "note": 1}
     assert list(places["agent/depth"]["added"][""]) == ["question"] and places["agent/depth"]["path"] is None
@@ -1470,7 +1470,7 @@ def test_status_says_what_is_in_other_worktrees_and_branches(repo, capsys, monke
     assert "Elsewhere (2)" in text
     # a place by its branch and its path, as git gives them, and its commit; nothing that says who wrote there
     wide_at, depth_at = git("rev-parse", "agent/wide").strip()[:12], git("rev-parse", "agent/depth").strip()[:12]
-    assert f"  agent/wide · {wide['path']} at {wide_at}: 1 variant, 2 runs and 1 note on e1 (width) · 1 record file not committed" in text
+    assert f"  agent/wide · {wide['path']} at {wide_at}: 1 variant, 2 runs and 1 note on e1 (width) · 2 record files not committed" in text
     assert f"  agent/depth at {depth_at}: 1 question on the project" in text
     assert not [w for w in WRITER_SAYS if w in text]
     git("merge", "-q", "--no-edit", "agent/depth")
@@ -1522,7 +1522,7 @@ def test_status_tells_worktrees_at_one_commit_apart_by_branch_and_path(repo, cap
     text = capsys.readouterr().out
     lines = sorted(line.strip() for line in text.splitlines() if " at " + at + ": " in line)
     assert lines == sorted(
-        f"{name.replace('-', '/')} · {listed[tree.resolve()]} at {at}: {n} note{'s' if n > 1 else ''} on e1 (width) · {n} record file{'s' if n > 1 else ''} not committed"
+        f"{name.replace('-', '/')} · {listed[tree.resolve()]} at {at}: {n} note{'s' if n > 1 else ''} on e1 (width) · {n + 1} record files not committed"
         for n, (name, tree) in enumerate(trees.items(), 1))
     assert not [w for w in WRITER_SAYS if w in text]
 

@@ -870,7 +870,7 @@ fn spec_from(ns: &Namespace, out: &mut Out, led: &Ledger) -> R {
         "{experiment}: {} {} from {rel}{} · {verified} verified",
         rows.len(),
         assess::plural("setting", rows.len() as i64),
-        commit.as_ref().map(|c| format!(" @{}", trunc(c, 7))).unwrap_or_default()
+        commit.as_ref().map(|c| format!(" @{}", trunc(c, 12))).unwrap_or_default()
     ));
     for (_, _, row) in &rows {
         if let Some(r) = row {
@@ -977,15 +977,18 @@ pub fn cmd_criterion_relate(ns: &Namespace, out: &mut Out) -> R {
     actor_line(out, &led)?;
     out.data.insert("object".into(), obj("criterion", c.dump(false)));
     let latest = c.relations.iter().rev().find(|r| r.kind == kind && r.target == target);
+    // the relation is written whole, its log line with it: the write reads the two criteria, their experiments and
+    // settings, never an analysis, so its reading (the two findings) leaves out what reads a file that does not read,
+    // named after its own lines
+    let mut not_read: Vec<(String, String)> = Vec::new();
     if remove {
         if let Some(relation) = latest.filter(|r| r.retracted.is_some()) {
             out.data.insert("relation".into(), Value::Dict(Ledger::withdrawn_relation(&c, relation)));
         }
+        // a withdrawal reads no finding, yet its reply names the files the relation's findings could not read, as a
+        // declaration's does
+        led.after_write(led.finding(&c), &mut not_read)?;
     } else if let Some(relation) = latest.filter(|r| r.retracted.is_none()) {
-        // the relation is written whole, its log line with it: the write reads the two criteria, their experiments and
-        // settings, never an analysis, so its reading (the two findings) leaves out what reads a file that does not read,
-        // named after its own lines
-        let mut not_read: Vec<(String, String)> = Vec::new();
         if let Some(reading) = led.after_write(led.criterion_relation(&c, relation, &indexmap::IndexMap::new()), &mut not_read)? {
             if let Some(Value::Str(summary)) = reading.get("summary") {
                 let said = crate::ledger::relations::relation_problems(&reading);
@@ -993,11 +996,11 @@ pub fn cmd_criterion_relate(ns: &Namespace, out: &mut Out) -> R {
             }
             out.data.insert("relation".into(), Value::Dict(reading));
         }
-        led.unread_beside(&mut not_read)?;
-        say_not_read(out, "relation", &not_read);
-        if !not_read.is_empty() {
-            out.next = vec!["rb doctor".into()];
-        }
+    }
+    led.unread_beside(&mut not_read)?;
+    say_not_read(out, if remove { "withdrawal" } else { "relation" }, &not_read);
+    if !not_read.is_empty() {
+        out.next = vec!["rb doctor".into()];
     }
     Ok(0)
 }
@@ -2125,24 +2128,31 @@ fn run_add_one(ns: &Namespace, out: &mut Out, pick: Option<usize>) -> R {
             out.data.insert("config_dirty".into(), Value::Str(d));
         }
     }
+    // where git cannot say, the checkout's own words say why: not in git, git not found, rb could not read git
+    let no_git = || {
+        let co = crate::checkout::Checkout::of(&led.root);
+        // git's own name stays as it is written
+        let said = if co.in_git() || co.state == crate::checkout::State::NotInGit { "Not in git".to_string() } else { co.said() };
+        format!("  {said}: the receipt has no commit.")
+    };
     match &run.receipt.attached {
-        None => out.say("  Not in a git repository: the receipt has no commit."),
-        Some(git) if git.is_empty() => out.say("  Not in a git repository: the receipt has no commit."),
+        None => out.say(no_git()),
+        Some(git) if git.is_empty() => out.say(no_git()),
         Some(git) => {
             if git.get("commit").map_or(true, |v| v.is_null()) {
-                out.say("  The repository has no commit yet; the receipt records the uncommitted tree's hash.");
+                out.say("  No commit yet: the receipt records a hash of the files not committed.");
             } else if !git.get("dirty").map_or(false, |v| v.truthy()) {
                 // rb's own files (what rb init or rb skill add installed, unchanged since) are no code a run ran
                 let top = crate::sources::git_top(&led.here).unwrap_or_else(|| led.root.clone());
                 let own = crate::sources::rb_written(&led.root, &top);
                 if !own.is_empty() {
                     out.say(format!(
-                        "  Only rb's own files are uncommitted ({}): they are not the run's code, so the receipt reads the tree as clean.",
+                        "  Only rb's own files are not committed ({}): they are not the run's code, so the receipt finds no changes outside the record.",
                         crate::assess::first_three(&own, ", ")
                     ));
                 }
             } else if git.get("dirty").map_or(false, |v| v.truthy()) {
-                out.say(format!("  The tree had uncommitted changes when recorded (hash {}).", trunc(&get_s(git, "diff_sha256"), 12)));
+                out.say(format!("  Changes outside the record not committed when recorded (hash {}).", trunc(&get_s(git, "diff_sha256"), 12)));
                 let watched = crate::ledger::support::run_command(&run).map_or(false, |g| g.given == "observed");
                 out.say_all(crate::cmds::exact_code_at(&led.root, git, crate::ledger::made_before_recorded(&run), watched));
             }

@@ -280,7 +280,7 @@ def test_a_setting_read_from_the_working_tree_is_as_old_as_its_line_and_a_run_ad
     that last changed it, a run add says it of the run it records, and the same day gives both UTC times."""
     rec.write("sweep/train.py", "EPOCHS = 90\nLR = 0.1\n", when=MAY)
     rec.write("sweep/train.py", "EPOCHS = 90\nLR = 0.2\n", when=JUNE)
-    june = rec.git("rev-parse", "HEAD").strip()[:7]
+    june = rec.git("rev-parse", "HEAD").strip()[:12]
     first = rec.ok("run", "add", "prec", "fp32.top1=0.761", "int8.top1=0.755", "--produced-at", "2026-05-20T10:00:00Z")["data"]["object"]["id"]
     said = lambda run, day: f"lr is provisional: sweep/train.py:2 was last changed at {june}, committed 2026-06-01, after run {run} was produced ({day}): the line postdates the run"
     env = rec.ok("spec", "set", "prec", "lr", "0.2", "--source", "sweep/train.py:2", "--term", "LR")

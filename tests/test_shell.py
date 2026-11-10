@@ -2558,8 +2558,13 @@ def test_no_place_on_a_page(record):
     doc["places"] = example("live")["places"]
     for surface in ("page", "export"):
         page = page_of(record, doc, surface)
-        for leak in ("/home/ana", "~/int8-resnet50", "exp-b", ".worktrees", "record files not committed"):
+        for leak in ("/home/ana", "~/int8-resnet50", "exp-b", ".worktrees"):
             assert leak not in page, (surface, leak)
+        # how the checkout held the record is said in About's line 2 and in the owner's span on the Overview, and
+        # nowhere else: no branch, no path
+        held = [re.sub(r"<[^>]+>", "", h) for h in re.findall(r'<span(?: class="held" data-vw="owner")?>((?:[^<]|<a href="#in-git">|</a>)*)</span>', page) if "record files" in h]
+        assert held == [" \u00b7 2 record files not committed", "2 record files not committed \u00b7 at commit 3f2a9c1e8d0b"], (surface, held)
+        assert page.count("record files not committed") == 2 and 'data-vw="owner"> \u00b7 <a href="#in-git">2 record files' in page, surface
 
 
 def test_reproduce_this_project_only_with_an_address(record):
@@ -3878,7 +3883,7 @@ _VIEWER_PROBE = r"""(() => {
   const acts = [...view.querySelectorAll('pre.cmd, [data-copybtn$=":confirm"], .qbtn')].filter(shown)
     .filter(e => !e.matches('pre.cmd') || /^\s*(rb |")/.test(e.textContent));
   const next = [...view.querySelectorAll('h3')].filter(h => shown(h) && h.textContent.trim() === 'Next step');
-  return {nav: words('#nav li.yc a'), head: words('#h-queue'), lede: words('#queue .lede'), rows: words('#queue .qrow').length,
+  return {nav: words('#nav li.yc a'), head: words('#h-queue'), ovh: words('#overview .ovh'), lede: words('#queue .lede'), rows: words('#queue .qrow').length,
     buttons: words('#queue .qbtn').length, callsHead: words('#h-your-call'), callsLede: words('#your-call .lede'),
     actions: acts.length, commands: view.innerText.split('\n').filter(l => /\brb (confirm|decide|reconcile)\b/.test(l)).length,
     next: next.length, nextSaid: next.filter(h => { let e = h.nextElementSibling; while (e && !shown(e)) e = e.nextElementSibling;
@@ -3922,6 +3927,8 @@ def test_the_hub_names_who_reads_the_export_and_it_reads_their_words(int8_demo, 
     assert r.returncode == 0, r.stderr
     page = (out / "page.html").read_text(encoding="utf-8")
     script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.js").read_text(encoding="utf-8")
+    st = subprocess.run([*command(), "status", "--json"], cwd=int8_demo.root, capture_output=True, encoding="utf-8", stdin=subprocess.DEVNULL, env=int8_demo.env)
+    held = json.loads(st.stdout)["data"]["repository"]["said"]
     runs = []
     for viewer in ("none", "owner", "reader", "guest"):
         meta = "" if viewer == "none" else f'<meta name="rb-viewer" content="{viewer}">'
@@ -3973,6 +3980,11 @@ console.log(JSON.stringify({ ok: true, out }));
             assert sum(g["actions"] for g in said.values()) > 0 and sum(g["commands"] for g in said.values()) > 0
         # a viewer the page does not know reads as the reader: no action, never the owner's words
         assert guest == reader, (guest, reader)
+        # how the checkout held the record ends the Overview's line for the owner alone, before the hub's "made"; the
+        # reader and an export opened from disk read it in About only
+        assert len(ov["owner"]["ovh"]) == 1 and f" \u00b7 {held} \u00b7 made " in ov["owner"]["ovh"][0], (held, ov["owner"]["ovh"])
+        assert held not in ov["reader"]["ovh"][0] and " \u00b7 made " in ov["reader"]["ovh"][0], ov["reader"]["ovh"]
+        assert held not in ov["none"]["ovh"][0] and "made" not in ov["none"]["ovh"][0], ov["none"]["ovh"]
 
 
 def test_a_notes_citations_are_chips_on_every_surface(record):

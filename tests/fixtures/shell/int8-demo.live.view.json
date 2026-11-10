@@ -1,5 +1,5 @@
 {
-  "contract": "rb-shell-view/1.14",
+  "contract": "rb-shell-view/1.16",
   "surface": "open",
   "tier": "live",
   "rb_version": "0.6.0",
@@ -875,7 +875,8 @@
             "refs": ["imagenet-val"],
             "command": "python get_data.py --split val",
             "from": "scripts/README.md:5",
-            "runnable": true
+            "runnable": true,
+            "checkout": null
           },
           {
             "n": 2,
@@ -884,7 +885,8 @@
             "refs": ["imagenet-calib-512"],
             "command": "python get_data.py --calib 512",
             "from": "scripts/README.md:6",
-            "runnable": true
+            "runnable": true,
+            "checkout": null
           },
           {
             "n": 3,
@@ -893,9 +895,10 @@
             "refs": ["runs1", "ckpt-int8-s1"],
             "command": "python quantize.py --seed 1 --calib 512",
             "from": "scripts/README.md:8",
-            "runnable": true
+            "runnable": true,
+            "checkout": null
           },
-          {"n": 4, "what": "evaluate each arm", "label": "command (as given): recorded for 2 of 4 runs", "refs": ["runs3", "runsql7"], "command": "", "from": "", "runnable": false}
+          {"n": 4, "what": "evaluate each arm", "label": "command (as given): recorded for 2 of 4 runs", "refs": ["runs3", "runsql7"], "command": "", "from": "", "runnable": false, "checkout": null}
         ],
         "per_run": {
           "keys": ["seed", "one_cycle"],
@@ -965,7 +968,7 @@
       "tally": [["gate missed", 1]],
       "muted": [],
       "folder": "results/calib/",
-      "repo_brief": "commit 3f2a9c1 · tree dirty",
+      "repo_brief": "commit 3f2a9c1, with changes outside the record not committed",
       "design": {
         "standing": "design not confirmed",
         "pending": true,
@@ -1019,12 +1022,12 @@
           }
         ]
       },
-      "rerun": [{"state": "ok", "what": "evaluation data · imagenet-val"}, {"state": "unknown", "what": "code: commit 3f2a9c1, tree dirty"}],
+      "rerun": [{"state": "ok", "what": "evaluation data · imagenet-val"}, {"state": "unknown", "what": "code: commit 3f2a9c1, with changes outside the record not committed"}],
       "reproduce": {
         "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
         "ready": [
           {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val", "refs": ["imagenet-val"]},
-          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed", "refs": []}
         ],
         "steps": [
           {
@@ -1034,7 +1037,8 @@
             "refs": ["imagenet-val"],
             "command": "python get_data.py --split val",
             "from": "scripts/README.md:5",
-            "runnable": true
+            "runnable": true,
+            "checkout": null
           }
         ],
         "per_run": {
@@ -1053,7 +1057,7 @@
             "line": "fp32 and int8 · calib images 512: the same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1."
           }
         ],
-        "script": "# Recipe, from what the record holds. rb did not run these commands.\n# code: commit 3f2a9c1 · tree dirty (when recorded, not when run)\npython get_data.py --split val\n# command (as given): not recorded\n",
+        "script": "# Recipe, from what the record holds. rb did not run these commands.\n# code: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\npython get_data.py --split val\n# command (as given): not recorded\n",
         "commands": [],
         "prompt": "run one more top1 measurement on calibration set size, at calib_images=256, and record it in rb"
       },
@@ -1087,7 +1091,7 @@
         ["run", "recorded 2026-10-06 10:28 UTC", []],
         ["produced", "2026-10-06 10:26 UTC (reported)", []],
         ["results", "results/seed1/metrics.json · sha256 44d9a7356c16", []],
-        ["repository", "when recorded, not when run: commit 3f2a9c1 · tree clean", []],
+        ["repository", "when recorded, not when run: commit 3f2a9c1", []],
         ["command", "command (as given): not recorded", []],
         ["outputs", "ckpt-int8-s1", ["ckpt-int8-s1"]],
         ["environment", "python 3.11.9 · torch 2.4.1", []],
@@ -1122,7 +1126,8 @@
             "command": "python get_data.py --split val",
             "from": "scripts/README.md:5",
             "runnable": true,
-            "n": 1
+            "n": 1,
+            "checkout": null
           },
           {
             "what": "get the calibration images",
@@ -1131,7 +1136,8 @@
             "command": "python get_data.py --calib 512",
             "from": "scripts/README.md:6",
             "runnable": true,
-            "n": 2
+            "n": 2,
+            "checkout": null
           },
           {
             "what": "make the int8 model",
@@ -1140,9 +1146,10 @@
             "command": "python quantize.py --seed 1 --calib 512",
             "from": "scripts/README.md:8",
             "runnable": true,
-            "n": 3
+            "n": 3,
+            "checkout": null
           },
-          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runs1"], "command": "", "from": "", "runnable": false, "n": 4}
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runs1"], "command": "", "from": "", "runnable": false, "n": 4, "checkout": null}
         ],
         "per_run": {"keys": ["seed", "one_cycle"], "by_arm": {"fp32": [{"run": "runs1", "seed": "1", "one_cycle": "1"}], "int8": [{"run": "runs1", "seed": "1", "one_cycle": "1"}]}},
         "settings": {
@@ -1167,7 +1174,8 @@
         ],
         "script": "# Reproduce a run of e1 · fp32 and int8 · seed 1\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# training data · imagenet-calib-512 · scripts/README.md:6\npython get_data.py --calib 512\n# per run: seed 1 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n# fp32 and int8 · seed 1: made ckpt-int8-s1. How to get it again:\npython quantize.py --seed 1 --calib 512\n",
         "commands": [],
-        "prompt": ""
+        "prompt": "",
+        "code_step": null
       }
     },
     "runs2": {
@@ -1202,7 +1210,7 @@
           {"state": "partial", "label": "settings", "text": "settings: seed=2 one_cycle=1; quant_backend unknown", "refs": []},
           {"state": "unknown", "label": "code", "text": "code: unknown · the run was made before it was recorded, and names no commit", "refs": []}
         ],
-        "steps": [{"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runs2"], "command": "", "from": "", "runnable": false, "n": 1}],
+        "steps": [{"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runs2"], "command": "", "from": "", "runnable": false, "n": 1, "checkout": null}],
         "per_run": {"keys": ["seed", "one_cycle"], "by_arm": {"fp32": [{"run": "runs2", "seed": "2", "one_cycle": "1"}], "int8": [{"run": "runs2", "seed": "2", "one_cycle": "1"}]}},
         "settings": {
           "shared": [{"name": "batch_size", "value": "256", "source": "configs/eval.yaml:3", "status": "verified"}],
@@ -1217,7 +1225,8 @@
         "made": [],
         "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2, recorded 2026-10-06 10:32 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
         "commands": [],
-        "prompt": ""
+        "prompt": "",
+        "code_step": null
       }
     },
     "runs2b": {
@@ -1261,9 +1270,10 @@
             "command": "python get_data.py --split val",
             "from": "scripts/README.md:5",
             "runnable": true,
-            "n": 1
+            "n": 1,
+            "checkout": null
           },
-          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runs2b"], "command": "", "from": "", "runnable": false, "n": 2}
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runs2b"], "command": "", "from": "", "runnable": false, "n": 2, "checkout": null}
         ],
         "per_run": {"keys": ["seed", "one_cycle"], "by_arm": {"fp32": [{"run": "runs2b", "seed": "2", "one_cycle": "1"}], "int8": [{"run": "runs2b", "seed": "2", "one_cycle": "1"}]}},
         "settings": {
@@ -1279,7 +1289,8 @@
         "made": [],
         "script": "# Reproduce a run of e1 · fp32 and int8 · seed 2, recorded 2026-10-13 14:12 UTC\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: seed 2 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given): not recorded\n",
         "commands": [],
-        "prompt": ""
+        "prompt": "",
+        "code_step": null
       }
     },
     "runs3": {
@@ -1307,8 +1318,8 @@
       "made": [],
       "retracted": null,
       "observed_in": {
-        "label": "recorded in exp-b · /home/ana/int8-resnet50/.worktrees/b at 5d1e0a7",
-        "label_short": "recorded in exp-b · .worktrees/b at 5d1e0a7",
+        "label": "recorded in exp-b · /home/ana/int8-resnet50/.worktrees/b",
+        "label_short": "recorded in exp-b · .worktrees/b",
         "commit": "5d1e0a7",
         "dirty": false,
         "gone": false,
@@ -1330,7 +1341,8 @@
             "command": "python get_data.py --split val",
             "from": "scripts/README.md:5",
             "runnable": true,
-            "n": 1
+            "n": 1,
+            "checkout": null
           },
           {
             "what": "evaluate both arms",
@@ -1339,7 +1351,8 @@
             "command": "python train.py --seed 3 --quant int8",
             "from": "runs3",
             "runnable": true,
-            "n": 2
+            "n": 2,
+            "checkout": null
           }
         ],
         "per_run": {"keys": ["seed", "one_cycle"], "by_arm": {"fp32": [{"run": "runs3", "seed": "3", "one_cycle": "1"}], "int8": [{"run": "runs3", "seed": "3", "one_cycle": "1"}]}},
@@ -1356,7 +1369,8 @@
         "made": [],
         "script": "# Reproduce a run of e1 · fp32 and int8 · seed 3\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: seed 3 · one cycle 1\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given), observed by rb journal run:\npython train.py --seed 3 --quant int8\n",
         "commands": [{"run": "runs3", "command": "python train.py --seed 3 --quant int8", "observed": true}],
-        "prompt": ""
+        "prompt": "",
+        "code_step": null
       }
     },
     "runsql7": {
@@ -1394,7 +1408,7 @@
           {"state": "partial", "label": "settings", "text": "settings: none recorded for this run; quant_backend unknown", "refs": []},
           {"state": "unknown", "label": "code", "text": "code: unknown · the run was made before it was recorded, and names no commit", "refs": []}
         ],
-        "steps": [{"what": "measure both arms", "label": "command (as given): given later, not observed", "refs": ["runsql7"], "command": "python bench.py --t4", "from": "runsql7", "runnable": true, "n": 1}],
+        "steps": [{"what": "measure both arms", "label": "command (as given): given later, not observed", "refs": ["runsql7"], "command": "python bench.py --t4", "from": "runsql7", "runnable": true, "n": 1, "checkout": null}],
         "per_run": {"keys": [], "by_arm": {}},
         "settings": {
           "shared": [{"name": "batch_size", "value": "256", "source": "configs/eval.yaml:3", "status": "verified"}],
@@ -1409,7 +1423,8 @@
         "made": [],
         "script": "# Reproduce a run of e1 · fp32 and int8 · results/runs.db row 7\n# Recipe, from what the record holds. rb did not run these commands.\n# code: unknown · the run was made before it was recorded, and names no commit\n# settings: batch_size=256 quant=int8 · quant=fp32; quant_backend unknown\n# command (as given), given later, not observed:\npython bench.py --t4\n",
         "commands": [{"run": "runsql7", "command": "python bench.py --t4", "observed": false}],
-        "prompt": ""
+        "prompt": "",
+        "code_step": null
       }
     },
     "runc128": {
@@ -1437,7 +1452,7 @@
         "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
         "ready": [
           {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
-          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed", "refs": []}
         ],
         "steps": [
           {
@@ -1447,17 +1462,19 @@
             "command": "python get_data.py --split val",
             "from": "scripts/README.md:5",
             "runnable": true,
-            "n": 1
+            "n": 1,
+            "checkout": null
           },
-          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc128"], "command": "", "from": "", "runnable": false, "n": 2}
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc128"], "command": "", "from": "", "runnable": false, "n": 2, "checkout": null}
         ],
         "per_run": {"keys": ["calib_images"], "by_arm": {"int8": [{"run": "runc128", "calib_images": "128"}]}},
         "settings": {"shared": [], "by_arm": {}, "unknown": [], "counts": {"verified": 1, "unknown": 0}},
         "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
         "made": [],
-        "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 128\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 128\n# command (as given): not recorded\n",
+        "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 128\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 128\n# command (as given): not recorded\n",
         "commands": [],
-        "prompt": ""
+        "prompt": "",
+        "code_step": null
       }
     },
     "runc512": {
@@ -1485,7 +1502,7 @@
         "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
         "ready": [
           {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
-          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed", "refs": []}
         ],
         "steps": [
           {
@@ -1495,9 +1512,10 @@
             "command": "python get_data.py --split val",
             "from": "scripts/README.md:5",
             "runnable": true,
-            "n": 1
+            "n": 1,
+            "checkout": null
           },
-          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc512"], "command": "", "from": "", "runnable": false, "n": 2}
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc512"], "command": "", "from": "", "runnable": false, "n": 2, "checkout": null}
         ],
         "per_run": {"keys": ["calib_images"], "by_arm": {"int8": [{"run": "runc512", "calib_images": "512"}]}},
         "settings": {"shared": [], "by_arm": {}, "unknown": [], "counts": {"verified": 1, "unknown": 0}},
@@ -1512,9 +1530,10 @@
             "line": "The same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1."
           }
         ],
-        "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 512\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 512\n# command (as given): not recorded\n# the same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1\n# how to get it again · scripts/README.md:8\npython quantize.py --seed 1 --calib 512\n",
+        "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 512\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 512\n# command (as given): not recorded\n# the same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1\n# how to get it again · scripts/README.md:8\npython quantize.py --seed 1 --calib 512\n",
         "commands": [],
-        "prompt": ""
+        "prompt": "",
+        "code_step": null
       }
     },
     "runc1024": {
@@ -1542,7 +1561,7 @@
         "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
         "ready": [
           {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
-          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed", "refs": []}
         ],
         "steps": [
           {
@@ -1552,17 +1571,19 @@
             "command": "python get_data.py --split val",
             "from": "scripts/README.md:5",
             "runnable": true,
-            "n": 1
+            "n": 1,
+            "checkout": null
           },
-          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc1024"], "command": "", "from": "", "runnable": false, "n": 2}
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc1024"], "command": "", "from": "", "runnable": false, "n": 2, "checkout": null}
         ],
         "per_run": {"keys": ["calib_images"], "by_arm": {"int8": [{"run": "runc1024", "calib_images": "1024"}]}},
         "settings": {"shared": [], "by_arm": {}, "unknown": [], "counts": {"verified": 1, "unknown": 0}},
         "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
         "made": [],
-        "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 1024\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 1024\n# command (as given): not recorded\n",
+        "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 1024\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 1024\n# command (as given): not recorded\n",
         "commands": [],
-        "prompt": ""
+        "prompt": "",
+        "code_step": null
       }
     },
     "runc2048": {
@@ -1590,7 +1611,7 @@
         "ready_line": "to run again: ✓ 1 ok · ○ 1 unknown",
         "ready": [
           {"state": "ok", "label": "evaluation data", "text": "evaluation data · imagenet-val · how to get it again: python get_data.py --split val", "refs": ["imagenet-val"]},
-          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1 · tree dirty", "refs": []}
+          {"state": "unknown", "label": "code", "text": "code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed", "refs": []}
         ],
         "steps": [
           {
@@ -1600,17 +1621,19 @@
             "command": "python get_data.py --split val",
             "from": "scripts/README.md:5",
             "runnable": true,
-            "n": 1
+            "n": 1,
+            "checkout": null
           },
-          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc2048"], "command": "", "from": "", "runnable": false, "n": 2}
+          {"what": "evaluate both arms", "label": "command (as given): not recorded", "refs": ["runc2048"], "command": "", "from": "", "runnable": false, "n": 2, "checkout": null}
         ],
         "per_run": {"keys": ["calib_images"], "by_arm": {"int8": [{"run": "runc2048", "calib_images": "2048"}]}},
         "settings": {"shared": [], "by_arm": {}, "unknown": [], "counts": {"verified": 1, "unknown": 0}},
         "command_as_given": {"recorded": 0, "runs": 1, "line": "the run records no command (as given)"},
         "made": [],
-        "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 2048\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1 · tree dirty (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 2048\n# command (as given): not recorded\n",
+        "script": "# Reproduce a run of e2 · fp32 and int8 · calib images 2048\n# Recipe, from what the record holds. rb did not run these commands.\n# code: when recorded, not when run: commit 3f2a9c1, with changes outside the record not committed (when recorded, not when run)\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n# per run: calib images 2048\n# command (as given): not recorded\n",
         "commands": [],
-        "prompt": ""
+        "prompt": "",
+        "code_step": null
       }
     }
   },
@@ -2207,6 +2230,40 @@
       }
     ]
   },
+  "checkout": {
+    "state": "not_committed",
+    "said": "2 record files not committed",
+    "line": "2 record files not committed · at commit 3f2a9c1e8d0b, with changes outside the record not committed",
+    "commit": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0",
+    "on_branch": true,
+    "name": "main",
+    "record_files_not_committed": 2,
+    "record_files_ignored": 0,
+    "ignored_by": null,
+    "record_held": true,
+    "changes_outside_record": true,
+    "why": null,
+    "page_line": "2 record files not committed · at commit 3f2a9c1e8d0b",
+    "fold": [{"text": "at commit 3f2a9c1e8d0b, with changes outside the record not committed", "kind": "commit", "sha": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0"}],
+    "record_files": 41,
+    "not_committed_files": [{"path": ".rb/experiments/int8/runs/run4k2xa9.yaml", "change": "new", "from": null}, {"path": ".rb/log.jsonl", "change": "changed", "from": null}],
+    "ignored_files": [],
+    "checked_at": "2026-10-19T09:41:07.000+00:00",
+    "check": "git -C /home/ana/int8-resnet50 status --short --untracked-files=all -- .rb",
+    "evidence": [
+      {"kind": "found", "text": "rb checked the record with git just now: 2 of its 41 record files are new, changed or deleted since commit 3f2a9c1e8d0b.", "code": [], "sha": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "when": "just now", "at": "2026-10-19T09:41:07.000+00:00", "cmd": null, "says": null},
+      {"kind": "files", "text": "Not committed: .rb/experiments/int8/runs/run4k2xa9.yaml (new) and .rb/log.jsonl (changed)", "code": [".rb/experiments/int8/runs/run4k2xa9.yaml", ".rb/log.jsonl"], "sha": null, "when": null, "at": null, "cmd": null, "says": null},
+      {"kind": "code", "text": "This checkout has changes outside the record not committed.", "code": [], "sha": null, "when": null, "at": null, "cmd": null, "says": null},
+      {"kind": "check", "text": "To check it yourself, in your terminal:", "code": [], "sha": null, "when": null, "at": null, "cmd": "git -C /home/ana/int8-resnet50 status --short --untracked-files=all -- .rb", "says": "It lists each record file not committed, and prints nothing when all are."},
+      {"kind": "define", "text": "Record files are the files rb keeps for this project next to its code, such as its questions, rules, runs, notes and log.", "code": [], "sha": null, "when": null, "at": null, "cmd": null, "says": null}
+    ],
+    "page_evidence": [
+      {"kind": "found", "text": "rb checked the record with git when this page was made, 2026-10-19 09:41 UTC: 2 of its 41 record files are new, changed or deleted since commit 3f2a9c1e8d0b.", "code": [], "sha": "3f2a9c1e8d0b4c7a9e2f61d5b0c8a7e4f3d2c1b0", "when": "when this page was made, 2026-10-19 09:41 UTC", "at": null, "cmd": null, "says": null},
+      {"kind": "page", "text": "This page shows the record as it stood on disk; a clone of commit 3f2a9c1e8d0b has the record as that commit holds it.", "code": [], "sha": null, "when": null, "at": null, "cmd": null, "says": null},
+      {"kind": "files", "text": "Not committed: .rb/experiments/int8/runs/run4k2xa9.yaml (new) and .rb/log.jsonl (changed)", "code": [".rb/experiments/int8/runs/run4k2xa9.yaml", ".rb/log.jsonl"], "sha": null, "when": null, "at": null, "cmd": null, "says": null},
+      {"kind": "define", "text": "Record files are the files rb keeps for this project next to its code, such as its questions, rules, runs, notes and log.", "code": [], "sha": null, "when": null, "at": null, "cmd": null, "says": null}
+    ]
+  },
   "places": {
     "place": {
       "id": "main",
@@ -2217,7 +2274,7 @@
       "version": null,
       "line": "main · ~/int8-resnet50 · 2 record files not committed"
     },
-    "places": [{"id": "main", "label": "main · ~/int8-resnet50", "can_show": true, "why_not": ""}, {"id": "exp-b", "label": "exp-b · .worktrees/b", "can_show": true, "why_not": ""}],
+    "places": [{"id": "main", "label": "main · ~/int8-resnet50", "can_show": true, "why_not": "", "said": "this record · 2 record files not committed · last write 2026-10-19 09:40 UTC", "started_here": null}, {"id": "exp-b", "label": "exp-b · .worktrees/b", "can_show": true, "why_not": "", "said": "its own record · 1 record file not committed · last write 2026-10-18 16:02 UTC", "started_here": null}],
     "versions": [{"sha": "3f2a9c1", "at": "2026-10-13 15:02 UTC", "subject": "the record, as of e2"}],
     "scope_bar": null,
     "elsewhere": [

@@ -241,7 +241,7 @@ def test_each_git_move_keeps_the_paths_it_changed(rec):
     assert (moved["from"], moved["commit"], moved["dirty"]) == (base, head, True)
     assert moved["changed"] == [{"path": "configs/calibration.json", "change": "added"}, {"path": "configs/train.yaml", "change": "modified"}]
     assert moved["tree"] == [{"path": "configs/eval.yaml", "change": "modified"}]
-    assert f"commit {head[:10]}, tree dirty · 2 paths changed since {base[:10]}" in rec("journal", text=True)
+    assert f"new commit · at commit {head[:12]} · 2 paths changed since commit {base[:12]}" in rec("journal", text=True)
 
 
 # ---------------------------------------------------------------- the briefing tells, once
@@ -312,10 +312,10 @@ def test_a_changed_file_nothing_cites_is_listed_by_path_with_the_commit_it_chang
     st = rec("status").data
     said = [u["said"] for u in st["uncited_changes"]]
     assert head != base and said == [
-        f"configs/calibration.json: new since {base[:7]}; nothing in the record cites it",
-        f"configs/eval.yaml: changed since {base[:7]}, not committed; nothing in the record cites it",
-        f"configs/train.yaml: changed since {base[:7]}; nothing in the record cites it",
-        f"run_metadata.json: new since {base[:7]}, not committed; nothing in the record cites it",
+        f"configs/calibration.json: new since {base[:12]}; nothing in the record cites it",
+        f"configs/eval.yaml: changed since {base[:12]}, not committed; nothing in the record cites it",
+        f"configs/train.yaml: changed since {base[:12]}; nothing in the record cites it",
+        f"run_metadata.json: new since {base[:12]}, not committed; nothing in the record cites it",
     ]
     u = st["uncited_changes"][2]
     assert (u["path"], u["since"], u["committed"], u["new"]) == ("configs/train.yaml", base, True, False) and u["key"].startswith("changed:configs/train.yaml@")
@@ -404,7 +404,12 @@ def test_a_session_s_apply_records_the_paths_and_leaves_them_on_the_user_s_count
     assert rec("reconcile", "--apply", agent="5e7a1c00-0008").data["applied"]["line"] == "1 changed file recorded by path (configs/eval.yaml)"
     assert [u["path"] for u in rec("status").data["uncited_changes"]] == ["configs/eval.yaml", "configs/train.yaml", "run_meta.json"]
     text = rec("status", text=True)
-    assert "cites (3): rb reconcile lists each by path" in text and "5e7a1c00" not in text and "session" not in text
+    # the check command names the record's folder, which is this test's tmp folder: rb's own words never name a session
+    # in the form rb prints it, slashed on every OS (sys::slashed), which git and both Windows shells take
+    folder = str(Path.cwd().resolve()).replace("\\", "/")
+    assert f"git -C {folder} status --short --untracked-files=all -- .rb" in text
+    words = text.replace(folder, "<the record's folder>")
+    assert "cites (3): rb reconcile lists each by path" in words and "5e7a1c00" not in words and "session" not in words
     rec("reconcile", "--apply")                                                                       # the user's own
     assert rec("status").data["uncited_changes"] == [] and home().uncited == 0
 
@@ -540,8 +545,8 @@ def test_a_new_untracked_config_in_a_subfolder_is_listed(rec):
     Path("configs/recovery").mkdir()
     Path("configs/recovery/run_metadata.json").write_text('{"rebuild_path": "historical", "recovered": true}', encoding="utf-8")
     assert _said(rec) == [
-        f"configs/eval_v2.yaml: new since {base[:7]}, not committed; nothing in the record cites it",
-        f"configs/recovery/run_metadata.json: new since {base[:7]}, not committed; nothing in the record cites it",
+        f"configs/eval_v2.yaml: new since {base[:12]}, not committed; nothing in the record cites it",
+        f"configs/recovery/run_metadata.json: new since {base[:12]}, not committed; nothing in the record cites it",
     ]
     assert "configs/recovery/run_metadata.json" in [e.get("path") for e in rec("journal", "-n", "20").data["entries"]] or True
 
@@ -557,8 +562,8 @@ def test_a_change_with_an_old_file_time_is_listed(rec):
     Path("run_meta_cluster.json").write_text('{"cluster": "a100", "rebuild_path": "historical"}', encoding="utf-8")
     os.utime("run_meta_cluster.json", (old, old))
     assert _said(rec) == [
-        f"configs/eval.yaml: changed since {base[:7]}, not committed; nothing in the record cites it",
-        f"run_meta_cluster.json: new since {base[:7]}, not committed; nothing in the record cites it",
+        f"configs/eval.yaml: changed since {base[:12]}, not committed; nothing in the record cites it",
+        f"run_meta_cluster.json: new since {base[:12]}, not committed; nothing in the record cites it",
     ]
 
 
@@ -586,8 +591,8 @@ def test_a_tracked_config_at_the_top_edited_after_rb_first_looked_is_changed_not
     Path("configs/quant.yaml").write_text("bits: 8\n", encoding="utf-8")
     _commit("seed 1, and the quantizer's bits")
     assert _said(rec) == [
-        f"configs/quant.yaml: new since {base[:7]}; nothing in the record cites it",
-        f"params.yaml: changed since {base[:7]}; nothing in the record cites it",
+        f"configs/quant.yaml: new since {base[:12]}; nothing in the record cites it",
+        f"params.yaml: changed since {base[:12]}; nothing in the record cites it",
     ]
 
 
@@ -596,7 +601,7 @@ def test_a_config_gone_is_listed_as_gone(rec):
     base = _git("rev-parse", "HEAD")
     _git("rm", "-q", "configs/eval.yaml")
     _commit("no eval config")
-    assert _said(rec) == [f"configs/eval.yaml: gone since {base[:7]}; nothing in the record cites it"]
+    assert _said(rec) == [f"configs/eval.yaml: gone since {base[:12]}; nothing in the record cites it"]
 
 
 def test_files_recorded_by_path_stay_recorded_once_committed_unchanged(rec):
@@ -610,7 +615,7 @@ def test_files_recorded_by_path_stay_recorded_once_committed_unchanged(rec):
     _commit("what was recorded")
     assert _said(rec) == []
     Path("run_meta.json").write_text('{"rebuild_path": "rebuilt"}', encoding="utf-8")
-    assert _said(rec) == [f"run_meta.json: new since {applied[:7]}; nothing in the record cites it"]
+    assert _said(rec) == [f"run_meta.json: new since {applied[:12]}; nothing in the record cites it"]
 
 
 def _later(hours: int) -> str:
@@ -658,7 +663,7 @@ def test_the_count_starts_at_the_commit_rb_init_saw_though_a_later_commit_shares
     main(["status", "--json"])
     said = [u["said"] for u in Envelope.model_validate_json(capsys.readouterr().out).data["uncited_changes"]]
     if committed_before:
-        assert said == [f"configs/eval.yaml: changed since {began_on[:7]}; nothing in the record cites it"]
+        assert said == [f"configs/eval.yaml: changed since {began_on[:12]}; nothing in the record cites it"]
     else:                                                   # the first look's HEAD
         assert said == [] and json.loads(_journal_state())["changes"]["base"] == head
 
@@ -690,7 +695,7 @@ def test_a_clone_without_the_commit_the_last_apply_saw_counts_from_the_newest_co
     monkeypatch.chdir(clone)
     stand_in = _git("rev-list", "--max-parents=0", "HEAD")              # the newest commit here before the apply
     env = rec("reconcile")
-    assert [u["said"] for u in env.data["uncited_changes"]] == [f"configs/eval.yaml: changed since {stand_in[:7]}; nothing in the record cites it"]
+    assert [u["said"] for u in env.data["uncited_changes"]] == [f"configs/eval.yaml: changed since {stand_in[:12]}; nothing in the record cites it"]
     assert env.data["uncited_from_head"] is None
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: step\nlr: 0.1\n", encoding="utf-8")
     _commit("step schedule")
@@ -716,10 +721,10 @@ def test_a_clone_with_no_commit_before_the_last_apply_says_the_count_starts_at_h
     env = rec("reconcile")
     assert env.data["uncited_changes"] == [] and env.data["uncited_from_head"] == {"commit": head, "not_in_clone": applied}
     text = rec("reconcile", text=True)
-    assert f"Changed .json, .yaml and .toml files are counted from {head[:7]}. This clone does not hold {applied[:7]}, where the count started, or any commit before it." in text
+    assert f"Changed .json, .yaml and .toml files are counted from {head[:12]}. This clone does not hold {applied[:12]}, where the count started, or any commit before it." in text
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: random\n", encoding="utf-8")
     _commit("random crop")
-    assert [u["said"] for u in rec("reconcile").data["uncited_changes"]] == [f"configs/eval.yaml: changed since {head[:7]}; nothing in the record cites it"]
+    assert [u["said"] for u in rec("reconcile").data["uncited_changes"]] == [f"configs/eval.yaml: changed since {head[:12]}; nothing in the record cites it"]
 
 
 def test_more_changed_files_than_the_cap_are_said_as_more_and_an_apply_records_the_first_thousand(rec):
@@ -988,7 +993,9 @@ def test_writes_past_what_the_briefing_prints_are_told_later(rec):
     for i in range(15):
         rec("metric", "add", f"extra{i:02d}", "--maximize")
     md = rec("context", agent="5e7a1c00-0022").data["markdown"]
-    assert "extra14" in md and "extra00" not in md                               # Recent activity shows the last twelve
+    # Recent activity shows the last twelve; the repository's evidence may name the files git lists, which tell nothing
+    recent = md.split("## Recent activity", 1)[1].split("\n## ", 1)[0]
+    assert "extra14" in recent and "extra00" not in recent
     told = rec("show", "int8", agent="5e7a1c00-0022").rb_delta
     assert [d["subject"] for d in told] == ["extra00", "extra01", "extra02"]
 

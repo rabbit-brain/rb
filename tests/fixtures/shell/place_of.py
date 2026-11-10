@@ -25,7 +25,7 @@ def recorded_here(here):
         if at["id"] == here:
             r["observed_in"], r["recorded_in"] = None, None
         else:
-            r["observed_in"] = {"label": f"recorded in {at['id']} · {at['path']} at {at['commit']}", "label_short": f"recorded in {at['label']} at {at['commit']}",
+            r["observed_in"] = {"label": f"recorded in {at['id']} · {at['path']}", "label_short": f"recorded in {at['label']}",  # no commit: Source details
                                 "commit": at["commit"], "dirty": False, "gone": False, "place": at["id"]}
             r["recorded_in"] = {"place": at["id"], "label": at["label"], "href": f"#run-{rid}&place={at['id']}"}
     for f in doc["findings"].values():
@@ -43,6 +43,30 @@ if state == "away":
     # another place, now: its own scope bar, no Elsewhere (that is the live start place's), every command with its cd
     P["place"] = {"id": EXPB["id"], "label": EXPB["label"], "path": EXPB["path"], "start": False, "read_only": False, "version": None,
                   "line": "exp-b · .worktrees/b · 1 run not merged into main"}
+    # the checkout of the place shown: exp-b's own, now
+    sha = "5d1e0a7c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e"
+    doc["checkout"] = {"state": "not_committed", "said": "1 record file not committed", "line": "1 record file not committed · at commit 5d1e0a7c4b3a",
+                       "commit": sha, "on_branch": True, "name": "exp-b", "record_files_not_committed": 1, "record_files_ignored": 0,
+                       "ignored_by": None, "record_held": True, "changes_outside_record": False, "why": None,
+                       "page_line": "1 record file not committed · at commit 5d1e0a7c4b3a", "fold": [{"text": "at commit 5d1e0a7c4b3a", "kind": "commit", "sha": sha}],
+                       "record_files": 42, "not_committed_files": [{"path": ".rb/log.jsonl", "change": "changed", "from": None}], "ignored_files": [],
+                       "checked_at": doc["checkout"]["checked_at"], "check": "git -C /home/ana/int8-resnet50/.worktrees/b status --short --untracked-files=all -- .rb",
+                       "evidence": [{"kind": "found", "text": "rb checked the record with git just now: 1 of its 42 record files is new, changed or deleted since commit 5d1e0a7c4b3a.",
+                                     "when": "just now", "at": doc["checkout"]["checked_at"], "sha": sha, "code": []},
+                                    {"kind": "files", "text": "Not committed: .rb/log.jsonl (changed)", "code": [".rb/log.jsonl"]},
+                                    {"kind": "check", "text": "To check it yourself, in your terminal:", "cmd": "git -C /home/ana/int8-resnet50/.worktrees/b status --short --untracked-files=all -- .rb",
+                                     "says": "It lists each record file not committed, and prints nothing when all are."},
+                                    {"kind": "define", "text": "Record files are the files rb keeps for this project next to its code, such as its questions, rules, runs, notes and log."}],
+                       "page_evidence": [{"kind": "found", "text": "rb checked the record with git when this page was made, " + doc["at"] + ": 1 of its 42 record files is new, changed or deleted since commit 5d1e0a7c4b3a.", "sha": sha, "code": []},
+                                         {"kind": "page", "text": "This page shows the record as it stood on disk; a clone of commit 5d1e0a7c4b3a has the record as that commit holds it."},
+                                         {"kind": "files", "text": "Not committed: .rb/log.jsonl (changed)", "code": [".rb/log.jsonl"]},
+                                         {"kind": "define", "text": "Record files are the files rb keeps for this project next to its code, such as its questions, rules, runs, notes and log."}]}
+    KEYS = ("kind", "text", "code", "sha", "when", "at", "cmd", "says")    # every key on every line, as rb gives them
+    for name, when in (("evidence", None), ("page_evidence", "when this page was made, " + doc["at"])):
+        doc["checkout"][name] = [{k: l.get(k, [] if k == "code" else None) for k in KEYS} for l in doc["checkout"][name]]
+        for l in doc["checkout"][name]:
+            if l["kind"] == "found" and when:
+                l["when"] = when
     P["versions"] = []
     P["scope_bar"] = {"line": "Viewing exp-b · .worktrees/b", "back": "Back to main", "href": "#overview", "withheld": ""}
     P["elsewhere"] = []
@@ -59,6 +83,7 @@ elif state == "past":
     v = dict(P["versions"][0])
     v["shown"] = f"{MAIN['label']} as of {v['sha']} · {v['at']} · read only"
     P["place"].update(version=v, read_only=True, line="")
+    doc["checkout"] = None                       # a past version is a commit, not a checkout
     P["scope_bar"] = {"line": v["shown"], "back": "Back to now", "href": "#overview",
                       "withheld": "A past version offers no command: a call copied here would be recorded on today's readings."}
     P["elsewhere"] = []

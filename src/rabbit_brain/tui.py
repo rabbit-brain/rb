@@ -100,9 +100,10 @@ def object_card(root: Path, subject: str, place: Optional[str] = None, at: Optio
     return c
 
 
-def places_view(root: Path, place: Optional[str] = None) -> View:
-    """The places the screen can show, and the versions of the record of `place` (by default the one it started on)."""
-    return ask(root, "places", place=place or "")
+def places_view(root: Path, place: Optional[str] = None, detail: bool = False) -> View:
+    """The places the screen can show, and the versions of the record of `place` (by default the one it started on);
+    with `detail`, each place's evidence, which only WHERE prints."""
+    return ask(root, "places", place=place or "", detail=detail)
 
 
 def short(p: View) -> str:
@@ -121,11 +122,12 @@ def update_line(root: Path, started: Optional[str]) -> tuple:
         return "", started
 
 
-def place_line(info: View, place: Optional[str], at: Optional[str]) -> str:
-    """Which place and version the screen shows, in rb's words: the place's branch and path, with what it is when it is
-    not the record the screen started on; a past version as rb says one. A single checkout says its branch, else its
-    folder's name; with more places, or a past version, each is named in short. Away from where the screen started, it says it is
-    read only and how to go back before what rb says of the place."""
+def place_line(info: View, place: Optional[str], at: Optional[str], width: int = 0) -> str:
+    """Which place and version the screen shows, in rb's words. The place it started on is its face, as rb made it: its
+    branch ("no branch" when detached, its folder's name only where git cannot say), then how its checkout holds the
+    record; within `width` the branch gives way with an ellipsis, never the words. A past version is named by the day
+    it was committed. Away from where the screen started, it says it is read only and how to go back before what rb
+    says of the place."""
     shown = next((p for p in info.places if p.id == place), None) or next((p for p in info.places if p.record == "this"), None)
     if shown is None:
         return ""
@@ -133,17 +135,39 @@ def place_line(info: View, place: Optional[str], at: Optional[str]) -> str:
     if at:
         version = next((v for v in info.versions if v.sha == at), None)
         if version is not None:
-            return f"{version.get('shown_short') or version.shown} · {back}"
+            return f"{version.get('shown_day') or version.get('shown_short') or version.shown} · {back}"
+    face = shown.get("face") or ""
+    if shown.record == "this" and face:
+        return fit_face(face, (shown.get("checkout") or {}).get("said") or "", width)
     if len(info.places) <= 1:
-        # a single checkout by its branch, else its folder's name: w lists it with its whole path
-        return shown.branch or PurePosixPath(shown.path).name
+        # a single checkout by its branch, "no branch" on a detached HEAD, its folder's name only where git cannot say
+        # (rb names it so: its checkout's name): w lists it with its whole path
+        return (shown.get("checkout") or {}).get("name") or shown.branch or PurePosixPath(shown.path).name
     return short(shown) if shown.record == "this" else f"{short(shown)} · read only · {back} · {shown.said}"
+
+
+def fit_face(face: str, words: str, width: int) -> str:
+    """The face within `width` cells: the name before the words gives way first, with an ellipsis; the words never."""
+    if width <= 0 or len(face) <= width or not words or not face.endswith(f" · {words}"):
+        return face
+    name, room = face[: -len(words) - 3], width - len(words) - 3
+    return f"{name[: room - 1]}…{face[len(name):]}" if room >= 2 else words
 
 
 def back_to(info: View) -> str:
     """Where escape goes back to: the place the screen started on, by its branch (else as it is named)."""
     start = next((p for p in info.places if p.record == "this"), None)
     return "" if start is None else (start.branch or short(start))
+
+
+def utc_minute(at: str) -> str:
+    """"09:14" of "2026-11-08T10:14:03+01:00": the minute in UTC."""
+    from datetime import datetime, timezone
+    try:
+        t = datetime.fromisoformat(at.replace("Z", "+00:00"))
+    except ValueError:
+        return at[11:16]
+    return (t.astimezone(timezone.utc) if t.tzinfo else t).strftime("%H:%M")
 
 
 def _esc(text: str) -> str:
@@ -443,6 +467,13 @@ class RunLine(Static):
             self.screen.app.push_screen(ObjectScreen(root, self._ev, getattr(self.screen, "place", None), getattr(self.screen, "at", None)))
 
 
+class PlaceLine(Static):
+    """The place line, clickable: a click runs w's action, as a chip runs its key's, and owns no behaviour of its own."""
+
+    async def on_click(self) -> None:
+        await self.screen.run_action("places")
+
+
 class Chip(Static):
     """The key, clickable. Terminals stream mouse events to the app (Textual turns that on for us),
     so a chip is just the binding with a hit area: it runs the same screen action the key runs and
@@ -664,7 +695,7 @@ class PlacesScreen(ModalScreen[Optional[tuple]]):
         self.info, self.place, self.at = info, place, at
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="places-box"):
+        with VerticalScroll(id="places-box"):
             with Vertical(id="where-panel"):
                 yield OptionList(id="where")
                 yield Static(id="where-detail")     # the highlighted place's whole path, as git lists it
@@ -675,10 +706,11 @@ class PlacesScreen(ModalScreen[Optional[tuple]]):
         self.query_one("#where-panel").border_title = "WHERE"
         where = self.query_one("#where", OptionList)
         shown = self.place or next((p.id for p in self.info.places if p.record == "this"), None)
-        # a single checkout is named as it always was, with nothing under it
+        # each place's row as rb made it: its label, then what rb says of it in the words every place says them
         named = short if len(self.info.places) > 1 else (lambda p: p.label)
         for p in self.info.places:
-            where.add_option(Option(Text(f"{named(p)}: {p.said}", no_wrap=True, overflow="ellipsis"), id=f"p:{p.id}", disabled=not p.readable))
+            row = p.get("row") or f"{named(p)}: {p.said}"
+            where.add_option(Option(Text(row, no_wrap=True, overflow="ellipsis"), id=f"p:{p.id}", disabled=not p.readable))
         ids = [p.id for p in self.info.places]
         if shown in ids:
             where.highlighted = ids.index(shown)
@@ -695,11 +727,12 @@ class PlacesScreen(ModalScreen[Optional[tuple]]):
         (versions if self.at in shas else where).focus()
 
     def _detail(self, index: Optional[int]) -> None:
-        """Under the places, the highlighted one's whole path, as git lists it, and why it cannot be shown; nothing for
-        a single checkout, whose one place is named whole."""
-        many = len(self.info.places) > 1
-        p = self.info.places[index] if many and index is not None and 0 <= index < len(self.info.places) else None
-        said = "" if p is None else p.path + (f"\n{p.why_not}" if p.get("why_not") else "")
+        """Under the places, the highlighted one's lines as rb made them: its whole path, as git lists it, then how its
+        checkout holds the record (its commit, one step down from the words), and why it cannot be shown."""
+        p = self.info.places[index] if index is not None and 0 <= index < len(self.info.places) else None
+        fold = list(p.get("fold") or [p.path]) if p is not None else []
+        lines = [] if p is None else (fold[:1] + list(p.evidence) if p.get("evidence") else fold) + ([p.why_not] if p.get("why_not") else [])
+        said = "\n".join(lines)
         detail = self.query_one("#where-detail", Static)
         detail.update(f"[{DIM}]{_esc(said)}[/{DIM}]" if said else "")
         detail.display = bool(said)
@@ -778,7 +811,7 @@ class HomeScreen(Screen):
         with Horizontal(id="head-row"):
             yield Static(id="head")
             yield Static(id="since")
-        yield Static(id="place")              # which place and version the screen shows: one quiet line
+        yield PlaceLine(id="place")           # which place and version the screen shows: one quiet line
         yield Static(id="began")              # the record's line, when anything was recorded afterwards: one quiet line
         with Horizontal(id="top"):
             with Vertical(id="tree-panel"):
@@ -799,7 +832,7 @@ class HomeScreen(Screen):
     def on_mount(self) -> None:
         self._tick = 0
         self.query_one("#tree-panel").border_title = "CATALOGUE"
-        self.query_one("#live-panel").border_title = "OBSERVED"
+        self.query_one("#live-panel").border_title = "OBSERVED · UTC"
         self.query_one("#side-card").can_focus = False     # tab goes list to list, never into the preview
         self._load_places()
         if self.at_start and self._scan():                 # look once on opening, as rb status does
@@ -817,7 +850,10 @@ class HomeScreen(Screen):
             self._places = places_view(self.root, self.place)
         except Exception:  # noqa: BLE001 - the place line is a courtesy: the record still shows without it
             self._places = None
-        line = place_line(self._places, self.place, self.at) if self._places is not None else ""
+        self._paint_place()
+
+    def _paint_place(self) -> None:
+        line = place_line(self._places, self.place, self.at, self.size.width - 2) if self._places is not None else ""
         widget = self.query_one("#place", Static)
         # away from where the screen started: in the warning colour, wrapped rather than cut
         widget.set_class(bool(line) and not self.at_start, "away")
@@ -897,7 +933,7 @@ class HomeScreen(Screen):
 
     def action_places(self) -> None:
         try:
-            info = places_view(self.root, self.place)
+            info = places_view(self.root, self.place, detail=True)
         except Exception as exc:  # noqa: BLE001
             self.app.notify(str(exc)[:120], severity="warning", timeout=8)
             return
@@ -919,6 +955,7 @@ class HomeScreen(Screen):
         return self.size.width >= NARROW
 
     def on_resize(self, _event) -> None:
+        self._paint_place()
         self._fill()
 
     def _paint_scope(self, h: Any, looked: Optional[tuple] = None) -> None:
@@ -1234,11 +1271,11 @@ class HomeScreen(Screen):
         activity = []
         try:
             for e in ask(self.root, "journal", last=12, _place=self.place, _at=self.at):
-                at, op = str(e.get("at", ""))[11:16], e.get("op")
+                at, op = f"{utc_minute(str(e.get('at', '')))} UTC", e.get("op")
                 if op == "file":
                     activity.append(f"{at}  {e.get('change')}  {e.get('path')}")
-                elif op == "git":
-                    activity.append(f"{at}  git  commit {(e.get('commit') or 'none')[:10]}" + (", dirty" if e.get("dirty") else ""))
+                elif op == "git" and e.get("said"):      # a move of HEAD alone, in rb's words, with its commit
+                    activity.append(f"{at}  git  {e.get('said')}")
                 elif op == "run":
                     activity.append(f"{at}  ran  {e.get('command')} (exit {e.get('exit')})")
         except Exception:  # noqa: BLE001
@@ -1303,6 +1340,7 @@ class RBApp(App):
     #reason-box Input {{ border: none; background: $boost; padding: 0 1; }}
     Reason {{ align: center middle; }}
     PlacesScreen {{ align: center middle; }}
+    #place:hover {{ background: $boost; }}
     #places-box {{ max-width: 110; width: 100%; height: auto; max-height: 90%; background: $surface; padding: 0 1; }}
     #where-panel, #versions-panel {{ height: auto; border: round #3d4450; border-title-color: {ACCENT}; padding: 0 1; }}
     #where, #versions {{ height: auto; max-height: 12; border: none; background: transparent; }}

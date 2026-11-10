@@ -81,6 +81,14 @@ pub enum Row {
     CdCommands,
     /// rb open's fingerprint of what it shows
     Digest,
+    /// how the checkout holds the record: its words and commit, on Live with its branch and the Where list's lines
+    Checkout,
+    /// Reproduce's line under each code step: whether your checkout has the code the runs ran
+    YourCheckout,
+    /// the evidence one step down from the words, as your own screens say it: evidence, checked_at, check, the names
+    CheckoutEvidence,
+    /// About's block: page_evidence and record_files; origin_holds and record_dir where the page names the code's address
+    PageEvidence,
 }
 
 /// What a tier shows of a row.
@@ -121,6 +129,10 @@ pub const TABLE: &[(Row, &str, Shown, Shown)] = &[
     (Row::Found, "Found in the repository", Shown::Yes, Shown::Yes),
     (Row::CdCommands, "commands away from the start place, with cd <path> &&", Shown::Yes, Shown::No),
     (Row::Digest, "digest", Shown::Yes, Shown::No),
+    (Row::Checkout, "how the checkout holds the record: its words and commit (Live adds its branch and the Where list's lines)", Shown::Yes, Shown::Yes),
+    (Row::YourCheckout, "your checkout", Shown::Yes, Shown::No),
+    (Row::CheckoutEvidence, "the evidence under the words: evidence, checked_at, check, the record files named", Shown::Yes, Shown::No),
+    (Row::PageEvidence, "About's block: page_evidence, record_files (origin_holds, record_dir with the code's address)", Shown::Yes, Shown::Yes),
 ];
 
 impl Tier {
@@ -149,6 +161,7 @@ mod tests {
             Row::Readings, Row::AuthorText, Row::YourWords, Row::Commands, Row::CitedSources, Row::Repository, Row::Versions, Row::ResultFiles,
             Row::Writer, Row::Session, Row::Branch, Row::Platform, Row::YouLine, Row::DownloadAddress, Row::Hosts, Row::Places, Row::Elsewhere,
             Row::RecordedIn, Row::OtherCode, Row::Pending, Row::DesignStanding, Row::ScopeLines, Row::Found, Row::CdCommands, Row::Digest,
+            Row::Checkout, Row::YourCheckout, Row::CheckoutEvidence, Row::PageEvidence,
         ];
         for r in rows {
             assert_eq!(TABLE.iter().filter(|(x, ..)| *x == r).count(), 1, "{r:?}");

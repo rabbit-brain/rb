@@ -94,4 +94,4 @@ def test_the_integrity_line_never_says_ok_above_a_run_on_uncommitted_code(rb):
            "--produced-at", "2026-05-12")
     code, out = rb("show", "c1", text=True)
     assert "integrity: ok" not in out
-    assert "integrity: a run it counts ran on code with uncommitted changes, as said below" in out, out
+    assert "integrity: a run it counts has a config that says the code had uncommitted changes when it ran, as said below" in out, out

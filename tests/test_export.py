@@ -555,7 +555,7 @@ def test_an_export_names_no_code_where_origin_is_no_address_a_reader_can_use(rep
         assert code == 0 and env.data["repo"] is None and env.data["repo_unnamed"] == UNNAMED, (remote, env.data["repo"])
         assert "repo" not in json.loads((dest / "manifest.json").read_text(encoding="utf-8")), remote
         page = (dest / "page.html").read_text(encoding="utf-8")
-        assert "say where it is" in page and "The code the runs used" not in page, remote
+        assert "say where it is" in page and "The code when this page was made" not in page, remote
         # nothing in the bundle, the zip beside it included, holds origin's address or a path of this machine
         for f in sorted(p for p in dest.rglob("*") if p.is_file()):
             data = f.read_bytes()
@@ -827,7 +827,11 @@ SCALE_RAW, SCALE_GZIP = 2_400_000, 185_000  # bytes: the scale record's page (SH
 # it past 2.3 MB. R's script squeeze after Oct 24 (SHELL-SPEC 932's saving, script.js squeezed) brings it back down.
 # Raised to 2.45 MB on the orchestrator's call of Oct 25, 21:55 +08 (design pass 1: your view and reader's view, and
 # citations): rb open's / measured 2,402,838 to 2,407,121 bytes on MP-1025-1905's trial.
-OPEN_RAW = 2_450_000                       # bytes: rb open's / on the scale record
+# Raised to 2.48 MB in round 12 (0.8.4), for the orchestrator to confirm: the checkout's words take it from 2,401,311
+# bytes (0.8.3) to 2,462,542, from each run card's own code step and its "your checkout" line (the design's Reproduce
+# this run), commits at 12 hex and "with changes outside the record not committed" in place of "uncommitted changes";
+# a run card points at the glossary line rather than repeating it, which saved 33 KB.
+OPEN_RAW = 2_480_000                       # bytes: rb open's / on the scale record
 OPEN_TIMES_STATUS = 3.5                    # rb open's / on the scale record, against rb status --json there: about 2.5 on
                                            # a quiet box, 3.04 once under load (MP-1030-03); twice as slow reads about 5
 
@@ -1300,6 +1304,13 @@ def test_the_manifest_names_what_the_working_tree_changes_of_its_commit(repo, ca
     out = tmp_path_factory.mktemp("exports")
     code, env = repo("export", "--with-record", "--out", str(out / "clean"))
     assert code == 0 and env.data["repo"]["changed"] == []
+    # a look, never a write: with a tracked file's times moved (its bytes as committed), git's index stays as it was,
+    # where a status that takes git's optional locks writes the refreshed index back
+    index = Path(".git/index")
+    before = (index.read_bytes(), index.stat().st_mtime_ns)
+    os.utime("eval.py", ns=(time.time_ns() + 5_000_000_000,) * 2)
+    code, env = repo("export", "--with-record", "--out", str(out / "touched"))
+    assert code == 0 and env.data["repo"]["changed"] == [] and (index.read_bytes(), index.stat().st_mtime_ns) == before
     # what rb writes in the checkout is its own, never the code's: its skill and server, a page, an export, one being built
     assert repo("skill", "add", "--agents-md", "--yes")[0] == 0 and Path("AGENTS.md").is_file()
     # the session hook rb adds to a settings file that was there (hook_entry): the file is rb's while it is as rb left it

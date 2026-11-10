@@ -74,7 +74,7 @@
    "out": [
     "runp5h4s6 on e1: fast.wall_s=7, slow.wall_s=10",
     "  read data1 (eval)",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
     "",
     "Next: rb criterion add \"<what it should show>\" -e e1 -q q1 --metric fast.wall_s --at-most <x>   (write the criterion before the next run)",
@@ -195,6 +195,7 @@
    "out": [
     "upkeep",
     "Kept with rb since 2026-10-01. 1 run was recorded afterwards, not as it happened.",
+    "no commit yet",
     "",
     "Is it fast? (open)",
     "  No criterion is linked directly to this question.",
@@ -206,6 +207,8 @@
     "  - e1: runs report fast.wall_s, slow.wall_s, which no recorded criterion reads",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work status --short --untracked-files=all -- .rb",
     "",
     "Experiments",
     "  e1      fast vs slow \u00b7 open \u00b7 slow (baseline) vs fast (candidate) \u00b7 not frozen \u00b7 settings 0 verified \u00b7 0 provisional \u00b7 0 unknown \u00b7 runs 1",

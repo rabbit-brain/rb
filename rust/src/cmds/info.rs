@@ -194,5 +194,9 @@ pub fn cmd_open(ns: &Namespace, _out: &mut Out) -> R {
         Value::Null => crate::webui::DEFAULT_PORT,
         given => given.as_i64().filter(|p| (0..=65535).contains(p)).ok_or_else(|| crate::webui::not_a_port(&pyjson::py_str(given)))?,
     };
+    // the folder it was started in: a worktree with no record of its own is said as yours in the Where list
+    if let Ok(here) = std::env::current_dir() {
+        crate::places::set_started_in(&here);
+    }
     crate::webui::serve(&root, port)
 }

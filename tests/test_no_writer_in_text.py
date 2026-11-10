@@ -138,7 +138,7 @@ def test_the_journal_and_reconcile_say_the_commit_and_no_branch(rec, tmp_path, r
     copy.rb(CLAUDE_CODE, "journal", "scan")
     head = copy.git("rev-parse", "HEAD")
     journal, reconcile = (copy.rb(READERS[reader], argv) for argv in ("journal", "reconcile"))
-    assert f"git      commit {head[:10]}\n" in journal and f"The repository at {head[:7]}: 1 results folder." in reconcile
+    assert f"git      new commit \u00b7 at commit {head[:12]}\n" in journal and f"The repository at commit {head[:12]}: 1 results folder." in reconcile
     assert not marks_in_text(journal) and not marks_in_text(reconcile), (marks_in_text(journal), marks_in_text(reconcile))
     moves = [e["branch"] for e in copy.json(READERS[reader], "journal")["data"]["entries"] if e["op"] == "git"]
     assert moves[-1] == AGENT_BRANCHES[1] and copy.json(READERS[reader], "reconcile")["data"]["repository"]["branch"] == AGENT_BRANCHES[1]

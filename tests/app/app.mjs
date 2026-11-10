@@ -16,6 +16,7 @@
 import { findChrome, launchChrome, parseArgs, progress, run, sleep, startRbOpen } from './cdp.mjs';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 const a = parseArgs(process.argv.slice(2), { flags: ['generic', 'places', 'wired', 'copy-only'] });
 if (!a.url && !((a.generic || a.places || a.shown) && a.rb && a.record)) { process.stderr.write('give --url, or --generic or --places with --rb and --record\n'); process.exit(2); }
@@ -740,6 +741,9 @@ await run(async () => {
       await p.key('?', 'Slash', 191, '?');
       const help = await p.ev(`(() => { const h = document.querySelector('.help'); return h ? [!h.hidden, (h.querySelector('a') || {}).getAttribute ? h.querySelector('a').getAttribute('href') : null] : null; })()`);
       check(`keys: '?' opens the keys, led by what the words mean [${at}]`, j(help) === j([true, '#words']), j(help));
+      // Esc's line names the bar's lists only where the bar has them (rb open), never on a page
+      const esc = await p.ev(`(() => { const t = document.querySelector('.help').textContent; return [!!document.querySelector('#where details.pick'), t.includes('close an open list in the bar'), t.includes('close the inspector;')]; })()`);
+      check(`keys: Esc's line names the bar's lists only where there are some [${at}]`, esc[0] ? esc[1] : (!esc[1] && esc[2]), j(esc));
       const opened = await p.ev(`[document.activeElement.getAttribute('href'), document.querySelector('button[data-keys]').getAttribute('aria-expanded')]`);
       check(`keys: the keys list opens on what the words mean, and says it is open [${at}]`, j(opened) === j(['#words', 'true']), j(opened));
       await p.key('j', 'KeyJ', 74, 'j');
@@ -1157,21 +1161,34 @@ await run(async () => {
       const first = Array.from(t.querySelectorAll('.end > *')).map(e => e.getBoundingClientRect()).find(r => r.width > 0);
       const gaps = first ? inner.filter(r => r.top < first.bottom && r.bottom > first.top).map(r => Math.round(first.left - r.right)) : [];
       return { over, under, lines, outside, gap: gaps.length ? Math.min(...gaps) : null, height: Math.round(tr.height) }; })()`;
-    for (const w of [960, 1000, 1050, 1279, 1280, 1440]) {
+    // the Where button's words, never cut: the button and the words whole on the screen, their text not clipped
+    const WORDS = `(() => { const g = document.querySelector('#where details.pick[data-pick="where"] > summary .gs'), s = g && g.parentElement;
+      if (!g) return null; const r = g.getBoundingClientRect(), b = s.getBoundingClientRect(), lab = s.querySelector('.lab');
+      return { text: g.textContent, whole: g.scrollWidth <= g.clientWidth + 1 && r.right <= b.right + 0.5 && r.right <= document.documentElement.clientWidth + 0.5,
+        labCut: lab.scrollWidth > lab.clientWidth + 1 }; })()`;
+    for (const w of [960, 1000, 1050, 1100, 1279, 1280, 1440]) {
       await open(w, 'light');
       const bar = await p.ev(BAR);
+      // 960 to 1279: the navigator beside the working view, the working view the wider (the inspector is a sheet)
+      if (w >= 960 && w < 1280) {
+        const panes = await p.ev(`(() => { const n = document.querySelector('#nav').getBoundingClientRect(), m = document.querySelector('#main').getBoundingClientRect(); return { nav: [Math.round(n.left), Math.round(n.top), Math.round(n.width)], main: [Math.round(m.left), Math.round(m.top), Math.round(m.width)] }; })()`);
+        check(`places: the working view sits beside the navigator, wider than it [${w}]`, panes.main[2] > panes.nav[2] && panes.main[0] >= panes.nav[0] + panes.nav[2] - 1 && Math.abs(panes.main[1] - panes.nav[1]) <= 1, j(panes));
+      }
       check(`places: the top bar's parts sit side by side, the id and the clock on one line each [${w}]`,
         !bar.over.length && !bar.under && bar.lines.every(n => n <= 1) && !bar.outside.length, j(bar));
       // from 1280 the pickers share the clock's line: a space after the Version picker's ▾ (D's take at 1440)
       if (w >= 1280) check(`places: a space between the Version picker and the clock [${w}]`, bar.gap !== null && bar.gap >= 6, j(bar));
-      // from 1280 the bar says the place once, cut by nothing of rb open's: the Where button names it whole
-      if (w >= 1280) {
-        const cut = await p.ev(`Array.from(document.querySelectorAll('header.top .where *')).filter(e => e.getBoundingClientRect().width > 0 && e.scrollWidth > e.clientWidth + 1 && !e.closest('ul.picks')).map(e => e.className || e.tagName)`);
-        const said = await p.ev(`[Array.from(document.querySelectorAll('header.top .where .pl')).filter(e => e.getBoundingClientRect().width > 0).length, (document.querySelector('#where details.pick[data-pick="where"] .lab') || {}).textContent]`);
-        check(`places: from 1280 the bar names the place once and cuts nothing of it [${w}]`, cut.length === 0 && said[0] === 0 && !/\//.test(said[1] || '/'), j({ cut, said }));
-      }
-      // a long place (a deep checkout path): the Where picker's summary grows until the Version picker sits at the
-      // screen's right edge, and its list, opened, stays on the screen
+      // the bar names the place once, in the Where button, with its words; nothing of it is cut at a usual length
+      const cut = await p.ev(`Array.from(document.querySelectorAll('header.top .where *')).filter(e => e.getBoundingClientRect().width > 0 && e.scrollWidth > e.clientWidth + 1 && !e.closest('ul.picks')).map(e => e.className || e.tagName)`);
+      const said = await p.ev(`[document.querySelectorAll('header.top .where .pl').length, (document.querySelector('#where details.pick[data-pick="where"] .lab') || {}).textContent, ${WORDS}]`);
+      check(`places: the bar names the place once, with its words, and cuts nothing of it [${w}]`, cut.length === 0 && said[0] === 0 && !/\//.test(said[1] || '/') && !!said[2] && said[2].whole, j({ cut, said }));
+      // a long branch and a long title: the title gives way, then the branch with an ellipsis; the words are never cut,
+      // and the space before the clock holds
+      await p.ev(`(() => { const t = document.querySelector('header.top .ttl'); t.textContent = t.textContent + ' calibration across 512, 1024, 2048 and 4096 images per class';
+        document.querySelector('#where details.pick[data-pick="where"] > summary .lab').textContent = 'exp/int8-per-channel-calibration-sweep-with-a-long-name'; return true; })()`);
+      const long = await p.ev(`[${BAR}, ${WORDS}]`);
+      check(`places: a long branch and title cut the branch, never the words [${w}]`, long[1] && long[1].whole && !long[0].over.length && (w < 1280 || (long[0].gap !== null && long[0].gap >= 6)), j(long));
+      // a long place (a deep checkout path): the Version list, opened, stays on the screen
       await p.ev(`(() => { const s = document.querySelector('#where details.pick[data-pick="where"] > summary'), v = document.querySelector('#where details.pick[data-pick="version"] > summary');
         const W = document.documentElement.clientWidth; for (let n = 0; n < 400 && v.getBoundingClientRect().right < W - 30 && v.getBoundingClientRect().top < 80; n++) (s.querySelector('.lab') || s).append('x'); return true; })()`);
       await p.clickEl(sel('#where details.pick[data-pick="version"] > summary'));
@@ -1179,6 +1196,78 @@ await run(async () => {
       const ov = await p.ev(OVERFLOW);
       check(`places: the Version list of a long place stays on the screen [${w}]`, !!list && list[0] >= 0 && list[1] <= list[2] && ov.n === 0, j({ list, ov }));
     }
+    // the Where list: the commit one step down, Copy, Esc back to the button, w to open and close it, and a live redraw
+    // that keeps it open
+    const FOLD = `(() => { const d = document.querySelector('#where details.pick[data-pick="where"]'), a = document.activeElement;
+      return { open: !!(d && d.open), focus: a ? (a.tagName + (a.closest('#where') ? ' in where' : '') + (a.matches('summary') ? ' summary' : '')) : '',
+        words: (d.querySelector('summary .gs') || {}).textContent || '', copy: (d.querySelector('button[data-from="where-sha"]') || {}).textContent || '',
+        sha: (d.querySelector('#where-sha') || {}).textContent || '' }; })()`;
+    for (const w of [390, 1100, 1280]) {
+      await open(w, 'light');
+      const FLOW = `(() => { const m = document.querySelector('main'), v = document.querySelector('#where details.pick[data-pick="version"] > summary'), l = document.querySelector('#where details.pick[data-pick="where"] > ul.picks');
+        return { main: m ? Math.round(m.getBoundingClientRect().top) : -1, version: v ? Math.round(v.getBoundingClientRect().left) : -1, pos: l ? getComputedStyle(l).position : '' }; })()`;
+      const shut = await p.ev(FLOW);
+      await p.clickEl(sel('#where details.pick[data-pick="where"] > summary'));
+      let f = await p.ev(FOLD);
+      check(`places: a click on the words opens the Where list, its commit with Copy [${w}]`, f.open && /^[0-9a-f]{40}$/.test(f.sha) && f.copy === 'Copy', j(f));
+      // from 960 the open list floats over the page: the page stays where it was and Version where it was (PANEL 4)
+      if (w >= 960) {
+        const opened = await p.ev(FLOW);
+        check(`places: the open Where list floats, moving neither the page nor Version [${w}]`, opened.pos === 'absolute' && opened.main === shut.main && opened.version === shut.version, j({ shut, opened }));
+      }
+      // the evidence (PARITY 4): the list scrolls inside 60vh; tab order is the place's link, the commit's Copy, the
+      // command's Copy; the command's Copy says Copied
+      const EV = `(() => { const l = document.querySelector('#where details.pick[data-pick="where"] > ul.picks'), a = document.activeElement;
+        return { h: l ? Math.round(l.getBoundingClientRect().height) : -1, max: Math.round(innerHeight * 0.6) + 1, scroll: l ? getComputedStyle(l).overflowY : '',
+          found: (document.getElementById('where-found') || {}).textContent || '', cmd: (document.querySelector('#where .cmdbox .cp') || {}).textContent || '',
+          focus: a ? (a.getAttribute('aria-label') || a.getAttribute('data-place') !== null && 'place' || a.tagName) : '' }; })()`;
+      let ev = await p.ev(EV);
+      check(`places: the Where list gives the evidence and scrolls inside 60vh [${w}]`, ev.h > 0 && ev.h <= ev.max && ev.scroll === 'auto' && /^rb checked the record with git just now: /.test(ev.found), j(ev));
+      await p.ev(`document.querySelector('#where details.pick[data-pick="where"] li.here a[data-place]').focus(), true`);
+      const order = [(await p.ev(EV)).focus];
+      // (a box whose command overflows is a scroller Chrome lets the keyboard reach too: passed over here)
+      for (let n = 0; n < 4 && order.length < 3; n++) { await p.key('Tab', 'Tab', 9); const at = (await p.ev(EV)).focus; if (at !== 'PRE') order.push(at); }
+      check(`places: Tab goes from the place to the commit's Copy, then the command's [${w}]`, j(order) === j(['place', 'Copy the commit', 'Copy the command']), j(order));
+      await p.clickEl(sel('#where .cmdbox .cp'));
+      await sleep(150);
+      ev = await p.ev(EV);
+      check(`places: the command's Copy says Copied [${w}]`, ev.cmd === 'Copied', j(ev));
+      await p.clickEl(sel('#where button[data-from="where-sha"]'));
+      await sleep(150);
+      f = await p.ev(FOLD);
+      check(`places: Copy says Copied [${w}]`, f.copy === 'Copied', j(f));
+      await p.key('Escape', 'Escape', 27);
+      f = await p.ev(FOLD);
+      check(`places: Esc closes the Where list and gives focus back to its button [${w}]`, !f.open && f.focus === 'SUMMARY in where summary', j(f));
+      await p.ev(`document.activeElement && document.activeElement.blur(), true`);
+      await p.key('w', 'KeyW', 87, 'w');
+      const on = await p.ev(FOLD);
+      await p.key('w', 'KeyW', 87, 'w');
+      const off = await p.ev(FOLD);
+      check(`places: w opens and closes Where [${w}]`, on.open && !off.open, j({ on, off }));
+    }
+    // once rb open stops answering, "just now" grows older, from when it last answered (live.js)
+    await open(1280, 'light');
+    await p.ev(`(() => { const t0 = Date.now(); Date.now = () => t0 + 61000; window.fetch = () => Promise.reject(new Error('gone')); return true; })()`);
+    await p.waitFor(`((document.querySelector('time[data-checked]') || {}).textContent || '') === '1 minute ago'`, 20000);
+    check('places: once rb open stops answering, the time reads 1 minute ago', (await p.ev(`document.querySelector('time[data-checked]').textContent`)) === '1 minute ago', '');
+    // printed, the Where button keeps its words, its list closed
+    await open(1280, 'light');
+    await p.media({ type: 'print', scheme: 'light' });
+    const printed = await p.ev(`(() => { const g = document.querySelector('#where summary .gs'), l = document.querySelector('#where details.pick[data-pick="where"] > ul.picks');
+      return { words: g && g.getBoundingClientRect().width > 0 ? g.textContent : '', list: l ? l.getBoundingClientRect().height : -1 }; })()`);
+    await p.media({ type: '', scheme: 'light' });
+    check('places: printed, the Where button keeps its words, its list closed', /^· /.test(printed.words) && printed.list === 0, j(printed));
+    // a write to the record while the list is open: the live module redraws the bar, and the list stays open with focus
+    // in it, its words now the write's
+    await open(1280, 'light');
+    await p.clickEl(sel('#where details.pick[data-pick="where"] > summary'));
+    await p.ev(`document.querySelector('#where details.pick[data-pick="where"] a[data-place]').focus(), true`);
+    const before = await p.ev(FOLD);
+    execFileSync(a.rb, ['note', 'add', 'the held-out set is not in the pretraining data'], { cwd: a.record, stdio: 'ignore' });
+    await p.waitFor(`((document.querySelector('#where summary .gs') || {}).textContent || '') !== ${j(before.words)}`, 15000);
+    const after = await p.ev(FOLD);
+    check('places: a live redraw keeps the Where list open, focus in it', after.open && after.focus === 'A in where' && after.words !== before.words && /not committed/.test(after.words), j({ before, after }));
     for (const w of WIDTHS) for (const scheme of SCHEMES) {
       const at = `${w} ${scheme}`;
       await open(w, scheme);
@@ -1244,14 +1333,15 @@ await run(async () => {
       o = await p.ev(OVERFLOW);
       check(`places: the open Version picker stays on the screen [${at}]`, o.n === 0 && o.scroll <= o.width, j(o));
       await p.clickEl(`document.querySelector('#where details.pick[data-pick="version"] a[data-at]:not([data-at=""])')`);
-      await p.waitFor(`/[0-9a-f]{7}/.test((document.querySelector('#where details.pick[data-pick="version"] > summary') || {}).textContent || '')`, 15000);
+      await p.waitFor(`/\\d{4}-\\d\\d-\\d\\d/.test((document.querySelector('#where details.pick[data-pick="version"] > summary') || {}).textContent || '')`, 15000);
       s = await p.ev(where);
-      check(`places: a past version is shown by its commit, and the address keeps it [${at}]`, /^Version [0-9a-f]{12}$/.test(s.version) && /&at=[0-9a-f]{40}/.test(s.hash), j(s));
+      check(`places: a past version is shown by its day, its commit in the list, and the address keeps it [${at}]`, /^Version \d{4}-\d\d-\d\d( \d\d:\d\d UTC)?$/.test(s.version) && s.where === 'Where main' && /&at=[0-9a-f]{40}/.test(s.hash), j(s));
       const sha = (s.hash.match(/&at=([0-9a-f]{40})/) || [])[1];
       await p.ev('setTimeout(() => location.reload(), 50); true'); await sleep(300);
-      await p.waitFor(`document.documentElement.classList.contains('ready') && /[0-9a-f]{12}/.test((document.querySelector('#where details.pick[data-pick="version"] > summary') || {}).textContent || '')`, 15000);
+      const day = s.version;
+      await p.waitFor(`document.documentElement.classList.contains('ready') && /\\d{4}-\\d\\d-\\d\\d/.test((document.querySelector('#where details.pick[data-pick="version"] > summary') || {}).textContent || '')`, 15000);
       s = await p.ev(where);
-      check(`places: a reload shows the past version again [${at}]`, s.version === `Version ${sha.slice(0, 12)}` && s.hash === `overview&at=${sha}`, j(s));
+      check(`places: a reload shows the past version again [${at}]`, s.version === day && s.hash === `overview&at=${sha}`, j(s));
       if (a.wired) {
         // the places a past version lists are the clone's, from the record rb open started on
         const labels = await p.ev(`Array.from(document.querySelectorAll('#where details.pick[data-pick="where"] li')).map(l => l.textContent)`);

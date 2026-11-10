@@ -520,7 +520,8 @@ pub fn exact_code_at(root: &Path, attached: &Dict, made_before: bool, watched: b
         format!("  {what}: git tree {t12}, not in this clone: the clone that recorded the run kept it.")
     }];
     if !base.is_empty() && here {
-        lines.push(format!("  See the changes: git diff {base} {t12}   Restore a file: git checkout {t12} -- <path>"));
+        let whole_base = attached.get("commit").filter(|v| v.truthy()).map(pyjson::py_str).unwrap_or_default();
+        lines.push(format!("  See the changes: git diff {whole_base} {tree}   Restore a file: git checkout {tree} -- <path>"));
     }
     if let Some(n) = attached.get("left_out").filter(|v| v.truthy()) {
         let one = n.as_i64() == Some(1);

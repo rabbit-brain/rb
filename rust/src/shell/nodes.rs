@@ -362,8 +362,12 @@ fn term(key: &str, inner: &str) -> String {
 
 /// The head of a finding's design cells where each says its interval and units, as rb page always said it.
 const WITHIN_CELL_UNITS: &str = "Within-cell units: each cell's interval over its own units";
-/// The same where no cell has an interval (a count or a best of N reads each cell's units, not their mean).
-const WITHIN_CELL_UNITS_ONLY: &str = "Within-cell units: each cell's own units";
+/// The same where no cell has an interval: each cell's number is still the mean of its units, as rb show's range and the
+/// figure give it, so the list says so; a count or a best of N reads each cell's units, not their mean, and says what
+/// it reads instead (MP-1108-1008 later 2).
+const WITHIN_CELL_UNITS_ONLY: &str = "Within-cell units: each cell's mean over its own units";
+const WITHIN_CELL_BEST: &str = "Within-cell units: each cell's mean over its own units; the rule reads each cell's best unit";
+const WITHIN_CELL_COUNT: &str = "Within-cell units: each cell's mean over its own units; the rule counts the units that meet it";
 
 /// A criterion's display noun on a screen (PLAIN-WORDS-PASS-1): a card says "rule", with the glossary's line that
 /// says what commands call it ("rule"). Commands, flags, kinds and anchors keep "criterion".
@@ -1037,7 +1041,12 @@ impl Doc<'_> {
                 );
             }
             // within each cell, its own units: the rule reads every cell apart
-            let said = if cells.iter().any(|c| !s(c, "interval_text").is_empty()) { WITHIN_CELL_UNITS } else { WITHIN_CELL_UNITS_ONLY };
+            let said = match s(f, "reading.over") {
+                _ if cells.iter().any(|c| !s(c, "interval_text").is_empty()) => WITHIN_CELL_UNITS,
+                "best" => WITHIN_CELL_BEST,
+                "count" => WITHIN_CELL_COUNT,
+                _ => WITHIN_CELL_UNITS_ONLY,
+            };
             let units = if cells.iter().any(|c| at(c, "n").is_some()) { format!("<p class=\"dim sm\">{said}</p>") } else { String::new() };
             body += &format!("{units}<ul class=\"cells\">{li}</ul>");
         } else if !obs.is_empty() {
@@ -1576,6 +1585,14 @@ impl Doc<'_> {
                 if said || state.is_empty() { String::new() } else { format!("{}{DOT}", esc(state)) },
                 self.with_refs(text, &strs(item, "refs"))
             );
+        }
+        // the run's own code step, and your checkout directly under it: never under the code row above, which names
+        // the commit the run was recorded at, and can differ from the code it ran
+        if let Some(step) = at(rep, "code_step").filter(|c| c.is_dict()) {
+            out += &format!("<p class=\"sm codestep\">{}</p>", esc(s(step, "label")));
+            if self.past.is_none() {
+                out += &super::views::yours(at(step, "checkout"), &format!("{id}:code-diff"));
+            }
         }
         let script = s(rep, "script");
         if !script.is_empty() && self.past.is_none() {
@@ -3985,7 +4002,7 @@ mod tests {
         }
         let open = all(&live, Surface::Open);
         let runs3 = card(&open, "run-runs3");
-        assert!(runs3.contains("<p class=\"sm obs-in\">recorded in exp-b \u{b7} .worktrees/b at 5d1e0a7</p>") && !runs3.contains("data-place"), "{runs3}");
+        assert!(runs3.contains("<p class=\"sm obs-in\">recorded in exp-b \u{b7} .worktrees/b</p>") && !runs3.contains("data-place"), "{runs3}");
         assert!(!all(&live, Surface::Page).contains("data-place"));
     }
 
@@ -4260,7 +4277,7 @@ mod tests {
         let open = all(&doc, Surface::Open);
         assert!(card(&open, "c-c1").contains(words) && card(&open, "c-c1").contains("ran other code: exp-b"));
         let c1 = dig(&mut doc, &["findings", "c1"]).as_dict_mut().unwrap();
-        c1.insert("other_code".into(), Value::str("1 of 3 runs ran other code: commit 5d1e0a7, with uncommitted changes"));
+        c1.insert("other_code".into(), Value::str("1 of 3 runs ran other code: commit 5d1e0a7c4b3a, with changes outside the record not committed"));
         assert!(text_of(card(&all(&doc, Surface::Page), "c-c1")).contains("ran other code: commit 5d1e0a7"));
     }
 
@@ -4812,16 +4829,16 @@ mod tests {
         let mut doc = example("owner");
         let rows = dig(&mut doc, &["runs", "runs1", "receipt_rows"]).as_list_mut().unwrap();
         rows[1] = Value::List(vec![Value::str("produced"), Value::str("produced 2026-10-14 01:54 UTC (as reported)"), Value::List(Vec::new())]);
-        rows[3] = Value::List(vec![Value::str("repository"), Value::str("repository when recorded: commit 3f2a9c1 \u{b7} tree clean"), Value::List(Vec::new())]);
+        rows[3] = Value::List(vec![Value::str("repository"), Value::str("repository when recorded: commit 3f2a9c1, with changes outside the record not committed"), Value::List(Vec::new())]);
         let page = all(&doc, Surface::Page);
         let run = card(&page, "run-runs1");
         // produced: its day in the card's head, its time and how rb knows it once, as a row of Source details
         assert!(run.contains("<dt>produced</dt><dd>2026-10-14 01:54 UTC (as reported)</dd>") && text_of(run).matches("2026-10-14 01:54 UTC (as reported)").count() == 1, "{run}");
         // a row in the UI font, its hash in monospace (DESIGN-PASS-1 target 7, P4), a path too; a date never
-        assert!(run.contains(">repository</dt><dd>when recorded: commit <span class=\"mono\">3f2a9c1</span> \u{b7} tree clean</dd>"), "{run}");
+        assert!(run.contains(">repository</dt><dd>when recorded: commit <span class=\"mono\">3f2a9c1</span>, with changes outside the record not committed</dd>"), "{run}");
         assert!(run.contains("<dd><span class=\"mono\">results/seed1/metrics.json</span> \u{b7} sha256 <span class=\"mono\">44d9a7356c16</span></dd>"), "{run}");
         assert!(!run.contains("<span class=\"mono\">2026-10-14"), "{run}");
-        assert_eq!(mono_tokens("python 3.12.15 \u{b7} rb 0.6.0 \u{b7} tree dirty, 2 files"), "python 3.12.15 \u{b7} rb 0.6.0 \u{b7} tree dirty, 2 files");
+        assert_eq!(mono_tokens("python 3.12.15 \u{b7} rb 0.6.0 \u{b7} 2 files not committed"), "python 3.12.15 \u{b7} rb 0.6.0 \u{b7} 2 files not committed");
         assert_eq!(mono_tokens("<a href=\"#r-x\">ckpt/int8.pt</a>, here"), "<a href=\"#r-x\"><span class=\"mono\">ckpt/int8.pt</span></a>, here");
     }
 

@@ -33,10 +33,11 @@ function serve() {
       return;
     }
     if (u.pathname === '/topbar') {
-      // rb open's top bar alone, as open.rs draws it with and without a Where picker (a record outside git has none)
-      const pick = u.searchParams.get('pick') === '1' ? '<details class="pick" data-pick="where"><summary><span class="dim">Where</span> <span class="lab">main</span></summary></details>' : '';
+      // rb open's top bar alone, as open.rs draws it: the Where button with its words, a branch as long as `lab` says
+      const lab = u.searchParams.get('lab') === 'long' ? 'exp/int8-per-channel-calibration-sweep-with-a-long-name' : 'main';
+      const pick = `<details class="pick" data-pick="where" data-fold="where"><summary><span class="dim">Where</span> <span class="lab">${lab}</span> <span class="gs" data-state="not_committed">· 2140 record files not committed</span></summary></details>`;
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end(`<!doctype html><html class="app"><head><link rel="stylesheet" href="/assets/open.css"></head><body><header class="top"><span class="ttl">INT8 ResNet-50 on ImageNet</span><div class="where" id="where">${pick}<span class="pl">2 record files not committed</span></div></header></body></html>`);
+      res.end(`<!doctype html><html class="app"><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/assets/shell.css"><link rel="stylesheet" href="/assets/open.css"></head><body><header class="top"><span class="ttl">INT8 ResNet-50 on ImageNet, calibrated per channel</span><span class="where" id="where">${pick}</span><span class="end"><span class="stamp">2026-11-08 09:41 UTC</span></span></header></body></html>`);
       return;
     }
     if (u.pathname === '/digest.json') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(j({ key: 'k1' })); return; }
@@ -171,13 +172,14 @@ await run(async () => {
     check(`v2: the guide's inspector step shows a finding [${at}]`, (steps[3] || {}).kind === 'criterion', j(steps[3]));
   }
 
-  // rb open's top bar from 1280: the place line gives way to the Where picker, and shows where there is none
-  const bar = {};
-  for (const pick of ['0', '1']) {
-    await p.blank(); await p.viewport(1280, 900); await p.goto(srv.url + 'topbar?pick=' + pick); await sleep(200);
-    bar[pick] = await p.ev(`getComputedStyle(document.querySelector('.where .pl')).display`);
+  // rb open's top bar: the Where button's words are never cut; a long branch gives way first, with an ellipsis
+  for (const w of [390, 1100, 1280]) for (const lab of ['main', 'long']) {
+    await p.blank(); await p.viewport(w, 900); await p.goto(srv.url + 'topbar?lab=' + lab); await sleep(200);
+    const got = await p.ev(`(() => { const g = document.querySelector('#where .gs'), s = g.parentElement, l = s.querySelector('.lab'), r = g.getBoundingClientRect(), b = s.getBoundingClientRect();
+      return { whole: g.scrollWidth <= g.clientWidth + 1 && r.right <= b.right + 0.5 && r.right <= document.documentElement.clientWidth + 0.5 && r.left >= 0,
+        labCut: l.scrollWidth > l.clientWidth + 1, ink: getComputedStyle(g).color !== getComputedStyle(s.querySelector('.dim')).color }; })()`);
+    check(`v2: the Where button's words are never cut, the branch gives way first [${w} ${lab}]`, got.whole && got.ink && (lab === 'main' ? !got.labCut : w > 400 || got.labCut), j(got));
   }
-  check(`v2: from 1280 the top bar's place line gives way to a Where picker, and shows where there is none`, bar['0'] !== 'none' && bar['1'] === 'none', j(bar));
 
   // without the script, the queue's button jumps to the Decide part in the document
   await p.blank(); await p.viewport(1280, 900); await p.noScript(true);

@@ -1,4 +1,4 @@
-"""The shell's model (SPRINT-OCT24.md section 1, track M): the document rb builds of a record, rb-shell-view/1.14, read
+"""The shell's model (SPRINT-OCT24.md section 1, track M): the document rb builds of a record, rb-shell-view/1.15, read
 through RB_TEST_SHELL_DUMP while rb page (the Owner tier) and rb open's `/` (the Live tier) draw it under RB_TEST_SHELL.
 Its fields are the contract's (tests/fixtures/shell/view-1.shape.tsv); here, those rb computes today (M0)."""
 import json
@@ -1063,7 +1063,7 @@ def test_a_cited_findings_receipt_and_source(m3_docs):
         c = f["cited"]
         assert (c["path"], c["line"], c["quote"]) == ("README.md", 3, "The published fp32 top-1 is 76.13.")
         assert re.fullmatch(r"[0-9a-f]{40}", c["commit"]) and re.fullmatch(r"[0-9a-f]{64}", c["sha256"])
-        assert said["source"] == f"README.md:3 · read at commit {c['commit'][:7]} · sha256 {c['sha256'][:12]}"
+        assert said["source"] == f"README.md:3 · read at commit {c['commit'][:12]} · sha256 {c['sha256'][:12]}"
         assert f["check_band"] == {"comparator": "within", "target": 76.13, "tolerance": 0.005}
         assert m3_docs[tier]["findings"]["c1"]["check_band"] == {"comparator": "at least", "target": -1, "tolerance": None}
         # no worse than 0.3 where higher is better: the worse bound at least -0.3
@@ -2418,7 +2418,7 @@ def test_a_citation_opens_the_lines_it_cites(cited):
         three = c["README.md:3"]
         assert (three["path"], three["name"], three["folder"], three["line"], three["end"]) == ("README.md", "README.md", "", 3, 3)
         assert three["label"] == "README.md · line 3" and three["raw"] == ["README.md:3"]
-        assert (three["commit"], three["commit_short"], three["read"]) == (head, head[:7], f"read at commit {head[:7]}"), three
+        assert (three["commit"], three["commit_short"], three["read"]) == (head, head[:12], f"read at commit {head[:12]}"), three
         assert three["sha256"] == readme and three["tracked"] and three["quoted"] and not three["missing"] and not three["not_quoted"]
         assert three["lines"] == [{"n": 2, "text": "", "cited": False}, {"n": 3, "text": "Does INT8 cost top-1 on ImageNet?", "cited": True},
                                   {"n": 4, "text": "", "cited": False}], three["lines"]
@@ -2427,7 +2427,7 @@ def test_a_citation_opens_the_lines_it_cites(cited):
         rng = c["README.md:5-7"]
         assert rng["label"] == "README.md · lines 5-7" and [(x["n"], x["cited"]) for x in rng["lines"]] == [(4, False), (5, True), (6, True), (7, True)]
         gone = c["README.md:40"]
-        assert gone["missing"] == f"README.md has no line 40 at commit {head[:7]}" and not gone["quoted"] and gone["lines"] == []
+        assert gone["missing"] == f"README.md has no line 40 at commit {head[:12]}" and not gone["quoted"] and gone["lines"] == []
         assert [b["kind"] for b in gone["cited_by"]] == ["note"]
         # a past call cites the document it is given from
         calls = c["notes.md:3"]
@@ -2464,7 +2464,7 @@ def test_a_shared_page_quotes_the_commit_not_the_working_copy(tmp_path):
     page as it is now, which says it differs from the commit."""
     rec = cited_record(tmp_path / "int8")
     (rec.root / "README.md").write_text("# INT8 ResNet-50 on ImageNet\n\nDoes INT8 cost top-1 on ImageNet, uncommitted?\n", encoding="utf-8")
-    head = rec.git("rev-parse", "--short=7", "HEAD")
+    head = rec.git("rev-parse", "--short=12", "HEAD")
     docs = {}
     for surface in ("page", "export"):
         dump = tmp_path / f"{surface}.json"
@@ -2491,7 +2491,7 @@ def test_a_citation_says_truly_what_it_could_not_read(tmp_path):
     (root / "gone.md").unlink()
     os.mkfifo(root / "pipe.md")
     rec.rb(Writers.HUMAN, "note", "add", "pipe.md:1, gone.md:2, empty.md:1, summary.md:2; example.com:8787 took 12.5s:3")
-    head = rec.git("rev-parse", "--short=7", "HEAD")
+    head = rec.git("rev-parse", "--short=12", "HEAD")
     docs = {}
     for surface in ("page", "export"):
         dump = tmp_path / f"{surface}.json"

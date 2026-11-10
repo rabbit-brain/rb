@@ -241,7 +241,7 @@
    "out": [
     "runp5h4s6 on e1: base.top1=0.7, wide.top1=0.74 \u00b7 seed=1",
     "  read data1 (eval)",
-    "  The repository has no commit yet; the receipt records the uncommitted tree's hash.",
+    "  No commit yet: the receipt records a hash of the files not committed.",
     "  Produced: when is unknown: the numbers were typed in, so a criterion reads their order as unknown. Where it is known, record them again with the time: rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"",
     "  c1 not reproduced \u00b7 point only: top1: 0.74 \u00b7 mean, 1 seed (rb)",
     "  c2 criterion undetermined \u00b7 point only: change.top1: +0.04 \u00b7 paired difference, 1 seed (rb)",
@@ -276,6 +276,7 @@
     "@BASE@/work/bundle written: the whole record, the page, and a manifest hashing every file.",
     "Readable without rb; rb status inside record/ reopens it. Regenerate after new runs.",
     "The record keeps who made each write (human:<name> or agent:<name>, and the channel it came through), an agent's chat session, name, version, provider and model, the user's words passed with --words, and each run's host, platform and branch. Anyone who can read the bundle can read all of it.",
+    "The page says: no commit yet.",
     "Not in this bundle, so a reader cannot rerun with them from it alone: data1 (remote).",
     "",
     "Next: rb clone @BASE@/work/bundle <dest>  \u00b7  rb export --with-record --url <public address>   (make it publishable)",
@@ -292,6 +293,7 @@
     "@BASE@/work/bundle.zip written: the whole record, the page, and a manifest hashing every file.",
     "Readable without rb; rb status inside record/ reopens it. Regenerate after new runs.",
     "The record keeps who made each write (human:<name> or agent:<name>, and the channel it came through), an agent's chat session, name, version, provider and model, the user's words passed with --words, and each run's host, platform and branch. Anyone who can read the bundle can read all of it.",
+    "The page says: no commit yet.",
     "Not in this bundle, so a reader cannot rerun with them from it alone: data1 (remote).",
     "",
     "Next: rb clone @BASE@/work/bundle.zip <dest>  \u00b7  rb export --with-record --url <public address>   (make it publishable)",
@@ -308,6 +310,7 @@
     "@BASE@/work/pub written: the whole record, the page, and a manifest hashing every file.",
     "Readable without rb; rb status inside record/ reopens it. Regenerate after new runs.",
     "The record keeps who made each write (human:<name> or agent:<name>, and the channel it came through), an agent's chat session, name, version, provider and model, the user's words passed with --words, and each run's host, platform and branch. Anyone who can read the bundle can read all of it.",
+    "The page says: no commit yet.",
     "Publish the directory at the address you gave; page.html is the reading surface and anyone reproduces it with: rb clone https://example.org/fork/bundle.zip",
     "Not in this bundle, so a reader cannot rerun with them from it alone: data1 (remote).",
     ""
@@ -322,6 +325,7 @@
    "out": [
     "@BASE@/work/page written: the project's page, and a manifest hashing it.",
     "It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.",
+    "The page says: no commit yet.",
     ""
    ],
    "err": [
@@ -361,6 +365,7 @@
    "exit": 0,
    "out": [
     "fork",
+    "no commit yet",
     "",
     "Rerun the parent",
     "  - parent: fork (cloned 2026-10-01 from bundle)",
@@ -390,6 +395,8 @@
     "      rb experiment add \"<what would test it>\" -q q2 --hypothesis \"<what you expect>\"",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work/cloned status --short --untracked-files=all -- .rb",
     "",
     "Rules",
     "  On every e1 criterion:",
@@ -1074,6 +1081,7 @@
     "@BASE@/work/forked written: the whole record, the page, and a manifest hashing every file.",
     "Readable without rb; rb status inside record/ reopens it. Regenerate after new runs.",
     "The record keeps who made each write (human:<name> or agent:<name>, and the channel it came through), an agent's chat session, name, version, provider and model, the user's words passed with --words, and each run's host, platform and branch. Anyone who can read the bundle can read all of it.",
+    "The page says: no commit yet.",
     "Cited sources no longer on disk, so not included: configs/train.json.",
     "Not in this bundle, so a reader cannot rerun with them from it alone: data1 (remote).",
     "",
@@ -1089,6 +1097,7 @@
    "exit": 0,
    "out": [
     "fork",
+    "no commit yet",
     "",
     "Rerun the parent",
     "  - parent: fork (cloned 2026-10-01 from bundle)",
@@ -1118,6 +1127,8 @@
     "      rb experiment add \"<what would test it>\" -q q2 --hypothesis \"<what you expect>\"",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: the repository has no commit yet, so no commit holds the record.",
+    "To check it yourself, in your terminal: git -C @BASE@/work/fork status --short --untracked-files=all -- .rb",
     "",
     "Rules",
     "  On every e1 criterion:",
@@ -1161,8 +1172,8 @@
    "bytes": 17
   },
   "bundle.zip": {
-   "sha256": "84aad806159a799ca64802093eec6aa82663b9114d8c12f514cd30cb9dd275d6",
-   "bytes": 150397
+   "sha256": "f7dd20f0956b9702bb359f0a7803d033502f2ebdcf53dc545a58d7f532bd6d8b",
+   "bytes": 150702
   },
   "bundle/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1235,10 +1246,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 146650,",
+   " \"bytes\": 146955,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe\",",
+   "  \"page.html\": \"b750ef75855b7734dac82b9632da1fb8a784db4b9b1eef94df15e9886020d09d\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -1272,8 +1283,8 @@
    ""
   ],
   "bundle/page.html": {
-   "sha256": "20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe",
-   "bytes": 127945
+   "sha256": "b750ef75855b7734dac82b9632da1fb8a784db4b9b1eef94df15e9886020d09d",
+   "bytes": 128250
   },
   "bundle/record/.rb/.gitattributes": [
    "* -text",
@@ -3156,10 +3167,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 17,",
-   " \"bytes\": 107837,",
+   " \"bytes\": 108152,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"ea5ea690dd351dd0edecd7f86c3eb82661beabd28e5bca6dac4996cef95d1b65\",",
+   "  \"page.html\": \"32bf96013646d3a08eceb9d18b5118119514d776f6cfa7aaece304273cc8b86e\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/criteria/c1.yaml\": \"347ab9bf0bee9c195eddc6be07c03ce47f697434aaa8a10837686fa77be310d5\",",
@@ -3190,8 +3201,8 @@
    ""
   ],
   "forked/page.html": {
-   "sha256": "ea5ea690dd351dd0edecd7f86c3eb82661beabd28e5bca6dac4996cef95d1b65",
-   "bytes": 97347
+   "sha256": "32bf96013646d3a08eceb9d18b5118119514d776f6cfa7aaece304273cc8b86e",
+   "bytes": 97662
   },
   "forked/record/.rb/.gitattributes": [
    "* -text",
@@ -3504,10 +3515,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 146650,",
+   " \"bytes\": 146955,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe\",",
+   "  \"page.html\": \"b750ef75855b7734dac82b9632da1fb8a784db4b9b1eef94df15e9886020d09d\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -3541,8 +3552,8 @@
    ""
   ],
   "newer/page.html": {
-   "sha256": "20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe",
-   "bytes": 127945
+   "sha256": "b750ef75855b7734dac82b9632da1fb8a784db4b9b1eef94df15e9886020d09d",
+   "bytes": 128250
   },
   "newer/record/.rb/.gitattributes": [
    "* -text",
@@ -4005,10 +4016,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 146650,",
+   " \"bytes\": 146955,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe\",",
+   "  \"page.html\": \"b750ef75855b7734dac82b9632da1fb8a784db4b9b1eef94df15e9886020d09d\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -4042,8 +4053,8 @@
    ""
   ],
   "other/page.html": {
-   "sha256": "20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe",
-   "bytes": 127945
+   "sha256": "b750ef75855b7734dac82b9632da1fb8a784db4b9b1eef94df15e9886020d09d",
+   "bytes": 128250
   },
   "other/record/.rb/.gitattributes": [
    "* -text",
@@ -4463,17 +4474,17 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 128577,",
+   " \"bytes\": 128882,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"39274e151fef4d091b25b82e625b26f4ce30f145f2f10d431f14800169f0285d\"",
+   "  \"page.html\": \"df04a4512129b3d1258fe700eb978ad78c4d213366c5451caf31cc575018a52a\"",
    " }",
    "}",
    ""
   ],
   "page/page.html": {
-   "sha256": "39274e151fef4d091b25b82e625b26f4ce30f145f2f10d431f14800169f0285d",
-   "bytes": 127986
+   "sha256": "df04a4512129b3d1258fe700eb978ad78c4d213366c5451caf31cc575018a52a",
+   "bytes": 128291
   },
   "proj/.rb/.gitattributes": [
    "* -text",
@@ -5028,8 +5039,8 @@
    ""
   ],
   "pub/bundle.zip": {
-   "sha256": "b2f4e1ef7315701bf9bfd796750129b2dc9eb6283720b0c55ef6609d175f5add",
-   "bytes": 154956
+   "sha256": "14c5e071e5506d9d0a866e996c0b4f40f0f5ee2527f4d7c18142fd81aff3b606",
+   "bytes": 155261
   },
   "pub/manifest.json": [
    "{",
@@ -5044,10 +5055,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 151210,",
+   " \"bytes\": 151515,",
    " \"files\": {",
    "  \"README.md\": \"e6cf0e19d0322c60bbd65e4a17f823478f187a80608a68e49b6570badc9af542\",",
-   "  \"page.html\": \"05cb4ad3471a1c9a1677452967225977d93fa30306056da4ffc7a0efbb3bd746\",",
+   "  \"page.html\": \"84e6e0038a96c5e7217aa0771fa71cc8b0e18ec95767b297f0cad8f9db54292d\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -5082,8 +5093,8 @@
    ""
   ],
   "pub/page.html": {
-   "sha256": "05cb4ad3471a1c9a1677452967225977d93fa30306056da4ffc7a0efbb3bd746",
-   "bytes": 132407
+   "sha256": "84e6e0038a96c5e7217aa0771fa71cc8b0e18ec95767b297f0cad8f9db54292d",
+   "bytes": 132712
   },
   "pub/record/.rb/.gitattributes": [
    "* -text",
@@ -5547,10 +5558,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 23,",
-   " \"bytes\": 146650,",
+   " \"bytes\": 146955,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe\",",
+   "  \"page.html\": \"b750ef75855b7734dac82b9632da1fb8a784db4b9b1eef94df15e9886020d09d\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/decisions/dp5h4s6.yaml\": \"f75bd9c4fa59779d707882d7b18575083a7ad51ddd4f662d33896bc2a5b2f564\",",
@@ -5584,8 +5595,8 @@
    ""
   ],
   "tampered/page.html": {
-   "sha256": "20e3d63d9050a45b53834c4a20d884a83f79d70ed30640a34f7eaaa7b09afdfe",
-   "bytes": 127945
+   "sha256": "b750ef75855b7734dac82b9632da1fb8a784db4b9b1eef94df15e9886020d09d",
+   "bytes": 128250
   },
   "tampered/record/.rb/.gitattributes": [
    "* -text",

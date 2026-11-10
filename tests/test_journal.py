@@ -134,7 +134,7 @@ def test_a_file_a_watched_command_wrote_is_proposed_with_the_code_it_ran_at(repo
     assert repo("reconcile", "--apply")[0] == 0
     code, env = repo("show", "e1")
     rows = {r["what"]: (r["state"], r["detail"]) for r in env.data["rerunnability"]}
-    assert rows["code"][0] == "ok" and rows["code"][1].startswith(f"commit {head[:10]}"), rows["code"]
+    assert rows["code"][0] == "ok" and rows["code"][1].startswith(f"commit {head[:12]}"), rows["code"]
 
 
 def test_a_watched_command_runs_in_the_worktree_it_was_given_in(repo, capsys, monkeypatch):

@@ -46,6 +46,8 @@ pub struct Plan {
     listed: Vec<Kept>,
     others: Vec<Kept>,
     uncommitted: usize,
+    /// the record files no commit keeps, in the words every screen says them ("2 record files not committed")
+    counted: String,
     tracked: usize,
     /// tracked files rb writes back (rb's part taken out) whose bytes then differ from what git holds for them
     changed: usize,
@@ -59,8 +61,6 @@ pub struct Plan {
     copy_first: String,
     /// how the plan names this checkout's .rb/
     record_path: String,
-    /// whether the checkout is in git: a record outside git is in no commit at all
-    in_git: bool,
     /// the files of the plan a link takes elsewhere: (how the plan names it, where the link takes it as said, the file)
     links: Vec<(String, String, String)>,
     /// the skill every project reads (the home directory's), when this checkout's own rb init wrote it there
@@ -140,10 +140,10 @@ impl Plan {
         let top = crate::sources::git_top(&root);
         let in_git = top.is_some();
         let top = top.unwrap_or_else(|| root.clone());
-        let mut plan = Plan { root: root.clone(), remove: Vec::new(), keep: Vec::new(), residue: Vec::new(), listed: Vec::new(), others: Vec::new(), uncommitted: 0, tracked: 0, changed: 0, staged: Vec::new(), staged_in_part: Vec::new(), unstage: String::new(), copy_first: String::new(), record_path: String::new(), in_git, links: Vec::new(), home_skill_named: false };
+        let mut plan = Plan { root: root.clone(), remove: Vec::new(), keep: Vec::new(), residue: Vec::new(), listed: Vec::new(), others: Vec::new(), uncommitted: 0, counted: String::new(), tracked: 0, changed: 0, staged: Vec::new(), staged_in_part: Vec::new(), unstage: String::new(), copy_first: String::new(), record_path: String::new(), links: Vec::new(), home_skill_named: false };
         let lines = crate::owned::entries(&root);
         let shown = |p: &Path| crate::sources::rel_to(p, &top).filter(|r| !r.is_empty()).unwrap_or_else(|| crate::sys::slashed(p));
-        plan.record(&root, &top, in_git, &shown);
+        plan.record(&root, in_git, &shown);
         plan.integrations(&root, &lines, &shown);
         plan.outputs(&root, &lines, &shown);
         if in_git {
@@ -157,7 +157,7 @@ impl Plan {
     /// This checkout's .rb/: every file rb wrote (a record as its log says rb last wrote it, the log, rb's own text and
     /// copies) goes, and a file rb did not write, or one changed since, is kept and named. A .rb/ that is a link (the
     /// user's: rb makes none) is named with where it goes, and stays, with the folder it points to.
-    fn record(&mut self, root: &Path, top: &Path, in_git: bool, shown: &dyn Fn(&Path) -> String) {
+    fn record(&mut self, root: &Path, in_git: bool, shown: &dyn Fn(&Path) -> String) {
         let dir = root.join(DIR);
         if !dir.is_dir() {
             return;
@@ -241,17 +241,17 @@ impl Plan {
             },
         );
         // the record's own files a commit is to keep: those not in git's index, or changed from the commit (staged too)
-        let kept_by_git: Vec<&PathBuf> = ours.iter().filter(|f| !local(&crate::sources::rel_to(f, &dir).unwrap_or_default())).collect();
-        if !in_git {
-            self.uncommitted = kept_by_git.len();
+        // counted as every screen counts them (the checkout's own count: a note's file and the log, a deletion, a rename
+        // once); where git cannot see them (outside git, or through a link) every file rb wrote there is in no commit
+        let checkout = crate::checkout::Checkout::of(root);
+        if linked || !in_git || !checkout.in_git() {
+            let n = ours.iter().filter(|f| !local(&crate::sources::rel_to(f, &dir).unwrap_or_default())).count();
+            self.uncommitted = n;
+            let words = format!("{} not committed", crate::checkout::plural(n, "record file", "record files"));
+            self.counted = if linked { words } else { format!("{words} ({})", checkout.said()) };
         } else {
-            let rel = crate::sources::rel_to(&dir, top).unwrap_or_else(|| DIR.to_string());
-            let listed = |args: &[&str]| -> HashSet<String> {
-                crate::sources::git(top, args).unwrap_or_default().split('\0').filter(|s| !s.is_empty()).map(str::to_string).collect()
-            };
-            let tracked = listed(&["ls-files", "-z", "--", &rel]);
-            let changed: HashSet<String> = listed(&["status", "--porcelain=v1", "-uno", "-z", "--", &rel]).into_iter().filter_map(|e| e.get(3..).map(str::to_string)).collect();
-            self.uncommitted = kept_by_git.iter().filter(|f| crate::sources::rel_to(f, top).map_or(true, |r| !tracked.contains(&r) || changed.contains(&r))).count();
+            self.uncommitted = checkout.count();
+            self.counted = checkout.count_said().unwrap_or_default();
         }
         if self.uncommitted > 0 {
             let id = led.project().map(|p| p.id).unwrap_or_else(|_| "record".into());
@@ -902,15 +902,7 @@ impl Plan {
         out.push("Listed, not removed:".into());
         out.extend(self.listed.iter().map(|k| format!("  {}: {}", k.path, k.why)));
         if self.uncommitted > 0 {
-            let one = self.uncommitted == 1;
-            let said = if self.in_git {
-                if one { "has uncommitted changes" } else { "have uncommitted changes" }
-            } else if one {
-                "is in no commit, since this folder is not in git"
-            } else {
-                "are in no commit, since this folder is not in git"
-            };
-            out.push(format!("{} {} of the record {said}. To keep a copy first, run: {}", self.uncommitted, if one { "file" } else { "files" }, self.copy_first));
+            out.push(format!("{}. To keep a copy first, run: {}", self.counted, self.copy_first));
         }
         let files = |n: usize| if n == 1 { "file" } else { "files" };
         match (self.tracked, self.changed) {

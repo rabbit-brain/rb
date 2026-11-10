@@ -182,7 +182,7 @@ struct Kept {
 
 /// How a bundle's parts name a file it keeps as it stood at a commit.
 fn at_commit_part(path: &str, commit: &str) -> String {
-    format!("{path} at {}", commit.chars().take(7).collect::<String>())
+    format!("{path} at {}", crate::checkout::short(commit))
 }
 
 /// The files the record's checks read at a commit, as they stood there: each only when it is the file rb verified, byte
@@ -430,6 +430,21 @@ pub fn code_unnamed(led: &Ledger) -> Option<&'static str> {
 }
 
 /// What rb export says, once, where origin is not an address a reader can use.
+/// What a bundle's code leaves out, which a rerun does not get (the export's `changed`, never a receipt's changes outside
+/// the record): "Not committed, so a rerun does not get it: configs/sweep.yaml." Ten named at most, the rest counted.
+pub fn not_committed_said(changed: &[String]) -> Option<String> {
+    const NAMED: usize = 10;
+    if changed.is_empty() {
+        return None;
+    }
+    let names = if changed.len() <= NAMED {
+        crate::next_step::and_list(changed)
+    } else {
+        format!("{} and {} more", changed[..NAMED].join(", "), changed.len() - NAMED)
+    };
+    Some(format!("{}{names}.", crate::shell::strings::not_committed_no_rerun(changed.len())))
+}
+
 pub const CODE_UNNAMED: &str = "The bundle names no address for the code: origin is not an https address a reader can fetch. A reader gets the code with rb clone --code <address>.";
 
 /// What a bundle carries of the checkout, or rb wrote there of its own, as paths from the repository's root: the
@@ -524,6 +539,8 @@ fn changed_paths(root: &Path, carried: &Carried) -> Vec<String> {
     let o = std::process::Command::new("git")
         .args(["-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"])
         .current_dir(root)
+        // a look, never a write: git refreshes no index for it
+        .env("GIT_OPTIONAL_LOCKS", "0")
         .stdin(std::process::Stdio::null())
         .output();
     let Ok(o) = o else { return Vec::new() };
@@ -968,6 +985,9 @@ fn shell_page(led: &Ledger, clone_to: Option<&str>, repo: Option<&Dict>, cites_f
             if escaped {
                 d.insert("escaped".into(), true.into());
             }
+            // and how that checkout holds the record, which the copy cannot say
+            let minute = d.get("at").and_then(Value::as_str).unwrap_or("").to_string();
+            d.insert("checkout".into(), crate::checkout::Checkout::of_page(&from.root).page_value_at(&minute));
         }
     }
     let mut doc = published(doc, clone_to, given);
@@ -980,6 +1000,14 @@ fn shell_page(led: &Ledger, clone_to: Option<&str>, repo: Option<&Dict>, cites_f
         }
         if let Some(repo) = repo {
             d.insert("reproduce_repo".into(), Value::Dict(repo.clone()));
+            // what About's block says of the code's address: whether origin's branches hold HEAD, and where the record
+            // is in the repository (PARITY 9.5), from the checkout the page states
+            if !given {
+                let co = crate::checkout::Checkout::of_page(&cites_from.unwrap_or(led).root);
+                if let Some(Value::Dict(c)) = d.get_mut("checkout") {
+                    co.add_origin_facts(c);
+                }
+            }
         }
     }
     for_the_hub(&crate::shell::render(&doc, crate::shell::Surface::Export)?)

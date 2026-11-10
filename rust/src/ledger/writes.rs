@@ -2568,7 +2568,7 @@ impl Ledger {
         let snapshots = attached.iter().any(|a| get(a, "dirty").truthy() && tree_kept(a));
         let lost = attached.iter().any(|a| get(a, "dirty").truthy() && !tree_kept(a));
         let left_out = attached.iter().any(|a| get(a, "left_out").truthy());
-        let short = |c: &str| truncate(c, 10);
+        let short = |c: &str| truncate(c, 12);
         let mut detail = if commits.is_empty() {
             "no commit".to_string()
         } else {
@@ -2578,10 +2578,10 @@ impl Ledger {
             detail.push_str(&format!(" · not in this repository: {} (get the code repository to rerun)", crate::assess::first_three(&absent.iter().map(|c| short(c)).collect::<Vec<_>>(), ", ")));
         }
         if snapshots {
-            detail.push_str(" · uncommitted changes kept as git trees");
+            detail.push_str(" · changes outside the record not committed, kept as git trees");
         }
         if lost {
-            detail.push_str(" · the tree had uncommitted changes when a run was recorded");
+            detail.push_str(" · changes outside the record not committed when a run was recorded, not kept");
         }
         if left_out {
             detail.push_str(" · files left out of a snapshot (over 10 MB, or too many)");

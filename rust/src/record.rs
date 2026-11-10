@@ -574,6 +574,8 @@ impl Source {
                     s.push_str(&format!(" \"{shown}\""));
                 }
                 if let Some(c) = self.commit.as_deref().filter(|c| !c.is_empty()) {
+                    // 7 hex, as every rb has listed it: a design's listing holds this form, and an earlier rb's
+                    // confirmation kept that wording
                     s.push_str(&format!(" @{}", c.chars().take(7).collect::<String>()));
                 }
                 s

@@ -1255,6 +1255,7 @@
     "Share it from its page on the site, with a link you can revoke; rb sync again updates what the link shows.",
     "Its page went alone: the record stays in this repository, the store, and rb sync --with-record sends it too.",
     "A share link's readers can rerun only a sync made with --with-record.",
+    "The page says: no commit yet.",
     ""
    ],
    "err": [
@@ -1295,6 +1296,7 @@
     "Share it from its page on the site, with a link you can revoke; rb sync again updates what the link shows.",
     "Its page went alone: the record stays in this repository, the store, and rb sync --with-record sends it too.",
     "A share link's readers can rerun only a sync made with --with-record.",
+    "The page says: no commit yet.",
     ""
    ],
    "err": [
@@ -1335,6 +1337,7 @@
     " \"rb_version\": \"0.0.0\",",
     " \"command\": \"sync\",",
     " \"data\": {",
+    "  \"page_says\": \"The page says: no commit yet.\",",
     "  \"handle\": \"t\",",
     "  \"url\": \"http://127.0.0.1:47821/m/query/u/t/proj\",",
     "  \"with_record\": false,",
@@ -1384,6 +1387,7 @@
     " \"rb_version\": \"0.0.0\",",
     " \"command\": \"sync\",",
     " \"data\": {",
+    "  \"page_says\": \"The page says: no commit yet.\",",
     "  \"handle\": \"t\",",
     "  \"url\": \"http://127.0.0.1:47821/m/ok/u/t/proj\",",
     "  \"clone\": \"rb clone http://127.0.0.1:47821/m/ok/u/t/proj/bundle.zip\",",

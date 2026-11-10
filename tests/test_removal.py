@@ -391,7 +391,7 @@ def test_with_a_nested_and_an_outside_worktree_each_checkout_removes_its_own(tmp
     (out / "research" / "warmup" / "run_transfer.py").write_bytes((rec.root / "research" / "warmup" / "run_transfer.py").read_bytes())
     here = rec.rb("remove", "--dry-run")
     [other] = here["others"]
-    assert other["command"].startswith("cd ") and other["command"].endswith("wt-out && rb remove") and "detached at " in other["place"]
+    assert other["command"].startswith("cd ") and other["command"].endswith("wt-out && rb remove") and other["place"].startswith("no branch · ")
     assert any(k["path"].startswith("refs/rb/") for k in here["keep"])
     rec.rb("remove", "--yes")
     there = rec.rb("remove", "--dry-run", cwd=out)

@@ -345,8 +345,8 @@ def test_rb_open_names_a_place_by_its_branch_and_path_only_in_a_place_s_label(ag
     assert CLAUDE_CODE["CLAUDE_CODE_SESSION_ID"] not in shown and "claude-code" not in shown and "anthropic" not in shown
     [row] = [r for r in state["home"]["runs"] if r["observed_in"]]
     listed = rec.git("worktree", "list", "--porcelain").split("worktree ")[2].splitlines()[0]
-    assert row["observed_in"]["label"].startswith(f"recorded in {AGENT_BRANCHES[0]} · {listed} at ")
-    assert row["observed_in"]["label"].endswith(", with uncommitted changes")
+    # the place by its label, with no commit: the commit and the tree's state are the receipt's, in Source details
+    assert row["observed_in"]["label"] == f"recorded in {AGENT_BRANCHES[0]} · {listed}" and row["observed_in"]["dirty"] is True
     assert json.loads(card)["card"]["facts"][-1] == row["observed_in"]["label_short"]
     # the page names no place
     assert status == 200

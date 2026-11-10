@@ -470,7 +470,12 @@ fn op_reconcile(led: &Ledger, a: &Args) -> Res<Value> {
 
 fn op_journal(led: &Ledger, a: &Args) -> Res<Value> {
     let last = a.whole("last")?;
-    Ok(dicts(crate::cmds::reading::py_last(crate::journal::entries(&led.root, None), last.unwrap_or(0))))
+    let mut all = crate::journal::entries(&led.root, None);
+    // each git entry given says its move of HEAD (`said`), as rb journal --json gives it
+    let (n, last) = (all.len() as i64, last.unwrap_or(0));
+    let start = if last > 0 { (n - last).max(0) } else { (-last).min(n) } as usize;
+    crate::checkout::say_moves(&led.root, &mut all, start);
+    Ok(dicts(crate::cmds::reading::py_last(all, last)))
 }
 
 fn op_export(led: &Ledger, a: &Args) -> Res<Value> {
@@ -840,10 +845,42 @@ fn op_places(led: &Ledger, a: &Args) -> Res<Value> {
         None => list.iter().find(|p| p.record == "this").ok_or_else(|| RBError::msg("E_INTERNAL", "rb lists no place for this record."))?,
     };
     let versions = p.root.as_ref().filter(|_| p.readable()).map(|r| crate::places::versions(r)).unwrap_or_default();
+    // the evidence under the places only when WHERE opens (`detail`): the place line repaints often, and each ask is a
+    // new rb bridge, so its asks count no record file (PARITY 5)
+    let detail = a.opt_flag("detail")?.unwrap_or(false).then(crate::checkout::When::now);
     Ok(crate::obj! {
-        "places" => Value::List(list.iter().map(|p| p.to_value()).collect()), "place" => p.id.clone(),
-        "versions" => Value::List(versions.iter().map(|v| v.to_value(p)).collect())
+        "places" => Value::List(list.iter().map(|p| on_the_screen(p, list.len() > 1, detail.as_ref())).collect()), "place" => p.id.clone(),
+        "versions" => Value::List(versions.iter().map(|v| {
+            let mut x = v.to_value(p);
+            if let Value::Dict(d) = &mut x {
+                d.insert("shown_day".into(), Value::Str(v.shown_day(p, &versions)));
+            }
+            x
+        }).collect())
     })
+}
+
+/// A place as rb ui prints it, made here so the screen invents no word: Place::to_value with three strings. `face`, the
+/// line under the head at the place the screen started on: its checkout's name (its branch, "no branch", or its folder
+/// where git cannot say), then how it holds the record ("main · 2 record files not committed"). `fold`, w's lines under
+/// the places for the highlighted one: its whole path, then its checkout's fold. `row`, its row in w's WHERE list: the
+/// place as rb ui names it (its label, in short where the clone has more places), then what rb says of it. With
+/// `detail` (WHERE opened, at that minute), `evidence`: its checkout's evidence as rb ui prints it after the path.
+fn on_the_screen(p: &crate::places::Place, many: bool, detail: Option<&crate::checkout::When>) -> Value {
+    let mut v = p.to_value();
+    let face = p.checkout.as_ref().map(|c| format!("{} \u{b7} {}", c.name(), c.said())).unwrap_or_default();
+    let mut fold = vec![p.listed.clone()];
+    fold.extend(p.checkout.as_ref().map(|c| c.fold_text()).unwrap_or_default());
+    let row = format!("{}: {}", if many { p.label_short() } else { p.label() }, p.said());
+    if let Value::Dict(d) = &mut v {
+        d.insert("face".into(), Value::Str(face));
+        d.insert("fold".into(), Value::list_of_str(fold));
+        d.insert("row".into(), Value::Str(row));
+        if let (Some(when), Some(c)) = (detail, p.checkout.as_ref()) {
+            d.insert("evidence".into(), Value::list_of_str(c.evidence_text(when)));
+        }
+    }
+    v
 }
 
 fn op_mark_seen(led: &Ledger, _a: &Args) -> Res<Value> {

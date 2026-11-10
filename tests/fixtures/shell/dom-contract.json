@@ -372,6 +372,26 @@
    ],
    "made_by": "markup",
    "example": "away"
+  },
+  {
+   "selector": "#where details.pick[data-pick=\"where\"] > summary .gs",
+   "what": "the Where button's words: how the checkout of the place shown holds the record",
+   "group": "A5",
+   "on": [
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
+  },
+  {
+   "selector": "#where ul.picks button[data-from=\"where-sha\"]",
+   "what": "Copy of the place shown's commit, in the Where list (all 40 hex, from #where-sha)",
+   "group": "A5",
+   "on": [
+    "open"
+   ],
+   "made_by": "markup",
+   "example": "live"
   }
  ]
 }

@@ -19,11 +19,9 @@
    "run": "journal",
    "exit": 0,
    "out": [
-    "  12:00  git      commit none",
-    "  12:00  new      out/a.json   (last written 2026-10-01 11:00 UTC)",
-    "  12:03  git      commit none",
-    "  12:04  ran      python3 x.py (exit 0, 1.5s)",
-    "  12:05  left out k1: \"not mine\"",
+    "  12:00 UTC  new      out/a.json   (last written 2026-10-01 11:00 UTC)",
+    "  12:04 UTC  ran      python3 x.py (exit 0)",
+    "  12:05 UTC  left out k1: \"not mine\"",
     "  5 entries could not be read, and are not listed: rb journal --json gives every entry as it is.",
     "",
     "Next: rb reconcile",
@@ -49,7 +47,8 @@
     "    \"commit\": null,",
     "    \"branch\": \"main\",",
     "    \"dirty\": false,",
-    "    \"by\": \"human:t\"",
+    "    \"by\": \"human:t\",",
+    "    \"said\": null",
     "   },",
     "   {",
     "    \"at\": \"2026-10-01T12:00:00+00:00\",",
@@ -91,7 +90,8 @@
     "    \"at\": \"2026-10-01T12:03:00+00:00\",",
     "    \"op\": \"git\",",
     "    \"commit\": \"\",",
-    "    \"branch\": null",
+    "    \"branch\": null,",
+    "    \"said\": null",
     "   },",
     "   {",
     "    \"at\": \"2026-10-01T12:04:00\",",
@@ -133,7 +133,7 @@
    "run": "journal -n 2",
    "exit": 0,
    "out": [
-    "  12:05  left out k1: \"not mine\"",
+    "  12:05 UTC  left out k1: \"not mine\"",
     "",
     "Next: rb reconcile",
     ""
@@ -146,7 +146,6 @@
    "run": "journal",
    "exit": 0,
    "out": [
-    "  12:00  git      commit none",
     "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
     "",
     "Next: rb reconcile",
@@ -160,7 +159,6 @@
    "run": "journal",
    "exit": 0,
    "out": [
-    "  12:00  git      commit none",
     "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
     "",
     "Next: rb reconcile",
@@ -186,7 +184,8 @@
     "    \"commit\": null,",
     "    \"branch\": \"main\",",
     "    \"dirty\": false,",
-    "    \"by\": \"human:t\"",
+    "    \"by\": \"human:t\",",
+    "    \"said\": null",
     "   },",
     "   {",
     "    \"at\": \"2026-10-01T12:00:00\",",
@@ -213,7 +212,6 @@
    "run": "journal",
    "exit": 0,
    "out": [
-    "  12:00  git      commit none",
     "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
     "",
     "Next: rb reconcile",
@@ -227,7 +225,6 @@
    "run": "journal",
    "exit": 0,
    "out": [
-    "  12:00  git      commit none",
     "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
     "",
     "Next: rb reconcile",
@@ -241,7 +238,6 @@
    "run": "journal",
    "exit": 0,
    "out": [
-    "  12:00  git      commit none",
     "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
     "",
     "Next: rb reconcile",
@@ -255,7 +251,6 @@
    "run": "journal",
    "exit": 0,
    "out": [
-    "  12:00  git      commit none",
     "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
     "",
     "Next: rb reconcile",
@@ -269,7 +264,6 @@
    "run": "journal",
    "exit": 0,
    "out": [
-    "  12:00  git      commit none",
     "  1 entry could not be read, and is not listed: rb journal --json gives every entry as it is.",
     "",
     "Next: rb reconcile",

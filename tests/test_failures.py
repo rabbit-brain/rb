@@ -170,7 +170,7 @@ def test_the_journal_lists_what_it_can_read_and_counts_what_it_cannot(record, ca
     (journal / "journal.jsonl").write_text("".join(json.dumps(e) + "\n" for e in entries) + "not an entry at all\n", encoding="utf-8", newline="\n")
     code, out, err = said(capsys, "journal")
     assert code == 0 and err == ""
-    assert out.splitlines()[:3] == ["  12:00  new      out/a.json", "  12:03  ran      python eval.py (exit 0, 1.5s)",
+    assert out.splitlines()[:3] == ["  12:00 UTC  new      out/a.json", "  12:03 UTC  ran      python eval.py (exit 0)",
                                     "  4 entries could not be read, and are not listed: rb journal --json gives every entry as it is."]
     assert not CRASH_WORDS.search(out)
     code, env, _ = envelope(capsys, "journal")

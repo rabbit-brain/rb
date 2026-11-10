@@ -351,7 +351,7 @@ impl Ledger {
             return Ok(match made.as_deref().and_then(crate::pytime::parse_iso) {
                 Some(c) if c > when => {
                     let (cday, day) = days_apart(&made.unwrap_or_default(), &at);
-                    Some((path.to_string(), variant, rid, day, Some((commit.chars().take(7).collect(), cday, None))))
+                    Some((path.to_string(), variant, rid, day, Some((crate::checkout::short(commit), cday, None))))
                 }
                 _ => None,
             });
@@ -367,7 +367,7 @@ impl Ledger {
             Some((n, (_, None))) => Some((path.to_string(), variant, rid, day, Some((String::new(), String::new(), Some(n))))),
             Some((n, (sha, Some(m)))) if crate::pytime::parse_iso(&m).map_or(false, |c| c > when) => {
                 let (cday, day) = days_apart(&m, &at);
-                Some((path.to_string(), variant, rid, day, Some((sha.chars().take(7).collect(), cday, Some(n)))))
+                Some((path.to_string(), variant, rid, day, Some((crate::checkout::short(&sha), cday, Some(n)))))
             }
             _ => None,
         })

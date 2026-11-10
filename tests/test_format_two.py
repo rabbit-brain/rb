@@ -788,6 +788,26 @@ def test_a_relation_beside_an_unreadable_analysis_file_is_made_whole(repo, capsy
     assert [json.loads(x)["op"] for x in lines] == ["relate"], lines
 
 
+@pytest.mark.parametrize("how", ["yaml", "invalid"])
+def test_a_relation_s_withdrawal_beside_an_unreadable_analysis_file_names_it(repo, capsys, how):
+    """MP-1108-1008 later 1: rb criterion relate --remove beside an analysis's file that does not read wrote the
+    withdrawal and exited 0, and its reply named no file, where the declaration's did. It names the file, as a
+    declaration does, though the withdrawal reads no finding."""
+    broken = broken_beside(capsys, repo)
+    if how == "invalid":
+        p = repo / broken
+        p.write_text("rb: 1\nkind: note\nid: n1\ntext: hi\nby: human:ana\nat: '2026-10-01T12:00:00.000+00:00'\n", encoding="utf-8")
+    capsys.readouterr()
+    assert main(["criterion", "relate", "c0", "reverses", "c9", "--orientation", "same", "--why", "the same comparison at two batch sizes"]) == 0
+    capsys.readouterr()
+    log = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").count("\n")
+    code, env = rbj(capsys, "criterion", "relate", "c0", "reverses", "c9", "--remove", "--why", "not the same comparison")
+    assert code == 0 and env.ok, (code, env.errors)
+    assert [u["path"] for u in env.data["unread_files"]] == [broken] and env.next[0] == "rb doctor", (env.data.get("unread_files"), env.next)
+    lines = (repo / ".rb/log.jsonl").read_text(encoding="utf-8").splitlines()[log:]
+    assert [json.loads(x)["op"] for x in lines] == ["unrelate"], lines
+
+
 @pytest.mark.parametrize("how", ["yaml", "invalid", "raised"])
 @pytest.mark.parametrize("where", ["experiment", "project"])
 def test_a_retraction_of_a_note_whose_file_does_not_read_names_the_file(repo, capsys, where, how):
@@ -817,6 +837,21 @@ def test_a_session_s_write_beside_an_unreadable_note_tells_what_changed(repo, ca
     monkeypatch.setenv("CLAUDECODE", "1")
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-delta-4e21")
     code, env = rbj(capsys, "spec", "set", "e1", "optim.lr", "0.1", "--no-verify")
+    assert code == 0 and env.ok, env.errors
+    told = {f["code"]: f for f in env.rb_delta}
+    assert "model_unsaid" in told and nid in told["edited_outside_rb"]["text"], env.rb_delta
+
+
+def test_a_session_s_read_beside_an_unreadable_note_tells_what_changed(repo, capsys, monkeypatch):
+    """MP-1108-0809 later 3: in an agent session, a read that never reads notes (rb journal, rb log) beside a
+    note's file that does not read told nothing (rb_delta []), where a clean record tells the open items and how to say
+    the model. It tells them, and that the note's file changed outside rb, as a write beside it does."""
+    seed(capsys)
+    nid = ok(capsys, "note", "add", "the held-out set is not in the pretraining data", "-e", "e1").data["object"]["id"]
+    (repo / f".rb/experiments/e1/notes/{nid}.yaml").write_text("rb: 1\nkind: [\n", encoding="utf-8")
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-delta-read-7b10")
+    code, env = rbj(capsys, "journal")
     assert code == 0 and env.ok, env.errors
     told = {f["code"]: f for f in env.rb_delta}
     assert "model_unsaid" in told and nid in told["edited_outside_rb"]["text"], env.rb_delta

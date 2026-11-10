@@ -839,7 +839,7 @@ def test_a_run_made_before_it_was_recorded_names_its_own_code_or_leaves_it_unkno
     ok(capsys, "run", "add", "e1", "int8.val_loss=1.6", "--produced-at", "unknown")
     ok(capsys, "run", "add", "e1", "int8.val_loss=1.7", "--produced-at", "2026-05-10", "--commit", head)
     state, detail = again()["code"]
-    assert state == "partial" and detail.startswith(f"commit {head[:10]} · ")      # metrics.json is the uncommitted change kept
+    assert state == "partial" and detail.startswith(f"commit {head[:12]} · ")      # metrics.json is the uncommitted change kept
     assert detail.endswith(" · 2 of 5 runs were made before they were recorded and name no commit")
     state, detail = again()["environment"]       # a commit names the code, not the machine
     assert state == "partial" and detail.endswith(" · 3 of 5 runs were made before they were recorded, in environments rb did not see")
@@ -886,7 +886,7 @@ def test_a_run_made_before_it_was_recorded_from_a_tree_says_its_uncommitted_chan
     git("reset", "-q", "train.py")
     ok(capsys, "run", "add", "e1", "int8.val_loss=1.4", "--produced-at", "2026-05-10", "--commit", head, "--tree", tree)
     code = {r["what"]: (r["state"], r["detail"]) for r in ok(capsys, "show", "e1")["rerunnability"]}["code"]
-    assert code == ("ok", f"commit {head[:10]} · uncommitted changes kept as git trees")
+    assert code == ("ok", f"commit {head[:12]} · changes outside the record not committed, kept as git trees")
 
 
 @needs_git

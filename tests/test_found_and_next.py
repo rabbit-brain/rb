@@ -397,7 +397,7 @@ def test_an_untracked_config_there_before_the_record_is_no_change_after_a_stash_
     local.unlink()
     rb("journal", "scan")
     local.write_text("data:\n  batch_size: 64\n", encoding="utf-8")
-    assert said() == [f"configs/local.yaml: changed since {base[:7]}, not committed; nothing in the record cites it"]
+    assert said() == [f"configs/local.yaml: changed since {base[:12]}, not committed; nothing in the record cites it"]
 
 
 def test_a_run_an_earlier_rb_journaled_owns_only_what_it_wrote_while_it_ran(rb):

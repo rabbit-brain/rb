@@ -626,26 +626,50 @@ impl Ledger {
         if let Some(src) = source.map(str::trim).filter(|s| !s.is_empty()) {
             return self.logged_launch(cmd, src).map(Some);
         }
+        // the one match (journal_match) that gives the code too
+        Ok(self.journal_match(Some(cmd), files, metrics).map(|e| crate::obj! {"by" => "journal", "at" => e.get("at").cloned().unwrap_or(Value::Null)}))
+    }
+
+    /// The rb journal run entry a run matches (E2), one match for both "watched" and the code the command started with:
+    /// with --command, the entry command_seen finds (one that wrote a file of the run as it is now, or printed its
+    /// numbers); otherwise the newest entry in this checkout that wrote one of the run's files (its --from or
+    /// --artifact), on its list of what it wrote or, past the list's 50 paths, among the look's file entries while it
+    /// ran. The file must be as the command left it: last written while it ran.
+    pub fn journal_match(&self, command: Option<&str>, files: &[FileRef], metrics: &Dict) -> Option<Dict> {
         let paths: HashSet<&str> = files.iter().map(|f| f.path.as_str()).collect();
-        let same = |shown: &Dict| {
-            !shown.is_empty()
-                && shown.iter().all(|(k, v)| {
-                    let Some(x) = v.as_f64() else { return false };
-                    metrics.iter().any(|(m, y)| (m == k || m.rsplit('.').next() == Some(k.as_str())) && y.as_f64().map_or(false, |y| isclose(x, y, 1e-9, 1e-12)))
-                })
+        let mt = |p: &str| std::fs::metadata(self.root.join(p)).ok().map(|md| crate::sys::mtime_ns(&md) as i64);
+        let entries = crate::journal::entries(&self.root, None);
+        let wrote_now = |e: &Dict| -> bool {
+            let Some(window) = ran_between(e) else { return false };
+            let mut wrote = crate::journal::wrote_of(e, &mt);
+            if wrote.len() >= 50 {
+                let at = |x: &Dict| x.get_str("at").and_then(crate::pytime::parse_iso).map(|d| d.timestamp_millis() * 1_000_000);
+                wrote.extend(entries.iter().filter(|x| x.get_str("op") == Some("file") && at(x).map_or(false, |t| window.0 <= t && t <= window.1)).filter_map(|x| x.get_str("path").map(str::to_string)));
+            }
+            wrote.iter().any(|w| paths.contains(w.as_str()) && mt(w).map_or(false, |m| window.0 <= m && m <= window.1))
         };
-        for e in crate::journal::entries(&self.root, None).iter().rev() {
-            if e.get_str("op") != Some("run") || !e.get_str("command").map_or(false, |c| crate::journal::same_command(c, cmd)) {
-                continue;
+        let runs = entries.iter().rev().filter(|e| e.get_str("op") == Some("run"));
+        match command.map(str::trim).filter(|c| !c.is_empty()) {
+            Some(cmd) => {
+                let same = |shown: &Dict| {
+                    !shown.is_empty()
+                        && shown.iter().all(|(k, v)| {
+                            let Some(x) = v.as_f64() else { return false };
+                            metrics.iter().any(|(m, y)| (m == k || m.rsplit('.').next() == Some(k.as_str())) && y.as_f64().map_or(false, |y| isclose(x, y, 1e-9, 1e-12)))
+                        })
+                };
+                for e in runs.filter(|e| e.get_str("command").map_or(false, |c| crate::journal::same_command(c, cmd))) {
+                    // as command_seen has always matched: on the entry's list of what it wrote, or its printed numbers
+                    let wrote = crate::journal::wrote_of(e, &mt).iter().any(|p| paths.contains(p.as_str()));
+                    if wrote || matches!(e.get("metrics"), Some(Value::Dict(m)) if same(m)) {
+                        return Some(e.clone());
+                    }
+                }
+                None
             }
-            let mt = |p: &str| std::fs::metadata(self.root.join(p)).ok().map(|md| crate::sys::mtime_ns(&md) as i64);
-            let wrote = crate::journal::wrote_of(e, &mt).iter().any(|p| paths.contains(p.as_str()));
-            let printed = matches!(e.get("metrics"), Some(Value::Dict(m)) if same(m));
-            if wrote || printed {
-                return Ok(Some(crate::obj! {"by" => "journal", "at" => e.get("at").cloned().unwrap_or(Value::Null)}));
-            }
+            None if paths.is_empty() => None,
+            None => runs.into_iter().find(|e| wrote_now(e)).cloned(),
         }
-        Ok(None)
     }
 
     /// Whether a command rb's journal watched wrote one of `paths` as it is now: on rb journal run's list of what it

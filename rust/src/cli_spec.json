@@ -191,6 +191,17 @@
         "help": "take every change made outside rb as it stands (with --why); edits to who wrote or decided what are refused"
        },
        {
+        "kind": "store_true",
+        "options": [
+         "--forget"
+        ],
+        "dest": "forget",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "drop rb's copy of the writes git took out of the record (a checkout, restore or reset), when that was meant: their files are set aside as <file>.outside-rb"
+       },
+       {
         "kind": "store",
         "options": [
          "-m",
@@ -232,7 +243,8 @@
          3,
          4,
          5,
-         6
+         6,
+         7
         ]
        }
       ],

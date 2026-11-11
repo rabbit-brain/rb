@@ -442,7 +442,10 @@ pub fn say_row(out: &mut Out, r: &Dict) {
         return;
     }
     if r.get("ok").map_or(false, |v| v.truthy()) {
+        let place = get_s(r, "where");
         let at = match r.get("commit").filter(|v| v.truthy()) {
+            // a source read at --commit names its commit already: said once
+            Some(c) if place.contains(&format!("@{}", trunc(&pyjson::py_str(c), 7))) => String::new(),
             Some(c) => format!(" @{}", trunc(&pyjson::py_str(c), 7)),
             None => " (uncommitted file)".into(),
         };
@@ -870,7 +873,8 @@ fn spec_from(ns: &Namespace, out: &mut Out, led: &Ledger) -> R {
         "{experiment}: {} {} from {rel}{} · {verified} verified",
         rows.len(),
         assess::plural("setting", rows.len() as i64),
-        commit.as_ref().map(|c| format!(" @{}", trunc(c, 12))).unwrap_or_default()
+        // a source named by its short form keeps 7 after its "@", as each setting's line below and rb spec verify say it (0.8.4)
+        commit.as_ref().map(|c| format!(" @{}", trunc(c, 7))).unwrap_or_default()
     ));
     for (_, _, row) in &rows {
         if let Some(r) = row {
@@ -2040,6 +2044,7 @@ fn run_add_one(ns: &Namespace, out: &mut Out, pick: Option<usize>) -> R {
             row,
             table_row,
             block: false,
+            start: None,
         },
     )?;
     let run = result.record;
@@ -2128,6 +2133,13 @@ fn run_add_one(ns: &Namespace, out: &mut Out, pick: Option<usize>) -> R {
             out.data.insert("config_dirty".into(), Value::Str(d));
         }
     }
+    // when the code it names was captured (E2): at the command's start, or given
+    for l in crate::cmds::code_when(&led.root, &run) {
+        if l.contains("changed after the run") || l.contains("does not have") {
+            out.warnings.push(l.clone());
+        }
+        out.say(format!("  {l}"));
+    }
     // where git cannot say, the checkout's own words say why: not in git, git not found, rb could not read git
     let no_git = || {
         let co = crate::checkout::Checkout::of(&led.root);
@@ -2139,7 +2151,14 @@ fn run_add_one(ns: &Namespace, out: &mut Out, pick: Option<usize>) -> R {
         None => out.say(no_git()),
         Some(git) if git.is_empty() => out.say(no_git()),
         Some(git) => {
-            if git.get("commit").map_or(true, |v| v.is_null()) {
+            let unread = crate::capture::Capture::of(git, crate::capture::When::After).none_why().is_some();
+            if git.get("commit").map_or(true, |v| v.is_null()) && unread {
+                // a HEAD git could not read is no first commit: rb says why it kept no code (E3)
+                let cap = crate::capture::Capture::of(git, crate::capture::When::After);
+                let lines = crate::capture::state_lines(&cap, false);
+                out.say_all(lines.iter().map(|l| format!("  {l}")));
+                out.warnings.extend(lines);
+            } else if git.get("commit").map_or(true, |v| v.is_null()) {
                 out.say("  No commit yet: the receipt records a hash of the files not committed.");
             } else if !git.get("dirty").map_or(false, |v| v.truthy()) {
                 // rb's own files (what rb init or rb skill add installed, unchanged since) are no code a run ran
@@ -2152,9 +2171,16 @@ fn run_add_one(ns: &Namespace, out: &mut Out, pick: Option<usize>) -> R {
                     ));
                 }
             } else if git.get("dirty").map_or(false, |v| v.truthy()) {
-                out.say(format!("  Changes outside the record not committed when recorded (hash {}).", trunc(&get_s(git, "diff_sha256"), 12)));
+                // a status git could not give has no hash: rb says why it kept no code, never a clean tree (E3)
+                let hash = get_s(git, "diff_sha256");
+                if !hash.is_empty() {
+                    out.say(format!("  Changes outside the record not committed when recorded (hash {}).", trunc(&hash, 12)));
+                }
                 let watched = crate::ledger::support::run_command(&run).map_or(false, |g| g.given == "observed");
-                out.say_all(crate::cmds::exact_code_at(&led.root, git, crate::ledger::made_before_recorded(&run), watched));
+                out.say_all(crate::cmds::exact_code_at(&led.root, git, crate::ledger::made_before_recorded(&run), watched, true, !crate::capture::given_absent(&led.root, &run)));
+                // what it kept short of the code goes to data.warnings too: MCP and the SDK (RBWarning) say it
+                let cap = crate::capture::Capture::of(git, crate::capture::When::After);
+                out.warnings.extend(crate::capture::state_lines(&cap, false));
             }
         }
     }
@@ -3036,6 +3062,10 @@ pub fn cmd_confirm(ns: &Namespace, out: &mut Out) -> R {
         if led.kind_of(&exp)? == Some("experiment") {
             if key.as_deref() == Some("") {
                 return Err(RBError::msg_fix("E_USAGE", format!("{id} names no key after the @."), format!("rb confirm {exp} lists its design with its key: rb confirm {exp}@<key>.")));
+            }
+            // N3: a design whose confirmation git took out is confirmed already, once it is put back
+            if led.taken_design_confirms()?.contains(&exp) {
+                return Err(led.taken_confirm_refusal(&format!("{exp}'s design")));
             }
             gate_ids.push((exp, key));
         } else {

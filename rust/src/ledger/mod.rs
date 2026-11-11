@@ -5,9 +5,11 @@
 pub mod authority;
 pub mod cite;
 pub mod design;
+pub mod evidence;
 pub mod findings;
 pub mod helpers;
 pub mod inquiries;
+pub mod kept;
 pub mod relations;
 pub mod report_link;
 pub mod resync;
@@ -159,6 +161,10 @@ pub fn kind_prefix(kind: &str) -> &'static str {
 pub fn is_kind(kind: &str) -> bool {
     KINDS.iter().any(|k| k.0 == kind)
 }
+
+/// The state of an experiment or a question that rests on a call git took a write of out of the record (L1): rb cannot
+/// read what the call made it until it is put back.
+pub const UNDETERMINED_STATE: &str = "undetermined";
 
 pub fn state_of(action: &str) -> &'static str {
     match action {
@@ -1149,6 +1155,14 @@ pub struct Ledger {
     session_noted: RefCell<Option<([String; 3], Dict)>>,
     /// the linked worktree `here` is in, worked out once
     worktree: std::cell::OnceCell<Option<PathBuf>>,
+    /// what git took out of the record (kept.rs), by the log's (size, time)
+    git_took: RefCell<Option<(Option<(u64, i64)>, Rc<kept::TakenOut>)>>,
+    /// the record files where_ leaves out: each holds only a write git took out
+    took_hidden: RefCell<Vec<(Key, PathBuf)>>,
+    /// what the readings under way read (kept.rs Reads), innermost last: taken_for counts what git took out of these
+    pub(crate) reads: RefCell<Vec<kept::Reads>>,
+    /// what git took out that each criterion's finding rests on, as its finding last read it (an inquiry names the rest)
+    pub(crate) finding_took: RefCell<HashMap<String, Vec<Key>>>,
 }
 
 /// The log's (size, modification time), as log_entries keys what it read.
@@ -1367,6 +1381,10 @@ impl Ledger {
             finding_cache: RefCell::new(HashMap::new()),
             session_noted: RefCell::new(None),
             worktree: std::cell::OnceCell::new(),
+            git_took: RefCell::new(None),
+            took_hidden: RefCell::new(Vec::new()),
+            reads: RefCell::new(Vec::new()),
+            finding_took: RefCell::new(HashMap::new()),
         }
     }
 
@@ -1531,6 +1549,7 @@ impl Ledger {
 
     /// The part files of one experiment (or, with no owner, the project): (key, path), as the index has them.
     pub fn parts_of(&self, kind: &str, owner: Option<&str>) -> Res<Vec<(String, PathBuf)>> {
+        self.note_read(|r| r.part(kind, owner));
         let idx = self.where_()?;
         let fresh = match self.parts_for.borrow().as_ref() {
             Some(i) => !Rc::ptr_eq(i, &idx),
@@ -1815,6 +1834,10 @@ impl Ledger {
         let mut bad: IndexMap<String, String> = IndexMap::new();
         let mut newer: Vec<Dict> = Vec::new();
         let mut newer_idx: HashMap<Key, PathBuf> = HashMap::new();
+        // a file that holds a write git took out, and not what the log on disk says rb last wrote, is not read (E1)
+        let took = self.taken_out()?.shas();
+        let last = if took.is_empty() { None } else { Some(self.last_writes()?) };
+        let mut hidden: Vec<(Key, PathBuf)> = Vec::new();
         for (kind, path) in self.record_files() {
             let ids = match self.in_(kind, &path) {
                 Ok(e) => {
@@ -1824,7 +1847,19 @@ impl Ledger {
                             newer.push(crate::dict! {"kind" => kind, "id" => id.clone(), "at" => "", "why" => format!("{}: {why}", self.rel(&path)), "part" => true});
                         }
                     }
-                    e.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>()
+                    let mut ids = Vec::new();
+                    for (id, form) in e.iter() {
+                        let key = (kind.to_string(), id.clone());
+                        if let (Some(shas), Some(last)) = (took.get(&key), &last) {
+                            let sha = rbyaml::content_sha(&Value::Dict(form.clone())).unwrap_or_default();
+                            if shas.contains(&sha) && last.get(&key).and_then(|w| w.get_str("sha256")) != Some(sha.as_str()) {
+                                hidden.push((key, path.clone()));
+                                continue;
+                            }
+                        }
+                        ids.push(id.clone());
+                    }
+                    ids
                 }
                 Err(Unreadable::Newer(why)) => {
                     newer.push(crate::dict! {"kind" => kind, "id" => Self::path_id(kind, &path).unwrap_or_else(|| self.rel(&path)), "at" => "", "why" => why});
@@ -1861,6 +1896,7 @@ impl Ledger {
         *self.newer_files.borrow_mut() = newer;
         *self.newer_index.borrow_mut() = newer_idx;
         *self.strays.borrow_mut() = strays;
+        *self.took_hidden.borrow_mut() = hidden;
         Ok(idx)
     }
 
@@ -2577,11 +2613,15 @@ impl Ledger {
         }
         let line = pyjson::jsonl_line(&Value::Dict(entry.clone()));
         let logp = self.dir.join("log.jsonl");
+        // whether git had taken writes out before this one: the kept copy then says so, so its last line is no sign
+        // that the log is as rb left it
+        let took = !crate::dry::active() && self.taken_out().map_or(false, |t| !t.is_empty());
         // what this ledger holds of the log stays the whole log when the log was just as it read it before this line
         let whole = self.hashes.borrow().is_some() && self.hashes_stamp.get().is_some() && self.hashes_stamp.get() == log_stamp(&self.dir);
         if let Err(e) = crate::dry::append(&logp, line.as_bytes()) {
             return Err(RBError::could_not_write(&e, &logp));
         }
+        self.keep_line(&line, &entry, took);
         *self.log_cache.borrow_mut() = None;
         self.hashes_stamp.set(if whole { log_stamp(&self.dir) } else { None });
         {
@@ -2745,7 +2785,7 @@ impl Ledger {
         let entry = writes.get(&key);
         let idx = self.where_()?;
         let mut found = idx.get(&key).cloned();
-        if found.is_none() && self.newer_index.borrow().contains_key(&key) {
+        if found.is_none() && (self.newer_index.borrow().contains_key(&key) || self.took_hidden(&key)) {
             return Ok(None);
         }
         if kind == "project" {
@@ -3529,7 +3569,8 @@ impl Ledger {
     pub fn restore(&self) -> Res<Vec<Dict>> {
         let who = self.actor()?;
         self.locked(|| {
-            let mut done: Vec<Dict> = Vec::new();
+            // what git took out goes back first, from rb's kept copy (E1); then whatever else changed outside rb
+            let mut done: Vec<Dict> = self.put_back(&who)?;
             let mut rebuilt: HashSet<String> = HashSet::new();
             let tampered = self.tampered()?;
             for t in tampered.iter() {
@@ -3541,7 +3582,7 @@ impl Ledger {
                     d
                 };
                 if kind == "log" {
-                    done.push(with_done("left as it is: git diff shows what was rewritten, and git checkout puts back the committed log (entries written since the last commit are then lost)".into()));
+                    done.push(with_done("left as it is: git diff shows what was rewritten, and git checkout puts back the committed log (rb keeps the entries written since the last commit, and rb doctor --restore puts them back)".into()));
                     continue;
                 }
                 if t.get("shallow").map_or(false, |v| v.truthy()) {
@@ -4023,6 +4064,7 @@ impl Ledger {
 
     /// Every record of a kind, oldest first, read once per state of the record.
     pub fn all<T: FromObj>(&self) -> Res<Rc<Vec<T>>> {
+        self.note_read(|r| r.kind(T::KIND));
         let idx = self.where_()?;
         let fresh = match self.objs_for.borrow().as_ref() {
             Some(i) => !Rc::ptr_eq(i, &idx),
@@ -4129,6 +4171,7 @@ impl Ledger {
 
     pub fn load<T: FromObj>(&self, id: &str) -> Res<T> {
         let kind = T::KIND;
+        self.note_read(|r| r.key(kind, id));
         if !id_ok(id) {
             return Err(RBError::msg("E_OBJECT_NOT_FOUND", format!("No {kind} {} in this project.", repr_str(id))));
         }
@@ -4143,6 +4186,7 @@ impl Ledger {
     }
 
     pub fn load_kind(&self, kind: &str, id: &str) -> Res<Obj> {
+        self.note_read(|r| r.key(kind, id));
         if !id_ok(id) {
             return Err(RBError::msg("E_OBJECT_NOT_FOUND", format!("No {kind} {} in this project.", repr_str(id))));
         }
@@ -4157,6 +4201,7 @@ impl Ledger {
     }
 
     pub fn kind_of(&self, id: &str) -> Res<Option<&'static str>> {
+        self.note_read(|r| r.id(id));
         if !id_ok(id) {
             return Ok(None);
         }

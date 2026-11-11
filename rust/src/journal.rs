@@ -196,7 +196,7 @@ pub fn aside_dir(root: &Path) -> Option<PathBuf> {
 
 /// Whether a journal folder holds a journal: its entries or its state.
 fn holds_journal(dir: &Path) -> bool {
-    dir.join("journal.jsonl").is_file() || dir.join("state.json").is_file()
+    dir.join("journal.jsonl").is_file() || dir.join("state.json").is_file() || dir.join(crate::ledger::kept::KEPT_FILE).is_file()
 }
 
 /// Whether the journal is kept beside the record now, its home in git's folder not written since it could not be.
@@ -290,6 +290,19 @@ fn settle(root: &Path) {
             _ => Dict::new(),
         };
         if save_state(&home, &merged_state(read(&home.join("state.json")), read(&state))).is_err() || std::fs::remove_file(&state).is_err() {
+            return;
+        }
+    }
+    // rb's kept copy of what it wrote to the record (E1) moves home with the journal: its lines the home lacks, in order
+    let kept = aside.join(crate::ledger::kept::KEPT_FILE);
+    if let Ok(text) = std::fs::read_to_string(&kept) {
+        let held = std::fs::read_to_string(home.join(crate::ledger::kept::KEPT_FILE)).unwrap_or_default();
+        let have: HashSet<&str> = held.split('\n').map(str::trim).filter(|l| !l.is_empty()).collect();
+        let add: String = text.split('\n').map(str::trim).filter(|l| !l.is_empty() && !have.contains(l)).map(|l| format!("{l}\n")).collect();
+        use std::io::Write;
+        let wrote = add.is_empty()
+            || std::fs::OpenOptions::new().create(true).append(true).open(home.join(crate::ledger::kept::KEPT_FILE)).and_then(|mut f| f.write_all(add.as_bytes())).is_ok();
+        if !wrote || std::fs::remove_file(&kept).is_err() {
             return;
         }
     }
@@ -501,7 +514,7 @@ fn git_fed(root: &Path, args: &[&str], input: &[u8]) -> Option<Vec<u8>> {
     let cwd = root.to_string_lossy().into_owned();
     let mut full: Vec<&str> = vec!["-C", &cwd];
     full.extend_from_slice(args);
-    sources::run("git", &full, None, &[], Some(input), std::time::Duration::from_secs(30)).filter(|r| r.code == 0).map(|r| r.stdout)
+    sources::run("git", &full, None, &[], Some(input), sources::git_timeout()).filter(|r| r.code == 0).map(|r| r.stdout)
 }
 
 /// Which of these files, each holding bytes this look saw first, hold bytes git already kept that no commit made here
@@ -586,7 +599,7 @@ fn kept_by_git(root: &Path, paths: &[String], made_here: Option<&(String, String
         let finds: Vec<String> = chunk.iter().map(|(_, id, _)| format!("--find-object={id}")).collect();
         let mut args: Vec<&str> = vec!["-C", &cwd, "log", "--all", "--reflog", "-m", "--format=commit %H", "--raw", "--no-abbrev"];
         args.extend(finds.iter().map(String::as_str));
-        let Some(text) = sources::run("git", &args, None, &[], None, std::time::Duration::from_secs(120)).filter(|r| r.code == 0).map(|r| String::from_utf8_lossy(&r.stdout).into_owned()) else {
+        let Some(text) = sources::run("git", &args, None, &[], None, sources::git_wait(std::time::Duration::from_secs(120))).filter(|r| r.code == 0).map(|r| String::from_utf8_lossy(&r.stdout).into_owned()) else {
             answered = false;
             break;
         };
@@ -1328,6 +1341,41 @@ pub fn reported(output: &[u8]) -> (crate::value::Dict, Vec<String>) {
     (metrics, lines[start..].iter().map(|l| l.chars().take(300).collect()).collect())
 }
 
+/// The code at a command's start (rb journal run) or a run block's (the SDK's `with exp.run()`), in the checkout it runs
+/// in: HEAD, the snapshot, the code as an entry keeps it (`code`, or `start_code` where not kept whole), and whether it
+/// was kept whole.
+pub fn code_at_start(led: &Ledger) -> (Option<String>, Option<Dict>, Dict, bool) {
+    let head = git(&led.here, &["rev-parse", "--verify", "-q", "HEAD"]).map(|h| strip(&h).to_string()).filter(|h| !h.is_empty());
+    let snap = sources::code_snapshot(&led.here, DIR);
+    // the code at the start, kept whole: a clean checkout's commit pins its tree, as rb run add does (E3)
+    let start_whole = match &snap {
+        None => true,
+        Some(s) => s.get("kept").and_then(Value::as_str).map_or(true, |k| k == "whole") && s.get("tree").map_or(false, |v| v.truthy()),
+    };
+    let mut code = crate::dict! {"commit" => head.clone(), "kept" => if start_whole { "whole" } else { "none" }};
+    match snap.as_ref().and_then(|s| s.get("tree")).filter(|v| v.truthy()) {
+        Some(t) => {
+            code.insert("tree".into(), t.clone());
+        }
+        // a clean start's code is its commit: its tree is pinned under refs/rb/snapshots/, and never written as
+        // `tree`, which every rb reads as the uncommitted changes the command started with
+        None if snap.is_none() => {
+            if let Some(h) = head.as_deref() {
+                let _ = sources::keep_tree(&led.here, h);
+            }
+        }
+        None => {}
+    }
+    if let Some(s) = snap.as_ref().filter(|_| !start_whole) {
+        for k in ["kept", "kept_why", "left_out", "left_out_files", "left_out_more", "too_many", "listing", "git_said", "git_secs"] {
+            if let Some(v) = s.get(k).filter(|v| v.truthy()) {
+                code.insert(k.into(), v.clone());
+            }
+        }
+    }
+    (head, snap, code, start_whole)
+}
+
 /// `run`, returning (exit code, the metrics the command printed, its last lines when it failed).
 pub fn run_reporting(led: &Ledger, command: &[String], echo_fd: i32) -> Res<(i32, Dict, Vec<String>)> {
     // what the look before the command checked: one that reached everything checked every path where rb looks, there
@@ -1337,11 +1385,10 @@ pub fn run_reporting(led: &Ledger, command: &[String], echo_fd: i32) -> Res<(i32
     let whole = !scan_noting(led, &mut Vec::new(), &mut checked)?.get("truncated").map_or(false, |t| t.truthy());
     // the command runs, and its code is kept, in the checkout it was given in: a linked worktree nested in the
     // record's runs its own code, and its line goes in the record's journal
-    let head = git(&led.here, &["rev-parse", "--verify", "-q", "HEAD"]).map(|h| strip(&h).to_string()).filter(|h| !h.is_empty());
-    let snap = sources::code_snapshot(&led.here, DIR);
-    let mut code = crate::dict! {"commit" => head.clone()};
-    if let Some(t) = snap.as_ref().and_then(|s| s.get("tree")).filter(|v| v.truthy()) {
-        code.insert("tree".into(), t.clone());
+    let (head, snap, code, start_whole) = code_at_start(led);
+    // past the file limit, said before the command runs (E3)
+    if let Some(line) = snap.as_ref().filter(|_| !start_whole).and_then(crate::capture::too_many_at_start) {
+        eprintln!("{line}");
     }
     // a nested worktree's results land in its own folders, which the record's scan does not watch
     let away = led.here != led.root;
@@ -1383,8 +1430,10 @@ pub fn run_reporting(led: &Ledger, command: &[String], echo_fd: i32) -> Res<(i32
     if rc != 0 && !tail.is_empty() {
         entry.insert("tail".into(), Value::list_of_str(tail.clone()));
     }
+    // code not kept whole at the start goes under start_code, never `code`, so no rb (an older one included) proposes it
+    // as the code the command ran
     if head.is_some() || snap.as_ref().map_or(false, |s| !s.is_empty()) {
-        entry.insert("code".into(), Value::Dict(code));
+        entry.insert(if start_whole { "code" } else { "start_code" }.into(), Value::Dict(code));
     }
     if let Some(w) = led.worktree_value() {
         entry.insert("worktree".into(), w);
@@ -2524,8 +2573,22 @@ fn found_in(led: &Ledger, st: &Dict, all_entries: &[Dict], dismissed: &HashSet<S
         }
         (argv, fill)
     };
+    // the file each standing run named, with the bytes it recorded: a file whose bytes changed since, which no watched
+    // command wrote, is said as changed since that run, never proposed as a run to average in with it (E5)
+    let mut named_by: HashMap<String, (String, crate::record::FileRef)> = HashMap::new();
+    for r in led.live::<crate::record::Run>().unwrap_or_default().iter() {
+        for f in &r.files {
+            named_by.insert(f.path.clone(), (r.id.clone(), f.clone()));
+        }
+    }
     for (rel, meta) in &files {
         let Some(sha) = meta.get("sha").filter(|v| v.truthy()).map(pyjson::py_str) else { continue };
+        // the same bytes in other line endings (a converted checkout) are the file the run recorded
+        if let Some((run, _)) = named_by.get(rel).filter(|(_, was)| was.sha256 != sha && !wrote_ok.contains(rel) && !commands.contains_key(rel) && led.file_state(was) != "here") {
+            unplaced.push(crate::shell::strings::evidence("file_changed_found", &[("path", rel.clone()), ("run", run.clone())]));
+            unplaced_paths.push(rel.clone());
+            continue;
+        }
         // a lockfile or a tool's config holds numbers that are no result
         if dismissed.contains(&sha) || attached_shas.contains(&sha) || tool_file(rel.rsplit('/').next().unwrap_or(rel)) {
             continue;

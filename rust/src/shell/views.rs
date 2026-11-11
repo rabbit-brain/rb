@@ -49,7 +49,7 @@ pub fn page(doc: &Value, surface: Surface) -> String {
         Surface::Page | Surface::Open if !SCRIPT.trim().is_empty() => format!("<script>{SCRIPT}</script>"),
         _ => String::new(),
     };
-    format!(
+    let html = format!(
         "<!doctype html>\n<html lang=\"en\" data-inspector-from=\"1280\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\">\
          <title>{}</title><link rel=\"icon\" href=\"{}\"><style>{}</style>{script}</head><body>\
          <a class=\"skip\" href=\"#main\">{}</a>{}{}{}<main id=\"main\" tabindex=\"-1\">{}\
@@ -73,7 +73,43 @@ pub fn page(doc: &Value, surface: Surface) -> String {
         w::NOTHING_PICKED,
         about(doc, surface, &words),
         p.rerun_panel(),
-    )
+    );
+    match surface {
+        Surface::Page | Surface::Export => hints_once(&html),
+        _ => html,
+    }
+}
+
+/// A page writes each term's line once: its first use carries `data-hint`, and its later uses name the same glossary
+/// entry alone, which the script turns into the same hint. With no script, the first use and the glossary still say it.
+/// rb open keeps every hint, since it draws its views again as the record changes.
+fn hints_once(html: &str) -> String {
+    const OPEN: &str = "<span class=\"term\" data-hint=\"";
+    const DESC: &str = "\" aria-describedby=\"";
+    let mut seen: HashSet<&str> = HashSet::new();
+    let (mut out, mut rest) = (String::with_capacity(html.len()), html);
+    while let Some(i) = rest.find(OPEN) {
+        let after = &rest[i + OPEN.len()..];
+        let Some(d) = after.find(DESC) else { break };
+        let id_from = d + DESC.len();
+        let Some(id_len) = after[id_from..].find('"') else { break };
+        let id = &after[id_from..id_from + id_len];
+        // an escaped hint holds no quote: anything else is not a term as rb draws one, and is kept as it is
+        if after[..d].contains('"') {
+            out.push_str(&rest[..i + OPEN.len()]);
+            rest = after;
+            continue;
+        }
+        if seen.insert(id) {
+            out.push_str(&rest[..i + OPEN.len() + id_from]);
+        } else {
+            out.push_str(&rest[..i]);
+            out.push_str("<span class=\"term\" aria-describedby=\"");
+        }
+        rest = &after[id_from..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// The glossary, folded: each term the page draws with a hint, and rb's line for it at its anchor, which the term names
@@ -1062,6 +1098,9 @@ fn plain_reading(f: &Value) -> String {
     let r = at(f, "reading");
     let num = |k: &str| r.and_then(|r| at(r, k)).and_then(Value::as_f64);
     let Some(e) = num("estimate") else {
+        if text(f, "timing") == "taken_out" {
+            return crate::shell::strings::evidence("took_results", &[]);
+        }
         return if text(f, "state") == "untested" || text(f, "reading.result") == "untested" { "No results yet.".to_string() } else { String::new() };
     };
     // a count rule and a best of N are said by their units, never by a mean: as the card says them (reading_short)
@@ -1603,7 +1642,15 @@ impl<'a> Page<'a> {
                 let eid = text(x, "id");
                 let xid = format!("x-{eid}");
                 let state = text(x, "state");
-                let state = if state.is_empty() { String::new() } else { format!("{DOT}{}", self.state_term(state)) };
+                // S4, L1: a state that rests on what git took out is said in rb's words, never as the state it hides
+                let said = text(x, "state_said");
+                let state = if !said.is_empty() {
+                    format!("{DOT}{}", esc(said))
+                } else if state.is_empty() {
+                    String::new()
+                } else {
+                    format!("{DOT}{}", self.state_term(state))
+                };
                 let standing = design_said(x);
                 let standing = if standing.is_empty() { String::new() } else { format!("{DOT}<span class=\"dim\">{}</span>", esc(standing)) };
                 // its criteria counted by rule, as rb's catalogue row says them (home.tree), green only where rb says so
@@ -3095,6 +3142,7 @@ impl<'a> Page<'a> {
         let state = list(doc, "home.standing").iter().find(|s| text(s, "question") == id).map(|s| text(s, "state_word")).filter(|t| !t.is_empty()).unwrap_or(status.split(' ').next().unwrap_or(""));
         let said = w::question_state(state);
         let status = if status.split(' ').next().is_some_and(|s| s.eq_ignore_ascii_case("open")) { term_as("open (question)", &esc(&said)) } else { esc(&said) };
+        let status = status + &took_state(q);
         let mine: Vec<String> = texts(q, "findings").into_iter().filter(|c| self.finding(c).is_some()).collect();
         let mut h = vec![crumbs, format!("<h1 id=\"h-{}\">{}</h1><p class=\"meta\">{status}</p>", esc(&qid), au_title(text(q, "text")))];
         // a question no rule is linked to says one thing under its status (plain words pass 4), never a headline and a
@@ -3844,6 +3892,7 @@ impl<'a> Page<'a> {
         // the state names its subject (plain words pass 3): "Open question", "Answered question"
         let said = w::question_state(&word);
         let word = if status.split(' ').next().is_some_and(|s| s.eq_ignore_ascii_case("open")) { term_as("open (question)", &esc(&said)) } else { esc(&said) };
+        let word = word + &took_state(q);
         let head = format!("<p class=\"sth\"><span class=\"stw\">{word}</span></p>");
         let question = format!("<p class=\"stq\">{}</p>", a(&qid, &au_title(text(q, "text")), "sq"));
         // rb's line on why: the document's reason, else rb's headline on the question's evidence, as the question's
@@ -4181,6 +4230,7 @@ impl<'a> Page<'a> {
             let status = text(q, "status");
             let said = w::question_state(status.split(' ').next().unwrap_or(""));
             let status = if status.split(' ').next().is_some_and(|s| s.eq_ignore_ascii_case("open")) { term_as("open (question)", &esc(&said)) } else { esc(&said) };
+            let status = status + &took_state(q);
             let muted = self.muted_of(id);
             let tally: Vec<String> = self.counts_of(q)
                 .iter()
@@ -4441,7 +4491,26 @@ impl<'a> Page<'a> {
         let (page, bundle) = self.rerun_at()?;
         // the bundle names the code where its manifest has a repo (rb export names one only where a reader can use it)
         let code = !text(self.doc, "reproduce_repo.url").is_empty();
-        Some(esc(&w::rerun_prompt(&page, &bundle, text(self.doc, "project.id"), code, experiment)))
+        Some(esc(&w::rerun_prompt_at(&page, &bundle, text(self.doc, "project.id"), code, self.origin_lacks().as_deref(), experiment)))
+    }
+
+    /// Where origin did not hold the code's commit when the page was made, or rb could not tell (E4): the sentence the
+    /// panel and the prompt say in place of a promise. None where it held it, or the bundle names no code.
+    fn origin_lacks(&self) -> Option<String> {
+        let repo = text(self.doc, "reproduce_repo.url");
+        let commit = crate::checkout::short(text(self.doc, "reproduce_repo.commit"));
+        if repo.is_empty() || commit.is_empty() {
+            return None;
+        }
+        let at = self.doc.get("reproduce_repo").and_then(|r| r.get("at_origin"));
+        let unfetched = self.doc.get("reproduce_repo").and_then(|r| r.get("origin_unfetched")).map_or(false, Value::truthy);
+        if matches!(at, Some(Value::Bool(false))) {
+            Some(w::rerun_origin_lacks(&commit, repo, true))
+        } else if unfetched {
+            Some(w::rerun_origin_lacks(&commit, repo, false))
+        } else {
+            None
+        }
     }
 
     /// rb's own addresses on what says them (`data-rb-page`, `data-rb-bundle`), so the hub's metas (rb-page, rb-clone)
@@ -4480,7 +4549,11 @@ impl<'a> Page<'a> {
                 let names = if changed.len() > 5 { format!("{} {}", shown.join(", "), w::and_more(changed.len() - 5)) } else { crate::next_step::and_list(&shown) };
                 format!(". {}{names}", w::not_committed_no_rerun(changed.len()))
             };
-            format!("{}{shown}{at}{changed}{}", w::CODE_WHEN_MADE, w::CODE_TRAVELS)
+            // a clone gets the code at that commit only where origin held it when the page was made (E4)
+            match self.origin_lacks() {
+                Some(lacks) => format!("{}{shown}{at}{changed}. {}", w::CODE_WHEN_MADE, esc(&lacks)),
+                None => format!("{}{shown}{at}{changed}{}", w::CODE_WHEN_MADE, w::CODE_TRAVELS),
+            }
         };
         let folder = text(self.doc, "project.id");
         format!(
@@ -4778,6 +4851,8 @@ fn glyph(state: &str) -> &'static str {
     match state {
         "ok" => "\u{2713}",
         "partial" => "\u{25d0}",
+        // a missing part is marked as the summary line marks it (item 5)
+        "missing" => "\u{2717}",
         _ => "\u{25cb}",
     }
 }
@@ -4785,6 +4860,13 @@ fn glyph(state: &str) -> &'static str {
 
 /// The design's standing in rb's words, where it waits: rb's data names it by a code (`not_confirmed`, `changed`),
 /// which a screen never draws; a standing already in words is drawn as given. Nothing for a design that does not wait.
+/// A question's state in rb's words where it rests on a call git took out (L1): " · a call on it taken out by git", from
+/// its brief's state_said; nothing for any other state.
+fn took_state(q: &Value) -> String {
+    let said = text(q, "state_said");
+    if said.is_empty() { String::new() } else { format!("{DOT}{}", esc(said)) }
+}
+
 fn design_said(x: &Value) -> &str {
     if !design_waits(x) {
         return "";

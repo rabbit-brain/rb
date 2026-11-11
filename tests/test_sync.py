@@ -444,6 +444,12 @@ def test_a_record_synced_names_its_code_only_at_an_https_origin(hub, monkeypatch
     # git's own rewrite for this machine's fetches: the https address goes to this machine's copy, which is never named
     subprocess.run(["git", "config", f"url.{here}.insteadOf", "https://github.com/ana/"], check=True)
     subprocess.run(["git", "remote", "add", "origin", here], check=True)
+    # with no branch of origin fetched, rb cannot tell whether origin holds the commit, and promises no code (E4)
+    subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/ana/int8-resnet50.git"], check=True)
+    assert main(["sync", "--with-record"]) == 0
+    assert (f"The code when this page was made: https://github.com/ana/int8-resnet50.git at commit {head[:12]}. When this page was made, git had"
+            f" fetched no branch of origin, so rb could not tell whether origin holds commit {head[:12]}.") in capsys.readouterr().out
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/main", head], check=True)       # origin's branch, as fetched
     for origin in [*named, *unnamed]:
         subprocess.run(["git", "remote", "set-url", "origin", origin], check=True)
         assert main(["sync", "--with-record"]) == 0

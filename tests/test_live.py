@@ -44,6 +44,7 @@ _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # never
 CHOSEN_ELSEWHERE = {"error": "A place or a version is chosen on rb open's own page."}
 FOREIGN = {"error": "rb open answers only at 127.0.0.1, localhost or [::1]. Open the link it printed."}
 POLL = 5.0          # the live module's interval while the page is in view
+SLOW = 120.0        # the most a wait on what the page did may take: a ceiling, never the check (a slow runner's answers)
 
 
 def needs(*groups: str) -> None:
@@ -621,11 +622,13 @@ class Front:
 
     def __init__(self, back: str, routes: dict = None):
         self.back, self.routes, self.asked = back, routes or {}, []
+        self.timed = []             # (path, when the page asked, when it was answered), by time.monotonic()
         self.down = False           # rb open as if stopped: its digest unanswered
         front = self
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
+                began = time.monotonic()
                 path, _, q = self.path.partition("?")
                 q = "?" + q if q else ""
                 headers = {k: v for k, v in self.headers.items() if k.lower() in ("x-rb-usage", "sec-fetch-site")}
@@ -641,6 +644,7 @@ class Front:
                 else:
                     status, ctype, body = front.forward(self.path, headers)
                 front.asked.append((self.path, status))
+                front.timed.append((path, began, time.monotonic()))
                 self.send_response(status)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(body)))
@@ -669,6 +673,16 @@ class Front:
 
     def count(self, path: str) -> int:
         return sum(1 for p, _ in list(self.asked) if p.partition("?")[0] == path)
+
+    def polls(self, since: float = 0.0) -> list:
+        """The digest polls the page asked since `since`: (when it asked, when rb answered), in order."""
+        return sorted((a, b) for p, a, b in list(self.timed) if p == "/digest.json" and a >= since)
+
+    def gaps(self, since: float = 0.0) -> list:
+        """The page's own waits between polls since `since`: from rb's answer to one poll to the page's next ask. A slow
+        runner's answers take longer; the page's wait is the same."""
+        ps = self.polls(since)
+        return [nxt[0] - cur[1] for cur, nxt in zip(ps, ps[1:])]
 
     def close(self) -> None:
         self.server.shutdown()
@@ -751,9 +765,13 @@ def test_a_poll_never_counts(front, chrome):
     until(lambda: f.count("/digest.json") >= polls + 2, 2 * POLL + 4, lambda: f.asked)
     pages = f.count("/")
     rec.rb("run", "add", "e1", "fp32.top1=0.764", "int8.top1=0.760")
-    until(lambda: f.count("/") == pages + 1, POLL + 4, lambda: f.asked)
+    # waits on what the page did, polls not seconds, so a slow runner's answers hold it to the same check: the fetch
+    # comes within the polls after the write, and none after it
     after = f.count("/digest.json")
-    until(lambda: f.count("/digest.json") >= after + 3, 3 * POLL + 4, lambda: f.asked)    # polls past rb open's next listing
+    until(lambda: f.count("/") == pages + 1 or f.count("/digest.json") >= after + 3, SLOW, lambda: f.asked)
+    assert f.count("/") == pages + 1, f.asked
+    after = f.count("/digest.json")
+    until(lambda: f.count("/digest.json") >= after + 3, SLOW, lambda: f.asked)    # polls past rb open's next listing
     # one write, one fetch: the new page's key is taken, and the places listed follow the write in the same poll
     assert f.count("/") == pages + 1, f.asked
     assert f.count("/telemetry/inspected") == 1, f.asked
@@ -809,19 +827,24 @@ def test_the_page_polls_less_while_hidden_or_unanswered(front, chrome):
     hide = ("v => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => v});"
             " Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => v ? 'hidden' : 'visible'});"
             " document.dispatchEvent(new Event('visibilitychange')); }")
+    # each check is of the page's own waits (from rb's answer to the page's next ask), and each wait is for polls the page
+    # made, so a slow runner, whose answers take longer, is held to the same schedule
     chrome.js(f"({hide})(true)")
-    n = polls()
-    time.sleep(4 * POLL)
-    assert polls() - n <= 2, f.asked                                   # 5 s, then 10 s: not the four of 5 s each
-    n = polls()
+    hidden = time.monotonic()
+    until(lambda: len(f.polls(hidden)) >= 3, SLOW, lambda: f.asked)
+    gaps = f.gaps(hidden)
+    assert gaps[0] >= 2 * POLL - 0.5 and gaps[1] >= 4 * POLL - 0.5, (gaps, f.asked)   # 10 s, then 20 s: never 5 s each
+    shown = time.monotonic()           # the third poll is answered, and the page waits 40 s now: nothing in flight
     chrome.js(f"({hide})(false)")
-    until(lambda: polls() > n, 2, lambda: f.asked)                   # shown: at once
-    n = polls()
-    until(lambda: polls() >= n + 2, 2 * POLL + 3, lambda: f.asked)   # and every 5 s
+    until(lambda: len(f.polls(shown)) >= 1, SLOW, lambda: f.asked)
+    assert f.polls(shown)[0][0] - shown < 2, (f.polls(shown), f.asked)              # shown: at once
+    until(lambda: len(f.polls(shown)) >= 3, SLOW, lambda: f.asked)
+    assert all(POLL - 0.5 <= g < 2 * POLL - 0.5 for g in f.gaps(shown)[:2]), (f.gaps(shown), f.asked)   # and every 5 s
     chrome.js("window.failedSaid = []; document.addEventListener('rb:failed', e => failedSaid.push(e.detail.error))")
     f.down = True
-    n = polls()
-    time.sleep(4 * POLL)
-    assert polls() - n <= 2, f.asked
+    down = time.monotonic()
+    until(lambda: len(f.polls(down)) >= 3, SLOW, lambda: f.asked)
+    gaps = f.gaps(down)
+    assert gaps[0] >= 2 * POLL - 0.5 and gaps[1] >= 4 * POLL - 0.5, (gaps, f.asked)   # unanswered: 10 s, then 20 s
     assert set(chrome.js("failedSaid")) == {"rb open is not answering"}
     assert chrome.thrown == []

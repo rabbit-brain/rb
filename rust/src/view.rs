@@ -966,6 +966,8 @@ pub(crate) fn code_of(run: &Run, root: &std::path::Path) -> Option<RunCode> {
     let at = run.receipt.attached.as_ref()?;
     let commit = named(at, "commit")?;
     let recorded = if at.get("dirty").map_or(false, |d| d.truthy()) {
+        // a tree with files left out is part of the run's code (E3): Reproduce rebuilds it, but no reading says two
+        // runs ran the same code, or other code, from part of it
         if at.get("left_out").map_or(false, |n| n.truthy()) {
             return None;
         }
@@ -1177,6 +1179,8 @@ pub struct FindingLine {
 #[derive(Debug, Clone, Default)]
 pub struct ExperimentBrief {
     pub id: String,
+    /// its state in words where they are not its state (S4, L1: runs or a call on it git took out), else ""
+    pub state_said: String,
     pub title: String,
     /// its title as a navigator line and a paired card name it (short_title)
     pub short_title: String,
@@ -1224,11 +1228,16 @@ pub struct QuestionBrief {
     pub id: Option<String>,
     pub text: String,
     pub status: String,
+    /// its state in words where they are not its state (L1: a call on it git took out), else ""
+    pub state_said: String,
     pub experiments: Vec<ExperimentBrief>,
     pub changed: Vec<String>,
     pub still_open: Vec<String>,
     pub next: Vec<String>,
     pub ruled: Vec<String>,
+    /// a line of work under it whose state rests on a call git took a write of out (L1), each as one sentence of rb's,
+    /// said beside the calls and never as one (MP-1111-0616's L-b)
+    pub states: Vec<String>,
     pub depth: usize,
     pub parent: Option<String>,
     pub rollup: String,
@@ -1960,12 +1969,13 @@ pub fn finding_line(f: &Value, decided: &str) -> FindingLine {
     let problems = list_of(f, "integrity");
     if !problems.is_empty() {
         // every problem, never "(and 1 more)": a page's reader has no rb show to open
-        parts.push(format!("integrity: {}", problems.iter().map(|p| get_or(p, "text", "")).filter(|t| !t.is_empty()).collect::<Vec<_>>().join(" · ")));
+        parts.push(format!("integrity: {}", problems.iter().map(|p| get_or(p, "text", "").trim_end_matches('.').to_string()).filter(|t| !t.is_empty()).collect::<Vec<_>>().join(" · ")));
     }
     if let Some(call) = call_said(f, decided) {
         parts.push(format!("decided: {call}"));
     }
-    let body = parts.into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join("; ") + ".";
+    // a part that ends a sentence of its own ends the line with one full stop, never two (S-a)
+    let body = parts.into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join("; ").trim_end_matches('.').to_string() + ".";
     FindingLine {
         criterion_id: get_or(f, "criterion", ""),
         statement: statement.clone(),
@@ -2208,6 +2218,7 @@ pub fn briefs(led: &Ledger, st: &Dict) -> Res<Vec<QuestionBrief>> {
             arms,
             varies,
             state: get_or(e, "state", "planned"),
+            state_said: get_or(e, "state_said", ""),
             hypothesis: get_or(e, "hypothesis", ""),
             if_holds: get_or(e, "if_holds", ""),
             if_not: get_or(e, "if_not", ""),
@@ -2302,7 +2313,15 @@ pub fn briefs(led: &Ledger, st: &Dict) -> Res<Vec<QuestionBrief>> {
                 let why = if (past && !words_are_theirs(&by)) || confirms_one(d) { format!(" · note: {}", get_or(d, "why", "")) } else { format!(" ({})", get_or(d, "why", "")) };
                 let text = format!("{}{}{}: \"{said}\"{why}", made(&get_or(d, "action", "")), crate::actor::by_writer(&by), past_phrase(d));
                 let current = d.get("current").map_or(true, |c| c.truthy());
-                ruled.push(with_words(&text, &get_truthy(d, "words").unwrap_or_default(), &by) + &crate::ledger::runs_after_of(d) + if current { "" } else { earlier(past) });
+                ruled.push(with_words(&text, &get_truthy(d, "words").unwrap_or_default(), &by) + &crate::ledger::runs_after_of(d) + if current { "" } else { earlier(past) } + &took_mark(d));
+            }
+        }
+        // L1: a line of work whose state rests on a call git took out says so among the calls, as its state does
+        let mut states: Vec<String> = Vec::new();
+        for e in exps.iter().filter(|e| eset.contains(&get_or(e, "id", ""))).chain(q.into_iter()) {
+            if get_or(e, "state", "") == crate::ledger::UNDETERMINED_STATE {
+                let name = get_truthy(e, "title").or_else(|| get_truthy(e, "text")).unwrap_or_default();
+                states.push(format!("\"{name}\" reads undetermined: {}", question_state_said(e, "")));
             }
         }
         let mut exps_here: Vec<ExperimentBrief> = Vec::new();
@@ -2355,11 +2374,13 @@ pub fn briefs(led: &Ledger, st: &Dict) -> Res<Vec<QuestionBrief>> {
             id: qid.clone(),
             text: q.map(|q| get_or(q, "text", qid.as_deref().unwrap_or(""))).unwrap_or_default(),
             status: q.map(|q| get_or(q, "state", "open")).unwrap_or_default(),
+            state_said: q.map(|q| get_or(q, "state_said", "")).unwrap_or_default(),
             experiments: exps_here,
             changed: changed(led, &led_exps, 4)?,
             still_open: still,
             next: nxt,
             ruled,
+            states,
             depth,
             parent: q.and_then(|q| q.get("parent")).filter(|p| !p.is_null()).map(py_str),
             rollup,
@@ -2465,6 +2486,8 @@ pub struct Home {
     /// Those files' paths, each with when rb first saw its change.
     pub uncited_paths: Vec<(String, String)>,
     pub uncited_line: Option<String>,
+    /// what git took out of the record, which rb kept (E1), in the one line every surface says it
+    pub taken_out: Option<String>,
     /// What rb looks at, when it last looked and what it does not read or see: rb status's scope line.
     pub scope: Option<String>,
     /// The count line and the scope line where a screen has one short line for each.
@@ -2674,7 +2697,7 @@ fn tree(st: &Value) -> Vec<TreeRow> {
     let exp_row = |e: &Value, depth: usize, rows: &mut Vec<TreeRow>, placed: &mut HashSet<String>| {
         let id = get_or(e, "id", "");
         let mine: Vec<&Value> = findings.iter().filter(|f| f.get("experiment").map(py_str).as_deref() == Some(id.as_str())).collect();
-        let mut parts = vec![get_or(e, "state", "planned")];
+        let mut parts = vec![state_said(e)];
         if !mine.is_empty() {
             parts.push(rule_tally(&mine));
         }
@@ -2690,7 +2713,7 @@ fn tree(st: &Value) -> Vec<TreeRow> {
             _ => Vec::new(),
         };
         rules.sort_by_key(|(k, _)| tally_rank(k));
-        let mut parts = vec![get_or(&q, "state", "open")];
+        let mut parts = vec![question_state_said(&q, "open")];
         parts.extend(rules.iter().map(|(k, n)| format!("{n} {}", crate::assess::rule_label(k, *n))));
         let inquiry = q.get("inquiry").cloned().unwrap_or(Value::empty_dict());
         let selected: HashSet<String> = list_of(&inquiry, "direct").iter().map(|r| get_or(r, "criterion", "")).collect();
@@ -3064,6 +3087,7 @@ fn home_in(led: &Ledger, since_from: Option<Option<i64>>) -> Res<Home> {
             uncited: uncited.len(),
             uncited_paths: uncited.iter().map(|u| (u.path.clone(), u.at.clone())).collect(),
             uncited_line: uncited_line.as_ref().map(|l| l.0.clone()),
+            taken_out: led.taken_out_value().get("said").map(crate::pyjson::py_str).filter(|s| !s.is_empty()),
             uncited_short: uncited_line.map(|l| l.1),
             scope: scope.as_ref().map(|s| s.said()),
             scope_short: scope.map(|s| s.said_short()),
@@ -3688,7 +3712,22 @@ pub fn relation_lines(exp: &Experiment) -> Vec<String> {
 }
 
 pub fn object_card(led: &Ledger, subject: &str) -> Res<Option<Card>> {
-    with_screen_trees(led, || led.locked(|| object_card_in(led, subject)))
+    with_screen_trees(led, || {
+        led.locked(|| {
+            let mut card = object_card_in(led, subject)?;
+            // L1: a record git took a write of out of the record says so first, as rb show <id> does
+            if let (Some(c), Some(kind)) = (card.as_mut(), led.kind_of(subject)?) {
+                let scope = || if matches!(kind, "experiment" | "question" | "resource") { led.took_scope_said(subject, false) } else { Ok(None) };
+                if let Some(said) = led.took_under_said(kind, subject)?.map_or_else(scope, |s| Ok(Some(s)))? {
+                    c.facts.insert(0, said);
+                }
+                if let Some(said) = led.took_said(kind, subject)? {
+                    c.facts.insert(0, said);
+                }
+            }
+            Ok(card)
+        })
+    })
 }
 
 fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
@@ -3708,6 +3747,18 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
             c.who_line = format!("run · recorded {}{}", cut(&get_or(&rc, "at", ""), 19).replace('T', " "), crate::actor::by_writer(&run.receipt.actor));
             let (facts, blockers) = run_facts(&run, &rc);
             c.facts.extend(facts);
+            // when its code was captured (E2) and what rb kept short of the whole (E3), as rb open's run card says them
+            c.facts.extend(crate::cmds::code_lines(Some(&led.root), &run, false, false));
+            c.facts.extend(crate::capture::state_lines(&crate::capture::Capture::of_run(&run), false));
+            // the code kept when it was recorded, and not in this clone: rb ui's card has no Reproduce to say it (E4)
+            let att = crate::capture::Capture::attached(&run);
+            if let (None, Some(t), true) = (crate::capture::Capture::produced(&run), att.tree.as_ref(), att.dirty) {
+                if crate::capture::tree_here(&led.root, t) == crate::capture::Here::Absent {
+                    c.facts.push(crate::shell::strings::evidence("not_here", &[("tree", t.chars().take(12).collect())]));
+                }
+            }
+            // its evidence, line by line (E5)
+            c.facts.extend(led.run_evidence_lines(&run, false));
             if reader() == Reader::Screen {
                 if let Some(o) = observed_in(&run, &place_shown(led)) {
                     c.facts.push(get_or(&o.value, "label_short", ""));
@@ -3726,7 +3777,7 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
             let n = e.get("run_count").and_then(|v| v.as_i64()).unwrap_or(0);
             c.who_line = format!(
                 "experiment · {} · {} · {n} run{}",
-                get_or(&e, "state", "planned"),
+                state_said(&e),
                 if e.get("frozen").map_or(false, |f| f.truthy()) { "locked" } else { "not locked" },
                 if n == 1 { "" } else { "s" }
             );
@@ -3841,7 +3892,8 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
                 c.facts.push(
                     with_words(&format!("decision: {}", call_line(&d.action, &d.by, &d.at, &d.why, d.past.as_ref(), led.confirms(&d.id)?)), &d.words, &d.by)
                         + &crate::ledger::runs_after_said(&d.subject, &d.past.as_ref().map(|p| p.when.clone()).unwrap_or_default(), &led.runs_after_past_call(d)?)
-                        + &if d.revisit.is_empty() { String::new() } else { format!(" · revisit: {}", d.revisit) },
+                        + &if d.revisit.is_empty() { String::new() } else { format!(" · revisit: {}", d.revisit) }
+                        + &led.took_call_mark(&d.id)?.map(|m| format!(" · {m}")).unwrap_or_default(),
                 );
             }
             c.pass_bars = findings
@@ -3896,6 +3948,10 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
                     c.facts.push(format!("{key}: {said}"));
                 }
             }
+            // what the reading's runs rest on (E5), in rb show's line
+            if let Some(e) = get_truthy(&says, "evidence") {
+                c.facts.push(e);
+            }
             for o in list_of(&f, "observations") {
                 let value = o.get("value").cloned().unwrap_or(Value::Null);
                 let said = match value.as_f64() {
@@ -3945,14 +4001,15 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
             for r in users.iter().take(6) {
                 let nums = r.metrics.iter().take(3).map(|(k, v)| format!("{k}={}", show(&Value::Float(*v)))).collect::<Vec<_>>().join(" · ");
                 let who = shown(&r.created_by);
-                c.runs.push((format!("{} · {}{nums}", cut(&r.created_at, 10), if who.is_empty() { String::new() } else { format!("{who} · ") }), r.id.clone()));
+                let took = led.took_mark("run", &r.id)?.map(|m| format!(" · {m}")).unwrap_or_default();
+                c.runs.push((format!("{} · {}{nums}{took}", cut(&r.created_at, 10), if who.is_empty() { String::new() } else { format!("{who} · ") }), r.id.clone()));
             }
         }
         _ => {
             let qs = list_of(&st, "questions");
             let Some(q) = qs.iter().find(|x| get_or(x, "id", "") == subject).cloned() else { return Ok(None) };
             c.title = get_or(&q, "text", subject);
-            c.who_line = format!("question · {}", get_or(&q, "state", "")) + &get_truthy(&q, "parent").map(|p| format!(" · under {p}")).unwrap_or_default();
+            c.who_line = format!("question · {}", question_state_said(&q, "")) + &get_truthy(&q, "parent").map(|p| format!(" · under {p}")).unwrap_or_default();
             let st_dict = match &st {
                 Value::Dict(d) => d.clone(),
                 _ => Dict::new(),
@@ -3970,6 +4027,7 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
                 c.facts.extend(changed);
                 let from = b.ruled.len().saturating_sub(2);
                 c.facts.extend(b.ruled[from..].iter().cloned());
+                c.facts.extend(b.states.iter().cloned());
                 c.looks = b.still_open.clone();
                 more(&mut c.looks, 3);
             }
@@ -4070,7 +4128,7 @@ impl ExperimentBrief {
     }
 
     pub fn to_value(&self) -> Value {
-        crate::obj! {
+        let mut v = crate::obj! {
             "id" => self.id.clone(), "title" => self.title.clone(), "short_title" => self.short_title.clone(), "findings" => Value::List(self.findings.iter().map(|f| f.to_value()).collect()),
             "scope" => opt_s(&self.scope), "counted" => self.counted, "table" => self.table.clone().map(Value::Dict).unwrap_or(Value::Null),
             "arms" => self.arms.clone(), "varies" => strs(&self.varies), "state" => self.state.clone(), "hypothesis" => self.hypothesis.clone(),
@@ -4090,24 +4148,47 @@ impl ExperimentBrief {
                 "standing" => self.design_standing.clone(), "pending" => !self.design_confirm.is_empty(), "confirm" => self.design_confirm.clone(),
                 "lines" => strs(&self.design_lines), "not_recorded" => strs(&self.not_recorded)
             }
+        };
+        // S4, L1: a state that rests on what git took out, in words (additive: only then)
+        if !self.state_said.is_empty() {
+            if let Value::Dict(d) = &mut v {
+                d.insert("state_said".into(), Value::Str(self.state_said.clone()));
+            }
         }
+        v
     }
 }
 
 impl QuestionBrief {
     pub fn to_value(&self) -> Value {
-        crate::obj! {
+        let mut v = crate::obj! {
             "id" => opt_s(&self.id), "text" => self.text.clone(), "status" => self.status.clone(),
             "experiments" => Value::List(self.experiments.iter().map(|e| e.to_value()).collect()), "changed" => strs(&self.changed),
             "still_open" => strs(&self.still_open), "next" => strs(&self.next), "ruled" => strs(&self.ruled), "depth" => self.depth,
             "parent" => opt_s(&self.parent), "rollup" => self.rollup.clone(),
             "inquiry" => self.inquiry.clone(), "inquiry_findings" => Value::List(self.inquiry_findings.iter().map(|f| f.to_value()).collect()), "overview" => self.overview.clone(), "summary" => strs(&self.summary)
+        };
+        // L1: a state that rests on a call git took out, in words (additive: only then)
+        if !self.state_said.is_empty() {
+            if let Value::Dict(d) = &mut v {
+                d.insert("state_said".into(), Value::Str(self.state_said.clone()));
+            }
         }
+        v
     }
 }
 
 impl Home {
     pub fn to_value(&self) -> Value {
+        let mut v = self.to_value_bare();
+        // what git took out of the record (E1): only where it did, so a home it never touched reads as before
+        if let (Some(t), Value::Dict(d)) = (&self.taken_out, &mut v) {
+            d.insert("taken_out".into(), Value::Str(t.clone()));
+        }
+        v
+    }
+
+    fn to_value_bare(&self) -> Value {
         crate::obj! {
             "title" => self.title.clone(), "project_id" => self.project_id.clone(), "you" => self.you.clone(), "since" => opt_s(&self.since),
             "found" => Value::List(self.found.iter().map(|a| crate::obj! {
@@ -4429,4 +4510,21 @@ mod tests {
             ]
         );
     }
+}
+
+/// An experiment's state as rb's text says it, from its row in rb status's data: its words where rb keeps runs git
+/// took out of an experiment with none left (S4), else its state.
+pub fn state_said(e: &Value) -> String {
+    question_state_said(e, "planned")
+}
+
+/// What a listed call's row in rb status's data says of a write to it git took out (L1): " · <its line>", or nothing.
+pub fn took_mark(d: &Value) -> String {
+    get_truthy(d, "taken_out").map(|m| format!(" · {m}")).unwrap_or_default()
+}
+
+/// A question's (or an experiment's) state as rb's text says it, from its row in rb status's data: its words where it
+/// rests on a call git took out (L1), else its state, `or` where it has none.
+pub fn question_state_said(e: &Value, or: &str) -> String {
+    e.get("state_said").filter(|v| v.truthy()).map(py_str).unwrap_or_else(|| get_or(e, "state", or))
 }

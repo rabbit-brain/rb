@@ -286,14 +286,12 @@ def test_older_results_moved_copied_or_put_back_by_git_are_never_new_runs(rb):
         "results/seed3/epoch3.json was there when rb first looked here, as results/seed3/metrics_epoch3.json, in results/seed3/, which int8 reads, so rb "
         "cannot tell it from the work before the record and proposes no run of it: rb run add int8 --from results/seed3/epoch3.json --set seed=3 "
         "--config results/seed3/config.yaml records it, if it is one",
-        "results/seed2/metrics.json holds bytes git already kept, in results/seed2/, which int8 reads, so rb cannot tell it from the work before the "
-        "record and proposes no run of it: rb run add int8 --from results/seed2/metrics.json --set seed=2 --config results/seed2/config.yaml records it, "
-        "if it is one",
-        "results/seed3/metrics.json holds bytes git already kept, in results/seed3/, which int8 reads, so rb cannot tell it from the work before the "
-        "record and proposes no run of it: rb run add int8 --from results/seed3/metrics.json --set seed=3 --config results/seed3/config.yaml records it, "
-        "if it is one",
     ):
         assert line in unplaced, unplaced
+    # seeds 2's and 3's files are ones recorded runs named, with other bytes now and no watched command that wrote them: said as
+    # changed since that run (EVIDENCE.md E5), never proposed as a run to average in with it
+    for seed in (2, 3):
+        assert any(u.startswith(f"results/seed{seed}/metrics.json changed since run ") and "rb does not propose it as a run" in u for u in unplaced), unplaced
     [older] = [i for i in rb("status").data["open"] if i["code"] == "unindexed_folder"]
     assert older["later"] and sorted(older["folders"]) == ["results/sweep-1-lr01/", "results/sweep-2-copy/", "results/sweep-2/"], older
     assert rb("reconcile", "--apply").data["recorded"] == [] and reading() == before
@@ -344,7 +342,7 @@ def test_a_result_rb_saw_land_is_still_a_new_run_after_a_stash_and_a_look(rb):
             "results/seed3/config.yaml records it, if it is one") in rb("reconcile").data["unplaced"]
     _git("stash", "pop", "-q")                                               # seed 2's re-evaluation, from before the record
     assert found() == runs
-    assert any(u.startswith("results/seed2/metrics.json holds bytes git already kept") for u in rb("reconcile").data["unplaced"])
+    assert any(u.startswith("results/seed2/metrics.json changed since run ") for u in rb("reconcile").data["unplaced"])  # E5: a file a run named
 
 
 def test_a_result_rb_saw_land_is_still_a_new_run_after_its_branch_is_left_and_checked_out_again(rb):

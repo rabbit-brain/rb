@@ -22,8 +22,38 @@ impl Ledger {
 
     /// A linked row keeps the numeric finding unchanged. Link timing uses rb's existing timing calculation with
     /// the link's declaration time; it does not inherit the criterion's earlier declaration.
+    /// Where git took records out, the row is traced as a finding is, and read again resting on the records git took
+    /// out of what the row read beyond its finding (the question: a reword, MP-1110-2303's B2), which no
+    /// interpretation is active without.
     fn inquiry_row(&self, q: &Question, c: &Criterion, link: Option<&QuestionLink>, findings: &IndexMap<String, Finding>) -> Res<Dict> {
+        if self.taken_out()?.is_empty() {
+            return self.inquiry_row_read(q, c, link, findings, &[]);
+        }
+        let (first, reads) = self.traced(|| {
+            self.note_read(|r| {
+                r.key("question", &q.id);
+                r.key("criterion", &c.id);
+            });
+            self.inquiry_row_read(q, c, link, findings, &[])
+        });
+        let first = first?;
+        // what its finding names already; a finding a cache held (rb_delta's ledger) is worked out again for it
+        if !self.finding_took.borrow().contains_key(&c.id) && self.kind_of(&c.experiment)? == Some("experiment") {
+            self.finding_now(c)?;
+        }
+        let by_finding = self.finding_took.borrow().get(&c.id).cloned().unwrap_or_default();
+        let taken: Vec<Key> = self.taken_for(&c.experiment, &reads)?.into_iter().filter(|k| !by_finding.contains(k)).collect();
+        if taken.is_empty() {
+            return Ok(first);
+        }
+        self.traced(|| self.inquiry_row_read(q, c, link, findings, &taken)).0
+    }
+
+    fn inquiry_row_read(&self, q: &Question, c: &Criterion, link: Option<&QuestionLink>, findings: &IndexMap<String, Finding>, taken: &[Key]) -> Res<Dict> {
         let mut integrity = self.inquiry_question_integrity(q)?;
+        if !taken.is_empty() {
+            integrity.push(self.taken_problem(taken)?);
+        }
         if let Some(why) = self.edited_outside("criterion", &c.id)? {
             integrity.push(Caveat::problem("edited_outside_rb", &c.id, why));
         }
@@ -179,7 +209,7 @@ impl Ledger {
             summary.push_str(&format!(" {label}{interpretation}."));
         }
         if !integrity.is_empty() {
-            summary.push_str(&format!(" Inquiry integrity: {}.", integrity.iter().map(|p| p.text.clone()).collect::<Vec<_>>().join("; ")));
+            summary.push_str(&format!(" Inquiry integrity: {}.", integrity.iter().map(|p| p.text.trim_end_matches('.').to_string()).collect::<Vec<_>>().join("; ")));
         }
         let unsaid: Vec<&String> = qualifications.iter().filter(|q| !said_elsewhere.contains(q)).collect();
         if !unsaid.is_empty() {
@@ -266,11 +296,19 @@ impl Ledger {
         summary.extend(unassigned);
         let relations = self.inquiry_relations(&q.id, findings)?;
         summary.extend(relations.iter().map(super::relations::relation_line));
+        // a criterion whose link here git took out is in no row: the question's reading names it (the f13g review)
+        let mut question_integrity = self.inquiry_question_integrity(q)?;
+        let dropped = self.taken_links_to(&q.id)?;
+        if !dropped.is_empty() {
+            let p = self.taken_problem(&dropped)?;
+            summary.push(format!("Inquiry integrity: {}", p.text));
+            question_integrity.push(p);
+        }
         Ok(crate::dict! {
             "question" => q.id.clone(), "text" => q.text.clone(), "state" => self.question_state(q)?,
             "direct" => Value::List(direct), "unmapped" => Value::List(unmapped), "withdrawn" => Value::List(withdrawn),
             "relations" => Value::List(relations),
-            "integrity" => Value::List(self.inquiry_question_integrity(q)?.iter().map(|p| Value::Dict(p.dump(false))).collect()),
+            "integrity" => Value::List(question_integrity.iter().map(|p| Value::Dict(p.dump(false))).collect()),
             "rollup" => Value::Dict(self.rollup(q, findings, &self.live::<Experiment>()?)?), "summary" => Value::list_of_str(summary)
         })
     }

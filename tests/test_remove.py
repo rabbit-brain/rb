@@ -97,7 +97,7 @@ def test_remove_takes_back_what_is_rb_s_and_leaves_the_rest_as_it_was(repo):
     folder in .git."""
     plan = _plan(repo)
     assert [i["path"] for i in plan["remove"]] == [".rb/", ".claude/skills/rabbit-brain/SKILL.md", "AGENTS.md", ".mcp.json", ".claude/settings.json",
-                                                    "rb-page.html", "rb-export/", "refs/rb/ (1 ref)", ".git/rb/"]
+                                                    "rb-page.html", "rb-export/", ".git/rb/journal/main/", "refs/rb/ (1 ref)", ".git/rb/"]
     assert plan["keep"] == [] and plan["others"] == [] and plan["dry_run"]
     assert plan["untouched"].startswith("Not rb's to touch: your research files, worktrees and .git/worktrees, git history, git objects")
     assert plan["residue"] and all(len(o) == 40 for o in plan["residue"])
@@ -308,7 +308,9 @@ def test_a_locked_worktree_whose_folder_is_away_keeps_the_clone_s_part(repo, tmp
     plan = _plan(repo)
     [other] = plan["others"]
     assert other["place"].startswith("exp-b · ") and other["place"].endswith("(locked, its folder not here)") and other["command"].endswith("wt-b && rb remove")
-    assert "refs/rb/ (1 ref)" in [k["path"] for k in plan["keep"]] and not any(i["path"].startswith(("refs/rb/", ".git/rb")) for i in plan["remove"])
+    # the clone's part stays; this record's own kept copy of what rb wrote to it goes (E1)
+    kept = "rb's copy of what it wrote to this record"
+    assert "refs/rb/ (1 ref)" in [k["path"] for k in plan["keep"]] and not any(i["path"].startswith(("refs/rb/", ".git/rb")) and i["why"] != kept for i in plan["remove"])
     repo.rb("remove", "--yes")
     assert repo.git("for-each-ref", "refs/rb/") != "" and (repo.root / ".git" / "rb").is_dir()
 
@@ -537,7 +539,7 @@ def test_the_last_line_says_which_files_rb_took_its_part_out_of(repo):
     r = repo.run("remove", "--yes")
     assert r.returncode == 0
     last = r.stdout.rstrip("\n").splitlines()[-1]
-    assert last == ("Removed .rb/, .claude/skills/rabbit-brain/SKILL.md, .claude/settings.json, rb-page.html, rb-export/, refs/rb/ (1 ref), .git/rb/. "
+    assert last == ("Removed .rb/, .claude/skills/rabbit-brain/SKILL.md, .claude/settings.json, rb-page.html, rb-export/, .git/rb/journal/main/, refs/rb/ (1 ref), .git/rb/. "
                     "Took rb's part out of AGENTS.md, .mcp.json. Nothing else was changed."), last
     assert (repo.root / "AGENTS.md").read_bytes() == HOUSE
 
@@ -699,7 +701,7 @@ def test_a_record_folder_that_is_a_link_stays_with_its_folder_and_rb_s_files_go(
     assert item["real_path"] == shared.resolve().as_posix() and item["why"].endswith("; the link and the folder it points to stay")
     assert f"\n  .rb/ (a link to {shared.resolve().as_posix()}, outside this repository): the record (" in rec.run("remove", "--dry-run").stdout
     done = rec.run("remove", "--yes")
-    said = "Removed rb's files in .rb/ (the link and the folder it points to stay), .git/rb/. Nothing else was changed."   # rb init's look
+    said = "Removed rb's files in .rb/ (the link and the folder it points to stay), .git/rb/journal/main/, .git/rb/. Nothing else was changed."   # rb init's look
     assert done.returncode == 0 and said in done.stdout, done.stdout
     assert (rec.root / ".rb").is_symlink() and shared.is_dir() and list(shared.iterdir()) == []
     again = rec.run("remove", "--yes")

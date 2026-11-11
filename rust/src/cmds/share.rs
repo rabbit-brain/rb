@@ -88,6 +88,8 @@ pub fn cmd_export(ns: &Namespace, out: &mut Out) -> R {
         if matches!(r.get("at_origin"), Some(Value::Bool(false))) {
             let url = r.get("url").map(pyjson::py_str).unwrap_or_default();
             out.say(format!("origin, as this clone last saw it, does not hold commit {at}: a rerun cannot get the code from {url} until it is pushed there."));
+        } else if r.get("origin_unfetched").map_or(false, Value::truthy) {
+            out.say(format!("git has fetched no branch of origin, so rb could not tell whether origin holds commit {at}."));
         }
     }
     // origin is no address a reader can use (a path of this machine, file://, ssh): the export names none, once

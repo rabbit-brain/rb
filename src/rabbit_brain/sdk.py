@@ -434,7 +434,7 @@ class Experiment:
                outputs: Iterable[Any] = (), host: Optional[Mapping[str, str]] = None, again: Optional[str] = None,
                note: str = "", repeats: Optional[str] = None, produced_at: Optional[str] = None,
                replaces: Optional[str] = None, why: str = "", command_source: Optional[str] = None,
-               dry_run: bool = False, _block: bool = False) -> Optional[RunData]:
+               dry_run: bool = False, _block: bool = False, _start: Optional[dict] = None) -> Optional[RunData]:
         """Record a run now, as logged by the code that produced it. Returns the run, or None when the same recording is
         already here (pass `again` with a reason to record a second execution, or `repeats` to check a run), with an
         RBWarning when the numbers given differ from what it recorded. `replaces` names an invalid run this one replaces:
@@ -449,7 +449,7 @@ class Experiment:
             command_source=command_source, commit=commit,
             files=[str(f) for f in files], links=dict(links or {}), again=again, note=note, inputs=_uses(inputs),
             outputs=_uses(outputs), host={k: str(v) for k, v in dict(host or {}).items()}, repeats=repeats, produced_at=produced_at,
-            replaces=replaces, why=why, **({"block": True} if _block else {}))
+            replaces=replaces, why=why, **({"block": True} if _block else {}), **({"start": _start} if _start else {}))
         return _shaped(got, _run)
 
     def record_from(self, path: PathLike, *, keys: Iterable[str] = (), table: Optional[str] = None, where: Optional[Mapping[str, Any]] = None,
@@ -594,6 +594,7 @@ class Run:
         self.record: Union[RunData, DryRun, None] = None
         self.duplicate = False
         self.dry_run = dry_run
+        self._start: Optional[dict] = None
 
     def log(self, metrics: Optional[Mapping[str, float]] = None, **named: float) -> None:
         """Record numbers: `run.log(val_loss=5.64)` or `run.log({"int8.val_loss": 5.64})`. The last value logged under a
@@ -618,6 +619,10 @@ class Run:
         self.outputs.append((resource, role))
 
     def __enter__(self) -> "Run":
+        # the code the block starts with is the run's (E2): kept as rb journal run keeps a command's, where git keeps it
+        # whole; a commit given names the code instead
+        if not self.dry_run and self.commit is None:
+            self._start = self.exp.state._call("code_start") or None
         return self
 
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
@@ -627,6 +632,6 @@ class Run:
             raise RBError("E_OBJECT_INVALID", message=f"The run block on {self.exp.id} ended without logging a number: run.log(name=value).")
         got = self.exp.record(self.metrics, variant=self.variant, per_run=self.per_run, config=self.config, command=self.command,
                               commit=self.commit, files=self.files, links=self.links, inputs=self.inputs, outputs=self.outputs,
-                              host=self.host, again=self.again, note=self.note, dry_run=self.dry_run, _block=True)
+                              host=self.host, again=self.again, note=self.note, dry_run=self.dry_run, _block=True, _start=self._start)
         self.record, self.duplicate = got, got is None or (isinstance(got, DryRun) and got.value is None)
         return False

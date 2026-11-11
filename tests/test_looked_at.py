@@ -465,13 +465,14 @@ def test_the_exact_code_only_where_rb_s_journal_watched_the_command(rec):
     Path("outputs").mkdir()
     Path("outputs/int8_seed1.json").write_text('{"top1": 0.76}', encoding="utf-8")
     added = rec("run", "add", "int8", "--from", "outputs/int8_seed1.json", text=True)
-    assert "  The code when it was recorded: git tree " in added and "The exact code" not in added
+    assert "  The code when it was recorded, after the run: git tree " in added and "The exact code" not in added
     script = 'import json; print(json.dumps({"metrics": {"top1": 0.77}}))'
     rec("journal", "run", "--", sys.executable, "-c", script, text=True)
     env = rec("reconcile", "--apply")
     [rid] = [r.split(":")[0] for r in env.data["recorded"]]
     shown = rec("show", rid, text=True)
-    assert "  The exact code: git tree " in shown
+    # the run reconcile records from the watched command names the code that command started with (E2)
+    assert "  The code when the run started: git tree " in shown and "exact code" not in shown.lower(), shown
     # numbers rb's journal watched a command print were not typed in
     assert "typed in" not in rec("status", text=True) and "typed in" not in rec("show", "c1", text=True)
 
@@ -1137,7 +1138,7 @@ def test_a_run_no_watched_command_made_says_git_tree_not_the_exact_code(rec):
     Path("outputs/int8_seed1.json").write_text('{"top1": 0.76}', encoding="utf-8")
     rid = rec("run", "add", "int8", "--from", "outputs/int8_seed1.json").data["object"]["id"]
     shown = rec("show", rid, text=True)
-    assert "the exact code" not in shown.lower() and "  The code when it was recorded: git tree " in shown, shown
+    assert "the exact code" not in shown.lower() and "  The code when it was recorded, after the run: git tree " in shown, shown
     head, tree = _git("rev-parse", "HEAD"), _git("rev-parse", "HEAD^{tree}")
     rid = rec("run", "add", "int8", "top1=0.77", "--commit", head, "--tree", tree).data["object"]["id"]
     shown = rec("show", rid, text=True)
@@ -1149,7 +1150,10 @@ def test_code_too_big_to_keep_is_not_called_the_exact_code(rec):
     for i in range(2001):
         (Path("scratch") / f"n_{i:04d}.txt").write_text("x", encoding="utf-8")
     added = rec("run", "add", "int8", "top1=0.76", text=True)
-    assert "  The code was not kept: 2001 changed or untracked files were too many to snapshot." in added
+    # E3's words: how many, and the folder that holds most of them, never "the exact code"
+    assert ("  rb kept no code for this run: 2001 files changed or untracked, 2001 of them in scratch/. Add such folders to .gitignore, or"
+            " commit them, so the next run's code is kept.") in added, added
+    assert "exact code" not in added
 
 
 def test_a_look_that_finds_nothing_says_where_it_looked(rec):

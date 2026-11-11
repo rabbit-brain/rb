@@ -532,7 +532,7 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
     for b in view::briefs(&led, &st)? {
         let has_id = b.id.as_deref().map_or(false, |i| !i.is_empty());
         let indent = "  ".repeat(b.depth);
-        let head = if has_id { format!("{} ({})", b.text, b.status) } else { "Not filed under a question".to_string() };
+        let head = if has_id { format!("{} ({})", b.text, if b.state_said.is_empty() { &b.status } else { &b.state_said }) } else { "Not filed under a question".to_string() };
         let mut lines: Vec<String> = if has_id || !b.experiments.is_empty() { vec![format!("{indent}{head}")] } else { Vec::new() };
         if !b.rollup.is_empty() {
             lines.push(format!("{indent}  {}", b.rollup));
@@ -589,6 +589,9 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
         lines.extend(more_exps);
         for d in &b.ruled {
             lines.push(format!("{indent}  call: {d}"));
+        }
+        for d in &b.states {
+            lines.push(format!("{indent}  {d}"));
         }
         if lines.len() > if has_id { 1 } else { 0 } {
             out.say("");
@@ -715,10 +718,11 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
             let varies: Vec<String> = items(e, "varies").iter().map(pyjson::py_str).collect();
             let mut lines: Vec<String> = Vec::new();
             lines.push(
-                format!("  {:<7} {} · {} · {arms}", gs(e, "id"), gs(e, "title"), gs(e, "state"))
+                format!("  {:<7} {} · {} · {arms}", gs(e, "id"), gs(e, "title"), view::state_said(e))
                     + &if varies.is_empty() { String::new() } else { format!(" · varies {}", varies.join(", ")) }
                     + &format!(" · {frozen} · {} · runs {}", settings_counts(e), gs(e, "run_count"))
-                    + &if truthy(e, "analysis_count") { format!(" · analyses {}", gs(e, "analysis_count")) } else { String::new() },
+                    + &if truthy(e, "analysis_count") { format!(" · analyses {}", gs(e, "analysis_count")) } else { String::new() }
+                    + &["taken_out", "taken_under"].iter().filter(|k| truthy(e, k)).map(|k| format!(" · {}", gs(e, k))).collect::<String>(),
             );
             let mut e2 = e.clone();
             if truthy(e, "run_count") {
@@ -817,7 +821,8 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
             let ident = av.get("identity").map(|i| gs(i, "text")).unwrap_or_default();
             out.say(
                 format!("  {:<12} {} · {label} · {} · {ident}", gs(r, "id"), gs(r, "type"), gs(&av, "state"))
-                    + &if truthy(&av, "how") { format!(" · how to get it again: {}", gs(&av, "how")) } else { String::new() },
+                    + &if truthy(&av, "how") { format!(" · how to get it again: {}", gs(&av, "how")) } else { String::new() }
+                    + &if truthy(r, "taken_out") { format!(" · {}", gs(r, "taken_out")) } else { String::new() },
             );
         }
         out.say_all(more);
@@ -832,8 +837,11 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
     let mut tripped: Vec<String> = fail_on.iter().filter(|g| truthy(&gate, g)).cloned().collect();
     let outside = |code: &str| findings.iter().any(|f| items(f, "integrity").iter().any(|c| gs(c, "code") == code));
     if !fail_on.is_empty() && tripped.is_empty() {
-        if let Some(code) = ["edited_outside_rb", "shallow_clone"].into_iter().find(|c| outside(c)) {
+        if let Some(code) = ["edited_outside_rb", "shallow_clone", "taken_out_by_git"].into_iter().find(|c| outside(c)) {
             tripped = vec![code.to_string()];
+        } else if !led.taken_out()?.is_empty() {
+            // records git took out fail every gate closed, as an edit outside rb does, whatever finding rests on them
+            tripped = vec!["taken_out_by_git".to_string()];
         }
     }
     st.insert("fail_on".into(), Value::List(fail_on.iter().cloned().map(Value::Str).collect()));
@@ -1064,6 +1072,11 @@ fn show_note(led: &Ledger, id: &str, holder: &Obj, out: &mut Out) -> R {
     };
     let Some(n) = notes.iter().find(|n| n.id.as_deref() == Some(id)) else { return Ok(0) };
     let w = led.note_words()?.remove(id).unwrap_or_default();
+    // a write to the note git took out (its retraction) is said first, as rb show <id> says it of any record (f13i)
+    if let Some(said) = led.took_said("note", id)? {
+        out.say(said.clone());
+        out.data.insert("taken_out".into(), Value::Str(said));
+    }
     out.say(format!("Note {id} on {on} ({}): {}", cut(&n.at, 10), n.text) + &words(&w, &n.by) + view::not_confirmed(&n.by));
     match &n.retracted {
         Some(r) => out.say(format!("  {}", view::retraction_words(r))),
@@ -1099,6 +1112,33 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             return show_note(&led, &subject, &holder, out);
         }
     }
+    // the records under it git took out, which leave its lines (L1): said first, as its own take-out is
+    if let Some(k) = led.kind_of(&subject)? {
+        // or, for an experiment, a question or a resource, what else its lines rest on (f13i: a catalogue entry its
+        // criteria name, a run that read the resource)
+        let scope = || if matches!(k, "experiment" | "question" | "resource") { led.took_scope_said(&subject, false) } else { Ok(None) };
+        if let Some(said) = led.took_under_said(k, &subject)?.map_or_else(scope, |s| Ok(Some(s)))? {
+            out.say(said.clone());
+            out.data.insert("taken_under".into(), Value::Str(said));
+        }
+    }
+    // a record git took out of the record, which rb kept (E1): said, with the restore
+    if let Some((kind, id)) = led.taken_record(None, &subject)? {
+        // a record still on disk, of which git took out a write (a reword, a spec set), is said by that write
+        let here = led.kind_of(&subject)?.is_some();
+        let said = if here {
+            crate::shell::strings::evidence("took_show_write", &[("kind", kind.clone()), ("id", id.clone())])
+        } else {
+            crate::shell::strings::evidence("took_show", &[("kind", kind.clone()), ("id", id.clone())])
+        };
+        out.say(said.clone());
+        // its data says it too, as its first line does (f13i): a record still on disk as one gone from it
+        out.data.insert("taken_out".into(), crate::obj! {"kind" => kind.clone(), "id" => id.clone(), "said" => said.clone()});
+        if !here {
+            out.next = vec!["rb doctor --restore".into()];
+            return Ok(0);
+        }
+    }
     let (kind, o) = led.get(&subject)?;
     let mut data = Dict::new();
     data.insert("object".into(), obj(kind, dump_obj(&o)));
@@ -1128,6 +1168,10 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                 );
             }
             out.say_all(finding_block(&fv, None));
+            // what the reading's runs rest on, in one line (E5)
+            if let Some(e) = fv.get("says").and_then(|s| s.get("evidence")).and_then(Value::as_str) {
+                out.say(format!("  {e}"));
+            }
             let relations = led.relations_touching(&std::collections::HashSet::from([c.id.clone()]), &indexmap::IndexMap::new())?;
             if !relations.is_empty() {
                 for row in &relations {
@@ -1254,12 +1298,19 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             out.say(
                 format!(
                     "  code that made it: {}",
-                    if p12.is_empty() { "unknown".to_string() } else { format!("{p12} ({})", if from == "flag" { "as given".to_string() } else { from }) }
+                    // when it was captured (E2): at the command's start, else as given
+                    match (p12.is_empty(), &ptree) {
+                        (true, None) => "unknown".to_string(),
+                        // a tree with no commit (a --tree given alone): the tree, and no diff against a commit it lacks
+                        (true, Some(t)) => format!("git tree {} ({})", cut(t, 12), when_label(&rc.produced, &from)),
+                        (false, _) => format!("{p12} ({})", when_label(&rc.produced, &from)),
+                    }
                 ) + &match &ptree {
-                    // the exact code only where rb's journal watched the command make these numbers
-                    Some(t) if watched => format!(", the exact code git tree {} (git diff {p12} {})", cut(t, 12), cut(t, 12)),
-                    Some(t) => format!(", git tree {} (git diff {p12} {})", cut(t, 12), cut(t, 12)),
-                    None => String::new(),
+                    // a tree this clone lacks has no diff to give (S3): the line under it says it is not here
+                    Some(t) if !p12.is_empty() && crate::capture::tree_here(&led.root, t) == crate::capture::Here::Absent => format!(", git tree {}", cut(t, 12)),
+                    // a snapshot shows which bytes rb kept, not which ones ran: never "the exact code"
+                    Some(t) if !p12.is_empty() => format!(", git tree {} (git diff {p12} {})", cut(t, 12), cut(t, 12)),
+                    _ => String::new(),
                 },
             );
             out.say_all(yours("produced"));
@@ -1273,6 +1324,17 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                     out.say(format!("  {} changed since the run was recorded: rb reads nothing it says of the run now", c.path));
                 }
             }
+            for l in crate::cmds::code_when(&led.root, r) {
+                out.say(format!("  {l}"));
+            }
+            // its evidence, line by line (E5): the files it named, its config, what it read
+            let ev = led.run_evidence_lines(r, false);
+            for l in &ev {
+                out.say(format!("  {l}"));
+            }
+            if !ev.is_empty() {
+                data.insert("evidence".into(), Value::list_of_str(ev));
+            }
             if let Some(att) = rc.attached.as_ref().filter(|a| !a.is_empty()) {
                 let dirty = att.get("dirty").map_or(false, |v| v.truthy());
                 out.say(format!(
@@ -1282,7 +1344,7 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                 ));
                 out.say_all(yours("recorded"));
                 if dirty {
-                    out.say_all(crate::cmds::exact_code_at(&led.root, att, made_before, watched));
+                    out.say_all(crate::cmds::exact_code_at(&led.root, att, made_before, watched, crate::ledger::evidence::recorded_in(&led.root, &r.id), !crate::capture::given_absent(&led.root, r)));
                 }
             }
             if let Some(cfg) = rc.config.as_ref().map(|c| c.given()) {
@@ -1365,7 +1427,8 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                 out.say(
                     format!("  {word} by run {} ({}, {})", r.id, r.experiment, cut(&r.created_at, 10))
                         + &u.availability.as_ref().filter(|x| !x.is_empty()).map(|x| format!(" · {x} then")).unwrap_or_default()
-                        + &u.sha256.as_ref().filter(|x| !x.is_empty()).map(|x| format!(" · sha256 {}", cut(x, 12))).unwrap_or_default(),
+                        + &u.sha256.as_ref().filter(|x| !x.is_empty()).map(|x| format!(" · sha256 {}", cut(x, 12))).unwrap_or_default()
+                        + &led.took_mark("run", &r.id)?.map(|m| format!(" · {m}")).unwrap_or_default(),
                 );
             }
             if users.len() > 12 {
@@ -1551,6 +1614,7 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
         }
         Obj::Question(q) => {
             let state = led.question_state(q)?;
+            let state = led.question_state_said(q, &state)?;
             out.say(format!("Question {} ({state}): {}", q.id, q.text));
             if let Some(p) = q.parent.as_ref().filter(|p| !p.is_empty()) {
                 out.say(format!("  under: {p}"));
@@ -1559,7 +1623,7 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             if !kids.is_empty() {
                 let mut parts = Vec::new();
                 for k in &kids {
-                    parts.push(format!("{} ({})", k.id, led.question_state(k)?));
+                    parts.push(format!("{} ({})", k.id, led.question_state_said(k, &led.question_state(k)?)?));
                 }
                 out.say(format!("  sub-questions: {}", parts.join(", ")));
             }
@@ -1584,16 +1648,31 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                 };
                 rules.sort_by_key(|(k, _)| tally_order(k));
                 let rules: Vec<String> = rules.iter().map(|(k, n)| format!("{n} {}", crate::assess::rule_label(k, *n))).collect();
-                let results: Vec<String> = match r.get("results") {
-                    Some(Value::Dict(d)) => d.iter().map(|(k, n)| format!("{} {}", pyjson::py_str(n), k.replace('_', " "))).collect(),
+                // S4: an untested result whose evidence git took out is said so
+                let took = r.get("results_taken_out").and_then(Value::as_i64).unwrap_or(0);
+                let mut results: Vec<String> = match r.get("results") {
+                    Some(Value::Dict(d)) => d
+                        .iter()
+                        .filter_map(|(k, n)| {
+                            let n = n.as_i64().unwrap_or(0) - if k == "untested" { took } else { 0 };
+                            (n > 0).then(|| format!("{n} {}", k.replace('_', " ")))
+                        })
+                        .collect(),
                     _ => Vec::new(),
                 };
+                if took > 0 {
+                    results.push(format!("{took} {}", crate::shell::strings::evidence("took_result", &[])));
+                }
                 out.say(
                     "  linked here, by rule: ".to_string()
                         + &if rules.is_empty() { "no criteria yet".to_string() } else { rules.join(" · ") }
                         + " · by result: "
                         + &if results.is_empty() { "none".to_string() } else { results.join(" · ") },
                 );
+                // S1: an experiment whose runs git took out, said under its own label, never as untested
+                for u in items(&r, "taken_out").iter().take(6) {
+                    out.say(format!("  {}", pyjson::py_str(u)));
+                }
                 let untested = items(&r, "untested");
                 for u in untested.iter().take(6) {
                     out.say(format!("  untested: {}", pyjson::py_str(u)));
@@ -1638,6 +1717,9 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             let mut dd = d.dump(false);
             dd.insert("current".into(), Value::Bool(current));
             dd.insert("settled_gates_moved".into(), Value::list_of_str(gates.iter().cloned()));
+            if let Some(m) = led.took_call_mark(&d.id)? {
+                dd.insert("taken_out".into(), Value::Str(m));
+            }
             let after = led.runs_after_past_call(d)?;
             if !after.is_empty() {
                 dd.insert("runs_after".into(), Value::list_of_str(after.iter().cloned()));
@@ -1653,7 +1735,8 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
                         [] => String::new(),
                         [gate] => format!(" · settled the missed gate {gate} on a reading that has moved since"),
                         _ => format!(" · settled the missed gates {} on readings that have moved since", gates.join(", ")),
-                    },
+                    }
+                    + &led.took_call_mark(&d.id)?.map(|m| format!(" · {m}")).unwrap_or_default(),
             );
         }
         data.insert("decisions".into(), Value::List(list));
@@ -1711,10 +1794,22 @@ fn show_setting(led: &Ledger, subject: &str, out: &mut Out) -> R {
     // what this read finds of it, the same re-check rb status and rb show <experiment> make
     let now: Vec<Caveat> = led.setting_caveats(&exp, led.has_origin(&exp)?, None)?.into_iter().filter(|c| c.subject == address).collect();
     let flag = now.iter().find(|c| c.code == "stale" || c.code == "conflict").map(|c| format!(" · {}", c.code.to_uppercase())).unwrap_or_default();
+    // N2 (f13i): what git took out that this setting's view rests on is said first, as rb show <id> says it; a call on
+    // the setting git took a write of out (a reject, a vouch) leaves its status undetermined, never as if never made
+    if let Some(said) = led.took_scope_said(&address, true)? {
+        out.say(said.clone());
+        out.data.insert("taken_under".into(), Value::Str(said));
+    }
+    let calls: Vec<crate::ledger::Key> = led.taken_under("setting", &address)?.into_iter().filter(|k| k.0 == "decision").collect();
+    let status = if calls.is_empty() {
+        led.status_read(&exp, &name, &st)?
+    } else {
+        format!("{}: {}", crate::ledger::UNDETERMINED_STATE, led.took_calls_state(&calls)?)
+    };
     out.say(if st.per_run {
         format!("{address} · per-run: each run gives its own")
     } else {
-        format!("{address} = {} · {}{}{flag}", show(&st.value), led.status_read(&exp, &name, &st)?, if st.required { "" } else { " (optional)" })
+        format!("{address} = {} · {status}{}{flag}", show(&st.value), if st.required { "" } else { " (optional)" })
     });
     if let Some(src) = &st.source {
         out.say(
@@ -1758,7 +1853,7 @@ fn show_setting(led: &Ledger, subject: &str, out: &mut Out) -> R {
         }
     }
     for d in led.rulings_on(&address)? {
-        out.say(format!("  decision {}: {}{}: {}", d.id, crate::ledger::made(&d.action), by_writer(&d.by), d.why));
+        out.say(format!("  decision {}: {}{}: {}", d.id, crate::ledger::made(&d.action), by_writer(&d.by), d.why) + &led.took_call_mark(&d.id)?.map(|m| format!(" · {m}")).unwrap_or_default());
     }
     let mut object = crate::dict! {"kind" => "setting", "id" => address.clone(), "address" => address.clone(), "experiment_id" => exp.id.clone()};
     for (k, v) in st.dump(false) {
@@ -1772,6 +1867,7 @@ fn show_setting(led: &Ledger, subject: &str, out: &mut Out) -> R {
 
 fn show_experiment(led: &Ledger, exp: &Experiment, out: &mut Out, data: &mut Dict) -> Res<()> {
     let state = led.experiment_state(exp, None)?;
+    let state = led.experiment_state_said(exp, &state)?;
     out.say(format!("Experiment {}: {} · {state}", exp.id, exp.title) + &if exp.questions.is_empty() { String::new() } else { format!(" · under {}", exp.questions.join(", ")) });
     // its design's standing, once, with the command while it waits, and what changed since the user confirmed it
     let design = led.design(&exp.id)?.unwrap_or_default();
@@ -2625,7 +2721,10 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
     }
     l.extend(CONTEXT_RULES.iter().map(|x| x.to_string()));
     for q in items(&stv, "questions") {
-        l.push(format!("## Question {}: {} ({})", gs(q, "id"), gs(q, "text"), gs(q, "state")));
+        l.push(
+            format!("## Question {}: {} ({})", gs(q, "id"), gs(q, "text"), view::question_state_said(q, ""))
+                + &["taken_out", "taken_under"].iter().filter(|k| truthy(q, k)).map(|k| format!(" · {}", gs(q, k))).collect::<String>(),
+        );
         l.push(String::new());
         if let Some(inquiry) = q.get("inquiry") {
             let summary = view::summary_lines(inquiry);
@@ -2721,7 +2820,9 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
     }
     for e in exps {
         let arms = e.live_variants().iter().map(|v| format!("{} ({})", v.name, v.role)).collect::<Vec<_>>().join(" · ");
-        l.push(format!("## Experiment {}: {} ({})", e.id, e.title, led.experiment_state(&e, None)?));
+        // what git took out of it, or that its lines may rest on, beside its heading, as its row in rb status says it
+        let took: String = [led.took_said("experiment", &e.id)?, led.took_scope_said(&e.id, false)?].into_iter().flatten().map(|t| format!(" · {t}")).collect();
+        l.push(format!("## Experiment {}: {} ({}){took}", e.id, e.title, led.experiment_state_said(&e, &led.experiment_state(&e, None)?)?));
         l.push(String::new());
         let questions = e.questions.join(", ");
         for (label, text) in [("questions", &questions), ("purpose", &e.purpose), ("hypothesis", &e.hypothesis)] {
@@ -2893,9 +2994,10 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
         let (k, more) = first_n(questions, SHOWN_ROWS, "- ", "questions", "rb show <id> reads one, and rb context --json lists every one");
         for q in &questions[..k] {
             l.push(
-                format!("- {} ({})", gs(q, "id"), gs(q, "state"))
+                format!("- {} ({})", gs(q, "id"), view::question_state_said(q, ""))
                     + &if truthy(q, "parent") { format!(" under {}", gs(q, "parent")) } else { String::new() }
-                    + &format!(": {}", gs(q, "text")),
+                    + &format!(": {}", gs(q, "text"))
+                    + &["taken_out", "taken_under"].iter().filter(|k| truthy(q, k)).map(|k| format!(" · {}", gs(q, k))).collect::<String>(),
             );
         }
         l.extend(more);
@@ -2958,7 +3060,8 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
                 format!("- {} ({}): {}", gs(r, "id"), gs(r, "type"), gs(r, "name"))
                     + &if truthy(r, "version") { format!(" {}", gs(r, "version")) } else { String::new() }
                     + &format!(" · {}", gs(&av, "state"))
-                    + &if truthy(&av, "how") { format!(" · how to get it again: {}", gs(&av, "how")) } else { String::new() },
+                    + &if truthy(&av, "how") { format!(" · how to get it again: {}", gs(&av, "how")) } else { String::new() }
+                    + &if truthy(r, "taken_out") { format!(" · {}", gs(r, "taken_out")) } else { String::new() },
             );
         }
         l.extend(more);
@@ -2991,7 +3094,8 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
                     + &words(&d.get("words").filter(|w| w.truthy()).map(pyjson::py_str).unwrap_or_default(), &gs(d, "by"))
                     + &crate::ledger::runs_after_of(d)
                     + &if truthy(d, "revisit") { format!(" · revisit: {}", gs(d, "revisit")) } else { String::new() }
-                    + if current { "" } else { crate::ledger::moved_since(truthy(d, "past")) },
+                    + if current { "" } else { crate::ledger::moved_since(truthy(d, "past")) }
+                    + &view::took_mark(d),
             );
         }
         l.push(String::new());
@@ -3141,4 +3245,14 @@ pub fn cmd_feedback(ns: &Namespace, out: &mut Out) -> R {
         out.say("Open it in your browser. Nothing is sent until you press Send there.");
     }
     Ok(crate::errors::EXIT_OK)
+}
+
+/// When the code a run names was captured, as rb show says it after "code that made it": at the command's start, as
+/// given, else the receipt's own word.
+fn when_label(produced: &crate::value::Dict, from: &str) -> String {
+    match (produced.get("captured").map(pyjson::py_str).as_deref(), from) {
+        (Some("start"), _) => "when the run started".to_string(),
+        (_, "flag") => "as given".to_string(),
+        (_, f) => f.to_string(),
+    }
 }

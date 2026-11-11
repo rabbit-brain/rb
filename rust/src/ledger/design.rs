@@ -326,12 +326,15 @@ pub struct Design {
     pub not_recorded: Vec<&'static str>,
     /// the parts that differ from the design the user owns closest to it, each apart (every part where they own none)
     waits: Vec<String>,
+    /// where git took its confirmation out of the record (N3), what its views say in place of its standing: it waits
+    /// for no confirmation then, since rb doctor --restore puts that one back
+    pub taken: String,
 }
 
 impl Design {
     /// Whether it waits for the user's one confirmation.
     pub fn pending(&self) -> bool {
-        matches!(self.state, "not_confirmed" | "changed")
+        matches!(self.state, "not_confirmed" | "changed") && self.taken.is_empty()
     }
 
     /// The command that confirms it as it reads now (on a screen that shows another place, with the cd to it first).
@@ -362,7 +365,7 @@ impl Design {
     /// Whether the gate a session set waits with its design: a branch of it, or its words, is not as in a design the
     /// user owns.
     pub fn gate_waits(&self) -> bool {
-        self.gate_waits
+        self.gate_waits && self.taken.is_empty()
     }
 
     /// Whether a gate that waits says so on its first branch, said on its own line, as the only one a session wrote:
@@ -385,6 +388,11 @@ impl Design {
     /// reads now, though a later line by the user's clock or on another branch be theirs; else `by`.
     pub fn writer(&self, by: &str, key: &str) -> String {
         if by.is_empty() {
+            return String::new();
+        }
+        // a gate whose confirmation git took out (N3) reads as neither a session's nor confirmed: its experiment's
+        // lines say the take-out, and rb doctor --restore gives the confirmer back
+        if key == "gate" && !self.taken.is_empty() {
             return String::new();
         }
         let a_session = |waits: bool| if waits && theirs(by) && !self.session.is_empty() { Some(self.session.clone()) } else { None };
@@ -415,6 +423,9 @@ impl Design {
     /// it to confirm, since a view of the experiment does not show every part its key names; at a past version, which
     /// offers no command, `design not confirmed` alone.
     pub fn standing_line(&self) -> Option<String> {
+        if !self.taken.is_empty() {
+            return Some(self.taken.clone());
+        }
         self.pending().then(|| if crate::view::at_past_version() { "design not confirmed".to_string() } else { format!("design not confirmed · list it to confirm: {}", self.listing()) })
     }
 
@@ -527,13 +538,17 @@ impl Design {
 
     /// The data: what --json, MCP and the SDK carry on the experiment.
     pub fn to_value(&self) -> Value {
-        crate::obj! {
+        let mut v = crate::obj! {
             "standing" => self.state, "pending" => self.pending(), "key" => self.key.clone(), "confirm" => self.waiting_command(),
             "changes" => Value::List(self.changes.iter().map(Change::to_value).collect()),
             "not_recorded" => Value::list_of_str(self.not_recorded.iter().map(|s| s.to_string())),
             "confirmed" => self.confirmed.as_ref().map(|(at, by)| crate::obj! {"at" => at.clone(), "by" => by.clone()}).unwrap_or(Value::Null),
             "parts" => Value::List(grouped_parts(&said_parts(&self.parts)).iter().map(|p| crate::obj! {"key" => p.key.clone(), "part" => p.label(), "value" => p.value.clone()}).collect())
+        };
+        if let (false, Value::Dict(d)) = (self.taken.is_empty(), &mut v) {
+            d.insert("taken_out".into(), Value::Str(self.taken.clone()));
         }
+        v
     }
 }
 
@@ -1859,6 +1874,18 @@ impl Ledger {
 
     /// One live experiment's design, worked out alone.
     pub fn design(&self, id: &str) -> Res<Option<Design>> {
+        // an experiment's design is its own file, its variants and its criteria (kept.rs Reads)
+        self.read_as(
+            |r| {
+                r.key("experiment", id);
+                r.part("variant", Some(id));
+                r.kind("criterion");
+            },
+            || self.design_now(id),
+        )
+    }
+
+    fn design_now(&self, id: &str) -> Res<Option<Design>> {
         let ix = self.design_index()?;
         match ix.exps.iter().find(|e| e.id == id && e.retracted.is_none()) {
             Some(e) => Ok(Some(self.design_in(&ix, e)?)),
@@ -1876,7 +1903,10 @@ impl Ledger {
             let of = |kind: &str, id: &str| tampered.iter().find(|t| t.get_str("kind") == Some(kind) && t.get_str("id") == Some(id)).map(|t| t.get_str("path").unwrap_or(id).to_string());
             Some(files.iter().filter_map(|(kind, id)| of(kind, id)).collect())
         };
-        let d = design_of(ix, e, &edited);
+        let mut d = design_of(ix, e, &edited);
+        if self.taken_design_confirms()?.contains(&e.id) {
+            d.taken = self.took_confirm_said(&e.id)?;
+        }
         ix.done.borrow_mut().insert(e.id.clone(), d.clone());
         Ok(d)
     }
@@ -1884,7 +1914,15 @@ impl Ledger {
     /// The live experiments whose design waits for the user's confirmation, in the record's order.
     pub fn pending_designs(&self) -> Res<Vec<(Experiment, Design)>> {
         let designs = self.designs()?;
-        Ok(self.live::<Experiment>()?.into_iter().filter_map(|e| designs.get(&e.id).filter(|d| d.pending()).cloned().map(|d| (e, d))).collect())
+        // a design whose confirmation git took out waits no more (N3): rb last wrote it confirmed, and rb doctor
+        // --restore puts that back, so it is never offered to be confirmed a second time
+        let taken = self.taken_design_confirms()?;
+        Ok(self
+            .live::<Experiment>()?
+            .into_iter()
+            .filter(|e| !taken.contains(&e.id))
+            .filter_map(|e| designs.get(&e.id).filter(|d| d.pending()).cloned().map(|d| (e, d)))
+            .collect())
     }
 
     /// Whether something a session wrote can wait here for the user's confirmation, or has: a design a session's line
@@ -1995,6 +2033,9 @@ impl Ledger {
             let exp: Experiment = self.load(id)?;
             if exp.retracted.is_some() {
                 return Err(RBError::msg("E_OBJECT_INVALID", format!("{id} was retracted: there is nothing to confirm.")));
+            }
+            if self.taken_design_confirms()?.contains(id) {
+                return Err(self.taken_confirm_refusal(&format!("{id}'s design")));
             }
             let Some(d) = self.design(id)?.filter(Design::pending) else {
                 return Err(RBError::msg_fix("E_OBJECT_INVALID", format!("{id}'s design waits for no confirmation."), "rb confirm lists what waits."));

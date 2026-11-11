@@ -369,6 +369,9 @@ pub fn repo_info(led: &Ledger, building: &[&Path]) -> Option<Dict> {
         d.insert("commit".into(), Value::Str(at));
         if !at_origin {
             d.insert("at_origin".into(), Value::Bool(false));
+        } else if git_out(&led.root, &["for-each-ref", "--count=1", "--format=x", "refs/remotes/origin/"]).map_or(true, |o| o.is_empty()) {
+            // git had fetched no branch of origin: rb cannot tell whether it holds the commit (E4)
+            d.insert("origin_unfetched".into(), Value::Bool(true));
         }
     }
     d.insert("changed".into(), Value::list_of_str(changed_paths(&led.root, &carried)));
@@ -971,8 +974,13 @@ const SHELL_SCRIPT: &str = include_str!("shell/assets/script.js");
 /// The shell's page of `led` as rb export writes it: its Export document, with the
 /// address a reader clones from when the export is published with one, drawn, then made what the hub serves.
 fn shell_page(led: &Ledger, clone_to: Option<&str>, repo: Option<&Dict>, cites_from: Option<&Ledger>) -> Res<String> {
-    let mut doc = crate::shell::document(led, crate::shell::Surface::Export, None)?;
     let given = std::env::var_os("RB_TEST_SHELL_MODEL").map_or(false, |v| !v.is_empty());
+    // a bundle's copy holds no file a run named: its runs' evidence is worked out in the checkout it was exported
+    // from, as of when the page is made (E5)
+    let mut doc = match (cites_from, given) {
+        (Some(from), false) => crate::ledger::evidence::drawn_from(&from.root, || crate::shell::document(led, crate::shell::Surface::Export, None))?,
+        _ => crate::shell::document(led, crate::shell::Surface::Export, None)?,
+    };
     // a bundle's page is drawn from the bundle's copy of the record, which has no git: its citations are read from the
     // checkout it was exported from (`cites_from`), under the same rule for what a shared page may quote (CITE item 4)
     if let (Some(from), false) = (cites_from, given) {

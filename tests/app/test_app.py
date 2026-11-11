@@ -833,6 +833,21 @@ def test_a_term_says_its_meaning_in_place_and_moves_nothing(a_record, tmp_path):
         assert any(n.startswith("term: ") and "(in a card)" in n and n.endswith(f"[{at}]") for n in names), at
 
 
+def test_a_term_s_line_is_written_once_and_shows_on_every_use(a_record, tmp_path):
+    """A page writes each term's line once (orchestrator's call, Nov 10 2026, for E5's line on pages): its first use
+    carries the hint, its later uses name the glossary entry, and the script gives them its line. With the script every
+    use shows it on hover; without it, the first use does. On rb page, and on rb export's page as the hub serves it."""
+    page = tmp_path / "p.html"
+    r = subprocess.run([*command(), "page", "--out", str(page)], cwd=a_record, env=_rb_env(EXAMPLE.format("owner")),
+                       capture_output=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+    assert r.returncode == 0, r.stderr
+    for url in (page.as_uri(), _export_with(a_record, tmp_path, "owner").as_uri()):
+        said = harness(None, "--url", url, timeout=120, runner="hints.mjs")
+        assert said["exit"] == 0 and said["ok"], (url, _failed(said), said["stderr"][-3000:])
+        names = [c["name"] for c in said["checks"]]
+        assert any("a later one of its" in n and n.endswith("[with the script]") for n in names) and any(n.endswith("[without the script]") for n in names), names
+
+
 def test_inside_the_hub_the_page_draws_no_bar_of_its_own(a_record, tmp_path):
     """Plain words pass 4, one bar on the hub (Oct 25 13:35 +08): a page the hub names a viewer of draws no top bar of
     its own, under the hub's; About is in the navigator, the guide's first step shows, and at 390 the navigator opens

@@ -14,8 +14,8 @@ use std::path::PathBuf;
 /// The status items that are a change in the state of the research, rather than work still to do.
 pub const ATTENTION: &[&str] = &[
     "unindexed_folder", "reindex", "check_failed", "audit_failed", "manifest_changed", "call_on_failed_check", "decision_outdated", "undecided",
-    "gate_missed", "edited_outside_rb", "id_collision", "merged_outside_rb", "shallow_clone", "drift", "state_newer", "stale", "conflict", "source_changed", "cited_source_changed", "analysis_source_changed",
-    "input_retracted", "input_superseded", "retracted_by_agent",
+    "gate_missed", "edited_outside_rb", "id_collision", "merged_outside_rb", "shallow_clone", "taken_out_by_git", "drift", "state_newer", "stale", "conflict", "source_changed", "cited_source_changed", "analysis_source_changed",
+    "input_retracted", "input_superseded", "retracted_by_agent", "evidence_file_changed",
 ];
 pub const QUIET: &[&str] = &["status", "context"];
 /// The fact that asks an agent with no model recorded for its writes to say it.

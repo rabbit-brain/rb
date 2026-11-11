@@ -193,7 +193,7 @@
    "out": [
     "rb-export written: the project's page, and a manifest hashing it.",
     "It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.",
-    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
+    "The page says: all record files committed \u00b7 at commit fdfd01ddeea3.",
     ""
    ],
    "err": [
@@ -209,10 +209,10 @@
     " \"rb_version\": \"0.0.0\",",
     " \"command\": \"export\",",
     " \"data\": {",
-    "  \"page_says\": \"The page says: all record files committed \\u00b7 at commit 007c91c44b65.\",",
+    "  \"page_says\": \"The page says: all record files committed \\u00b7 at commit fdfd01ddeea3.\",",
     "  \"path\": \"@BASE@/work/rb-export\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 138949,",
+    "  \"bytes\": 137826,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
@@ -287,7 +287,7 @@
     "      rb spec set e1 schedule cosine --source <file#key that states it>   (or vouch for it: rb decide e1/schedule accept --why \"...\")",
     "",
     "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
-    "rb checked the record with git at 2026-10-01 12:00 UTC: all 16 record files are new, changed or deleted since commit 007c91c44b65, which does not hold the record.",
+    "rb checked the record with git at 2026-10-01 12:00 UTC: all 16 record files are new, changed or deleted since commit fdfd01ddeea3, which does not hold the record.",
     "Not committed: .rb/.gitattributes (new), .rb/.gitignore (new), .rb/experiments/e1/analyses/a1.yaml (new) and 13 more",
     "To check it yourself, in your terminal: git -C @BASE@/work/rb-export/record status --short --untracked-files=all -- .rb",
     "",
@@ -340,7 +340,7 @@
    "out": [
     "rb-export.zip written: the project's page, and a manifest hashing it.",
     "It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.",
-    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
+    "The page says: all record files committed \u00b7 at commit fdfd01ddeea3.",
     ""
    ],
    "err": [
@@ -353,7 +353,7 @@
    "out": [
     "bundles/b1 written: the project's page, and a manifest hashing it.",
     "It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.",
-    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
+    "The page says: all record files committed \u00b7 at commit fdfd01ddeea3.",
     ""
    ],
    "err": [
@@ -403,9 +403,10 @@
     "published written: the whole record, the page, and a manifest hashing every file.",
     "Readable without rb; rb status inside record/ reopens it. Regenerate after new runs.",
     "The record keeps who made each write (human:<name> or agent:<name>, and the channel it came through), an agent's chat session, name, version, provider and model, the user's words passed with --words, and each run's host, platform and branch. Anyone who can read the bundle can read all of it.",
-    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
-    "Code repository recorded: https://example.org/team/repo.git at 007c91c44b65. Pass --no-repo to leave it out.",
+    "The page says: all record files committed \u00b7 at commit fdfd01ddeea3.",
+    "Code repository recorded: https://example.org/team/repo.git at fdfd01ddeea3. Pass --no-repo to leave it out.",
     "Not committed, so a rerun does not get it: notours/file.txt.",
+    "git has fetched no branch of origin, so rb could not tell whether origin holds commit fdfd01ddeea3.",
     "Cited sources no longer on disk, so not included: papers/gone.txt.",
     "Publish the directory at the address you gave; page.html is the reading surface and anyone reproduces it with: rb clone https://example.org/share/bundle.zip",
     "Not in this bundle, so a reader cannot rerun with them from it alone: evalset (present here; in the bundle lost); far (remote, train it again); named (lost).",
@@ -424,10 +425,10 @@
     " \"rb_version\": \"0.0.0\",",
     " \"command\": \"export\",",
     " \"data\": {",
-    "  \"page_says\": \"The page says: all record files committed \\u00b7 at commit 007c91c44b65.\",",
+    "  \"page_says\": \"The page says: all record files committed \\u00b7 at commit fdfd01ddeea3.\",",
     "  \"path\": \"@BASE@/work/pub.zip\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 144026,",
+    "  \"bytes\": 143009,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
@@ -462,7 +463,8 @@
     "  ],",
     "  \"repo\": {",
     "   \"url\": \"https://example.org/team/repo.git\",",
-    "   \"commit\": \"007c91c44b65a01265dae593a54d0962171d698d\",",
+    "   \"commit\": \"fdfd01ddeea302df5efce3b02aaee0fd4066dc37\",",
+    "   \"origin_unfetched\": true,",
     "   \"changed\": [",
     "    \"notours/file.txt\"",
     "   ]",
@@ -485,7 +487,7 @@
    "out": [
     "plain written: the project's page, and a manifest hashing it.",
     "It is the record as computed now; regenerate after new runs. The record stays here: rb export --with-record carries it too, for rb clone.",
-    "The page says: all record files committed \u00b7 at commit 007c91c44b65.",
+    "The page says: all record files committed \u00b7 at commit fdfd01ddeea3.",
     ""
    ],
    "err": [
@@ -549,6 +551,10 @@
    "sha256": "20ab1b41ee309492f3e6c741d05246a6acded53c4ab5e02547d17d89f2ff9013",
    "bytes": 609
   },
+  ".rb/cache/objects/a5/a54f169a316bebbd2668c0ea03a419e78d370a54c8788bf59081cbc4f9441857.json.gz": {
+   "sha256": "60a4805bf1d4d70b177430f35b700fd230bd12b38298afbe417c160308412f18",
+   "bytes": 1431
+  },
   ".rb/cache/objects/a7/a720369b14e0c25da3ba55d6ebaadda24870575d8f0b222cf79504040ad5b413.json.gz": {
    "sha256": "650e587b44950f4e816d3205f8e5f58383520c39c32eb9a3fc397499d766e3be",
    "bytes": 1206
@@ -560,10 +566,6 @@
   ".rb/cache/objects/ea/eadf76af395b034f4e80c0bc0f49c22d4109e286ba6e09611d90136ded2666c1.json.gz": {
    "sha256": "3e87a574bc1f04029e3b2afbdd931eb97060c9dff9546ff6a826f3742e5f0034",
    "bytes": 171
-  },
-  ".rb/cache/objects/ee/eeb35a7dc1976d8d97b39086b35f4cc00fb3c9e97a38d7ca0cda0d649435ee3d.json.gz": {
-   "sha256": "526eb20c50768797afa053f09aab4f429bdadafdb46d628ad078e6b86383cf77",
-   "bytes": 1397
   },
   ".rb/cache/objects/f1/f1522d13ff514ecc7757a0676c9164e7cd10029673879515a67e072d9056a6db.json.gz": {
    "sha256": "3d19da540f26402f83d1e3875647093282984f5609f5d8d5968a83c791957f3a",
@@ -763,7 +765,9 @@
    "    dirty: true",
    "    diff_sha256: 128738475a4cd7b785422b5fe5f0855201494beb8b0052a45312ba69344a2c4f",
    "    untracked: 5",
+   "    captured: after",
    "    tree: 1ba8f0d43845b2c4663e438f544874b107c754d0",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -812,7 +816,7 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"evalset\", \"sha256\": \"f1522d13ff514ecc7757a0676c9164e7cd10029673879515a67e072d9056a6db\", \"path\": \".rb/resources/evalset.yaml\", \"detail\": {\"type\": \"dataset\", \"name\": \"eval set\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"far\", \"sha256\": \"44bd994292e55ec1be680258e98240ce519abd2b76b92a067b10dab29f1ecdeb\", \"path\": \".rb/resources/far.yaml\", \"detail\": {\"type\": \"checkpoint\", \"name\": \"far ckpt\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"named\", \"sha256\": \"eadf76af395b034f4e80c0bc0f49c22d4109e286ba6e09611d90136ded2666c1\", \"path\": \".rb/resources/named.yaml\", \"detail\": {\"type\": \"code\", \"name\": \"just a name\"}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"eeb35a7dc1976d8d97b39086b35f4cc00fb3c9e97a38d7ca0cda0d649435ee3d\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"a54f169a316bebbd2668c0ea03a419e78d370a54c8788bf59081cbc4f9441857\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"a1\", \"sha256\": \"a720369b14e0c25da3ba55d6ebaadda24870575d8f0b222cf79504040ad5b413\", \"path\": \".rb/experiments/e1/analyses/a1.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",
    ""
   ],
@@ -932,17 +936,17 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 124246,",
+   " \"bytes\": 123060,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"0e2193cb530c56c87c9e982b63561118d73fdcae4bf54edc6a29e09262ec8982\"",
+   "  \"page.html\": \"00ff5b07d13eaa71001615da1d8117dd69732061617a6898916a1490d8362eff\"",
    " }",
    "}",
    ""
   ],
   "bundles/b1/page.html": {
-   "sha256": "0e2193cb530c56c87c9e982b63561118d73fdcae4bf54edc6a29e09262ec8982",
-   "bytes": 123655
+   "sha256": "00ff5b07d13eaa71001615da1d8117dd69732061617a6898916a1490d8362eff",
+   "bytes": 122469
   },
   "configs/train.json": [
    "{\"optim\": {\"lr\": 0.0003, \"betas\": [0.9, 0.999]}, \"model\": {\"depth\": 18, \"width\": 64}, \"name\": \"base\"}",
@@ -991,21 +995,21 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 124246,",
+   " \"bytes\": 123060,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"0e2193cb530c56c87c9e982b63561118d73fdcae4bf54edc6a29e09262ec8982\"",
+   "  \"page.html\": \"00ff5b07d13eaa71001615da1d8117dd69732061617a6898916a1490d8362eff\"",
    " }",
    "}",
    ""
   ],
   "plain/page.html": {
-   "sha256": "0e2193cb530c56c87c9e982b63561118d73fdcae4bf54edc6a29e09262ec8982",
-   "bytes": 123655
+   "sha256": "00ff5b07d13eaa71001615da1d8117dd69732061617a6898916a1490d8362eff",
+   "bytes": 122469
   },
   "pub.zip": {
-   "sha256": "580ae2659bce1fa4dc8f7e1b4fef197ed1e902b9394064dec7dd9d7b3e704580",
-   "bytes": 147609
+   "sha256": "920948ddc3db106e626072fa094e5bf9dde02580c0ad408ca8a5dc3595885d40",
+   "bytes": 146620
   },
   "published/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1070,8 +1074,8 @@
    ""
   ],
   "published/bundle.zip": {
-   "sha256": "c9a2498cf67f5a33e22feee86a0b5a7ed94ebc349cf3fc0011cef26a762687d8",
-   "bytes": 147704
+   "sha256": "af941fe24641bf20ddaffa97515d4d39cae21bac2909a0b6c6e69347a9b8c0aa",
+   "bytes": 146715
   },
   "published/manifest.json": [
    "{",
@@ -1086,20 +1090,20 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 144070,",
+   " \"bytes\": 143053,",
    " \"files\": {",
    "  \"README.md\": \"fb3d38898e893f4588356c9f5015eca9d468bcd5f12881be5ac63effc32759cf\",",
-   "  \"page.html\": \"aed1c7eb985c348f6f23b5dd73b00ce66b4cfe6e17c3caa2f5b5ba2d5eae6406\",",
+   "  \"page.html\": \"09201df5b6c4d085394463af9078ccbd8b2f93becb68f69a3524f00a115a060d\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
    "  \"record/.rb/experiments/e1/criteria/c1.yaml\": \"11377752dfcbc85b1e5a77536c76b3a1497baf55be97319ddf320c148a150b2a\",",
    "  \"record/.rb/experiments/e1/criteria/c2.yaml\": \"f51b10bf323350d889cf781311f0baaf4e8ffaeb5cc88ad51a7d533ed4d9ab59\",",
    "  \"record/.rb/experiments/e1/experiment.yaml\": \"5cc48204165d0097472c71f4403144fb83af2dfd77270f8307a973d24cfecd52\",",
-   "  \"record/.rb/experiments/e1/runs/runp5h4s6.yaml\": \"bc0342e6f7b713ca59bc818b9b80caac01269089ed3ba78bef559ab4ee7710f9\",",
+   "  \"record/.rb/experiments/e1/runs/runp5h4s6.yaml\": \"1eb2ece2aa18198ac8974c8efaca7e228bf76dcdb7ee69406affd07a02ef18fe\",",
    "  \"record/.rb/experiments/e1/variants/base.yaml\": \"5608e6a1663dac28398befc090b72c7e9af9ed829cc5e31d1b764e6bb2e5f296\",",
    "  \"record/.rb/experiments/e1/variants/wide.yaml\": \"91e9d596485aaff56a04bfa91689d23a8fb617bec277e49941a2c2839750f863\",",
-   "  \"record/.rb/log.jsonl\": \"ee488354d86ecab69ba19c4e02e94f458f493266936276ae40da9bd31e4f9e34\",",
+   "  \"record/.rb/log.jsonl\": \"b26849f302efd104f16e1123c9abcfc61c9debd09b27e0c1871e302f71035a2f\",",
    "  \"record/.rb/metrics/top1.yaml\": \"ee9491089e8242c7ef5ca06221fc4083ab8c183416b99c486f012ba742628df2\",",
    "  \"record/.rb/project.yaml\": \"ea20cfa9621daedb5116b630099ca96d19acae70b391c3b793b54748fb3c2b4e\",",
    "  \"record/.rb/questions/q1.yaml\": \"01fcc5a6107feff52aea22766073ffa1df826a165f43704ba1d03e1d6e4845ca\",",
@@ -1122,7 +1126,8 @@
    " },",
    " \"repo\": {",
    "  \"url\": \"https://example.org/team/repo.git\",",
-   "  \"commit\": \"007c91c44b65a01265dae593a54d0962171d698d\",",
+   "  \"commit\": \"fdfd01ddeea302df5efce3b02aaee0fd4066dc37\",",
+   "  \"origin_unfetched\": true,",
    "  \"changed\": [",
    "   \"notours/file.txt\"",
    "  ]",
@@ -1132,8 +1137,8 @@
    ""
   ],
   "published/page.html": {
-   "sha256": "aed1c7eb985c348f6f23b5dd73b00ce66b4cfe6e17c3caa2f5b5ba2d5eae6406",
-   "bytes": 128668
+   "sha256": "09201df5b6c4d085394463af9078ccbd8b2f93becb68f69a3524f00a115a060d",
+   "bytes": 127615
   },
   "published/record/.rb/.gitattributes": [
    "* -text",
@@ -1337,7 +1342,9 @@
    "    dirty: true",
    "    diff_sha256: 128738475a4cd7b785422b5fe5f0855201494beb8b0052a45312ba69344a2c4f",
    "    untracked: 5",
+   "    captured: after",
    "    tree: 1ba8f0d43845b2c4663e438f544874b107c754d0",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1386,7 +1393,7 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"evalset\", \"sha256\": \"f1522d13ff514ecc7757a0676c9164e7cd10029673879515a67e072d9056a6db\", \"path\": \".rb/resources/evalset.yaml\", \"detail\": {\"type\": \"dataset\", \"name\": \"eval set\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"far\", \"sha256\": \"44bd994292e55ec1be680258e98240ce519abd2b76b92a067b10dab29f1ecdeb\", \"path\": \".rb/resources/far.yaml\", \"detail\": {\"type\": \"checkpoint\", \"name\": \"far ckpt\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"named\", \"sha256\": \"eadf76af395b034f4e80c0bc0f49c22d4109e286ba6e09611d90136ded2666c1\", \"path\": \".rb/resources/named.yaml\", \"detail\": {\"type\": \"code\", \"name\": \"just a name\"}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"eeb35a7dc1976d8d97b39086b35f4cc00fb3c9e97a38d7ca0cda0d649435ee3d\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"a54f169a316bebbd2668c0ea03a419e78d370a54c8788bf59081cbc4f9441857\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"a1\", \"sha256\": \"a720369b14e0c25da3ba55d6ebaadda24870575d8f0b222cf79504040ad5b413\", \"path\": \".rb/experiments/e1/analyses/a1.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",
    ""
   ],
@@ -1489,8 +1496,8 @@
    ""
   ],
   "rb-export.zip": {
-   "sha256": "37e3a19e2a210d23cf3798253675f4d2ce05a18a98c6a91f3cccc5ffbd9173e1",
-   "bytes": 124754
+   "sha256": "3388b420796bd87367fd213bda44a46a642d64e2cd3425cea0e060f970039b4b",
+   "bytes": 123568
   },
   "rb-export/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1563,20 +1570,20 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 138949,",
+   " \"bytes\": 137826,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"603c65000efbf32b82786a078593326930c1e00a2e626a57156d901b50375109\",",
+   "  \"page.html\": \"2dc3b166ea7880fe0f7d7ab338d05d09a45338aafff753dd1e9c10a0aa945dfd\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
    "  \"record/.rb/experiments/e1/criteria/c1.yaml\": \"11377752dfcbc85b1e5a77536c76b3a1497baf55be97319ddf320c148a150b2a\",",
    "  \"record/.rb/experiments/e1/criteria/c2.yaml\": \"f51b10bf323350d889cf781311f0baaf4e8ffaeb5cc88ad51a7d533ed4d9ab59\",",
    "  \"record/.rb/experiments/e1/experiment.yaml\": \"5cc48204165d0097472c71f4403144fb83af2dfd77270f8307a973d24cfecd52\",",
-   "  \"record/.rb/experiments/e1/runs/runp5h4s6.yaml\": \"bc0342e6f7b713ca59bc818b9b80caac01269089ed3ba78bef559ab4ee7710f9\",",
+   "  \"record/.rb/experiments/e1/runs/runp5h4s6.yaml\": \"1eb2ece2aa18198ac8974c8efaca7e228bf76dcdb7ee69406affd07a02ef18fe\",",
    "  \"record/.rb/experiments/e1/variants/base.yaml\": \"5608e6a1663dac28398befc090b72c7e9af9ed829cc5e31d1b764e6bb2e5f296\",",
    "  \"record/.rb/experiments/e1/variants/wide.yaml\": \"91e9d596485aaff56a04bfa91689d23a8fb617bec277e49941a2c2839750f863\",",
-   "  \"record/.rb/log.jsonl\": \"ee488354d86ecab69ba19c4e02e94f458f493266936276ae40da9bd31e4f9e34\",",
+   "  \"record/.rb/log.jsonl\": \"b26849f302efd104f16e1123c9abcfc61c9debd09b27e0c1871e302f71035a2f\",",
    "  \"record/.rb/metrics/top1.yaml\": \"ee9491089e8242c7ef5ca06221fc4083ab8c183416b99c486f012ba742628df2\",",
    "  \"record/.rb/project.yaml\": \"ea20cfa9621daedb5116b630099ca96d19acae70b391c3b793b54748fb3c2b4e\",",
    "  \"record/.rb/questions/q1.yaml\": \"01fcc5a6107feff52aea22766073ffa1df826a165f43704ba1d03e1d6e4845ca\",",
@@ -1601,8 +1608,8 @@
    ""
   ],
   "rb-export/page.html": {
-   "sha256": "603c65000efbf32b82786a078593326930c1e00a2e626a57156d901b50375109",
-   "bytes": 123646
+   "sha256": "2dc3b166ea7880fe0f7d7ab338d05d09a45338aafff753dd1e9c10a0aa945dfd",
+   "bytes": 122487
   },
   "rb-export/record/.rb/.gitattributes": [
    "* -text",
@@ -1806,7 +1813,9 @@
    "    dirty: true",
    "    diff_sha256: 128738475a4cd7b785422b5fe5f0855201494beb8b0052a45312ba69344a2c4f",
    "    untracked: 5",
+   "    captured: after",
    "    tree: 1ba8f0d43845b2c4663e438f544874b107c754d0",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1855,7 +1864,7 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"evalset\", \"sha256\": \"f1522d13ff514ecc7757a0676c9164e7cd10029673879515a67e072d9056a6db\", \"path\": \".rb/resources/evalset.yaml\", \"detail\": {\"type\": \"dataset\", \"name\": \"eval set\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"far\", \"sha256\": \"44bd994292e55ec1be680258e98240ce519abd2b76b92a067b10dab29f1ecdeb\", \"path\": \".rb/resources/far.yaml\", \"detail\": {\"type\": \"checkpoint\", \"name\": \"far ckpt\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"resource\", \"id\": \"named\", \"sha256\": \"eadf76af395b034f4e80c0bc0f49c22d4109e286ba6e09611d90136ded2666c1\", \"path\": \".rb/resources/named.yaml\", \"detail\": {\"type\": \"code\", \"name\": \"just a name\"}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"eeb35a7dc1976d8d97b39086b35f4cc00fb3c9e97a38d7ca0cda0d649435ee3d\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"a54f169a316bebbd2668c0ea03a419e78d370a54c8788bf59081cbc4f9441857\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"a1\", \"sha256\": \"a720369b14e0c25da3ba55d6ebaadda24870575d8f0b222cf79504040ad5b413\", \"path\": \".rb/experiments/e1/analyses/a1.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",
    ""
   ],

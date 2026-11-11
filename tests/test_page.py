@@ -594,3 +594,109 @@ def test_an_export_with_an_address_offers_the_prompt_that_reruns_it(repo, tmp_pa
     monkeypatch.chdir(away / folder)
     assert main(["context"]) == 0
     assert main(["journal", "run", "--", "git", "--version"]) == 0
+
+
+def test_no_page_runs_past_the_screen_at_390_px(tmp_path, monkeypatch):
+    """Nothing runs past a 390 px screen, light and dark (the orchestrator's 21:05Z default, MP-1110-0133's proposal 1):
+    rb page in each state of the checkout, a page published with its code's address where origin holds the commit (its
+    About block's clone lines), and the hub's owner and reader tiers of it, with and without rb-clone. scrollWidth is
+    the screen's, and every element shown that nothing clips or scrolls ends inside it, so no part of the footer is cut.
+    The hub's tiers are the export form (rb sync's: no script of its own) with the hub's metas and script.js."""
+    import os
+    import test_shell as shell
+    from rbtest import command, environment
+    as_the_user(monkeypatch)
+    cfg = tmp_path / "gitconfig"
+    cfg.write_text("[user]\n\temail = ana@example.org\n\tname = ana\n[init]\n\tdefaultBranch = main\n", encoding="utf-8")
+    env = {**environment(), "GIT_CONFIG_GLOBAL": str(cfg), "GIT_CONFIG_NOSYSTEM": "1", "RB_ACTOR": "human:ana"}
+
+    def sh(cwd, *argv):
+        subprocess.run(list(argv), cwd=cwd, env=env, check=True, capture_output=True, stdin=subprocess.DEVNULL)
+
+    def rb(cwd, *argv):
+        sh(cwd, *command(), *argv)
+
+    def record(name, git=True):
+        d = tmp_path / name
+        d.mkdir()
+        if git:
+            sh(d, "git", "init", "-q")
+        (d / "train.py").write_text("lr = 0.1\n", encoding="utf-8")
+        rb(d, "init", "INT8 ResNet-50 on ImageNet", "--no-agents")
+        rb(d, "question", "add", "Does INT8 cost accuracy on the held-out set?", "--id", "q-int8")
+        rb(d, "experiment", "add", "INT8 against FP32", "--id", "int8", "-q", "q-int8", "--baseline", "fp32", "--candidate", "int8")
+        return d
+
+    pages = {}
+    for state in ("committed", "not-committed", "not-held", "ignored", "no-commit", "not-in-git"):
+        d = record(state, git=state != "not-in-git")
+        if state == "ignored":
+            (d / ".gitignore").write_text(".rb/\n", encoding="utf-8")
+        if state == "not-held":
+            sh(d, "git", "add", "train.py")
+            sh(d, "git", "commit", "-qm", "code")
+        elif state not in ("no-commit", "not-in-git"):
+            sh(d, "git", "add", "-A")
+            sh(d, "git", "commit", "-qm", "the record")
+        if state == "not-committed":
+            rb(d, "note", "add", "the held-out set is not in the pretraining data")
+        rb(d, "page", "--out", str(tmp_path / f"{state}.html"))
+        pages[state] = tmp_path / f"{state}.html"
+    pub = record("published")
+    sh(pub, "git", "add", "-A")
+    sh(pub, "git", "commit", "-qm", "the record")
+    sh(tmp_path, "git", "init", "-q", "--bare", "origin.git")
+    sh(pub, "git", "remote", "add", "origin", str(tmp_path / "origin.git"))
+    sh(pub, "git", "push", "-q", "origin", "main")
+    sh(pub, "git", "fetch", "-q", "origin")
+    sh(pub, "git", "remote", "set-url", "origin", "https://github.com/ana/int8-resnet50")
+    rb(pub, "export", "--with-record", "--url", "https://pages.example.org/int8/", "--out", str(tmp_path / "pubx"))
+    exported = (tmp_path / "pubx" / "page.html").read_text(encoding="utf-8")
+    assert 'id="in-git"' in exported and "git clone" in exported and "github.com/ana/int8-resnet50" in exported
+    pages["published"] = tmp_path / "pubx" / "page.html"
+    # the export form, as rb sync sends it: it names the hub's script (data-shell) and runs none of its own, so the
+    # hub's tiers below run one copy of script.js
+    assert 'data-shell="sha256:' in exported and "<script>" not in exported and "<script " not in exported.replace('<script type="application/json"', "")
+    script = (Path(__file__).resolve().parent.parent / "rust" / "src" / "shell" / "assets" / "script.js").read_text(encoding="utf-8")
+    for viewer in ("owner", "reader"):
+        for clone in (True, False):
+            metas = f'<meta name="rb-viewer" content="{viewer}">' + ('<meta name="rb-clone" content="https://pages.example.org/int8/bundle.zip">' if clone else "")
+            at = tmp_path / f"hub-{viewer}{'-clone' if clone else ''}.html"
+            at.write_text(exported.replace("</head>", metas + "<script>" + script + "</script></head>", 1), encoding="utf-8")
+            pages[at.stem] = at
+    node = shell._node()
+    runner = shell._cdp_script(tmp_path / "w390.mjs", f"""
+const pages = {json.dumps({k: v.as_uri() for k, v in pages.items()})};
+await cdp.run(async () => {{
+  const browser = await cdp.launchChrome();
+  const tab = await browser.page();
+  const out = {{}};
+  for (const [name, url] of Object.entries(pages)) for (const scheme of ['light', 'dark']) {{
+    await tab.blank(); await tab.viewport(390, 844); await tab.media({{ type: '', scheme }});
+    await tab.goto(url + '#about', {{ timeoutMs: 30000 }}); await tab.settle();
+    out[name + ' ' + scheme] = await tab.ev(`(() => {{
+      const W = document.documentElement.clientWidth;
+      // every element shown, that no box narrower than the screen clips or scrolls, ends inside the screen: in
+      // app mode scrollWidth alone does not see a footer that runs past it (MP-1110-0531's check)
+      const kept = e => {{ for (let a = e.parentElement; a && a !== document.documentElement; a = a.parentElement) {{
+        const s = getComputedStyle(a), r = a.getBoundingClientRect();
+        // a box of its own that scrolls or clips inside the screen (a command's): never a view as wide as the screen
+        if (s.position === 'fixed' || (s.overflowX !== 'visible' && r.right <= W + 0.5 && r.width < W - 1)) return true; }} return false; }};
+      const past = [...document.querySelectorAll('body *')].filter(e => {{ const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+        return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.position !== 'fixed' && r.right > W + 0.5 && !kept(e); }})
+        .slice(0, 5).map(e => e.tagName + '#' + e.id + '.' + e.className + ' ' + Math.round(e.getBoundingClientRect().right));
+      return [document.documentElement.scrollWidth, W, past];
+    }})()`);
+  }}
+  out.errors = tab.errors;
+  return out;
+}}, {{ timeoutMs: 150000 }});
+""")
+    code, said, err = shell._runner(node, runner, env=dict(os.environ))
+    assert code == 0 and said["ok"], err
+    errors = said.pop("errors")
+    said.pop("ok", None)
+    said.pop("started", None)
+    assert len(said) == 2 * len(pages), said
+    wide = {k: v for k, v in said.items() if v[0] != v[1] or v[1] != 390 or v[2]}
+    assert not wide and errors == [], (wide, errors)

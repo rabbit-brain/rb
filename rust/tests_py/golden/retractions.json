@@ -200,6 +200,7 @@
     "  On every e1 criterion:",
     "          \u00b7 typed in, not read from a file or run: runp5h4s6, runqtdhpa",
     "          \u00b7 no run config was compared with the spec (record runs with --config)",
+    "          \u00b7 run runp5h4s6's code was not kept: no commit to keep it at",
     "  c1      wide fast",
     "          criterion not met \u00b7 point only \u00b7 wide.wall_s \u2264 10",
     "          reads:     wide.wall_s: 10.5 \u00b7 mean, 2 runs (rb)",
@@ -396,6 +397,12 @@
     "      \"subject\": \"c1\",",
     "      \"problem\": false,",
     "      \"text\": \"no run config was compared with the spec (record runs with --config)\"",
+    "     },",
+    "     {",
+    "      \"code\": \"evidence_run_note\",",
+    "      \"subject\": \"c1\",",
+    "      \"problem\": false,",
+    "      \"text\": \"run runp5h4s6's code was not kept: no commit to keep it at\"",
     "     }",
     "    ],",
     "    \"says\": {",
@@ -407,7 +414,8 @@
     "     \"units\": \"2 runs\",",
     "     \"integrity\": \"e1 was retracted \\u00b7 note: the whole experiment \\u00b7 not confirmed\",",
     "     \"review\": \"no decision\",",
-    "     \"history\": \"\"",
+    "     \"history\": \"\",",
+    "     \"evidence\": \"Evidence: 2 runs. Short of whole: 1 run's code not kept (no commit to keep it at). rb has not rerun them.\"",
     "    },",
     "    \"n\": 2,",
     "    \"witness\": {",
@@ -518,6 +526,12 @@
     "      \"subject\": \"c2\",",
     "      \"problem\": false,",
     "      \"text\": \"no run config was compared with the spec (record runs with --config)\"",
+    "     },",
+    "     {",
+    "      \"code\": \"evidence_run_note\",",
+    "      \"subject\": \"c2\",",
+    "      \"problem\": false,",
+    "      \"text\": \"run runp5h4s6's code was not kept: no commit to keep it at\"",
     "     }",
     "    ],",
     "    \"says\": {",
@@ -529,7 +543,8 @@
     "     \"units\": \"2 runs\",",
     "     \"integrity\": \"e1 was retracted \\u00b7 note: the whole experiment \\u00b7 not confirmed\",",
     "     \"review\": \"no decision\",",
-    "     \"history\": \"\"",
+    "     \"history\": \"\",",
+    "     \"evidence\": \"Evidence: 2 runs. Short of whole: 1 run's code not kept (no commit to keep it at). rb has not rerun them.\"",
     "    },",
     "    \"n\": 2,",
     "    \"witness\": {",
@@ -760,10 +775,6 @@
    "journal/",
    ""
   ],
-  ".rb/cache/objects/1a/1a22739af2cba88de388f130198eb5af7ca7869e6347fd55d57e9beb25caa0b0.json.gz": {
-   "sha256": "cc9209f691e074350af577363362861d74c0c8e6ebc1a83c9dbdca4abe13f0b2",
-   "bytes": 1141
-  },
   ".rb/cache/objects/43/436c323e3c7a23588a299e447556e93518309b820343ab8409bc72b33d8f1948.json.gz": {
    "sha256": "0aae5b1864463d7e09a1106be7c482fd7caab45a9024b20202090ef0b9745721",
    "bytes": 201
@@ -788,13 +799,17 @@
    "sha256": "98817e5ff01da25bbb99d66aa6ac6a116ead6b31b62367ba162c3aafeb699712",
    "bytes": 145
   },
+  ".rb/cache/objects/ac/ac8edfc2cca95b432a30450660367a1743ff41c10b7fd6ef4b38146d02d4ab3e.json.gz": {
+   "sha256": "ac001e5af2b699088dc0acba098cd56fb69c8b67dada0229c97befd1658cdc4d",
+   "bytes": 1035
+  },
   ".rb/cache/objects/c5/c5a09f88c53026f632a07003d7afe6506f9a7897d164306d5fc977129d252124.json.gz": {
    "sha256": "98369863fa14c9d957a16301c74af4c8cdda5e84cb1c0d831f0351ea99f35c80",
    "bytes": 164
   },
-  ".rb/cache/objects/e4/e4194774fe853af593bcf1284dfdceeef8171afebd1361e8190c0f7054e9042f.json.gz": {
-   "sha256": "23c4161f89b2859b79dbe45dd40c412f115ea753aad0d4f6b2576bf25d9f89b3",
-   "bytes": 979
+  ".rb/cache/objects/cc/ccf489455f20c17e0a37f3b4f62f0f5391f19cf0d5b9bac34f90493d68e997b3.json.gz": {
+   "sha256": "72ed7721af6b8a79dd28be7052a04bb224f9772686ca5ea45308143b8d312892",
+   "bytes": 1175
   },
   ".rb/cache/objects/ea/ea6cd3f5c794c73f30fd980d8352505545cec0d5255de1408ac2563bb3e2f6f8.json.gz": {
    "sha256": "1e673457cc0007d4e0dc3df4bbb8c749847531bbeccbac1c7186b0dd890b35aa",
@@ -818,8 +833,8 @@
    "  \"fc4be49e7da5abf9\",",
    "  \"c2f90f1527884521\",",
    "  \"b82bf8e5eb0ea614\",",
-   "  \"dc273e7fda6dc655\",",
-   "  \"e07f404fced3c891\",",
+   "  \"a4a2cf8e250e79dc\",",
+   "  \"4a4ad1763dce9227\",",
    "  \"cc574b81eae66ea3\",",
    "  \"ded364cb6a57c5a8\",",
    "  \"8b46fed7d4722484\"",
@@ -907,6 +922,9 @@
    "    commit: null",
    "    branch: main",
    "    dirty: false",
+   "    captured: after",
+   "    kept: none",
+   "    kept_why: no_commit",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -953,7 +971,9 @@
    "    dirty: true",
    "    diff_sha256: eb3eb6e052fe99ba756863e8966bcb941c8775d831f4c1c6e8e9f0beaa39910d",
    "    untracked: 1",
+   "    captured: after",
    "    tree: 886193c58029702e3eb738d8ddcc765350795721",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1008,8 +1028,8 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"a897a24bcd146c482cdb1a253bfde3d26ed6f9e288c9bd310b9046fcd1bb88b1\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/base\", \"path\": \".rb/experiments/e1/variants/base.yaml\", \"sha256\": \"eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695\"}, {\"kind\": \"variant\", \"id\": \"e1/wide\", \"path\": \".rb/experiments/e1/variants/wide.yaml\", \"sha256\": \"4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb\"}], \"detail\": {\"variants\": [\"base\", \"wide\"], \"like\": null, \"questions\": [], \"changed_parts\": {\"e1\": {\"variant:base\": \"baseline\", \"variant:wide\": \"candidate\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c1\", \"sha256\": \"8cfc358cd28e21a7bff7c45806c1adac9ac9b8b3de07ee1e88a9161c3a645a33\", \"path\": \".rb/experiments/e1/criteria/c1.yaml\", \"detail\": {\"rule\": \"wide.wall_s \u2264 10\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:c1\": \"primary\", \"rule:c1\": \"wide.wall_s \u2264 10\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c2\", \"sha256\": \"5eff0b0f935891e8ace3fa1b092b5b09acde3b9708983d51bd65b2256152ca34\", \"path\": \".rb/experiments/e1/criteria/c2.yaml\", \"detail\": {\"rule\": \"wide.top1 \u2265 0.5\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:c2\": \"primary\", \"rule:c2\": \"wide.top1 \u2265 0.5\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"e4194774fe853af593bcf1284dfdceeef8171afebd1361e8190c0f7054e9042f\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.7, \"wide.wall_s\": 9.0}, \"per_run\": {}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"1a22739af2cba88de388f130198eb5af7ca7869e6347fd55d57e9beb25caa0b0\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.71, \"wide.wall_s\": 12.0}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"ac8edfc2cca95b432a30450660367a1743ff41c10b7fd6ef4b38146d02d4ab3e\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.7, \"wide.wall_s\": 9.0}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"ccf489455f20c17e0a37f3b4f62f0f5391f19cf0d5b9bac34f90493d68e997b3\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.71, \"wide.wall_s\": 12.0}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add_variant\", \"kind\": \"experiment\", \"id\": \"e1\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/extra\", \"path\": \".rb/experiments/e1/variants/extra.yaml\", \"sha256\": \"5367ea4b7d0cb1ec25a5032b3025dfbc154cf70449636b8c9edc9eb819a636c8\"}], \"detail\": {\"variant\": \"extra\", \"role\": \"control\", \"changed_parts\": {\"e1\": {\"variant:extra\": \"control\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"retract\", \"kind\": \"experiment\", \"id\": \"e1\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/extra\", \"path\": \".rb/experiments/e1/variants/extra.yaml\", \"sha256\": \"436c323e3c7a23588a299e447556e93518309b820343ab8409bc72b33d8f1948\"}], \"detail\": {\"variant\": \"extra\", \"why\": \"not needed\", \"changed_parts\": {\"e1\": {\"variant:extra\": null}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"agent:claude-code\", \"actor_via\": \"detected:CLAUDECODE\", \"via\": \"cli\", \"op\": \"retract\", \"kind\": \"experiment\", \"id\": \"e1\", \"agent\": {\"name\": \"claude-code\", \"provider\": \"anthropic\", \"provider_from\": \"inferred\"}, \"words\": \"drop it\", \"sha256\": \"ea6cd3f5c794c73f30fd980d8352505545cec0d5255de1408ac2563bb3e2f6f8\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"why\": \"the whole experiment\", \"changed_parts\": {\"e1\": {}}, \"parts_compared\": \"structured\"}}",

@@ -1200,6 +1200,7 @@
     "    ],",
     "    \"code\": {",
     "     \"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\",",
+    "     \"kept\": \"whole\",",
     "     \"tree\": \"30aa01ce2132695563ee1051c2c3e046cb5b7726\"",
     "    }",
     "   },",
@@ -1214,6 +1215,7 @@
     "    \"wrote_checked\": true,",
     "    \"code\": {",
     "     \"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\",",
+    "     \"kept\": \"whole\",",
     "     \"tree\": \"30aa01ce2132695563ee1051c2c3e046cb5b7726\"",
     "    }",
     "   }",
@@ -1886,7 +1888,7 @@
    "- `rb experiment add \"<title>\" -q <q> --hypothesis \"<h>\" -m \"<why>\" --if-holds \"<then>\" --if-not \"<else>\"`: what is tested, and the decision it gates; it stays planned until something runs it. Arms are `--baseline <b> --candidate <c> --varies <setting>`; `rb experiment gate <exp>` sets or revises the gate later. A control or an ablation is `rb variant add`, a metric `rb metric add`, a setting `rb spec set <exp> <name> --source <file#key>`, a dataset or checkpoint `rb resource add`.",
    "- `rb criterion add \"<statement>\" -e <exp> -q <q> --metric <m> --at-most <x>`: what would count, declared before the evidence it reads, and the question its finding bears on; `--when-met \"<what meeting it would mean for the question>\"` keeps the interpretation, verbatim, when there is one.",
    "- `rb criterion file <criterion> <q> --why \"...\"`: link a criterion already recorded to the question its finding bears on. A question's reading counts only the criteria linked to it, and `rb status` gives this command for each criterion filed under a question and linked to none.",
-   "- `rb journal run -- <evaluation command>`, then `rb run add <exp> --from <metrics file> --set seed=<n> --command \"...\"`: what ran, with a receipt. A command whose last line is `{\"metrics\": {...}}` has those numbers kept, and `rb reconcile` proposes the run.",
+   "- `rb journal run -- <evaluation command>`, then `rb run add <exp> --from <metrics file> --set seed=<n> --command \"...\"`: what ran, with a receipt and the code the command started with. Give each run a results path of its own (`out/seed<n>/metrics.json`), so a new seed never overwrites an earlier run's file. A command whose last line is `{\"metrics\": {...}}` has those numbers kept, and `rb reconcile` proposes the run.",
    "- `rb analysis add <exp> --compare \"<a>/<b>:<metric>=<est>[<lo>,<hi>]\" --method \"...\" --source <report>`: a computation over saved outputs, never a run.",
    "- `rb note add \"<text>\" -e <exp>`: an assumption, a caveat or an uncertainty, verbatim; a note changes no finding. A hypothesis weakened is a note on its experiment pointing at the evidence.",
    "- `rb decide <subject> <action> --why \"...\" --words \"...\"`: a call (accept, reject, investigate; continue, park, stop, pivot, ship). Calls are the user's: record one when they ask for it. It is proposed, not made, until they confirm it in their own terminal (`rb confirm <id>`); tell them it waits. A call made before the record takes `--past --when \"...\"`; `--source <file>[:<line>] --quote \"...\"` cites the document that states it. A past call waits for the same one confirmation: rb says beside it what git shows of the document.",
@@ -1939,17 +1941,13 @@
    "sha256": "a932af1300912e58c79f915390b8e901055b662651eaae198bb260b341e6bac5",
    "bytes": 150
   },
+  ".rb/cache/objects/29/29b005e7074fcfeb616fcf0515c50f2dd1a04651c38eb9d5ea4f42a03e76dbe7.json.gz": {
+   "sha256": "142c16bbb5a644ea79c14c7476132fe4a0cb223b7197e017e90b8775c760d3d3",
+   "bytes": 1505
+  },
   ".rb/cache/objects/3d/3d454dfd07793d6bac57a2df9f14fe5835a687cfad7363cc90b596879da1a39e.json.gz": {
    "sha256": "feb938d0926137990eddba9e18d5243e66125f4fb3d85b0bd06c0dee4bed411e",
    "bytes": 250
-  },
-  ".rb/cache/objects/68/68e40f186d82029e8f3442776dc6a74bd3f120d9787b0ff0bc77455577b1c9ca.json.gz": {
-   "sha256": "8ff9d5c3ddbb5905e08036f26680908facab67e155a378b102ca120694c79791",
-   "bytes": 1238
-  },
-  ".rb/cache/objects/71/71a66d53411c3f2da6a876bc567e3b8b5470150ae902d21d2d139098f2c3f31a.json.gz": {
-   "sha256": "5c3bda86cb8ec03ba956b94df091c339749b154eed0d93949e9b2ca05e59c039",
-   "bytes": 1288
   },
   ".rb/cache/objects/a5/a586acb2a032aa95bcbc48078d4dddb1555773715a0e826beec028fffe975f36.json.gz": {
    "sha256": "0f4d310d15dba3e15e7a755fcbd21ac9df2cd41109c0ddf1fb409d4c23f1d7b9",
@@ -1958,6 +1956,10 @@
   ".rb/cache/objects/b7/b715c3b4aba97c7b5a71dc54ef1378f2756368268eda08601007538dffb02072.json.gz": {
    "sha256": "06972562945834e10b5f3e6432aabc24a6070f66a827b111b269394bba7f190a",
    "bytes": 1978
+  },
+  ".rb/cache/objects/d1/d16cfced10eb4a338655135496f0b06e96548b2757cad534a07614ecdf538b7a.json.gz": {
+   "sha256": "5aa51f5a0743ec526bcc15e6642af85449364d5f1bea21b3f228253bec2f9c0c",
+   "bytes": 1272
   },
   ".rb/cache/objects/ee/eec416713631367c3bbee27e394434e12c4314b7d3decd197fda6e0728acdd92.json.gz": {
    "sha256": "a7b84437ccea2be5e4b3f59514bc224cbb828d0fa656865f15256fcc48a78945",
@@ -2127,7 +2129,9 @@
    "    dirty: true",
    "    diff_sha256: f3e9a52253f07c47b182dd1b90b4a3929178d27edbc763929087cf829aba4757",
    "    untracked: 1",
+   "    captured: after",
    "    tree: 4b98812ce24d183827157ef72c2f507d87db5272",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -2175,11 +2179,18 @@
    "    dirty: true",
    "    diff_sha256: 19aca91420b950be4f94b16741e21dab1d6d735116dbc1c86940307dfaa770b3",
    "    untracked: 2",
+   "    captured: after",
    "    tree: 6261df6873b833381f5df4557c3442436209dfd1",
+   "    kept: whole",
    "  produced:",
    "    commit: d7961b9462929707adc86be88c7ac9db104738c7",
    "    tree: 4b98812ce24d183827157ef72c2f507d87db5272",
+   "    dirty: true",
    "    from: flag",
+   "    captured: start",
+   "    kept: whole",
+   "    command: \"python3 -c 'print(\\\"{\\\\\\\"metrics\\\\\\\": {\\\\\\\"top1\\\\\\\": 0.76, \\\\\\\"loss\\\\\\\": 1.5}}\\\")'\"",
+   "    ran_at: \"2026-10-01T12:00:00.000+00:00\"",
    "  environment:",
    "    python: 3.12.1",
    "    platform: Linux-6.1.0-x86_64-with-glibc2.39",
@@ -2203,10 +2214,10 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c1\", \"sha256\": \"3d454dfd07793d6bac57a2df9f14fe5835a687cfad7363cc90b596879da1a39e\", \"path\": \".rb/experiments/warmup/criteria/c1.yaml\", \"detail\": {\"rule\": \"top1 \u2265 0.7\", \"experiment\": \"warmup\", \"role\": \"primary\", \"changed_parts\": {\"warmup\": {\"role:c1\": \"primary\", \"rule:c1\": \"top1 \u2265 0.7\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reindex\", \"kind\": \"experiment\", \"id\": \"warmup\", \"sha256\": \"a586acb2a032aa95bcbc48078d4dddb1555773715a0e826beec028fffe975f36\", \"path\": \".rb/experiments/warmup/experiment.yaml\", \"detail\": {\"folder\": \"results/warmup/\", \"files\": 5, \"quotes\": 5, \"checks\": 1, \"changed_parts\": {\"warmup\": {}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reconciled\", \"kind\": \"project\", \"id\": \"work\", \"detail\": {\"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\", \"added\": [], \"updated\": {\"warmup\": [\"files: 1 new (seed2/metrics.json)\"]}, \"results\": 0, \"next\": 0, \"guides\": [], \"checks\": {\"passed\": 0, \"failed\": 0, \"not_run\": 1}, \"audits_failed\": 1, \"manifests\": 1, \"changed_sources\": 1, \"line\": \"1 re-indexed (warmup) \u00b7 checks: 1 not run under rb's watch \u00b7 1 audit file saying failed \u00b7 1 manifest, 1 source changed since frozen\", \"uncited_seen\": {\"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\", \"count\": 0, \"cut\": false, \"files\": []}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"68e40f186d82029e8f3442776dc6a74bd3f120d9787b0ff0bc77455577b1c9ca\", \"path\": \".rb/experiments/warmup/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"warmup\", \"metrics\": {\"top1\": 0.75, \"top5\": 0.92}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"d16cfced10eb4a338655135496f0b06e96548b2757cad534a07614ecdf538b7a\", \"path\": \".rb/experiments/warmup/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"warmup\", \"metrics\": {\"top1\": 0.75, \"top5\": 0.92}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reindex\", \"kind\": \"experiment\", \"id\": \"warmup\", \"sha256\": \"b715c3b4aba97c7b5a71dc54ef1378f2756368268eda08601007538dffb02072\", \"path\": \".rb/experiments/warmup/experiment.yaml\", \"detail\": {\"folder\": \"results/warmup/\", \"files\": 5, \"quotes\": 5, \"checks\": 1, \"changed_parts\": {\"warmup\": {}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"reconciled\", \"kind\": \"project\", \"id\": \"work\", \"detail\": {\"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\", \"added\": [], \"updated\": {\"warmup\": [\"files: 1 changed (README.md)\", \"result changed\"]}, \"results\": 1, \"next\": 0, \"guides\": [], \"checks\": {\"passed\": 1, \"failed\": 0, \"not_run\": 0}, \"audits_failed\": 1, \"manifests\": 1, \"changed_sources\": 1, \"line\": \"1 re-indexed (warmup) \u00b7 1 result quoted \u00b7 checks: 1 passed \u00b7 1 audit file saying failed \u00b7 1 manifest, 1 source changed since frozen\", \"uncited_seen\": {\"commit\": \"d7961b9462929707adc86be88c7ac9db104738c7\", \"count\": 0, \"cut\": false, \"files\": []}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"71a66d53411c3f2da6a876bc567e3b8b5470150ae902d21d2d139098f2c3f31a\", \"path\": \".rb/experiments/warmup/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"warmup\", \"metrics\": {\"loss\": 1.5, \"top1\": 0.76}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"29b005e7074fcfeb616fcf0515c50f2dd1a04651c38eb9d5ea4f42a03e76dbe7\", \"path\": \".rb/experiments/warmup/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"warmup\", \"metrics\": {\"loss\": 1.5, \"top1\": 0.76}, \"per_run\": {}, \"again\": false}}",
    ""
   ],
   ".rb/project.yaml": [
@@ -2232,8 +2243,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "cb1a4106655028e35ca6ea447fcf2709877b14eb9b282b9595ce4151ea95230c",
-   "bytes": 203093
+   "sha256": "49095caf80f3be1ba87412b46041459bc8d6c4a53c2463aa6ed2fbfeac9a4589",
+   "bytes": 203008
   },
   "results/other/report.md": [
    "# Other",

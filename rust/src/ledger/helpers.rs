@@ -356,27 +356,42 @@ pub fn isclose(a: f64, b: f64, rel_tol: f64, abs_tol: f64) -> bool {
 /// their own inside it that the code leaves out (`nested`).
 pub fn with_code(root: &Path, attached: Option<Dict>) -> Option<Dict> {
     let mut attached = attached?;
+    // when this capture was made (after the run: a recording), and how much of the code it kept, beside the code it
+    // describes (EVIDENCE: the record change); a status git could not give said so already (git_state)
+    attached.entry("captured".into()).or_insert_with(|| Value::Str("after".into()));
+    if attached.contains_key("kept_why") {
+        return Some(attached);
+    }
     if attached.get("dirty").map_or(false, |v| v.truthy()) {
-        let snap = sources::code_snapshot(root, DIR);
-        if let Some(snap) = snap {
-            let left_out = snap.get("left_out").cloned().unwrap_or(Value::Null);
-            if snap.get("tree").map_or(false, |v| v.truthy()) {
-                attached.insert("tree".into(), snap.get("tree").cloned().unwrap());
-                if left_out.truthy() {
-                    attached.insert("left_out".into(), left_out);
+        match sources::code_snapshot(root, DIR) {
+            Some(snap) => {
+                let kept = snap.get("tree").map_or(false, |v| v.truthy());
+                attached.insert("tree".into(), if kept { snap.get("tree").cloned().unwrap() } else { Value::Null });
+                for k in ["left_out", "kept", "kept_why", "left_out_files", "left_out_more", "too_many", "listing", "git_said", "git_secs", "nested"] {
+                    if let Some(v) = snap.get(k).filter(|v| v.truthy() || k == "kept") {
+                        attached.insert(k.into(), v.clone());
+                    }
                 }
-            } else if !snap.is_empty() {
-                attached.insert("tree".into(), Value::Null);
-                attached.insert("left_out".into(), left_out);
             }
-            if let Some(n) = snap.get("nested") {
-                attached.insert("nested".into(), n.clone());
+            // dirty, and nothing to snapshot (a deletion of the record alone, say): no tree was kept
+            None => {
+                attached.insert("kept".into(), "none".into());
             }
         }
     } else if let Some(commit) = attached.get("commit").filter(|v| v.truthy()).map(pyjson::py_str) {
-        if let Some(tree) = sources::keep_tree(root, &commit) {
-            attached.insert("tree".into(), Value::Str(tree));
+        match sources::keep_tree(root, &commit) {
+            Some(tree) => {
+                attached.insert("tree".into(), Value::Str(tree));
+                attached.insert("kept".into(), "whole".into());
+            }
+            None => {
+                attached.insert("kept".into(), "none".into());
+                attached.insert("kept_why".into(), "git_failed".into());
+            }
         }
+    } else {
+        attached.insert("kept".into(), "none".into());
+        attached.insert("kept_why".into(), "no_commit".into());
     }
     Some(attached)
 }

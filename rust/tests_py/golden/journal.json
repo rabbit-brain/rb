@@ -52,6 +52,7 @@
     "{\"metrics\": {\"wide.top1\": 0.71}}",
     "exit 0. The command, its exit code and what it wrote are in the journal.",
     "It printed its metrics: wide.top1=0.71. rb reconcile proposes the run of e1 that records them.",
+    "  rb put the code in git at refs/rb/snapshots/309c53e781ae84c30ae3a229cdc7c1c20da14ce0, so it outlives a deleted branch or worktree; git update-ref -d refs/rb/snapshots/309c53e781ae84c30ae3a229cdc7c1c20da14ce0 removes it.",
     "",
     "Since this session last looked:",
     "  - python3 -c 'print('\"'\"'{\"metrics\": {\"wide.top1\": 0.71}}'\"'\"')': results landed and are not in the record   (rb reconcile)",

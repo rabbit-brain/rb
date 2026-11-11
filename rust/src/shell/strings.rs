@@ -585,7 +585,23 @@ pub const CODE_UNNAMED: &str = "The runs need the code; this bundle doesn't say 
 /// experiment's commands, with, where a run ran other code, the command that puts that code here first (named in words,
 /// so the step holds if rb's line changes); rb journal run records a command, not a run, so each run is recorded with
 /// the rb run add line rb reconcile prints for it.
+/// Where origin lacked the code's commit when the page was made (E4): the sentence the Rerun panel, its prompt and rb sync say
+/// in place of a promise that a rerun gets the code. `fetched` false: git had fetched no branch of origin.
+pub fn rerun_origin_lacks(commit: &str, url: &str, fetched: bool) -> String {
+    if fetched {
+        format!("When this page was made, origin's branches, as git last fetched them, did not hold commit {commit}: a rerun cannot get the code from {url} until it is pushed there.")
+    } else {
+        format!("When this page was made, git had fetched no branch of origin, so rb could not tell whether origin holds commit {commit}.")
+    }
+}
+
 pub fn rerun_prompt(page: &str, bundle: &str, folder: &str, code: bool, experiment: Option<(&str, &str, &[String])>) -> String {
+    rerun_prompt_at(page, bundle, folder, code, None, experiment)
+}
+
+/// rerun_prompt, with what origin held when the page was made: `origin`, origin_lacks's sentence where it did not hold
+/// the code's commit, so the prompt promises no code a clone cannot get.
+pub fn rerun_prompt_at(page: &str, bundle: &str, folder: &str, code: bool, origin: Option<&str>, experiment: Option<(&str, &str, &[String])>) -> String {
     let run = match experiment {
         Some((id, title, _)) => format!("Run experiment {id}, \u{201c}{}\u{201d}: its commands", typographic(title)),
         None => "Run each experiment's commands".to_string(),
@@ -595,7 +611,13 @@ pub fn rerun_prompt(page: &str, bundle: &str, folder: &str, code: bool, experime
         Some((_, _, rules)) if !rules.is_empty() => format!("which of its rules ({}) reproduced and which did not, with their numbers", rules.join(", ")),
         _ => "which rules reproduced and which did not, with their numbers".to_string(),
     };
-    let clone = if code {
+    let clone = if let (true, Some(lacks)) = (code, origin) {
+        format!(
+            "rb clone {bundle} {folder}. This bundle names the code, but: {lacks} If rb clone says it could not get the \
+             code, tell me what it says and stop: once I give you an address of the code, rb clone {bundle} <another new \
+             folder> --code <that address> gets it."
+        )
+    } else if code {
         format!(
             "rb clone {bundle} {folder}. This bundle names the code: rb clone gets it too, at the commit the record names, \
              and puts the record in it. If it says it could not get the code, tell me what it says and stop: once I give \
@@ -769,6 +791,170 @@ fn canonical(term: &str) -> &str {
 pub fn hint(term: &str) -> Option<&'static str> {
     let term = canonical(term);
     HINTS.iter().find(|(t, _)| *t == term).map(|(_, line)| *line)
+}
+
+/// What git took out of the record (E1), in the one line every surface says: rb status, rb context, rb open, rb ui and
+/// the data's `taken_out.said`. `stash` is the stash that holds the writes, and whether git stash pop puts them back.
+pub fn taken_out_line(count: usize, stash: Option<(&str, bool)>) -> String {
+    let [records, were, are, them] = took_fill(count);
+    match stash {
+        Some((stash, true)) => evidence("took_stash_pop", &[("records", records), ("are", are), ("stash", stash.to_string()), ("them", them)]),
+        Some((stash, false)) => evidence("took_stash", &[("records", records), ("were", were), ("stash", stash.to_string()), ("them", them)]),
+        None => evidence("took", &[("records", records), ("were", were), ("them", them)]),
+    }
+}
+
+/// E1's words for `count` records: "4 records" or "1 record", then were, are and them in its number.
+pub fn took_fill(count: usize) -> [String; 4] {
+    let one = count == 1;
+    [
+        if one { "1 record".to_string() } else { format!("{count} records") },
+        if one { "was" } else { "were" }.to_string(),
+        if one { "is" } else { "are" }.to_string(),
+        if one { "it" } else { "them" }.to_string(),
+    ]
+}
+
+// ---------------------------------------------------------------- S7 evidence words
+//
+// What rb says of the code it kept for a run, in one table: rb run add, rb show <run> and <experiment>, rb status, rb
+// context, rb journal run, rb open, rb ui, pages and data.warnings (MCP, the SDK's RBWarning) all draw these words,
+// filled by crate::capture. A key ending in `_page` is the page's form: a page names no file a run left out and never
+// quotes git. Each `{name}` is filled where the words are drawn; tests/test_capture_words.py reads this table.
+pub const EVIDENCE_WORDS: &[(&str, &str)] = &[
+    ("no_code_git", "rb kept no code for this run: rb could not read git ({git_said})."),
+    ("no_code_git_page", "rb kept no code for this run: rb could not read git {when}."),
+    ("no_code_timeout", "rb kept no code for this run: git did not answer in {secs} s."),
+    ("no_code_failed", "rb kept no code for this run: git failed ({git_said})."),
+    ("no_code_failed_bare", "rb kept no code for this run: git failed."),
+    ("no_code_list", "rb kept no code for this run: git could not list the {listing} files ({git_said})."),
+    ("no_code_list_page", "rb kept no code for this run: git could not list the {listing} files."),
+    ("no_code_too_many", "rb kept no code for this run: {files} files changed or untracked, {in_folder} of them in {folder}. Add such folders to .gitignore, or commit them, so the next run's code is kept."),
+    ("no_code_too_many_page", "rb kept no code for this run: {files} files changed or untracked, {in_folder} of them in {folder}."),
+    ("no_code_too_many_flat", "rb kept no code for this run: {files} files changed or untracked. Add such folders to .gitignore, or commit them, so the next run's code is kept."),
+    ("no_code_too_many_flat_page", "rb kept no code for this run: {files} files changed or untracked."),
+    ("too_many_start", "rb keeps no code for this command: {files} files changed or untracked, {in_folder} of them in {folder}. Add such folders to .gitignore, or commit them, so the next run's code is kept."),
+    ("too_many_start_flat", "rb keeps no code for this command: {files} files changed or untracked. Add such folders to .gitignore, or commit them, so the next run's code is kept."),
+    ("no_code", "rb kept no code for this run: it had changes outside the record not committed, and rb kept no tree of them."),
+    ("part", "rb kept part of this run's code: git tree {tree}."),
+    ("part_not_in", "Not in it: {files}."),
+    ("part_page", "rb kept part of this run's code: git tree {tree}. Not in it: {count} ({reasons})."),
+    ("part_tracked", "{path} is in it as commit {commit} holds it, not as the run had it ({why})."),
+    ("part_tracked_page", "{count} in it as commit {commit} holds it, not as the run had it ({why})."),
+    ("part_unnamed", "{count} left out of it; this record does not name them."),
+    ("part_unnamed_one", "1 file was left out of it; this record does not name it."),
+    ("part_more", "and {count} more"),
+    ("over_10_mb", "over 10 MB"),
+    ("not_regular", "not a regular file"),
+    ("unreffed", "git tree {tree} is in this repository, but no ref keeps it, so git gc may remove it."),
+    ("not_here", "This run's code is not in this clone: it had changes outside the record not committed, and rb kept them as git tree {tree} in the clone that recorded the run."),
+    ("not_here_page", "A rerun from this page does not get this run's code: it had changes outside the record not committed, which rb kept as git tree {tree} in the clone that recorded the run."),
+    ("start_not_here", "This run's code is not in this clone: rb kept the code its command started with as git tree {tree} in the clone that recorded the run."),
+    ("start_not_here_page", "This run's code was not in the repository this page was made from: rb kept the code its command started with as git tree {tree} in the clone that recorded the run."),
+    ("start_gone", "This run's code is gone from this clone: rb kept the code its command started with here as git tree {tree}, and git no longer has it: git gc removes a tree no ref keeps."),
+    ("gone_here", "This run's code is gone from this clone: it had changes outside the record not committed, which rb kept here as git tree {tree}, and git no longer has it: git gc removes a tree no ref keeps."),
+    ("row_gone", "code gone for {runs}: rb kept it in this clone as git tree {tree}, and git no longer has it"),
+    ("row_not_here", "code not in this clone for {runs}: rb kept it as git tree {tree} in the clone that recorded it"),
+    ("part_rebuild", "The kept tree is not the run's whole code: it lacks {files}. Put those files in place after these commands, never before."),
+    ("part_rebuild_page", "The kept tree is not the run's whole code: it lacks {lacks}. Put those files in place after these commands, never before."),
+    ("row_part", "part of the code kept: {what}"),
+    ("row_none", "no code kept for {runs}: {why}"),
+    ("why_git", "rb could not read git"),
+    ("why_timeout", "git did not answer in {secs} s"),
+    ("why_failed", "git failed"),
+    ("why_list", "git could not list the {listing} files"),
+    ("why_too_many", "{files} files changed or untracked"),
+    ("why_not_kept", "changes that were never committed, with no tree kept"),
+    ("why_no_commit", "no commit to keep it at"),
+    // E2: when the code a run names was captured
+    ("code_recorded", "The code when it was recorded, after the run"),
+    ("code_recorded_earlier", "The code when it was recorded, not when it ran"),
+    ("code_start", "The code when the run started: git tree {tree}."),
+    ("code_start_commit", "The code when the run started: commit {commit}."),
+    ("code_given_tree", "The code as given: git tree {tree}."),
+    ("code_given_commit", "The code as given: commit {commit}."),
+    ("code_given_absent", "The code as given: git tree {tree}, which this repository does not have."),
+    ("code_given_absent_page", "The code as given: git tree {tree}, which the repository this page was made from did not have."),
+    ("code_given_commit_absent", "The code as given: commit {commit}, which this repository does not have."),
+    ("code_given_commit_absent_page", "The code as given: commit {commit}, which the repository this page was made from did not have."),
+    ("code_from", "Its code is from the start of: {command} (rb journal run, {at} UTC)."),
+    ("code_changed", "The code changed after the run: rb keeps the code the command started with ({code}). Your checkout now differs in {files}: {names}."),
+    // E1: what git took out of the record, which rb kept ({records} is "4 records" or "1 record")
+    ("took", "{records} rb wrote {were} taken out by git (a checkout, restore or reset). rb kept {them}: rb doctor --restore puts {them} back."),
+    ("took_stash", "{records} rb wrote {were} taken out by git (a stash, {stash}). rb kept {them}: rb doctor --restore puts {them} back."),
+    ("took_stash_pop", "{records} rb wrote {are} in git's stash: git stash pop {stash} puts {them} back."),
+    ("took_check", "taken_out_by_git"),
+    ("took_detail", "{records} rb wrote {were} taken out by git (a checkout, restore or reset)"),
+    ("took_detail_stash", "{records} rb wrote {were} taken out by git (a stash, {stash})"),
+    ("took_fix", "rb doctor --restore puts {them} back; rb doctor --forget drops {them}"),
+    ("took_fix_pop", "git stash pop {stash} puts {them} back"),
+    ("took_restored", "put back the write git took out"),
+    ("took_finding", "{what} it rests on {were} taken out of the record by git: {ids}. rb kept {them}: rb doctor --restore puts {them} back, and rb reads {them} again then."),
+    ("took_finding_pop", "{what} it rests on {are} in git's stash: {ids}. git stash pop {stash} puts {them} back, and rb reads {them} again then."),
+    ("took_rule", "{part} was taken out of the record by git ({ids}): rb reads it again once it is put back"),
+    ("took_rule_pop", "{part} is in git's stash ({ids}): git stash pop {stash} puts it back, and rb reads it again then"),
+    ("took_unkept_one", "1 more record on disk is in neither the log nor rb's copy ({ids}): an older rb, or a hand, wrote it. rb doctor --restore sets it aside as <file>.outside-rb; rb doctor --adopt --why \"...\" keeps it."),
+    ("took_unkept", "{records} more on disk are in neither the log nor rb's copy ({ids}): an older rb, or a hand, wrote {them}. rb doctor --restore sets {them} aside as <file>.outside-rb; rb doctor --adopt --why \"...\" keeps {them}."),
+    ("took_evidence", "{runs} taken out of the record by git"),
+    ("took_timing", "its evidence was taken out of the record by git"),
+    ("took_timing_unknown", "rb cannot read it while what it reads is taken out of the record by git"),
+    ("took_result", "taken out by git"),
+    ("took_state", "{what} taken out by git"),
+    ("took_state_pop", "{what} in git's stash"),
+    ("took_under", "{what} under it {were} taken out of the record by git: {ids}. rb kept {them}: rb doctor --restore puts {them} back."),
+    ("took_under_pop", "{what} under it {are} in git's stash: {ids}. git stash pop {stash} puts {them} back."),
+    ("took_direction", "{result}: the catalogue's entry for {metric}, which gives its direction, was taken out of the record by git"),
+    ("took_call", "{part} was taken out of the record by git: rb reads it again once it is put back"),
+    ("took_call_pop", "{part} is in git's stash: git stash pop {stash} puts it back, and rb reads it again then"),
+    ("took_results", "Its results were taken out of the record by git."),
+    ("took_runs", "Its runs were taken out of the record by git: rb doctor --restore puts them back."),
+    ("given_not_here", "{runs} code as given not in this repository"),
+    ("took_forgot", "Dropped rb's copy of {records} git took out: {ids}. Their files are set aside as <file>.outside-rb."),
+    ("took_forgot_none", "Dropped rb's copy of what git took out: {ids}. No file held it, so none is set aside."),
+    ("took_forgot_one", "Dropped rb's copy of 1 record git took out: {ids}. Its file is set aside as <file>.outside-rb."),
+    ("took_show", "{kind} {id} was taken out of the record by git. rb kept it: rb doctor --restore puts it back."),
+    ("took_show_write", "A write to {kind} {id} was taken out of the record by git. rb kept it: rb doctor --restore puts it back."),
+    ("took_remove", "{folder}: rb's copy of what it wrote to this record"),
+    // E5: a file a run named, now ({what} is "changed" or "is gone")
+    ("file_check", "evidence_file_changed"),
+    ("file_problem", "{path} {what} since run {run} was recorded, and rb holds no copy of the bytes it recorded: the number can no longer be checked against its file."),
+    ("file_fix", "put the file back as the run recorded it, or record the run again from what produced it"),
+    ("file_copy_tree", "{path} {what} since run {run} was recorded. The kept code holds the bytes rb recorded: git show {tree}:{path}."),
+    ("file_copy_commit", "{path} {what} since run {run} was recorded. Commit {commit12} holds the bytes rb recorded: git show {commit}:{path}."),
+    ("file_not_in_clone", "{path} is not in this clone."),
+    ("file_changed_found", "{path} changed since run {run} was recorded, and no command rb watched wrote it: rb does not propose it as a run (rb show {run})"),
+    // E5: a run's evidence, line by line ({n} of {m} files)
+    ("files_unchanged", "Files it named: unchanged since it was recorded."),
+    ("files_changed", "{n} of {m} changed since it was recorded: {names}."),
+    ("files_gone", "{n} of {m} gone: {names}."),
+    ("files_not_in_clone", "{n} of {m} not in this clone: {names}."),
+    ("files_not_in_page", "{n} of {m} not in the repository this page was made from: {names}."),
+    ("note_code_away", "run {run}'s code is not in this clone"),
+    ("note_code_gone", "run {run}'s code is gone from this clone: git gc removed the tree rb kept"),
+    ("gone_line", "{runs} code gone from this clone"),
+    ("note_code_none", "run {run}'s code was not kept: {why}"),
+    ("note_code_part", "run {run}'s code was kept in part"),
+    ("note_config", "run {run}'s config changed since it was recorded"),
+    ("config_unchanged", "Config: unchanged since it was recorded."),
+    ("config_changed", "Config: changed since it was recorded."),
+    ("read_same", "What it read: the same bytes here."),
+    ("read_different", "What it read: different bytes here: {names}."),
+    ("read_sha_only", "What it read: a sha256 only; rb did not keep the files."),
+    ("run_quiet", "{what} {are} as recorded."),
+    ("page_lead", "When this page was made: {lines}"),
+    // E5: a finding's evidence, in one line
+    ("finding_whole", "Evidence: {runs}, each with its files unchanged and its code kept {when}. rb has not rerun them."),
+    ("finding_short", "Evidence: {runs}. Short of whole: {short}. rb has not rerun them."),
+];
+
+
+/// The words of EVIDENCE_WORDS under `key`, each `{name}` filled from `with`.
+pub fn evidence(key: &str, with: &[(&str, String)]) -> String {
+    let mut s = EVIDENCE_WORDS.iter().find(|(k, _)| *k == key).map(|(_, t)| t.to_string()).unwrap_or_else(|| panic!("no evidence words {key:?}"));
+    for (name, v) in with {
+        s = s.replace(&format!("{{{name}}}"), v);
+    }
+    s
 }
 
 #[cfg(test)]

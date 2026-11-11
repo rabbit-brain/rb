@@ -380,6 +380,7 @@
     "          \u00b7 typed in, not read from a file or run: run4teabd, run6pqyge, runedhdx7, runf3hlli, runp5h4s6, runprswmo and 1 more",
     "          \u00b7 no run config was compared with the spec (record runs with --config)",
     "          \u00b7 the interval [+0.0205, +0.03885] crosses 0.03165 and 0.03175: not reproduced on the estimate, not across the whole interval",
+    "  Evidence: 7 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.",
     "  run4teabd: fp32.val_loss 0.9701 (typed) \u00b7 unit batch=32 \u00b7 seed=3 \u00b7 produced before the declaration \u00b7 seed=3, batch=32",
     "  run6pqyge: int8.val_loss 0.9899 (typed) \u00b7 unit batch=32 \u00b7 seed=4 \u00b7 produced before the declaration \u00b7 seed=4, batch=32",
     "  runedhdx7: int8.val_loss 0.9978 (typed) \u00b7 unit batch=32 \u00b7 seed=2 \u00b7 produced before the declaration \u00b7 seed=2, batch=32",
@@ -412,6 +413,7 @@
     "          \u00b7 typed in, not read from a file or run: run3rosg3, run4zuz4h, run7pjy2o, rundk5ekt, runeszfgw, runqscttb and 1 more",
     "          \u00b7 no run config was compared with the spec (record runs with --config)",
     "          \u00b7 the interval [+1.205, +4.378] crosses 3.5: met on the estimate, not across the whole interval",
+    "  Evidence: 7 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.",
     "  run3rosg3: int8.val_loss 0.9801 (typed) \u00b7 unit batch=64 \u00b7 seed=1 \u00b7 produced before the declaration \u00b7 seed=1, batch=64",
     "  run4zuz4h: fp32.val_loss 0.9555 (typed) \u00b7 unit batch=64 \u00b7 seed=2 \u00b7 produced before the declaration \u00b7 seed=2, batch=64",
     "  run7pjy2o: fp32.val_loss 0.9512 (typed) \u00b7 unit batch=64 \u00b7 seed=1 \u00b7 produced before the declaration \u00b7 seed=1, batch=64",
@@ -474,69 +476,57 @@
    "sha256": "878778e43a0a97d7492eba3e27b9cd5288c1cf9d8b869399721067b23773edcc",
    "bytes": 182
   },
-  ".rb/cache/objects/14/14719335cab4404639f4d8875786db98d78df87aa061b07c84de72f593a1c68e.json.gz": {
-   "sha256": "8588170f31a9cde64d7b5cc08cb594f2370692b41111fb81c7dcf13c29df3632",
-   "bytes": 1252
+  ".rb/cache/objects/08/088cc54e248453493efcda349de565fd448271dafcf174ce0aa162efe2d19c4b.json.gz": {
+   "sha256": "d9541a8e46586cf9db8b8079ec0ae86f92d9d3c853fcdf5732fea37ef6d24909",
+   "bytes": 1286
+  },
+  ".rb/cache/objects/08/08d01bdc7c821843500b15fdfe9ae2fc401d604176f7832184367488f446ff23.json.gz": {
+   "sha256": "604be5e884947a361a6a9d2de0996d168f115520dc5ea1a442b5904ddc1bf71c",
+   "bytes": 1286
   },
   ".rb/cache/objects/14/14afffc97956762b87354eff10f643b848c5105b1de8ee5815825bfd9c201e9a.json.gz": {
    "sha256": "35f6e1013a4ea0509eeec5dd926b7d7d7f8dc58e71fd76a2d60b4b659b037ecd",
    "bytes": 116
   },
-  ".rb/cache/objects/2c/2c5cd98b82bce474e93b1675a5a8ebbfbb6bb8d375dc26e7103f0adfd7b46f02.json.gz": {
-   "sha256": "4c95baa208ef28fab7c5f2e4c40f2ea0b752e9128fdf0562fc321e70f8c72fa2",
-   "bytes": 1252
-  },
-  ".rb/cache/objects/2f/2f2c5be7b2d051c55c105ce917b4120c8b154d5056748c4a8680de20d16cf99b.json.gz": {
-   "sha256": "477887cba9d90c9ffaeac9b839414846c7ee4768550438d1e0c1fb6ae12c4f77",
-   "bytes": 1252
+  ".rb/cache/objects/34/3447475228742854d800bc97446b2d4aaaec3485c22b8440e98db35312a40f43.json.gz": {
+   "sha256": "89c5863c68e1774cc126f2ee838319701fa73ab69016b2e85a9ad3f9c14c326e",
+   "bytes": 1286
   },
   ".rb/cache/objects/4a/4a876039d62409383d4c6ff16314aa92208574092454b41bd0389f155b9493ea.json.gz": {
    "sha256": "a306831c061ee03b533e4a3a79f52a5cb891428409155e71467429cc146404a3",
    "bytes": 322
   },
-  ".rb/cache/objects/4b/4bbd9cee60b4a3d2b61c95956234a8d83ddb12e364848eb5fc07609484807584.json.gz": {
-   "sha256": "a603b39c9772d3d17b179a12ea049716f549716bccdef81b559b9950208f27ea",
-   "bytes": 1252
-  },
   ".rb/cache/objects/51/5114ae1a7cb18be1f7f98198674d3042196e4a6e058bbb3bebd772d9c7026a2e.json.gz": {
    "sha256": "f21200bc1e6e55f8c6a06baa8bfbbdffd604c6d3a3528c3efec6d933c57eab63",
    "bytes": 643
-  },
-  ".rb/cache/objects/57/570f789d67ceeaa8af4d5aa57ada96169a897a6ee43a554701712dad42631b4b.json.gz": {
-   "sha256": "0e26a2cd7dfd7475d06431dee2591fab3a6e02dde511dada19730b9e859f217e",
-   "bytes": 1252
   },
   ".rb/cache/objects/5d/5d0c69c1b5bf628512aacaec946febfeecfc1401e3fe408783f20296df434aca.json.gz": {
    "sha256": "10a5c32c7e240ecba67cc5278579b02fbed6b803bbb6724284ae2bf35f7fd202",
    "bytes": 292
   },
-  ".rb/cache/objects/62/62210e5314c6975192926a9ab85013d3d17c6af6982521cc7344408ffc5cb6fd.json.gz": {
-   "sha256": "4ebed8b32454a22ea4ceeb7eab9d23801c122edc8d3479e0517207629f193b17",
-   "bytes": 1252
+  ".rb/cache/objects/5f/5fee787e74d9a66599803ab8dac8b25c6b7bfb986584dc22e2b71f0bb9c26b1f.json.gz": {
+   "sha256": "9991a7073f9e40eb592ef88f0cb52495b1989f833ecfcf90eb5826d1c027e9bd",
+   "bytes": 1286
   },
-  ".rb/cache/objects/62/627837e574b6714a90c86f7f00a32d066f4b2c736d368ba4db5fb90560ad30b7.json.gz": {
-   "sha256": "3e4de23b3b93176461782512a69b64a67f702a9dd58598e07ea9dea04ca96747",
-   "bytes": 1252
-  },
-  ".rb/cache/objects/68/68d2685c7fc81f4ef7a57e18de6b7f969cb5c79baca39dbb297f3c27b0cb8d04.json.gz": {
-   "sha256": "9783864ad0f2a6a70f558b143ec5a90661419a959988ac656ac2182b0853efa7",
-   "bytes": 1252
+  ".rb/cache/objects/66/66d685fc903dd642e474c786bf0f0dadfe439ac2e31cf9a18f5f5167d6b1df94.json.gz": {
+   "sha256": "00c65757a8a220289497962f69435ee89ebd8f068307e4bde42d128971b0e5b6",
+   "bytes": 1286
   },
   ".rb/cache/objects/69/699f2481e8d78561c70ee3cbd30f18205505f6cdcb241eb7c3480bb1501ae9e1.json.gz": {
    "sha256": "762554d9aa74558f4ebc54dc55feb7dd53c2d8b186367226a793aaa34903b30f",
    "bytes": 333
   },
-  ".rb/cache/objects/77/77fe41f926e7c0c960aed35612a3e1668394c0a9cab1281796bbae03afd607cd.json.gz": {
-   "sha256": "4d64ac1c2f8b0c252ce0a84865db1672c51a959194d49fcdb248ba4f7c84f9c4",
-   "bytes": 1252
+  ".rb/cache/objects/74/740139406cbb25d33ebfe5d5cd4831461679c6f3d6caf23206c01820d0b6f492.json.gz": {
+   "sha256": "388e630df459311650631abaf9fc3e22aca3232edf4565cc7951f18c31166b53",
+   "bytes": 1286
   },
   ".rb/cache/objects/80/80b4e4ccc3f1ceeb0c3ead8dfc9f6774dfdd6378af73fa81f283d7022035e16a.json.gz": {
    "sha256": "a2fa8ee72fd6edfe963caf664e0146125878b3644f5a529ebf0777fffe93f39a",
    "bytes": 493
   },
-  ".rb/cache/objects/8d/8dbeab88cc8679157199360493102829f573b7b0ca6dcb9a837f214bd86308b2.json.gz": {
-   "sha256": "e3338e9005cefe8dfe1232e00ae3a98afba2a5f5bb5401f5d699510c4789192a",
-   "bytes": 1252
+  ".rb/cache/objects/84/841a06d034af6165411f99ca97068b579bb02b60214171c55170b534d1f4cc18.json.gz": {
+   "sha256": "6024bcc42b6e1d3612906de681f1b065e461500d30c1435a287a1e2c17d2b22b",
+   "bytes": 1286
   },
   ".rb/cache/objects/93/93bac1623ddfe6155980db36ca60a661913859713ce053fceed81a5b7a900416.json.gz": {
    "sha256": "678a26a49e745bc9b196ba5e20243de7241ba4909aaa023c7b6cdbaec7e30c31",
@@ -546,29 +536,41 @@
    "sha256": "7218fd27d2418ffa0b6c25f81cea19b6c2401bdb73502d8e51911c8850a8cee0",
    "bytes": 293
   },
+  ".rb/cache/objects/a0/a0b24688ace6bfc930afaf9605616226703ba54aeff1051ee294e7b4d7102c48.json.gz": {
+   "sha256": "504f2e57f716852e011c7b4627d4a9822e02f8edfac8648c7aefde1a506e14df",
+   "bytes": 1286
+  },
   ".rb/cache/objects/ab/abd353600d1c5138df23b726bc5af3c643b91dd5f57373fd56a931fbf538ec27.json.gz": {
    "sha256": "799d0afb1272ef78874e2421f8b41bdcbe45d38932ef383582ecb8467a124c1f",
    "bytes": 117
   },
-  ".rb/cache/objects/ab/abd6c2eec36b9877a577b071d9f8e55d14ce12fef005d06e294b4307c154cb12.json.gz": {
-   "sha256": "6061f155b327a9f1164a2a90eb6b5ceb4ac3a49424c4d8da6e36737d25f69680",
-   "bytes": 1252
+  ".rb/cache/objects/b2/b2f363f986501d30b60d1e67a713c558c36d590b1c03af94a7c80bfd4717645d.json.gz": {
+   "sha256": "82621f7c24ac923f0eb0d0eba343c280bc52c3f66d1233d54d0b3b0d5bd003b9",
+   "bytes": 1286
   },
-  ".rb/cache/objects/c4/c4be5db8ccf3e191d9a0933925052007853187c1c4bb34d458be92f363eb459d.json.gz": {
-   "sha256": "6c943a88dd34be4fec40f757ac28f56d0caea09ec7a080fe1e6ca41328d4906f",
-   "bytes": 1252
+  ".rb/cache/objects/bf/bfae77efd200266a8ddad608846cbf3a1b7d588dbf79f5e38fb01c7ea4c1f5bd.json.gz": {
+   "sha256": "3ffdb7bb4a6895950b63bbc3934ca82eb3d7d7ab3aff9edefcc4ef0945cf2ad0",
+   "bytes": 1286
+  },
+  ".rb/cache/objects/c0/c09ba6693aa677e1a6784ebfc845504ecd394265b411cea286e8beffe9f680c6.json.gz": {
+   "sha256": "b65281bd37c50b8276e2c1ced880b6edc00f0dbecd53e2d24e9a6b7bbb1cf941",
+   "bytes": 1286
+  },
+  ".rb/cache/objects/c3/c33bb003a8181e06d475e2a8fbcfff174192eeb6ba595c7d06333d7f465e54c2.json.gz": {
+   "sha256": "33152140e0f59ad7be3c4690fd140990e3488ff339ac40f2641c20be4ae9f984",
+   "bytes": 1286
+  },
+  ".rb/cache/objects/c5/c5aed6dc8577245f69ed27697317848a3e61c732686781de76292ce8d3b42001.json.gz": {
+   "sha256": "31fba520108143ef008c1830886de72a9144ee16108996c143636fbd6ecfa156",
+   "bytes": 1286
   },
   ".rb/cache/objects/cf/cf32a1365d5282334ecb4f46259c57bc57bfe613d8d23e652e7e041282cad31f.json.gz": {
    "sha256": "ae4e2c374577aa03f73ddc1c2634d1c8d08ee6a1bff07a7faf85dbcd22581949",
    "bytes": 152
   },
-  ".rb/cache/objects/ea/eaa6921a1aca43bfdce78cb6fbb69886663ac846dfe90102fc00a2bad7504745.json.gz": {
-   "sha256": "161cf57aba19d5042da8542a081d1867484d0007716b168183cdd4a35903fe97",
-   "bytes": 1252
-  },
-  ".rb/cache/objects/fe/feeaec2cfcc9529f09b814a3e95f54696a401dd827882d0896753d5af40dbc5f.json.gz": {
-   "sha256": "bd98cc0d64cd8925787e7eba667d4d37649011434076b6cb7e6940f2a2347d4c",
-   "bytes": 1252
+  ".rb/cache/objects/e3/e3d9ebcd7ac0a1ea22cf8a1d0d976b763c73e12a581312ac9e94c6487b3236cd.json.gz": {
+   "sha256": "35006bbe08e767e87f6ce99a257705cc7dde2e29fd8f0df9350d0e6f32584c58",
+   "bytes": 1286
   },
   ".rb/experiments/e1/criteria/cm.yaml": [
    "rb: 2",
@@ -688,7 +690,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -740,7 +744,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -792,7 +798,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -844,7 +852,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -896,7 +906,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -948,7 +960,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1000,7 +1014,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1052,7 +1068,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1104,7 +1122,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1156,7 +1176,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1208,7 +1230,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1260,7 +1284,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1312,7 +1338,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1364,7 +1392,9 @@
    "    dirty: true",
    "    diff_sha256: 5767cc2b3fb88fd7ac912321c861c762f0f9e2eb0d258d22de0b04e5c3ce1cb8",
    "    untracked: 1",
+   "    captured: after",
    "    tree: ab0a3c85c3469a936bff99e8187415d2d3916a16",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1428,20 +1458,20 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"spec_set\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"80b4e4ccc3f1ceeb0c3ead8dfc9f6774dfdd6378af73fa81f283d7022035e16a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"setting\": \"batch\", \"change\": \"setting batch: new, unknown (per-run)\", \"value\": null, \"status\": \"unknown\", \"required\": true, \"source\": null, \"changed_parts\": {\"e1\": {\"factor:batch\": \"a fixed design factor\", \"setting:batch\": \"per run\", \"source:batch\": null}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"cm\", \"sha256\": \"5114ae1a7cb18be1f7f98198674d3042196e4a6e058bbb3bebd772d9c7026a2e\", \"path\": \".rb/experiments/e1/criteria/cm.yaml\", \"detail\": {\"rule\": \"change.val_loss [where batch=32] as a difference of means = 0.0317 \u00b1 0.00005\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:cm\": \"primary\", \"rule:cm\": \"change.val_loss [where batch=32] as a difference of means = 0.0317 \u00b1 0.00005\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"cr\", \"sha256\": \"4a876039d62409383d4c6ff16314aa92208574092454b41bd0389f155b9493ea\", \"path\": \".rb/experiments/e1/criteria/cr.yaml\", \"detail\": {\"rule\": \"change.val_loss [where batch=64] as a relative change \u2264 3.5%\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:cr\": \"primary\", \"rule:cr\": \"change.val_loss [where batch=64] as a relative change \u2264 3.5%\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"abd6c2eec36b9877a577b071d9f8e55d14ce12fef005d06e294b4307c154cb12\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9612}, \"per_run\": {\"seed\": 1, \"batch\": 32}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"2f2c5be7b2d051c55c105ce917b4120c8b154d5056748c4a8680de20d16cf99b\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9655}, \"per_run\": {\"seed\": 2, \"batch\": 32}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"62210e5314c6975192926a9ab85013d3d17c6af6982521cc7344408ffc5cb6fd\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9701}, \"per_run\": {\"seed\": 3, \"batch\": 32}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runf3hlli\", \"sha256\": \"627837e574b6714a90c86f7f00a32d066f4b2c736d368ba4db5fb90560ad30b7\", \"path\": \".rb/experiments/e1/runs/runf3hlli.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9931}, \"per_run\": {\"seed\": 1, \"batch\": 32}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runedhdx7\", \"sha256\": \"77fe41f926e7c0c960aed35612a3e1668394c0a9cab1281796bbae03afd607cd\", \"path\": \".rb/experiments/e1/runs/runedhdx7.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9978}, \"per_run\": {\"seed\": 2, \"batch\": 32}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runprswmo\", \"sha256\": \"4bbd9cee60b4a3d2b61c95956234a8d83ddb12e364848eb5fc07609484807584\", \"path\": \".rb/experiments/e1/runs/runprswmo.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 1.0003}, \"per_run\": {\"seed\": 3, \"batch\": 32}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run6pqyge\", \"sha256\": \"14719335cab4404639f4d8875786db98d78df87aa061b07c84de72f593a1c68e\", \"path\": \".rb/experiments/e1/runs/run6pqyge.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9899}, \"per_run\": {\"seed\": 4, \"batch\": 32}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run7pjy2o\", \"sha256\": \"feeaec2cfcc9529f09b814a3e95f54696a401dd827882d0896753d5af40dbc5f\", \"path\": \".rb/experiments/e1/runs/run7pjy2o.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9512}, \"per_run\": {\"seed\": 1, \"batch\": 64}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4zuz4h\", \"sha256\": \"2c5cd98b82bce474e93b1675a5a8ebbfbb6bb8d375dc26e7103f0adfd7b46f02\", \"path\": \".rb/experiments/e1/runs/run4zuz4h.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9555}, \"per_run\": {\"seed\": 2, \"batch\": 64}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runeszfgw\", \"sha256\": \"68d2685c7fc81f4ef7a57e18de6b7f969cb5c79baca39dbb297f3c27b0cb8d04\", \"path\": \".rb/experiments/e1/runs/runeszfgw.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9601}, \"per_run\": {\"seed\": 3, \"batch\": 64}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run3rosg3\", \"sha256\": \"eaa6921a1aca43bfdce78cb6fbb69886663ac846dfe90102fc00a2bad7504745\", \"path\": \".rb/experiments/e1/runs/run3rosg3.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9801}, \"per_run\": {\"seed\": 1, \"batch\": 64}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runscsfau\", \"sha256\": \"c4be5db8ccf3e191d9a0933925052007853187c1c4bb34d458be92f363eb459d\", \"path\": \".rb/experiments/e1/runs/runscsfau.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9848}, \"per_run\": {\"seed\": 2, \"batch\": 64}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"rundk5ekt\", \"sha256\": \"8dbeab88cc8679157199360493102829f573b7b0ca6dcb9a837f214bd86308b2\", \"path\": \".rb/experiments/e1/runs/rundk5ekt.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9873}, \"per_run\": {\"seed\": 3, \"batch\": 64}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqscttb\", \"sha256\": \"570f789d67ceeaa8af4d5aa57ada96169a897a6ee43a554701712dad42631b4b\", \"path\": \".rb/experiments/e1/runs/runqscttb.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9769}, \"per_run\": {\"seed\": 4, \"batch\": 64}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"bfae77efd200266a8ddad608846cbf3a1b7d588dbf79f5e38fb01c7ea4c1f5bd\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9612}, \"per_run\": {\"seed\": 1, \"batch\": 32}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"3447475228742854d800bc97446b2d4aaaec3485c22b8440e98db35312a40f43\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9655}, \"per_run\": {\"seed\": 2, \"batch\": 32}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"e3d9ebcd7ac0a1ea22cf8a1d0d976b763c73e12a581312ac9e94c6487b3236cd\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9701}, \"per_run\": {\"seed\": 3, \"batch\": 32}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runf3hlli\", \"sha256\": \"66d685fc903dd642e474c786bf0f0dadfe439ac2e31cf9a18f5f5167d6b1df94\", \"path\": \".rb/experiments/e1/runs/runf3hlli.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9931}, \"per_run\": {\"seed\": 1, \"batch\": 32}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runedhdx7\", \"sha256\": \"088cc54e248453493efcda349de565fd448271dafcf174ce0aa162efe2d19c4b\", \"path\": \".rb/experiments/e1/runs/runedhdx7.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9978}, \"per_run\": {\"seed\": 2, \"batch\": 32}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runprswmo\", \"sha256\": \"5fee787e74d9a66599803ab8dac8b25c6b7bfb986584dc22e2b71f0bb9c26b1f\", \"path\": \".rb/experiments/e1/runs/runprswmo.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 1.0003}, \"per_run\": {\"seed\": 3, \"batch\": 32}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run6pqyge\", \"sha256\": \"c33bb003a8181e06d475e2a8fbcfff174192eeb6ba595c7d06333d7f465e54c2\", \"path\": \".rb/experiments/e1/runs/run6pqyge.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9899}, \"per_run\": {\"seed\": 4, \"batch\": 32}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run7pjy2o\", \"sha256\": \"841a06d034af6165411f99ca97068b579bb02b60214171c55170b534d1f4cc18\", \"path\": \".rb/experiments/e1/runs/run7pjy2o.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9512}, \"per_run\": {\"seed\": 1, \"batch\": 64}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4zuz4h\", \"sha256\": \"740139406cbb25d33ebfe5d5cd4831461679c6f3d6caf23206c01820d0b6f492\", \"path\": \".rb/experiments/e1/runs/run4zuz4h.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9555}, \"per_run\": {\"seed\": 2, \"batch\": 64}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runeszfgw\", \"sha256\": \"c09ba6693aa677e1a6784ebfc845504ecd394265b411cea286e8beffe9f680c6\", \"path\": \".rb/experiments/e1/runs/runeszfgw.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"fp32.val_loss\": 0.9601}, \"per_run\": {\"seed\": 3, \"batch\": 64}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run3rosg3\", \"sha256\": \"b2f363f986501d30b60d1e67a713c558c36d590b1c03af94a7c80bfd4717645d\", \"path\": \".rb/experiments/e1/runs/run3rosg3.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9801}, \"per_run\": {\"seed\": 1, \"batch\": 64}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runscsfau\", \"sha256\": \"a0b24688ace6bfc930afaf9605616226703ba54aeff1051ee294e7b4d7102c48\", \"path\": \".rb/experiments/e1/runs/runscsfau.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9848}, \"per_run\": {\"seed\": 2, \"batch\": 64}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"rundk5ekt\", \"sha256\": \"08d01bdc7c821843500b15fdfe9ae2fc401d604176f7832184367488f446ff23\", \"path\": \".rb/experiments/e1/runs/rundk5ekt.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9873}, \"per_run\": {\"seed\": 3, \"batch\": 64}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqscttb\", \"sha256\": \"c5aed6dc8577245f69ed27697317848a3e61c732686781de76292ce8d3b42001\", \"path\": \".rb/experiments/e1/runs/runqscttb.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"int8.val_loss\": 0.9769}, \"per_run\": {\"seed\": 4, \"batch\": 64}, \"again\": false}}",
    ""
   ],
   ".rb/metrics/val_loss.yaml": [
@@ -1473,8 +1503,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "938c0f8d202e2a14bf9a90ebc351dbcee9bb3a2bdc104974b4337296f679da9a",
-   "bytes": 275956
+   "sha256": "c8522bc44c4e1fdba4f7884094ee3b424459b41575c7e70761fd451200116857",
+   "bytes": 273806
   },
   "said.txt": [
    "grid: FP32 baseline INT8 Difference Batch: 32 0.966 \u00b7 3 seeds 0.995 \u00b7 4 seeds 0.02968 nats higher than FP32 (+0.0205 to +0.03885) Batch: 64 0.956 \u00b7 3 seeds 0.982 \u00b7 4 seeds 0.027 nats higher than FP32",

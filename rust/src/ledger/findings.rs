@@ -246,6 +246,10 @@ fn fetch_whole() -> String {
 
 impl Ledger {
     pub fn metric_aliases(&self) -> Res<Aliases> {
+        self.read_as(|r| r.aliases(), || self.metric_aliases_now())
+    }
+
+    fn metric_aliases_now(&self) -> Res<Aliases> {
         let idx = self.where_()?;
         if let Some((i, a)) = self.aliases_cache.borrow().as_ref() {
             if Rc::ptr_eq(i, &idx) {
@@ -262,6 +266,30 @@ impl Ledger {
         let rc = Rc::new(out);
         *self.aliases_cache.borrow_mut() = Some((idx, rc.clone()));
         Ok(rc)
+    }
+
+    /// The integrity problem of a finding that rests on records git took out (B1), naming them, in E1's words.
+    pub(crate) fn taken_problem(&self, taken: &[Key]) -> Res<Caveat> {
+        let t = self.taken_out()?;
+        let ids: Vec<String> = taken.iter().map(|k| k.1.clone()).collect();
+        let kind = if taken.iter().all(|k| k.0 == taken[0].0) { taken[0].0.as_str() } else { "record" };
+        // a record still on disk, of which git took out a write (a reword, an exposure, a spec set), is named by it
+        let idx = self.where_()?;
+        let on_disk = taken.iter().all(|k| idx.contains_key(k));
+        let plural = |k: &str| if k == "analysis" { "analyses".to_string() } else { format!("{k}s") };
+        let what = match (kind, taken.len(), on_disk) {
+            (k, 1, true) => format!("1 write to {} {k}", if k.starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" }),
+            (k, n, true) => format!("writes to {n} {}", plural(k)),
+            (k, 1, false) => format!("1 {k}"),
+            (k, n, false) => format!("{n} {}", plural(k)),
+        };
+        let [_, were, are, them] = crate::shell::strings::took_fill(taken.len());
+        let named = crate::assess::first_few(&ids, RUNS_NAMED, ", ");
+        let text = match t.pop() {
+            Some(stash) => crate::shell::strings::evidence("took_finding_pop", &[("what", what), ("are", are), ("ids", named), ("stash", stash.to_string()), ("them", them)]),
+            None => crate::shell::strings::evidence("took_finding", &[("what", what), ("were", were), ("ids", named), ("them", them)]),
+        };
+        Ok(Caveat::problem("taken_out_by_git", &ids[0], text))
     }
 
     /// The problem of a run or analysis an analysis rests on that is not what rb last wrote (`how` it rests on it).
@@ -376,6 +404,10 @@ impl Ledger {
     /// A setting's status as this read finds it: one verified from a line no commit before a past run held reads
     /// provisional, as its note says (source_postdates_run); every other as it is kept.
     pub fn status_read(&self, exp: &Experiment, name: &str, s: &Setting) -> Res<String> {
+        // N2 (f13i): a call on it git took a write of out of the record leaves its status undetermined until put back
+        if self.taken_under("setting", &format!("{}/{name}", exp.id))?.iter().any(|k| k.0 == "decision") {
+            return Ok(super::UNDETERMINED_STATE.into());
+        }
         Ok(if s.status == "verified" && !s.per_run && self.setting_postdates(exp, name, s, None)?.is_some() { "provisional".into() } else { s.status.clone() })
     }
 
@@ -466,7 +498,12 @@ impl Ledger {
                     continue;
                 }
             }
-            if s.status == "provisional" {
+            let took_call: Vec<super::Key> = self.taken_under("setting", &subject)?.into_iter().filter(|k| k.0 == "decision").collect();
+            if s.status == "provisional" && !took_call.is_empty() {
+                // N2 (f13i): a call on it git took a write of out reads as neither made nor never made
+                let said = self.took_part("a call on it", &took_call)?;
+                out.push(Caveat::note("provisional", &subject, format!("{name} = {}: {said}", show(&s.value))));
+            } else if s.status == "provisional" {
                 if let Some(v) = &vouch {
                     out.push(Caveat::note("vouched", &subject, format!("{name} = {} is provisional · vouched for{} ({})", show(&s.value), actor::by_writer(&v.by), v.id)));
                 } else {
@@ -577,6 +614,8 @@ impl Ledger {
             }
         }
         let live = self.live::<Analysis>()?;
+        // which analysis supersedes which, in any experiment (kept.rs Reads)
+        self.note_read(|r| r.superseders());
         let replaced: HashSet<&String> = live.iter().flat_map(|a| a.supersedes.iter()).collect();
         let mut out = Vec::new();
         let mut seen: HashSet<(String, String, String, String)> = HashSet::new();
@@ -1608,6 +1647,10 @@ impl Ledger {
 
     /// Every time a dataset's contents were looked at: its exposures, and every run that evaluated on it.
     pub fn exposures_of(&self, res: &Resource) -> Res<Vec<Dict>> {
+        self.read_as(|r| r.eval_on(&res.id), || self.exposures_now(res))
+    }
+
+    fn exposures_now(&self, res: &Resource) -> Res<Vec<Dict>> {
         let mut out: Vec<Dict> = res
             .exposures
             .iter()
@@ -1701,7 +1744,28 @@ impl Ledger {
         Ok(out)
     }
 
-    fn finding_now(&self, crit: &Criterion) -> Res<Finding> {
+    /// A finding worked out now. Where git took records out, the reading is traced, and read again resting on the
+    /// records git took out of what it read (taken_for), so the two cannot drift.
+    pub(crate) fn finding_now(&self, crit: &Criterion) -> Res<Finding> {
+        if self.taken_out()?.is_empty() {
+            return self.finding_read(crit, &[]);
+        }
+        // the criterion it is given is read as the reading loads the rest
+        let (first, reads) = self.traced(|| {
+            self.note_read(|r| r.key("criterion", &crit.id));
+            self.finding_read(crit, &[])
+        });
+        let first = first?;
+        let taken = self.taken_for(&crit.experiment, &reads)?;
+        self.finding_took.borrow_mut().insert(crit.id.clone(), taken.clone());
+        if taken.is_empty() {
+            return Ok(first);
+        }
+        // traced too, so its reads are its own and never a reading's around it
+        self.traced(|| self.finding_read(crit, &taken)).0
+    }
+
+    fn finding_read(&self, crit: &Criterion, taken: &[Key]) -> Res<Finding> {
         let exp: Experiment = self.load(&crit.experiment)?;
         let (subject, reference, metric, arm_problem) = self.arms(&exp, crit)?;
         let catalogue = self.catalogue_entry(&metric)?;
@@ -1766,6 +1830,11 @@ impl Ledger {
             } else {
                 Caveat::problem("edited_outside_rb", &d.id, format!("{why}: it is not read as anyone's call until restored or adopted"))
             });
+        }
+        // what git took out that this finding rests on (B1): rb kept it, and the finding is not read on what is left
+        let taken: Vec<Key> = taken.to_vec();
+        if !taken.is_empty() {
+            problems.push(self.taken_problem(&taken)?);
         }
         if let Some(src) = &crit.source {
             if src.resolved.is_none() {
@@ -1869,6 +1938,7 @@ impl Ledger {
             _ => None,
         };
         if let Some(why) = own_reading.filter(|_| !readings.is_empty()) {
+            self.note_read(|r| r.superseders());
             let replaced: HashSet<String> = self.live::<Analysis>()?.iter().flat_map(|a| a.supersedes.iter().cloned()).collect();
             for (rd, a) in readings.iter().filter(|(_, a)| a.retracted.is_none() && !replaced.contains(&a.id)) {
                 notes.push(Caveat::note(
@@ -1923,6 +1993,7 @@ impl Ledger {
         let mut unread_cut: Vec<String> = Vec::new();
         let mut superseded_by: IndexMap<String, Analysis> = IndexMap::new();
         if !readings.is_empty() {
+            self.note_read(|r| r.superseders());
             for a in self.live::<Analysis>()? {
                 for old in &a.supersedes {
                     superseded_by.entry(old.clone()).or_insert_with(|| a.clone());
@@ -2222,6 +2293,28 @@ impl Ledger {
             if !dirty.is_empty() {
                 notes.push(Caveat::note("uncommitted_code", &crit.id, crate::assess::first_few(&dirty, RUNS_NAMED, "; ")));
             }
+            // a file a counted run named that changed or went since (E5): a problem where this checkout held the bytes
+            // and rb holds no copy, else a note that says where a copy is, or that it is not in this clone; the
+            // recorded number stays the reading's
+            let mut counted_ids: Vec<String> = Vec::new();
+            for o in rr_.counted.iter().filter(read) {
+                if !counted_ids.contains(&o.run) {
+                    counted_ids.push(o.run.clone());
+                }
+            }
+            let (file_problems, file_notes) = self.file_caveats(&counted_ids);
+            // the table's sentences end without a period here, as every problem's and note's text does
+            for (rid, said) in file_problems {
+                problems.push(Caveat::problem("evidence_file_changed", &rid, said.trim_end_matches('.')));
+            }
+            if !file_notes.is_empty() {
+                let said: Vec<String> = file_notes.into_iter().map(|(_, s)| s.trim_end_matches('.').to_string()).collect();
+                notes.push(Caveat::note("evidence_file_note", &crit.id, crate::assess::first_few(&said, RUNS_NAMED, "; ")));
+            }
+            let run_notes = self.run_caveats(&counted_ids);
+            if !run_notes.is_empty() {
+                notes.push(Caveat::note("evidence_run_note", &crit.id, crate::assess::first_few(&run_notes, RUNS_NAMED, "; ")));
+            }
         }
         // the axes
         let eq_margin = if crit.comparator == "equivalent" { crit.margin } else { None };
@@ -2274,6 +2367,19 @@ impl Ledger {
             }
             why_rule = said.join("; ");
         }
+        if !taken.is_empty() {
+            outcome = "undetermined".into();
+            // a record still on disk is named by the write git took out of it (S2: an exposure is no run)
+            let idx = self.where_()?;
+            let ids: Vec<String> = taken.iter().map(|k| if idx.contains_key(k) { format!("a write to {}", k.1) } else { k.1.clone() }).collect();
+            let ids = crate::assess::first_few(&ids, RUNS_NAMED, ", ");
+            // where a reading remains, part of it was taken out (S2); in a stash, said as the integrity line says it
+            let part = if current.is_some() { "part of its evidence" } else { "its evidence" }.to_string();
+            why_rule = match self.taken_out()?.pop() {
+                Some(stash) => crate::shell::strings::evidence("took_rule_pop", &[("part", part), ("ids", ids), ("stash", stash.to_string())]),
+                None => crate::shell::strings::evidence("took_rule", &[("part", part), ("ids", ids)]),
+            };
+        }
         if reads_number && !cited_differs.is_empty() && (outcome == "meets" || outcome == "misses") {
             outcome = "undetermined".into();
             why_rule = format!("not comparable: {}", cited_differs.iter().map(|c| c.text.clone()).collect::<Vec<_>>().join("; "));
@@ -2313,6 +2419,9 @@ impl Ledger {
                     unread_shallow.join(", ")
                 ),
             }
+        } else if current.is_none() && taken.iter().any(|k| k.0 == "run" || k.0 == "analysis") {
+            // S-d: rb keeps the evidence git took out, so there is evidence, and it is not read until it is put back
+            crate::shell::strings::evidence("took_timing", &[])
         } else {
             "no evidence recorded yet".to_string()
         };
@@ -2426,6 +2535,12 @@ impl Ledger {
                     timing_why = format!("{timing_why}; {}", came_first(&exp, &reference));
                 }
             }
+        }
+        // S1 (MP-1110-2303): what the timing reads (runs, analyses, the resources whose exposures it reads) taken out,
+        // it cannot say the rule came before them
+        if timing == "before" && taken.iter().any(|k| matches!(k.0.as_str(), "run" | "analysis" | "resource")) {
+            timing = "unknown".into();
+            timing_why = crate::shell::strings::evidence("took_timing_unknown", &[]);
         }
         // units
         let population = exp
@@ -2543,6 +2658,18 @@ impl Ledger {
         }
         let notes = grouped(unique(notes.into_iter().filter(|c| !c.problem).collect()));
         let mut says = self.says(crit, current.as_ref(), result, &outcome, &why_rule, &timing, &timing_why, &declared, &units, &problems, review.as_ref(), &history, &metric_unit, prospective.as_ref(), &direction);
+        // S4 (MP-1110-2303): with every run git took out, its result is that, never "untested" (the code stays)
+        if current.is_none() && taken.iter().any(|k| k.0 == "run" || k.0 == "analysis") {
+            let rule_w = assess::rule_said(crit, &outcome, None);
+            says.insert("headline".into(), format!("{rule_w} \u{b7} {}", crate::shell::strings::evidence("took_result", &[])));
+            says.insert("result".into(), crate::shell::strings::evidence("took_timing", &[]));
+        }
+        // the later of MP-1111-0219: a reading with no direction because git took its metric's entry out says so
+        if matches!(result, "higher" | "lower") {
+            if let Some(m) = taken.iter().find(|k| k.0 == "metric") {
+                says.insert("result".into(), crate::shell::strings::evidence("took_direction", &[("result", result.to_string()), ("metric", m.1.clone())]));
+            }
+        }
         if let Some(h) = says.get_mut("headline") {
             for (name, values, missed) in &pooled {
                 h.push_str(&format!(" · pooled over {} {name} values", values.len()));
@@ -2563,6 +2690,17 @@ impl Ledger {
         f.review = review;
         f.history = history;
         f.prospective = prospective;
+        // what the reading's runs rest on, in one line (E5): recorded, intact, here and rerun kept apart
+        let mut counted_runs: Vec<String> = Vec::new();
+        for o in observations.iter().filter(|o| o.counted) {
+            if !counted_runs.contains(&o.run) {
+                counted_runs.push(o.run.clone());
+            }
+        }
+        let taken_runs = taken.iter().filter(|k| k.0 == "run").count();
+        if let Some(line) = self.finding_evidence(&counted_runs, taken_runs) {
+            says.insert("evidence".into(), line);
+        }
         f.observations = observations;
         f.caveats = notes;
         f.says = says;

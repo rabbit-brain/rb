@@ -158,6 +158,9 @@ pub struct NewRun {
     pub table_row: Option<Dict>,
     /// an SDK run block recorded it as the block ended: rb saw the numbers made then
     pub block: bool,
+    /// the code an SDK run block started with (journal::code_at_start, kept whole): the run's code, captured at its
+    /// start (E2), where no rb journal run entry matches the run and no --tree or --commit is given
+    pub start: Option<Dict>,
 }
 
 /// The row of a SQLite database a run is read from (`rb run add --from <database> --table --where`): what the receipt
@@ -270,6 +273,7 @@ impl Default for NewRun {
             row: None,
             table_row: None,
             block: false,
+            start: None,
         }
     }
 }
@@ -1745,12 +1749,14 @@ impl Ledger {
 
     /// The catalogue's metric for a name or one of its aliases, or None.
     pub fn catalogue_entry(&self, name: &str) -> Res<Option<Metric>> {
-        for m in self.live::<Metric>()? {
-            if name == m.id || m.aliases.iter().any(|a| a == name) {
-                return Ok(Some(m));
+        self.read_as(|r| r.metric(name), || {
+            for m in self.live::<Metric>()? {
+                if kept::metric_names(&m.id, &m.aliases, name) {
+                    return Ok(Some(m));
+                }
             }
-        }
-        Ok(None)
+            Ok(None)
+        })
     }
 
     // ------------------------------------------------------------ runs
@@ -2010,15 +2016,77 @@ impl Ledger {
                 };
                 let database = a.row.as_ref().map(|row| crate::sys::typed(&row.path));
                 let (produced, produced_basis, existed) = self.produced(a.produced_at.as_deref(), &refs, &from, &earlier, database.as_deref())?;
-                let mut produced_v = if a.commit.as_ref().map_or(false, |c| !c.is_empty()) || a.tree.as_ref().map_or(false, |t| !t.is_empty()) {
-                    let mut p = crate::dict! {"commit" => a.commit.clone()};
-                    if let Some(t) = a.tree.as_ref().filter(|t| !t.is_empty()) {
-                        p.insert("tree".into(), Value::Str(t.clone()));
+                // the code the run names (E2): the code of the rb journal run entry it matches, captured when the command
+                // started, however it reached here (reconcile's proposal passes it as --tree and --commit); any other
+                // --tree or --commit is given, a tree checked and pinned as rb pins its own
+                let metrics_now: Dict = values.clone().into_iter().collect();
+                let matched = self.journal_match(a.command.as_deref(), &refs, &metrics_now);
+                let start = matched.as_ref().and_then(|e| e.get("code").and_then(Value::as_dict).filter(|c| c.get_str("commit").is_some()).cloned());
+                let given_tree = a.tree.as_ref().filter(|t| !t.is_empty()).cloned();
+                let given_commit = a.commit.as_ref().filter(|c| !c.is_empty()).cloned();
+                let is_start = |c: &Dict| match (&given_tree, &given_commit) {
+                    (Some(t), _) => c.get_str("tree") == Some(t.as_str()),
+                    (None, Some(k)) => c.get_str("tree").is_none() && c.get_str("commit").map_or(false, |h| h.starts_with(k.as_str()) || k.starts_with(h)),
+                    (None, None) => true,
+                };
+                let mut produced_v = match (&start, given_tree.is_some() || given_commit.is_some()) {
+                    (Some(c), _) if is_start(c) => {
+                        let mut p = crate::dict! {"commit" => c.get("commit").cloned().unwrap_or(Value::Null)};
+                        if let Some(t) = c.get("tree").filter(|t| t.truthy()) {
+                            p.insert("tree".into(), t.clone());
+                            p.insert("dirty".into(), Value::Bool(true));
+                        }
+                        p.insert("from".into(), Value::Str(if given_tree.is_some() || given_commit.is_some() { "flag" } else { "journal" }.into()));
+                        p.insert("captured".into(), Value::Str("start".into()));
+                        p.insert("kept".into(), Value::Str("whole".into()));
+                        if let Some(e) = &matched {
+                            p.insert("command".into(), e.get("command").cloned().unwrap_or(Value::Null));
+                            p.insert("ran_at".into(), e.get("at").cloned().unwrap_or(Value::Null));
+                        }
+                        p
                     }
-                    p.insert("from".into(), Value::Str("flag".into()));
-                    p
-                } else {
-                    crate::dict! {"commit" => Value::Null, "from" => "unknown"}
+                    (_, true) => {
+                        let mut p = crate::dict! {"commit" => given_commit.clone()};
+                        if let Some(t) = &given_tree {
+                            p.insert("tree".into(), Value::Str(t.clone()));
+                            // a given tree this repository has is pinned as rb pins its own; one it lacks is recorded as given
+                            if !crate::dry::active() && !sources::pin_tree(&self.here, t) {
+                                p.insert("here".into(), Value::Bool(false));
+                            }
+                        }
+                        p.insert("from".into(), Value::Str("flag".into()));
+                        p.insert("captured".into(), Value::Str("given".into()));
+                        p
+                    }
+                    // an SDK run block's start (E2): the code it started with, kept whole
+                    (_, false) if a.start.as_ref().map_or(false, |c| c.get_str("commit").is_some()) => {
+                        let c = a.start.as_ref().expect("a start");
+                        let mut p = crate::dict! {"commit" => c.get("commit").cloned().unwrap_or(Value::Null)};
+                        if let Some(t) = c.get("tree").filter(|t| t.truthy()) {
+                            p.insert("tree".into(), t.clone());
+                            p.insert("dirty".into(), Value::Bool(true));
+                        }
+                        // pinned now, as the run is recorded: the block's start made no ref, so one that raised left none
+                        if !crate::dry::active() {
+                            match (c.get_str("tree").filter(|t| !t.is_empty()), c.get_str("commit")) {
+                                (Some(t), _) => {
+                                    sources::pin_tree(&self.here, t);
+                                }
+                                (None, Some(commit)) => {
+                                    sources::keep_tree(&self.here, commit);
+                                }
+                                _ => {}
+                            }
+                        }
+                        p.insert("from".into(), Value::Str("sdk".into()));
+                        p.insert("captured".into(), Value::Str("start".into()));
+                        p.insert("kept".into(), Value::Str("whole".into()));
+                        if let Some(at) = c.get("at").filter(|v| v.truthy()) {
+                            p.insert("ran_at".into(), at.clone());
+                        }
+                        p
+                    }
+                    _ => crate::dict! {"commit" => Value::Null, "from" => "unknown"},
                 };
                 if let Some((at, by)) = existed {
                     produced_v.insert("existed".into(), crate::obj! {"at" => at, "by" => by});
@@ -2542,20 +2610,38 @@ impl Ledger {
         commits.dedup();
         let trees: Vec<String> = attached.iter().map(|a| get(a, "tree")).filter(|v| v.truthy()).map(|v| pyjson::py_str(&v)).collect();
         if commits.is_empty() && trees.is_empty() {
+            // a capture git could not make says why, never "outside git" (E3)
+            let mut nones: Vec<String> = attached.iter().filter_map(|a| crate::capture::Capture::of(a, crate::capture::When::After).none_why()).collect();
+            nones.sort();
+            nones.dedup();
+            if !nones.is_empty() {
+                let runs = attached.iter().filter(|a| crate::capture::Capture::of(a, crate::capture::When::After).none_why().is_some()).count();
+                let runs = if runs == 1 { "1 run".to_string() } else { format!("{runs} runs") };
+                let detail = crate::shell::strings::evidence("row_none", &[("runs", runs), ("why", nones.join("; "))]);
+                return crate::dict! {"what" => "code", "state" => "missing", "detail" => detail};
+            }
             return crate::dict! {"what" => "code", "state" => "missing", "detail" => "no commit recorded: the runs were recorded outside git or before the first commit"};
         }
         let has = |obj: &str, kind: &str| sources::git(&self.root, &["cat-file", "-e", &format!("{obj}^{{{kind}}}")]).is_some();
         let present: HashMap<String, bool> = commits.iter().map(|c| (c.clone(), has(c, "commit"))).collect();
-        let mut kept: HashMap<String, bool> = HashMap::new();
+        // a tree is in this repository, and kept there only while a ref keeps it (E3): git gc may remove one with none
+        let mut kept: HashMap<String, crate::capture::Here> = HashMap::new();
         for t in &trees {
             if !kept.contains_key(t) {
-                kept.insert(t.clone(), has(t, "tree"));
+                kept.insert(t.clone(), crate::capture::tree_here(&self.root, t));
             }
         }
-        let tree_kept = |a: &Dict| get(a, "tree").truthy() && kept.get(&pyjson::py_str(&get(a, "tree"))).copied().unwrap_or(false);
+        let tree_at = |a: &Dict| kept.get(&pyjson::py_str(&get(a, "tree"))).copied().unwrap_or(crate::capture::Here::Absent);
+        let tree_kept = |a: &Dict| get(a, "tree").truthy() && tree_at(a) != crate::capture::Here::Absent;
+        // one no ref keeps, where a clean run's commit is not here to give it again
+        let unreffed = |a: &Dict| {
+            let c = get(a, "commit");
+            get(a, "tree").truthy() && tree_at(a) == crate::capture::Here::Unreffed && !(c.truthy() && !get(a, "dirty").truthy() && present.get(&pyjson::py_str(&c)).copied().unwrap_or(false))
+        };
         let here = |a: &Dict| -> bool {
+            // a tree kept with files left out is part of the run's code, kept: here, and said as part (E3)
             if get(a, "tree").truthy() {
-                return tree_kept(a) && !get(a, "left_out").truthy();
+                return tree_kept(a);
             }
             let c = get(a, "commit");
             c.truthy() && !get(a, "dirty").truthy() && present.get(&pyjson::py_str(&c)).copied().unwrap_or(false)
@@ -2566,27 +2652,69 @@ impl Ledger {
             .filter(|c| !present[*c] && !attached.iter().filter(|a| get(a, "commit").as_str() == Some(c.as_str())).all(|a| here(a)))
             .collect();
         let snapshots = attached.iter().any(|a| get(a, "dirty").truthy() && tree_kept(a));
-        let lost = attached.iter().any(|a| get(a, "dirty").truthy() && !tree_kept(a));
-        let left_out = attached.iter().any(|a| get(a, "left_out").truthy());
+        let caps: Vec<crate::capture::Capture> = attached.iter().map(|a| crate::capture::Capture::of(a, crate::capture::When::After)).collect();
+        // a tree recorded and not here was kept in the clone that recorded the run (E4); none recorded was never kept
+        let missing: Vec<&Dict> = attached.iter().filter(|a| get(a, "dirty").truthy() && get(a, "tree").truthy() && !tree_kept(a)).collect();
+        // one this clone recorded is gone from it, never kept "in the clone that recorded it" (S-c)
+        let (gone, away): (Vec<&Dict>, Vec<&Dict>) = missing.into_iter().partition(|a| a.get_str("_run").map_or(false, |r| super::evidence::recorded_in(&self.root, r)));
+        let lost = attached.iter().any(|a| get(a, "dirty").truthy() && !get(a, "tree").truthy());
+        let parts: Vec<String> = caps.iter().filter_map(|c| c.part_what(true)).collect(); // counts and reasons: pages read this row too
+        let mut nones: Vec<String> = caps.iter().filter_map(|c| c.none_why()).collect();
+        nones.sort();
+        nones.dedup();
         let short = |c: &str| truncate(c, 12);
+        // each commit named once (S3): those here first, then those not here, which the line's next part says
+        let here_commits: Vec<String> = commits.iter().filter(|c| !absent.contains(c)).map(|c| short(c)).collect();
+        let absent_commits: Vec<String> = absent.iter().map(|c| short(c)).collect();
         let mut detail = if commits.is_empty() {
             "no commit".to_string()
-        } else {
+        } else if absent.is_empty() || here_commits.is_empty() {
             format!("commit {}", crate::assess::first_three(&commits.iter().map(|c| short(c)).collect::<Vec<_>>(), ", "))
+        } else {
+            format!("commit {} · commit {}", crate::assess::first_three(&here_commits, ", "), crate::assess::first_three(&absent_commits, ", "))
         };
         if !absent.is_empty() {
-            detail.push_str(&format!(" · not in this repository: {} (get the code repository to rerun)", crate::assess::first_three(&absent.iter().map(|c| short(c)).collect::<Vec<_>>(), ", ")));
+            // the commits not here are the line's last named: said once (item 5, S3)
+            detail.push_str(" · not in this repository (get the code repository to rerun)");
         }
         if snapshots {
             detail.push_str(" · changes outside the record not committed, kept as git trees");
         }
         if lost {
-            detail.push_str(" · changes outside the record not committed when a run was recorded, not kept");
+            let runs = attached.iter().filter(|a| get(a, "dirty").truthy() && !get(a, "tree").truthy()).count();
+            let runs = if runs == 1 { "1 run".to_string() } else { format!("{runs} runs") };
+            let why = if nones.is_empty() { crate::shell::strings::evidence("why_not_kept", &[]) } else { nones.join("; ") };
+            detail.push_str(&format!(" · {}", crate::shell::strings::evidence("row_none", &[("runs", runs), ("why", why)])));
         }
-        if left_out {
-            detail.push_str(" · files left out of a snapshot (over 10 MB, or too many)");
+        if !gone.is_empty() {
+            let runs = if gone.len() == 1 { "1 run".to_string() } else { format!("{} runs", gone.len()) };
+            let mut ts: Vec<String> = gone.iter().map(|a| short(&pyjson::py_str(&get(a, "tree")))).collect();
+            ts.sort();
+            ts.dedup();
+            detail.push_str(&format!(" · {}", crate::shell::strings::evidence("row_gone", &[("runs", runs), ("tree", crate::assess::first_three(&ts, ", "))])));
         }
-        let state = if n == attached.len() { "ok" } else if n == 0 { "missing" } else { "partial" };
+        if !away.is_empty() {
+            let runs = if away.len() == 1 { "1 run".to_string() } else { format!("{} runs", away.len()) };
+            let mut ts: Vec<String> = away.iter().map(|a| short(&pyjson::py_str(&get(a, "tree")))).collect();
+            ts.sort();
+            ts.dedup();
+            detail.push_str(&format!(" · {}", crate::shell::strings::evidence("row_not_here", &[("runs", runs), ("tree", crate::assess::first_three(&ts, ", "))])));
+        }
+        let mut parts = parts;
+        parts.sort();
+        parts.dedup();
+        for p in parts.iter().take(3) {
+            detail.push_str(&format!(" · {p}"));
+        }
+        let mut loose: Vec<String> = attached.iter().filter(|a| unreffed(a)).map(|a| short(&pyjson::py_str(&get(a, "tree")))).collect();
+        loose.sort();
+        loose.dedup();
+        for t in loose.iter().take(3) {
+            detail.push_str(&format!(" · {}", crate::shell::strings::evidence("unreffed", &[("tree", t.clone())]).trim_end_matches('.')));
+        }
+        // part of a run's code kept is kept, and never its whole code: partial, never ok; a tree no ref keeps neither
+        let whole = n - caps.iter().zip(attached).filter(|(c, a)| here(a) && (c.kept == crate::capture::Kept::Part || unreffed(a))).count();
+        let state = if whole == attached.len() { "ok" } else if n == 0 { "missing" } else { "partial" };
         crate::dict! {"what" => "code", "state" => state, "detail" => detail}
     }
 
@@ -2622,7 +2750,8 @@ impl Ledger {
         let code: Vec<Dict> = runs
             .iter()
             .zip(&before)
-            .filter_map(|(r, b)| if *b { Some(named(r)).filter(|c| !c.is_empty()) } else { Some(r.receipt.attached.clone().unwrap_or_default()) })
+            // a --commit or --tree this repository lacks is the run's code, and not here (B2), as a page's Reproduce reads it
+            .filter_map(|(r, b)| if *b || crate::capture::given_absent(&self.root, r) { Some(named(r)).filter(|c| !c.is_empty()) } else { Some(r.receipt.attached.clone().unwrap_or_default()) }.map(|c| with_run(c, &r.id)))
             .collect();
         let envs: Vec<&Dict> = runs.iter().zip(&before).filter(|(r, b)| !**b && !r.receipt.environment.is_empty()).map(|(r, _)| &r.receipt.environment).collect();
         let n = runs.len();
@@ -2732,6 +2861,12 @@ impl Ledger {
             if let Some(rt) = &res.retracted {
                 state = "missing";
                 detail = format!("{label}: retracted ({})", rt.why);
+            }
+            // N1 (f13i): a resource git took a write of out of the record reads as rb cannot tell, as reproduce.rs's
+            // readiness reads it, until it is put back
+            if let Some(mark) = self.took_mark("resource", &res.id)? {
+                state = "unknown";
+                detail = format!("{label}: {mark}");
             }
             let read: std::collections::BTreeSet<String> = uses.iter().filter_map(|u| u.sha256.clone().filter(|s| !s.is_empty())).collect();
             let here = av.get("locations").and_then(|l| l.as_list()).and_then(|l| {
@@ -3100,6 +3235,11 @@ impl Ledger {
             if self.outside_rb("decision", id)? {
                 return Err(RBError::msg_fix("E_STATE_EDITED", format!("{id} was changed outside rb, and a decision rb did not write is nobody's call."), "rb doctor"));
             }
+            // MP-1111-0616's L-a: a confirmation git took out comes back with rb doctor --restore; a second one now
+            // would leave two
+            if self.taken_confirms()?.contains(id) {
+                return Err(self.taken_confirm_refusal(id));
+            }
             let a = self.authority(id)?.ok_or_else(|| RBError::msg("E_OBJECT_NOT_FOUND", format!("No decision {} in this project.", repr_str(id))))?;
             if let Some(by) = &a.confirmed_by {
                 return Err(RBError::msg("E_OBJECT_INVALID", format!("{id} was confirmed already, as {by}.")));
@@ -3117,7 +3257,13 @@ impl Ledger {
     pub fn pending_gates(&self) -> Res<Vec<Experiment>> {
         // the design says whether a part of the gate waits: a session's gate that puts back the user's waits nowhere
         let designs = self.designs()?;
-        Ok(self.live::<Experiment>()?.into_iter().filter(|e| !(e.if_holds.is_empty() && e.if_not.is_empty()) && designs.get(&e.id).map_or(false, |d| d.gate_waits())).collect())
+        // nor one whose design's confirmation git took out (N3): rb doctor --restore puts that back
+        let taken = self.taken_design_confirms()?;
+        Ok(self
+            .live::<Experiment>()?
+            .into_iter()
+            .filter(|e| !taken.contains(&e.id) && !(e.if_holds.is_empty() && e.if_not.is_empty()) && designs.get(&e.id).map_or(false, |d| d.gate_waits()))
+            .collect())
     }
 
     /// The user's confirmation of the gate a session set on an experiment: one log line, the gate and its words as they
@@ -3376,6 +3522,10 @@ impl Ledger {
     /// a call that waits for a confirmation, which changes nothing. A call recorded as made earlier (--past) comes
     /// before every call recorded as made when it was recorded.
     pub fn decisions_on(&self, subject: &str) -> Res<Vec<Decision>> {
+        self.read_as(|r| r.subject(subject), || self.decisions_on_now(subject))
+    }
+
+    fn decisions_on_now(&self, subject: &str) -> Res<Vec<Decision>> {
         let auth = self.authorities()?;
         let mut out = Vec::new();
         for d in self.all::<Decision>()?.iter() {
@@ -3395,13 +3545,21 @@ impl Ledger {
     /// Decisions a finding reads that are not what rb wrote.
     pub fn decisions_outside_of(&self, criterion_id: &str, experiment_id: &str) -> Res<Vec<Decision>> {
         let prefix = format!("{experiment_id}/");
-        let mut out = Vec::new();
-        for d in self.all::<Decision>()?.iter() {
-            if (d.subject == criterion_id || d.subject.starts_with(&prefix)) && self.outside_rb("decision", &d.id)? {
-                out.push(d.clone());
-            }
-        }
-        Ok(out)
+        self.read_as(
+            |r| {
+                r.subject(criterion_id);
+                r.subject_prefix(&prefix);
+            },
+            || {
+                let mut out = Vec::new();
+                for d in self.all::<Decision>()?.iter() {
+                    if (d.subject == criterion_id || d.subject.starts_with(&prefix)) && self.outside_rb("decision", &d.id)? {
+                        out.push(d.clone());
+                    }
+                }
+                Ok(out)
+            },
+        )
     }
 
     /// The rulings on a subject: its accept, reject and investigate decisions.
@@ -3410,7 +3568,14 @@ impl Ledger {
     }
 
     /// An accept on e1/lr (a vouch for its value), still standing for the value the setting has now.
+    /// A vouch that rests on a call git took a write of out of the record vouches for nothing until it is put back (the
+    /// f13h review): the value reads as not vouched, never as vouched by a call rb cannot read.
     pub fn vouch(&self, exp: &Experiment, name: &str, s: &Setting) -> Res<Option<Decision>> {
+        let (v, took) = self.traced_calls(|| self.vouch_now(exp, name, s))?;
+        Ok(if took.is_empty() { v } else { None })
+    }
+
+    fn vouch_now(&self, exp: &Experiment, name: &str, s: &Setting) -> Res<Option<Decision>> {
         for d in self.rulings_on(&format!("{}/{name}", exp.id))?.into_iter().rev() {
             if d.action == "accept" {
                 return Ok(if !d.value.is_null() && !s.value.is_null() && same_value(&d.value, &s.value) { Some(d) } else { None });
@@ -3811,4 +3976,11 @@ impl Ledger {
             .collect();
         Ok(!keys.iter().any(|k| as_given.contains(&canon(k, exp, &aliases))))
     }
+}
+
+/// A run's code, as code_row reads it, with the run it is of (`_run`), so a tree it kept that git lacks reads as gone in
+/// the clone that recorded the run (S-c). Never written: the row says only what it reads from it.
+pub fn with_run(mut code: Dict, run: &str) -> Dict {
+    code.insert("_run".into(), Value::Str(run.to_string()));
+    code
 }

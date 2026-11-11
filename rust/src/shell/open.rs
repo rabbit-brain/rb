@@ -470,7 +470,7 @@ mod tests {
         let sha = "9fa4f89a1b2c3d4e5f60718293a4b5c6d7e8f901";
         let mut c = Checkout {
             state: State::Committed, commit: Some(sha.into()), branch: Some("main".into()), on_branch: true, folder: "int8-resnet50".into(),
-            record_files_not_committed: 0, record_files_ignored: 0, ignored_by: None, more_rules: 0, record_held: None, changes_outside_record: false,
+            record_files_not_committed: 0, record_files_ignored: 0, ignored_by: None, ignored_by_file: None, more_rules: 0, record_held: None, changes_outside_record: false,
             why: None, timed_out: false, root: Default::default(), top: None, rb_dir: ".rb".into(), not_committed_names: Vec::new(),
             ignored_names: Vec::new(), listed: Vec::new(),
         };

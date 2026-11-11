@@ -1,5 +1,5 @@
 {
- "contract": "rb-shell-view/1.16",
+ "contract": "rb-shell-view/1.18",
  "surface": "page",
  "tier": "owner",
  "rb_version": "0.6.0",
@@ -64,6 +64,7 @@
   "uncited": 1,
   "uncited_line": "1 changed file nothing in the record cites: configs/calib.yaml, changed since 3f2a9c1.",
   "uncited_short": "1 changed file nothing cites",
+  "taken_out": "",
   "found": [
    {
     "request_id": "f7q2",
@@ -997,6 +998,7 @@
    "observed_short": "",
    "observed_places": [],
    "other_code": "",
+   "timing": "before",
    "witness": {
     "total": 3,
     "afterwards": 0
@@ -1161,6 +1163,7 @@
    "observed_short": "",
    "observed_places": [],
    "other_code": "",
+   "timing": "after_evidence",
    "witness": {
     "total": 3,
     "afterwards": 0
@@ -1322,6 +1325,7 @@
    "observed_short": "",
    "observed_places": [],
    "other_code": "",
+   "timing": "before",
    "witness": {
     "total": 1,
     "afterwards": 0
@@ -1457,6 +1461,7 @@
    "observed_short": "",
    "observed_places": [],
    "other_code": "",
+   "timing": "before",
    "witness": {
     "total": 3,
     "afterwards": 0
@@ -1690,6 +1695,7 @@
    "observed_short": "",
    "observed_places": [],
    "other_code": "",
+   "timing": "before",
    "witness": {
     "total": 4,
     "afterwards": 0
@@ -1836,6 +1842,7 @@
    "observed_short": "",
    "observed_places": [],
    "other_code": "",
+   "timing": "after_evidence",
    "witness": {
     "total": 1,
     "afterwards": 1

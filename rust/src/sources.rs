@@ -251,8 +251,16 @@ pub struct GitRan {
 /// A git command run in `cwd` that says why it failed: git missing, git out of time, or git's exit code with its first
 /// line on standard error, as git gives it. GIT_OPTIONAL_LOCKS=0, as for every git rb runs. Never memoised.
 pub fn git_full(cwd: &Path, args: &[&str], input: Option<&[u8]>) -> Result<GitRan, GitFail> {
+    git_full_env(cwd, args, input, &[], git_timeout())
+}
+
+/// git_full with variables of its own (a temporary index) and a wait of its own.
+pub fn git_full_env(cwd: &Path, args: &[&str], input: Option<&[u8]>, env: &[(&str, &str)], wait: Duration) -> Result<GitRan, GitFail> {
     let mut c = Command::new("git");
     c.arg("-C").arg(cwd).args(args).stdout(Stdio::piped()).stderr(Stdio::piped()).env("GIT_OPTIONAL_LOCKS", "0");
+    for (k, v) in env {
+        c.env(k, v);
+    }
     c.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() });
     let mut child = c.spawn().map_err(|_| GitFail::NotFound)?;
     if let Some(data) = input {
@@ -285,7 +293,7 @@ pub fn git_full(cwd: &Path, args: &[&str], input: Option<&[u8]>) -> Result<GitRa
                 return Ok(GitRan { code: status.code().unwrap_or(-1), stdout, first_err });
             }
             Ok(None) => {
-                if start.elapsed() > git_timeout() {
+                if start.elapsed() > wait {
                     let _ = child.kill();
                     let _ = child.wait();
                     return Err(GitFail::TimedOut);
@@ -298,8 +306,13 @@ pub fn git_full(cwd: &Path, args: &[&str], input: Option<&[u8]>) -> Result<GitRa
 }
 
 /// How long rb waits for git: 30 s (RB_TEST_GIT_TIMEOUT_MS in rb's own tests).
-fn git_timeout() -> Duration {
-    std::env::var("RB_TEST_GIT_TIMEOUT_MS").ok().and_then(|v| v.parse::<u64>().ok()).map(Duration::from_millis).unwrap_or(Duration::from_secs(30))
+pub fn git_timeout() -> Duration {
+    git_wait(Duration::from_secs(30))
+}
+
+/// How long rb waits for a git call that waits `usual` (RB_TEST_GIT_TIMEOUT_MS, in rb's own tests, for every one).
+pub fn git_wait(usual: Duration) -> Duration {
+    std::env::var("RB_TEST_GIT_TIMEOUT_MS").ok().and_then(|v| v.parse::<u64>().ok()).map(Duration::from_millis).unwrap_or(usual)
 }
 
 thread_local! {
@@ -312,6 +325,7 @@ thread_local! {
 /// repository (a command it watched, a repository it made).
 pub fn forget_git() {
     ANSWERS.with(|a| a.borrow_mut().clear());
+    SNAP_REFS.with(|s| s.borrow_mut().clear());
     crate::repo::forget_roots();
 }
 
@@ -359,7 +373,7 @@ pub fn git_bytes(cwd: &Path, args: &[&str]) -> Option<Vec<u8>> {
     let cwd_s = cwd.to_string_lossy().into_owned();
     let mut full: Vec<&str> = vec!["-C", &cwd_s];
     full.extend_from_slice(args);
-    let answer = run("git", &full, None, &[], None, Duration::from_secs(30)).filter(|r| r.code == 0).map(|r| r.stdout);
+    let answer = run("git", &full, None, &[], None, git_timeout()).filter(|r| r.code == 0).map(|r| r.stdout);
     if let Some(k) = key.filter(|_| answer.is_some() || holds == Holds::Always) {
         ANSWERS.with(|a| a.borrow_mut().insert(k, answer.clone()));
     }
@@ -373,6 +387,12 @@ pub fn git(cwd: &Path, args: &[&str]) -> Option<String> {
 /// `git diff` of the working tree, asked of a copy of this checkout's index: git diff refreshes the index it reads and
 /// writes it back whatever GIT_OPTIONAL_LOCKS says, and a read of rb's leaves the user's index as it was.
 pub fn git_diff_bytes(cwd: &Path, args: &[&str]) -> Option<Vec<u8>> {
+    git_diff_full(cwd, args).ok().filter(|r| r.code == 0).map(|r| r.stdout)
+}
+
+/// git_diff_bytes that says why it failed, as git_full does.
+pub fn git_diff_full(cwd: &Path, args: &[&str]) -> Result<GitRan, GitFail> {
+    let unread = || Ok(GitRan { code: -1, stdout: Vec::new(), first_err: String::new() });
     let index = match std::env::var_os("GIT_INDEX_FILE").filter(|f| !f.is_empty()) {
         Some(f) => {
             let p = PathBuf::from(f);
@@ -382,25 +402,30 @@ pub fn git_diff_bytes(cwd: &Path, args: &[&str]) -> Option<Vec<u8>> {
                 cwd.join(p)
             }
         }
-        None => PathBuf::from(git(cwd, &["rev-parse", "--absolute-git-dir"])?.trim()).join("index"),
+        None => match git(cwd, &["rev-parse", "--absolute-git-dir"]) {
+            Some(d) => PathBuf::from(d.trim()).join("index"),
+            None => return unread(),
+        },
     };
     let tmp = std::env::temp_dir().join(format!("rb-index-{}-{}", std::process::id(), crate::rng::os_randbits(32)));
-    std::fs::create_dir_all(&tmp).ok()?;
+    if std::fs::create_dir_all(&tmp).is_err() {
+        return unread();
+    }
     let copy = tmp.join("index");
     if index.is_file() {
         if std::fs::copy(&index, &copy).is_err() {
             let _ = std::fs::remove_dir_all(&tmp);
-            return None;
+            return unread();
         }
         // the copy keeps the index's time, by which git tells a file changed in the second the index was written
         if let Ok(t) = std::fs::metadata(&index).and_then(|m| m.modified()) {
             let _ = std::fs::OpenOptions::new().write(true).open(&copy).and_then(|f| f.set_modified(t));
         }
     }
-    let (cwd_s, copy_s) = (cwd.to_string_lossy().into_owned(), copy.to_string_lossy().into_owned());
-    let mut full: Vec<&str> = vec!["-C", &cwd_s, "diff"];
+    let copy_s = copy.to_string_lossy().into_owned();
+    let mut full: Vec<&str> = vec!["diff"];
     full.extend_from_slice(args);
-    let answer = run("git", &full, None, &[("GIT_INDEX_FILE", copy_s.as_str())], None, Duration::from_secs(30)).filter(|r| r.code == 0).map(|r| r.stdout);
+    let answer = git_full_env(cwd, &full, None, &[("GIT_INDEX_FILE", copy_s.as_str())], git_timeout());
     let _ = std::fs::remove_dir_all(&tmp);
     answer
 }
@@ -452,20 +477,89 @@ pub fn resolve_path(p: &Path) -> PathBuf {
     }
 }
 
+/// The capture facts of a git call that failed (EVIDENCE E3): kept none, and why, with git's first line or the wait.
+fn failed_capture(fail: Result<GitRan, GitFail>, why: &str) -> Dict {
+    match fail {
+        Err(GitFail::TimedOut) => crate::dict! {"kept" => "none", "kept_why" => "git_timeout", "git_secs" => git_timeout().as_secs_f64().ceil() as i64},
+        Err(GitFail::NotFound) => crate::dict! {"kept" => "none", "kept_why" => why, "git_said" => "git could not be run"},
+        Ok(r) => {
+            let mut d = crate::dict! {"kept" => "none", "kept_why" => why};
+            if !r.first_err.is_empty() {
+                d.insert("git_said".into(), Value::Str(r.first_err));
+            } else if why == "git_unreadable" {
+                d.insert("git_said".into(), Value::Str(format!("git exited {}", r.code)));
+            }
+            d
+        }
+    }
+}
+
+/// HEAD's commit, None where the branch has no commit yet, or the capture facts where git could not say which: a HEAD
+/// git cannot read is no "no commit yet", which would keep the untracked files alone as the code.
+pub fn head_now(top: &Path) -> Result<Option<String>, Dict> {
+    let unborn = |top: &Path| -> bool {
+        // a branch with no commit: HEAD names a branch, and no ref of that name is there
+        let Ok(r) = git_full(top, &["symbolic-ref", "-q", "HEAD"], None) else { return false };
+        let name = String::from_utf8_lossy(&r.stdout).trim().to_string();
+        if r.code != 0 || name.is_empty() {
+            return false;
+        }
+        matches!(git_full(top, &["for-each-ref", "--format=%(objectname)", &name], None), Ok(f) if f.code == 0 && f.stdout.iter().all(u8::is_ascii_whitespace))
+    };
+    match git_full(top, &["rev-parse", "--verify", "-q", "HEAD"], None) {
+        Ok(r) if r.code == 0 => {
+            let h = String::from_utf8_lossy(&r.stdout).trim().to_string();
+            if h.is_empty() {
+                Err(failed_capture(Ok(r), "git_unreadable"))
+            } else {
+                Ok(Some(h))
+            }
+        }
+        Ok(r) if r.first_err.is_empty() && unborn(top) => Ok(None),
+        other => Err(failed_capture(other, "git_unreadable")),
+    }
+}
+
 /// The repository at this moment: the commit, the branch, whether the tree had uncommitted changes, and a hash of the
 /// tracked diff and the untracked files. The record's own directory is left out.
 pub fn git_state(root: &Path, exclude: &str) -> Option<Dict> {
     let top = git_top(root)?;
-    let head = git(root, &["rev-parse", "--verify", "-q", "HEAD"]);
+    let head = match head_now(&top) {
+        Ok(h) => h,
+        Err(why) => {
+            let mut state = crate::dict! {"commit" => Value::Null, "branch" => Value::Null, "dirty" => true, "tree" => Value::Null, "captured" => "after"};
+            state.extend(why);
+            return Some(state);
+        }
+    };
     let spec = code_pathspec(root, exclude, &top);
     let pathspec: Vec<&str> = spec.iter().map(|s| s.as_str()).collect();
     let mut st_args = vec!["status", "--porcelain", "--untracked-files=all"];
     st_args.extend_from_slice(&pathspec);
-    let status = git(root, &st_args).unwrap_or_default();
+    // a status git could not give is no clean tree (EVIDENCE E3): the receipt keeps dirty: true and no tree, and says why,
+    // so every rb, an older one too, reads the run's code as not kept
+    let failed = match git_full(root, &st_args, None) {
+        Ok(r) if r.code == 0 => Err(String::from_utf8_lossy(&r.stdout).into_owned()),
+        other => Ok(failed_capture(other, "git_unreadable")),
+    };
+    let status = match failed {
+        Err(out) => out,
+        Ok(why) => {
+            let mut state = Dict::new();
+            state.insert("commit".into(), head.as_ref().map(|h| Value::Str(h.clone())).unwrap_or(Value::Null));
+            let branch = git(root, &["symbolic-ref", "--short", "-q", "HEAD"]).unwrap_or_default().trim().to_string();
+            state.insert("branch".into(), if branch.is_empty() { Value::Null } else { Value::Str(branch) });
+            state.insert("dirty".into(), Value::Bool(true));
+            state.insert("tree".into(), Value::Null);
+            state.insert("captured".into(), "after".into());
+            state.extend(why);
+            return Some(state);
+        }
+    };
     let branch = git(root, &["symbolic-ref", "--short", "-q", "HEAD"]).unwrap_or_default().trim().to_string();
     let mut state = Dict::new();
     state.insert("commit".into(), match &head {
-        Some(h) => Value::Str(h.trim().to_string()),
+        Some(h) => Value::Str(h.clone()),
         None => Value::Null,
     });
     state.insert("branch".into(), if branch.is_empty() { Value::Null } else { Value::Str(branch) });
@@ -631,7 +725,7 @@ fn held_before(path: &Path, line: &Dict) -> Option<Vec<u8>> {
 /// (line endings, filters), never written to the object store.
 fn same_as_committed(top: &Path, rel: &str, bytes: &[u8]) -> bool {
     let top_s = top.to_string_lossy().into_owned();
-    let hashed = run("git", &["-C", &top_s, "hash-object", "--path", rel, "--stdin"], None, &[], Some(bytes), Duration::from_secs(30))
+    let hashed = run("git", &["-C", &top_s, "hash-object", "--path", rel, "--stdin"], None, &[], Some(bytes), git_timeout())
         .filter(|r| r.code == 0)
         .map(|r| String::from_utf8_lossy(&r.stdout).trim().to_string());
     let head = git(top, &["rev-parse", &format!("HEAD:{rel}")]).map(|h| h.trim().to_string());
@@ -651,6 +745,17 @@ pub fn keep_tree(root: &Path, commit: &str) -> Option<String> {
     Some(tree)
 }
 
+/// Keep a tree someone gave (rb run add --tree) under refs/rb/snapshots/, as rb keeps its own: false where this
+/// repository does not have it, and nothing is pinned.
+pub fn pin_tree(root: &Path, tree: &str) -> bool {
+    let Some(top) = git_top(root) else { return false };
+    if git(&top, &["cat-file", "-e", &format!("{tree}^{{tree}}")]).is_none() {
+        return false;
+    }
+    keep_ref(&top, tree);
+    true
+}
+
 /// The words a write says once, when it makes the ref that keeps a tree: where it is and the command that removes it.
 pub fn snapshot_ref_told(tree: &str) -> String {
     let name = format!("{SNAPSHOT_REFS}/{tree}");
@@ -662,9 +767,44 @@ pub fn is_snapshot_ref_told(line: &str) -> bool {
     line.starts_with(&format!("rb put the code in git at {SNAPSHOT_REFS}/"))
 }
 
+thread_local! {
+    /// The trees refs/rb/snapshots/ keeps, by repository, asked of git once while one command line runs.
+    static SNAP_REFS: std::cell::RefCell<std::collections::HashMap<PathBuf, std::collections::HashSet<String>>> = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Whether a ref under refs/rb/snapshots/ keeps `tree` in the repository at `root`: one listing of them per command.
+pub fn snapshot_ref_kept(root: &Path, tree: &str) -> bool {
+    let key = git_top(root).unwrap_or_else(|| root.to_path_buf());
+    SNAP_REFS.with(|s| {
+        let mut s = s.borrow_mut();
+        let held = s.entry(key.clone()).or_insert_with(|| {
+            let listed = git(&key, &["for-each-ref", "--format=%(refname)", &format!("{SNAPSHOT_REFS}/")]).unwrap_or_default();
+            listed.lines().filter_map(|l| l.trim().strip_prefix(&format!("{SNAPSHOT_REFS}/")).map(str::to_string)).collect()
+        });
+        held.contains(tree)
+    })
+}
+
+thread_local! {
+    /// Set while the SDK's run block captures its start: no ref is made then (review5 L2).
+    static UNPINNED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// `f`, keeping no tree under refs/rb/snapshots/: the SDK's run block starts so, and its run pins the code when it is
+/// recorded, so a block that raises leaves no ref behind.
+pub fn unpinned<T>(f: impl FnOnce() -> T) -> T {
+    UNPINNED.with(|u| u.set(true));
+    let out = f();
+    UNPINNED.with(|u| u.set(false));
+    out
+}
+
 /// Keep `tree` under refs/rb/snapshots/, and say so at the write that makes the ref, never again; a preview makes no
 /// ref and says what the write will.
 fn keep_ref(top: &Path, tree: &str) {
+    if UNPINNED.with(|u| u.get()) {
+        return;
+    }
     let name = format!("{SNAPSHOT_REFS}/{tree}");
     if git(top, &["rev-parse", "--verify", "-q", &name]).map_or(false, |s| !s.trim().is_empty()) {
         return;
@@ -672,6 +812,7 @@ fn keep_ref(top: &Path, tree: &str) {
     if crate::dry::active() {
         crate::plain::tell(snapshot_ref_told(tree));
     } else if git(top, &["update-ref", &name, tree]).is_some() {
+        SNAP_REFS.with(|s| s.borrow_mut().clear());
         crate::owned::record(top, "repo", crate::dict! {"path" => name, "how" => "ref", "target" => tree});
         crate::plain::tell(snapshot_ref_told(tree));
     }
@@ -679,29 +820,64 @@ fn keep_ref(top: &Path, tree: &str) {
 
 pub fn code_snapshot(root: &Path, exclude: &str) -> Option<Dict> {
     let top = git_top(root)?;
-    let head = git(&top, &["rev-parse", "--verify", "-q", "HEAD"]).map(|h| h.trim().to_string()).filter(|h| !h.is_empty());
+    let head = match head_now(&top) {
+        Ok(h) => h,
+        Err(mut why) => {
+            why.insert("tree".into(), Value::Null);
+            return Some(why);
+        }
+    };
     let pathspec = code_pathspec(root, exclude, &top);
     let spec: Vec<&str> = pathspec.iter().map(|s| s.as_str()).collect();
     let split0 = |b: Vec<u8>| -> Vec<Vec<u8>> { b.split(|c| *c == 0).filter(|x| !x.is_empty()).map(|x| x.to_vec()).collect() };
+    // a listing git could not give makes no tree: one missing the changes it did not list is never the code (E3)
+    let failed = |listing: &str, fail: Result<GitRan, GitFail>| {
+        let mut d = failed_capture(fail, "list_failed");
+        if d.get("kept_why").and_then(Value::as_str) == Some("list_failed") {
+            d.insert("listing".into(), Value::Str(listing.into()));
+        }
+        d.insert("tree".into(), Value::Null);
+        Some(d)
+    };
+    // with no commit yet, the changed files are every file the index holds: staged, and in no commit to read the tree
+    // from (EVIDENCE E3: a tree missing them is no whole code)
     let changed: Vec<Vec<u8>> = if head.is_some() {
         let mut a = vec!["--name-only", "-z", "HEAD"];
         a.extend_from_slice(&spec);
-        split0(git_diff_bytes(&top, &a).unwrap_or_default())
+        match git_diff_full(&top, &a) {
+            Ok(r) if r.code == 0 => split0(r.stdout),
+            other => return failed("changed", other),
+        }
     } else {
-        Vec::new()
+        let mut a = vec!["ls-files", "-z", "--cached"];
+        a.extend_from_slice(&spec);
+        match git_full(&top, &a, None) {
+            Ok(r) if r.code == 0 => split0(r.stdout),
+            other => return failed("changed", other),
+        }
     };
     let mut a = vec!["ls-files", "-z", "--others", "--exclude-standard"];
     a.extend_from_slice(&spec);
-    let others = split0(git_bytes(&top, &a).unwrap_or_default());
+    let others = match git_full(&top, &a, None) {
+        Ok(r) if r.code == 0 => split0(r.stdout),
+        other => return failed("untracked", other),
+    };
     if changed.is_empty() && others.is_empty() {
         return None;
     }
     if changed.len() + others.len() > SNAPSHOT_MAX_FILES {
-        return Some(crate::dict! {"tree" => Value::Null, "left_out" => (changed.len() + others.len()) as i64});
+        let all: Vec<String> = changed.iter().chain(others.iter()).map(|p| String::from_utf8_lossy(p).into_owned()).collect();
+        let mut many = crate::dict! {"files" => all.len() as i64};
+        if let Some((folder, n)) = crate::capture::busiest_folder(&all) {
+            many.insert("folder".into(), Value::Str(folder));
+            many.insert("in_folder".into(), Value::Int(n));
+        }
+        return Some(crate::dict! {"tree" => Value::Null, "left_out" => all.len() as i64, "kept" => "none", "kept_why" => "too_many", "too_many" => Value::Dict(many)});
     }
     let mut add: Vec<Vec<u8>> = Vec::new();
     let mut remove: Vec<Vec<u8>> = Vec::new();
     let (mut left_out, mut nested) = (0i64, 0i64);
+    let mut left_files: Vec<Value> = Vec::new();
     for rel in changed.iter().chain(others.iter()) {
         let p = top.join(String::from_utf8_lossy(rel).as_ref());
         if !p.exists() && changed.contains(rel) {
@@ -713,9 +889,25 @@ pub fn code_snapshot(root: &Path, exclude: &str) -> Option<Dict> {
             nested += 1;
             continue;
         }
-        match std::fs::metadata(&p) {
-            Ok(md) if md.is_file() && md.len() <= SNAPSHOT_FILE_LIMIT => add.push(rel.clone()),
-            _ => left_out += 1,
+        // a file over 10 MB, or one that is no regular file (a FIFO, a link to nothing), is left out and named: one
+        // git tracks stays in the tree as HEAD holds it
+        let why = match std::fs::symlink_metadata(&p) {
+            Ok(md) if md.file_type().is_symlink() && std::fs::metadata(&p).is_ok() => match std::fs::metadata(&p) {
+                Ok(t) if t.is_file() && t.len() > SNAPSHOT_FILE_LIMIT => Some("over_10_mb"),
+                _ => None,
+            },
+            Ok(md) if md.is_file() && md.len() <= SNAPSHOT_FILE_LIMIT => None,
+            Ok(md) if md.is_file() => Some("over_10_mb"),
+            _ => Some("not_regular"),
+        };
+        match why {
+            None => add.push(rel.clone()),
+            Some(why) => {
+                left_out += 1;
+                if left_files.len() < crate::capture::LEFT_OUT_NAMED {
+                    left_files.push(crate::obj! {"path" => String::from_utf8_lossy(rel).into_owned(), "why" => why, "tracked" => changed.contains(rel)});
+                }
+            }
         }
     }
     // a preview writes the tree's objects into a directory of its own, reading the repository's beside it: the same
@@ -731,7 +923,6 @@ pub fn code_snapshot(root: &Path, exclude: &str) -> Option<Dict> {
     let _ = std::fs::create_dir_all(tmp.join("objects"));
     let index = tmp.join("index");
     let index_s = index.to_string_lossy().into_owned();
-    let top_s = top.to_string_lossy().into_owned();
     let mut env: Vec<(&str, String)> = vec![("GIT_INDEX_FILE", index_s.clone())];
     if let Some(objects) = &objects {
         // named in info/alternates, which git splits only at a newline (its variable splits at ':', on Windows ';')
@@ -749,14 +940,15 @@ pub fn code_snapshot(root: &Path, exclude: &str) -> Option<Dict> {
         env.push(("GIT_OBJECT_DIRECTORY", tmp.join("objects").to_string_lossy().into_owned()));
     }
     let env: Vec<(&str, &str)> = env.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    let timed_out = std::cell::Cell::new(false);
     let gitrun = |args: &[&str], data: Option<&[u8]>| -> Option<String> {
-        let mut full: Vec<&str> = vec!["-C", &top_s];
-        full.extend_from_slice(args);
-        let r = run("git", &full, None, &env, data, Duration::from_secs(300))?;
-        if r.code == 0 {
-            Some(String::from_utf8_lossy(&r.stdout).trim().to_string())
-        } else {
-            None
+        match git_full_env(&top, args, data, &env, git_wait(Duration::from_secs(300))) {
+            Ok(r) if r.code == 0 => Some(String::from_utf8_lossy(&r.stdout).trim().to_string()),
+            Err(GitFail::TimedOut) => {
+                timed_out.set(true);
+                None
+            }
+            _ => None,
         }
     };
     let result = (|| {
@@ -780,8 +972,22 @@ pub fn code_snapshot(root: &Path, exclude: &str) -> Option<Dict> {
         Some(tree)
     })();
     let _ = std::fs::remove_dir_all(&tmp);
-    let tree = result?;
-    let mut snap = crate::dict! {"tree" => tree, "left_out" => left_out};
+    let Some(tree) = result else {
+        if timed_out.get() {
+            let mut d = failed_capture(Err(GitFail::TimedOut), "git_failed");
+            d.insert("tree".into(), Value::Null);
+            return Some(d);
+        }
+        return Some(crate::dict! {"tree" => Value::Null, "kept" => "none", "kept_why" => "git_failed"});
+    };
+    let mut snap = crate::dict! {"tree" => tree, "left_out" => left_out, "kept" => if left_out > 0 { "part" } else { "whole" }};
+    if left_out > 0 {
+        snap.insert("kept_why".into(), "left_out".into());
+        snap.insert("left_out_files".into(), Value::List(left_files));
+        if left_out > crate::capture::LEFT_OUT_NAMED as i64 {
+            snap.insert("left_out_more".into(), Value::Int(left_out - crate::capture::LEFT_OUT_NAMED as i64));
+        }
+    }
     if nested > 0 {
         snap.insert("nested".into(), Value::Int(nested));
     }

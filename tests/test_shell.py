@@ -2534,9 +2534,12 @@ def test_plain_words_pass_2_no_role_word_and_every_card_term_has_its_hover(recor
         assert "record's owner" not in html.unescape(page), surface
         # "not confirmed" is said in a note's own line now (plain words pass 3); its glossary line still says no role
         assert re.search(r'<dd id="g-not-confirmed">it waits to be confirmed with rb in a terminal; until then it reads as a note', page), surface
-        chips = re.findall(r'<span class="kind"><span class="term" data-hint="([^"]*)" aria-describedby="g-rule">rule</span></span>', page)
-        assert chips and all(h == "a threshold or comparison declared for a question; commands call it a criterion." for h in chips), surface
-        assert re.search(r'<span class="term" data-hint="problems with what a finding depends on[^"]*Not the repository(?:\'|&#x27;)s own checks\." aria-describedby="g-checks">checks</span>', page), surface
+        # a term's line is written once a page, on its first use; its later uses name the entry, which the script reads
+        chips = re.findall(r'<span class="kind"><span class="term"(?: data-hint="([^"]*)")? aria-describedby="g-rule">rule</span></span>', page)
+        assert chips and all(h in ("", "a threshold or comparison declared for a question; commands call it a criterion.") for h in chips), surface
+        assert re.findall(r'data-hint="([^"]*)" aria-describedby="g-rule"', page) == ["a threshold or comparison declared for a question; commands call it a criterion."], surface
+        assert re.findall(r'data-hint="(problems with what a finding depends on[^"]*Not the repository(?:\'|&#x27;)s own checks\.)" aria-describedby="g-checks"', page), surface
+        assert re.search(r'<span class="term"(?: data-hint="[^"]*")? aria-describedby="g-checks">checks</span>', page), surface
         fold = {said(t.text(e)) for e in t.all() if e["tag"] == "dt"}
         assert "checks" in fold and "integrity" not in fold and "rule (noun)" not in fold, surface
         # the glossary holds what every surface may say: no "your call" (the export says no "you" of a call) and
@@ -2936,15 +2939,24 @@ def test_all_criteria_lists_each_criterion_once_by_experiment(record):
 
 def test_the_glossary_describes_each_term(record):
     """Every term drawn with rb's hint names its glossary entry, and the glossary fold, open in the About view (design
-    pass 1, P10), holds each line once, so the document has them with no script."""
+    pass 1, P10), holds each line once, so the document has them with no script. The page writes a term's line once,
+    on its first use (Nov 10 2026): its later uses name the entry alone, and the script gives them its line."""
     t = Html(page_of(record))
     words = t.by_id("words")
     assert words is not None and words["up"]["tag"] == "details" and "open" in words["up"]["attrs"] and t.inside(words, t.by_id("about"))
     entries = {e["attrs"]["id"]: said(t.text(e)) for e in t.all(words) if e["tag"] == "dd"}
     terms = [e for e in t.all() if t.has(e, "term")]
     assert terms
+    seen = set()
     for e in terms:
-        assert entries.get(e["attrs"].get("aria-describedby")) == said(e["attrs"]["data-hint"]), e["attrs"]
+        named = e["attrs"].get("aria-describedby")
+        assert named in entries, e["attrs"]
+        if named in seen:
+            assert "data-hint" not in e["attrs"], e["attrs"]
+        else:
+            assert entries[named] == said(e["attrs"]["data-hint"]), e["attrs"]
+            seen.add(named)
+    assert len(seen) < len(terms)
     assert "g-open-question" in entries and "g-rb-s-interval" in entries and "g-not-confirmed" in entries and len(entries) == 40
     q = t.by_id("q-q1")
     assert {e["attrs"]["aria-describedby"] for e in t.all(q) if t.has(e, "term")} >= {"g-open-question", "g-rule-written-after-the-results"}

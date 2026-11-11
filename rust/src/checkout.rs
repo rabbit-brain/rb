@@ -50,6 +50,9 @@ pub struct Checkout {
     pub record_files_ignored: usize,
     /// the first rule that ignores a record file, as git check-ignore -v gives it ("<file>:<line>:<pattern>")
     pub ignored_by: Option<String>,
+    /// that rule's file, as git check-ignore -v -z gives it in a field of its own: never cut from the joined rule, so a
+    /// file whose own name holds `:<digits>:` is the file it is
+    pub ignored_by_file: Option<String>,
     /// how many other rules ignore record files
     pub more_rules: usize,
     /// whether the commit checked out holds the record (None where it was not asked: no commit, or nothing to commit)
@@ -185,7 +188,7 @@ fn folder_of(p: &Path) -> String {
 impl Checkout {
     fn bare(state: State, folder: String) -> Checkout {
         Checkout {
-            state, commit: None, branch: None, on_branch: false, folder, record_files_not_committed: 0, record_files_ignored: 0, ignored_by: None,
+            state, commit: None, branch: None, on_branch: false, folder, record_files_not_committed: 0, record_files_ignored: 0, ignored_by: None, ignored_by_file: None,
             more_rules: 0, record_held: None, changes_outside_record: false, why: None, timed_out: false, root: PathBuf::new(), top: None,
             rb_dir: DIR.to_string(), not_committed_names: Vec::new(), ignored_names: Vec::new(), listed: Vec::new(),
         }
@@ -372,18 +375,9 @@ impl Checkout {
         } else {
             let input = ignored.iter().map(|p| format!("{p}\0")).collect::<String>();
             let out = git_full(top, &["check-ignore", "-v", "-z", "--stdin"], Some(input.as_bytes())).map(|r| r.stdout).unwrap_or_default();
-            let out = String::from_utf8_lossy(&out).into_owned();
-            let f: Vec<&str> = out.split('\0').collect();
-            let mut rules: Vec<String> = Vec::new();
-            for c in f.chunks(4).filter(|c| c.len() == 4 && !c[0].is_empty()) {
-                let r = format!("{}:{}:{}", c[0], c[1], c[2]);
-                if !rules.contains(&r) {
-                    rules.push(r);
-                }
-            }
-            let n = rules.len().saturating_sub(1);
-            (rules.into_iter().next(), n)
+            rules_of(&String::from_utf8_lossy(&out))
         };
+        let (ignored_by, ignored_by_file) = ignored_by.map_or((None, None), |(r, f)| (Some(r), Some(f)));
         let changes_outside_record = changes();
         let state = if !ignored.is_empty() {
             State::Ignored
@@ -396,7 +390,7 @@ impl Checkout {
         };
         Checkout {
             state, on_branch: branch.is_some(), commit: head, branch, folder, record_files_not_committed: not_committed,
-            record_files_ignored: ignored.len(), ignored_by, more_rules, record_held, changes_outside_record, why: None, timed_out: false,
+            record_files_ignored: ignored.len(), ignored_by, ignored_by_file, more_rules, record_held, changes_outside_record, why: None, timed_out: false,
             root: root.to_path_buf(), top: Some(top.to_path_buf()), rb_dir, not_committed_names: names,
             ignored_names: { let mut i: Vec<String> = ignored.iter().map(|p| from_root(p)).collect(); i.sort(); i.truncate(NAMES_KEPT); i },
             listed,
@@ -738,8 +732,24 @@ pub const IGNORE_SAYS: &str = "It prints the rule that makes git ignore that fil
 pub const CODE_SAYS: &str = "This checkout has changes outside the record not committed.";
 const OUTSIDE_RULE: &str = "by a rule outside the repository's files";
 
+/// git check-ignore -v -z's records (`<source>\0<line>\0<pattern>\0<path>\0`): the first rule, joined as
+/// `<source>:<line>:<pattern>`, with its source as git gave it, and how many other rules there are.
+fn rules_of(out: &str) -> (Option<(String, String)>, usize) {
+    let f: Vec<&str> = out.split('\0').collect();
+    let mut rules: Vec<(String, String)> = Vec::new();
+    for c in f.chunks(4).filter(|c| c.len() == 4 && !c[0].is_empty()) {
+        let r = format!("{}:{}:{}", c[0], c[1], c[2]);
+        if !rules.iter().any(|(had, _)| *had == r) {
+            rules.push((r, c[0].to_string()));
+        }
+    }
+    let n = rules.len().saturating_sub(1);
+    (rules.into_iter().next(), n)
+}
+
 /// The file of a rule as git check-ignore -v gives it, `<source>:<line>:<pattern>`: everything before the first
-/// `:<digits>:`, so a Windows path's drive letter (`C:\Users\x\.gitignore:1:.rb/`) stays in the file.
+/// `:<digits>:`, so a Windows path's drive letter (`C:\Users\x\.gitignore:1:.rb/`) stays in the file. Only for a
+/// rule whose file git did not give apart (a test's checkout); git's own is `ignored_by_file`.
 fn rule_file(rule: &str) -> &str {
     let b = rule.as_bytes();
     for (i, _) in rule.match_indices(':') {
@@ -752,15 +762,14 @@ fn rule_file(rule: &str) -> &str {
 }
 
 /// Whether a rule's file is inside the repository: a relative path that does not climb out of it. A drive letter, a
-/// UNC path, an absolute path on any OS and `..` are outside.
-fn rule_file_inside(rule: &str) -> bool {
-    let file = rule_file(rule);
+/// UNC path, an absolute path on any OS and `..` are outside; a folder named `x:1:` is not a drive.
+fn file_inside(file: &str) -> bool {
     let b = file.as_bytes();
     !(file.is_empty()
         || Path::new(file).is_absolute()
         || file.starts_with('/')
         || file.starts_with('\\')
-        || (b.len() >= 2 && b[1] == b':' && b[0].is_ascii_alphabetic())
+        || (b.len() >= 3 && b[1] == b':' && b[0].is_ascii_alphabetic() && matches!(b[2], b'/' | b'\\'))
         || file.split(['/', '\\']).any(|p| p == ".."))
 }
 
@@ -833,7 +842,7 @@ impl Checkout {
     /// whose file git names inside the repository, else None (the words say "by a rule outside the repository's files").
     fn rule_said(&self, page: bool) -> Option<String> {
         let r = self.ignored_by.clone()?;
-        if page && !rule_file_inside(&r) {
+        if page && !file_inside(self.ignored_by_file.as_deref().unwrap_or_else(|| rule_file(&r))) {
             return None;
         }
         Some(r)
@@ -1230,8 +1239,8 @@ static COMPARED: std::sync::Mutex<Option<std::collections::HashMap<String, Compa
 
 /// Whether your checkout has the code the runs ran: `treeish` (the runs' commit, or the git tree rb kept of their
 /// uncommitted changes) against your working tree, one `git diff` run on a copy of the index, so the index is never
-/// written. Only paths the runs' commit holds count (`holds`, whatever git's letter: one the kept tree had deleted that
-/// your tree has counts too), the record (`record`, its folder from the top) and the files the runs name (`named`) left
+/// written. Paths the runs' commit holds count (`holds`, whatever git's letter: one the kept tree had deleted that
+/// your tree has counts too), and so does a file the runs' code had that your tree lacks; the record (`record`, its folder from the top) and the files the runs name (`named`) left
 /// out: a commit of the record alone, a file added since or an untracked result is never a difference. None where
 /// there is nothing to compare with: your folder is not in git, or has no commit yet.
 pub fn compare(viewer: &Viewer, treeish: &str, record: &str, holds: &std::collections::BTreeMap<String, String>, named: &std::collections::HashSet<String>) -> Option<Compared> {
@@ -1259,11 +1268,13 @@ pub fn compare(viewer: &Viewer, treeish: &str, record: &str, holds: &std::collec
     let inside = format!("{record}/");
     // a status, then its path, each ended by a NUL
     let fields: Vec<String> = listed.split(|b| *b == 0).map(|f| String::from_utf8_lossy(f).into_owned()).collect();
+    // a path the commit holds, or one the runs' code had that your tree lacks (git's D: a file the run imported, say)
     let mut differ: Vec<String> = fields
         .chunks(2)
         .filter(|c| c.len() == 2)
+        .filter(|c| holds.contains_key(&c[1]) || c[0].starts_with('D'))
         .map(|c| c[1].clone())
-        .filter(|p| !p.is_empty() && holds.contains_key(p) && *p != record && !p.starts_with(&inside) && !named.contains(p))
+        .filter(|p| !p.is_empty() && *p != record && !p.starts_with(&inside) && !named.contains(p))
         .collect();
     differ.sort();
     differ.dedup();
@@ -1579,5 +1590,25 @@ mod tests {
         }
         assert_eq!(rule_file(r"C:\Users\x\.gitignore_global:1:.rb/"), r"C:\Users\x\.gitignore_global");
         assert_eq!(rule_file(".gitignore:12:x:1:y"), ".gitignore");
+    }
+
+    /// The rule's file is git's own field, never cut from the joined rule again: a file whose name holds `:<digits>:`
+    /// (MP-1110-0933) is the file it is, outside the repository or inside it.
+    #[test]
+    fn a_rule_file_whose_name_holds_a_line_number_is_never_cut() {
+        let (rule, more) = rules_of("x:1:/../../ign2\x001\x00.rb/\x00.rb/project.yaml\x00x:1:/../../ign2\x001\x00.rb/\x00.rb/log.jsonl\x00");
+        assert_eq!(rule.clone(), Some(("x:1:/../../ign2:1:.rb/".to_string(), "x:1:/../../ign2".to_string())));
+        assert_eq!(more, 0);
+        let c = Checkout { state: State::Ignored, record_files_ignored: 2, ..Checkout::bare(State::Ignored, "int8".into()) };
+        let (r, f) = rule.unwrap();
+        let outside = Checkout { ignored_by: Some(r.clone()), ignored_by_file: Some(f), ..c.clone() };
+        assert_eq!(outside.rule_said(true), None, "the file climbs out of the repository");
+        assert_eq!(outside.rule_said(false).as_deref(), Some(r.as_str()), "your own screens quote it");
+        let (r, f) = rules_of("x:1:/.gitignore\x003\x00.rb/\x00.rb/project.yaml\x00").0.unwrap();
+        assert_eq!(f, "x:1:/.gitignore");
+        let inside = Checkout { ignored_by: Some(r.clone()), ignored_by_file: Some(f), ..c.clone() };
+        assert_eq!(inside.rule_said(true).as_deref(), Some(r.as_str()), "a folder named x:1: is inside");
+        // cut from the joined rule, the first would read as the file "x", inside: the bug this guards
+        assert!(file_inside(rule_file("x:1:/../../ign2:1:.rb/")));
     }
 }

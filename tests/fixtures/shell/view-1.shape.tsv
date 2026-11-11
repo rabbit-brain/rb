@@ -55,6 +55,7 @@ home.scope_short	string	today	view::home (Home)	both
 home.uncited	number	today	view::home (Home)	both
 home.uncited_line	string	today	view::home (Home)	both
 home.uncited_short	string	today	view::home (Home)	both
+home.taken_out	string	1b	contract 1.17 (round 13, S7 E1): ledger/kept.rs, what git took out of the record, which rb kept, in the one line every surface says it; "" where nothing was	both
 home.found	list	today	view::home (Home)	both
 home.found[]	object	today	view::home (Home)	both
 home.found[].request_id	string	today	view::home (Home)	both
@@ -381,6 +382,7 @@ findings.{id}.observed_places[]	object	today	FindingLine	live
 findings.{id}.observed_places[].id	string	today	FindingLine	live
 findings.{id}.observed_places[].label	string	today	FindingLine	live
 findings.{id}.other_code	string	today	FindingLine	both
+findings.{id}.timing	string	1b	contract 1.18 (round 13, MP-1111-0219 S2): the finding's timing code (before, after_evidence, after_exposure, unknown, untested; taken_out where git took out what it reads), which the rule card's words are chosen by	both
 findings.{id}.witness	object	WIT	WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards	both
 findings.{id}.witness.total	number	WIT	WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards	both
 findings.{id}.witness.afterwards	number	WIT	WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards	both

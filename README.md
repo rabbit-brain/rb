@@ -71,6 +71,7 @@ Criterion cviuxxm on int8 (primary, own): INT8 adds at most 0.05 validation loss
           timing:    declared after the evidence existed: 1 of 3 units was produced before it was declared; produced after it: +0.025 nats · paired difference, 2 seeds (rb)
           units:     3 seeds
           integrity: ok
+  Evidence: 3 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.
   produced after it was declared: +0.025 nats · paired difference, 2 seeds (rb)
   runso7fgx: difference +0.03 (file) · unit seed=1 · produced before the declaration · seed=1
   runtubqyq: difference +0.02 (file) · unit seed=2 · seed=2

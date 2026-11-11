@@ -10,7 +10,7 @@ use crate::value::Value;
 pub const REASONS: &[(&str, &str)] = &[
     ("unknown", "unknown settings"), ("conflict", "a source contradicts a setting"), ("stale", "a source changed"),
     ("confound", "an undeclared difference"), ("drift", "the frozen spec changed"), ("edited_outside_rb", "edited outside rb"),
-    ("shallow_clone", "the clone is shallow"),
+    ("shallow_clone", "the clone is shallow"), ("taken_out_by_git", "git took records out"),
     ("cited_unchecked", "the cited number was not checked"), ("cited_source_changed", "the cited source changed"),
     ("inherited_without_parent", "inherited without a parent"), ("rejected_setting", "a setting someone rejected"),
     ("not_comparable", "settings differ from the source's"), ("state_newer", "part of the record needs a newer rb"),
@@ -18,6 +18,7 @@ pub const REASONS: &[(&str, &str)] = &[
     ("analysis_source_changed", "the document stating it changed"), ("input_retracted", "what it read was retracted"),
     ("input_superseded", "what it read was superseded"), ("arms", "its arms are ambiguous"),
     ("units", "more units than the runs it read form"),
+    ("evidence_file_changed", "a file a run named changed, with no copy kept"),
 ];
 
 pub fn reason(code: &str) -> Option<&'static str> {
@@ -276,8 +277,8 @@ mod tests {
         codes.sort();
         let mut expected = vec![
             "conflict", "stale", "unknown", "rejected_setting", "inherited_without_parent", "confound", "drift", "edited_outside_rb",
-            "shallow_clone", "state_newer", "cited_unchecked", "cited_source_changed", "not_comparable", "experiment_retracted", "retracted",
-            "input_retracted", "input_superseded", "analysis_source_changed", "arms", "units",
+            "shallow_clone", "taken_out_by_git", "state_newer", "cited_unchecked", "cited_source_changed", "not_comparable", "experiment_retracted", "retracted",
+            "input_retracted", "input_superseded", "analysis_source_changed", "arms", "units", "evidence_file_changed",
         ];
         expected.sort();
         assert_eq!(codes, expected);

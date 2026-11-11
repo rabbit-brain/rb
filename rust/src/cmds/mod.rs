@@ -486,52 +486,155 @@ pub fn tally_order(key: &str) -> usize {
 
 /// Where the exact code of a run recorded from a tree with uncommitted changes is, and how to see it.
 pub fn exact_code(root: &Path, attached: &Dict) -> Vec<String> {
-    exact_code_at(root, attached, false, true)
+    exact_code_at(root, attached, false, true, false, true)
 }
 
 /// The code a receipt kept: the exact code only where rb's journal watched the command run (`watched`), else the code
 /// when the run was recorded, and not when it ran for a run made earlier. It is said to be kept in this repository only
 /// where git here has the tree: a clone does not carry rb's refs.
-pub fn exact_code_at(root: &Path, attached: &Dict, made_before: bool, watched: bool) -> Vec<String> {
+/// `offer` is false for a run whose code was given as a commit or tree this repository lacks: the tree when it was
+/// recorded is not its code, so no diff or restore against it is offered.
+pub fn exact_code_at(root: &Path, attached: &Dict, made_before: bool, watched: bool, recorded_here: bool, offer: bool) -> Vec<String> {
     let tree = attached.get("tree").filter(|v| v.truthy()).map(pyjson::py_str);
     let base = trunc(&attached.get("commit").filter(|v| v.truthy()).map(pyjson::py_str).unwrap_or_default(), 12);
+    let cap = crate::capture::Capture::of(attached, crate::capture::When::After);
     let Some(tree) = tree else {
-        return match attached.get("left_out").filter(|v| v.truthy()) {
-            Some(n) => vec![format!("  The code was not kept: {} changed or untracked files were too many to snapshot.", pyjson::py_str(n))],
-            None => Vec::new(),
-        };
+        // no tree: said with why (E3), never as clean
+        return crate::capture::state_lines(&cap, false).into_iter().map(|l| format!("  {l}")).collect();
     };
     let t12 = trunc(&tree, 12);
     // a write rb only previews keeps no tree: the write does
     let dry = crate::dry::active();
-    let here = !dry && crate::sources::git(root, &["cat-file", "-e", &format!("{tree}^{{tree}}")]).is_some();
-    let what = if made_before {
-        "The code when it was recorded, not when it ran"
-    } else if watched {
-        "The exact code"
-    } else {
-        "The code when it was recorded"
-    };
+    let held = if dry { crate::capture::Here::Absent } else { crate::capture::tree_here(root, &tree) };
+    let here = held != crate::capture::Here::Absent;
+    // a snapshot shows which bytes rb kept, not which ones ran: "the exact code" is retired (E2)
+    let _ = watched;
+    let what = if made_before { crate::shell::strings::evidence("code_recorded_earlier", &[]) } else { crate::shell::strings::evidence("code_recorded", &[]) };
     let mut lines = vec![if dry {
         format!("  {what}: git tree {t12}, which the write keeps in this repository under refs/rb/snapshots/.")
-    } else if here {
+    } else if held == crate::capture::Here::Kept {
         format!("  {what}: git tree {t12}, kept in this repository under refs/rb/snapshots/.")
+    } else if here {
+        // in this clone, and no ref keeps it: "kept" would say more than git does (E3)
+        format!("  {what}: {}", crate::shell::strings::evidence("unreffed", &[("tree", t12.clone())]))
+    } else if recorded_here {
+        // recorded in this very clone, and git has the tree no more: gone, never kept elsewhere (S-c)
+        format!("  {}", crate::shell::strings::evidence("gone_here", &[("tree", t12.clone())]))
     } else {
-        format!("  {what}: git tree {t12}, not in this clone: the clone that recorded the run kept it.")
+        // not here: kept on the machine that recorded the run (E4)
+        format!("  {}", crate::shell::strings::evidence("not_here", &[("tree", t12.clone())]))
     }];
-    if !base.is_empty() && here {
+    if !base.is_empty() && here && offer {
         let whole_base = attached.get("commit").filter(|v| v.truthy()).map(pyjson::py_str).unwrap_or_default();
-        lines.push(format!("  See the changes: git diff {whole_base} {tree}   Restore a file: git checkout {tree} -- <path>"));
+        lines.push(format!("  See the changes: git diff {whole_base} {tree}   Restore a file: git restore --source={tree} --worktree -- <path>"));
     }
-    if let Some(n) = attached.get("left_out").filter(|v| v.truthy()) {
-        let one = n.as_i64() == Some(1);
-        lines.push(format!("  {} {} over 10 MB {} not in it.", pyjson::py_str(n), if one { "file" } else { "files" }, if one { "is" } else { "are" }));
+    // part of the code kept: what it lacks, each file with why (E3)
+    for l in crate::capture::state_lines(&cap, false) {
+        lines.push(format!("  {l}"));
     }
     if let Some(n) = attached.get("nested").filter(|v| v.truthy()) {
         let one = n.as_i64() == Some(1);
         lines.push(format!("  {} nested {} not in it.", pyjson::py_str(n), if one { "repository is" } else { "repositories are" }));
     }
     lines
+}
+
+/// When the code a run names was captured (E2), in EVIDENCE_WORDS: at the command's start (with the command it is
+/// from, and, where the code changed after the run, how your checkout differs from it now), or given (and whether this
+/// repository has a given tree). Nothing for a run whose code is the checkout it was recorded in.
+pub fn code_when(root: &Path, run: &crate::record::Run) -> Vec<String> {
+    code_lines(Some(root), run, false, true)
+}
+
+/// `code_when` as a run's card says it (rb open, rb ui, a page): the same lines, but for how your checkout differs now,
+/// which the card's Reproduce says where a checkout is compared. `root` is the git checkout the view is drawn from
+/// (None where it has no git, a bundle's copy: a given tree is then said as given, never as absent); `page` says the
+/// page form, for a reader who has only the page.
+pub fn code_lines(root: Option<&Path>, run: &crate::record::Run, page: bool, changed: bool) -> Vec<String> {
+    use crate::capture::{Capture, When};
+    use crate::shell::strings::evidence;
+    use crate::value::DictExt;
+    let Some(c) = Capture::produced(run) else { return Vec::new() };
+    let p = &run.receipt.produced;
+    let commit = c.commit.clone().unwrap_or_default();
+    let mut out = Vec::new();
+    match c.when {
+        When::Start => {
+            if let Some(cmd) = p.get_str("command").filter(|s| !s.is_empty()) {
+                let at = p.get_str("ran_at").map(|a| a.chars().take(16).collect::<String>().replace('T', " ")).unwrap_or_default();
+                out.push(evidence("code_from", &[("command", cmd.to_string()), ("at", at)]));
+            }
+            // a start tree this clone lacks (a clone carries no refs/rb) is said so, and compared with nothing (S3)
+            let held = c.tree.as_ref().and_then(|t| root.map(|r| crate::capture::tree_here(r, t)));
+            let away = held == Some(crate::capture::Here::Absent);
+            let code = match &c.tree {
+                Some(t) => {
+                    out.push(evidence("code_start", &[("tree", trunc(t, 12))]));
+                    if away {
+                        let gone = !page && root.map_or(false, |r| crate::ledger::evidence::recorded_in(r, &run.id));
+                        out.push(if page {
+                            evidence("start_not_here_page", &[("tree", trunc(t, 12))])
+                        } else if gone {
+                            // recorded in this very clone, and git has the tree no more (S-c)
+                            evidence("start_gone", &[("tree", trunc(t, 12))])
+                        } else {
+                            evidence("start_not_here", &[("tree", trunc(t, 12))])
+                        });
+                    } else if held == Some(crate::capture::Here::Unreffed) && !page {
+                        // in this clone with no ref to keep it, as the after-the-run tree says it (S-c)
+                        out.push(evidence("unreffed", &[("tree", trunc(t, 12))]));
+                    }
+                    format!("git tree {}", trunc(t, 12))
+                }
+                None => {
+                    out.push(evidence("code_start_commit", &[("commit", trunc(&commit, 12))]));
+                    format!("commit {}", trunc(&commit, 12))
+                }
+            };
+            // the code when it was recorded, against the code the command started with
+            let start = c.tree.clone().unwrap_or_else(|| commit.clone());
+            let after = Capture::attached(run).code().map(|(k, t)| if t == k { k } else { t });
+            let same = |a: &str| a == start || (c.tree.is_none() && (a.starts_with(&start) || start.starts_with(a)));
+            if let (true, Some(root)) = (!away && changed && after.as_deref().map_or(false, |a| !start.is_empty() && !same(a)) && !crate::dry::active(), root) {
+                // what is no code (S-b): the files the run named, what the journal says a watched command wrote (a
+                // run's outputs, its own or another's), and Python's __pycache__
+                let named: std::collections::HashSet<String> = run.files.iter().map(|f| f.path.clone()).collect();
+                let mtime = |p: &str| -> Option<i64> {
+                    std::fs::metadata(root.join(p)).ok()?.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_nanos() as i64)
+                };
+                let wrote: std::collections::HashSet<String> = crate::journal::entries(root, None)
+                    .iter()
+                    .filter(|e| e.get_str("op") == Some("run"))
+                    .flat_map(|e| crate::journal::wrote_of(e, &mtime))
+                    .collect();
+                let code_file = |f: &str| !f.is_empty() && !named.contains(f) && !wrote.contains(f) && !f.split('/').any(|p| p == "__pycache__") && !f.ends_with(".pyc");
+                let exclude = format!(":(top,exclude){}", crate::ledger::DIR);
+                let names = |args: &[&str]| -> Option<Vec<String>> {
+                    crate::sources::git_diff_bytes(root, args).map(|b| String::from_utf8_lossy(&b).lines().map(str::to_string).filter(|f| code_file(f)).collect())
+                };
+                // the code changed only where the tree when it was recorded differs from the start in a file of code
+                let moved = after.as_deref().and_then(|a| names(&["--name-only", &start, a, "--", ":(top)", &exclude])).map_or(true, |f| !f.is_empty());
+                let files: Vec<String> = if moved { names(&["--name-only", &start, "--", ":(top)", &exclude]).unwrap_or_default() } else { Vec::new() };
+                if !files.is_empty() {
+                    let n = files.len();
+                    let names = if n <= 3 { crate::next_step::and_list(&files) } else { format!("{} and {} more", files[..3].join(", "), n - 3) };
+                    out.push(evidence("code_changed", &[("code", code), ("files", if n == 1 { "1 file".into() } else { format!("{n} files") }), ("names", names)]));
+                }
+            }
+        }
+        When::Given => match &c.tree {
+            Some(t) if root.map_or(false, |r| crate::capture::tree_here(r, t) == crate::capture::Here::Absent) => {
+                out.push(if page { evidence("code_given_absent_page", &[("tree", trunc(t, 12))]) } else { evidence("code_given_absent", &[("tree", trunc(t, 12))]) })
+            }
+            Some(t) => out.push(evidence("code_given_tree", &[("tree", trunc(t, 12))])),
+            None if root.map_or(false, |r| crate::capture::given_absent(r, run)) => {
+                out.push(if page { evidence("code_given_commit_absent_page", &[("commit", trunc(&commit, 12))]) } else { evidence("code_given_commit_absent", &[("commit", trunc(&commit, 12))]) })
+            }
+            None => out.push(evidence("code_given_commit", &[("commit", trunc(&commit, 12))])),
+        },
+        When::After => {}
+    }
+    out
 }
 
 pub fn get_s(d: &Dict, k: &str) -> String {

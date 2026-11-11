@@ -663,8 +663,11 @@ def test_every_term_chip_on_a_real_page_carries_its_hover(int8_demo, tmp_path, s
     chips = re.findall(r'<span class="kind">(.*?)</span>(?=<span class="(?:id|lab)"|</div>|<span class="dim)', cards)
     named = [c for c in chips if _glossary_id(html.unescape(re.sub(r"<[^>]+>", "", c))) in ids]
     assert len([c for c in named if re.sub(r"<[^>]+>", "", c) == "rule"]) >= 6, chips
-    bare = [c for c in named if 'class="term" data-hint="' not in c]
+    # a term's line is written once a page (its first use), and its later uses name the glossary entry the script reads
+    bare = [c for c in named if not re.search(r'class="term"(?: data-hint="[^"]+")? aria-describedby="g-', c)]
     assert not bare, f"chips with no hover: {bare[:5]}"
+    hinted = re.findall(r' data-hint="[^"]*" aria-describedby="(g-[^"]+)"', page)
+    assert len(hinted) == len(set(hinted)), "each term's line once a page"
     # the hover is said once a card: "rule" on its chip, not again on its rule row
     for c in re.findall(r'<div class="card crit[^"]*" id="c-[^"]+"', cards):
         one = cards.split(c, 1)[1].split('<div class="card ', 1)[0]

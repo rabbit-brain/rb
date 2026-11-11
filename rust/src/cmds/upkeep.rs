@@ -140,6 +140,8 @@ pub fn cmd_fmt(ns: &Namespace, out: &mut Out) -> R {
 
 // ---------------------------------------------------------------- rb doctor
 
+use crate::shell::strings::evidence;
+
 fn problem(check: &str, detail: String, fix: &str) -> Value {
     crate::obj! {"check" => check, "ok" => false, "detail" => detail, "fix" => fix}
 }
@@ -162,9 +164,46 @@ fn went_over(verb: &str, d: &Dict) -> String {
 /// What can go wrong with .rb/ that no single command would notice. Every file is read on its own, so one that does not
 /// parse is listed rather than stopping the check.
 pub fn research_doctor(ns: &Namespace, out: &mut Out, led: &Ledger) -> R {
-    let (restore, adopt) = (flag(ns, "restore"), flag(ns, "adopt"));
-    if restore && adopt {
-        return Err(RBError::msg("E_USAGE", "rb doctor takes --restore or --adopt, not both."));
+    let (restore, adopt, forget) = (flag(ns, "restore"), flag(ns, "adopt"), flag(ns, "forget"));
+    if [restore, adopt, forget].iter().filter(|f| **f).count() > 1 {
+        return Err(RBError::msg("E_USAGE", "rb doctor takes one of --restore, --adopt and --forget."));
+    }
+    if forget {
+        // refused where rb remove and rb confirm are (S1): dropping rb's copy of what git took out is the user's to do
+        if crate::actor::agent_session_sign().is_some() {
+            return Err(RBError::msg_fix(
+                "E_USAGE",
+                "Nothing was dropped: this is an agent session, and dropping rb's copy of what git took out is the user's to do.",
+                "The user runs rb doctor --forget in their own terminal. rb doctor --restore puts what git took out back, and rb doctor lists it.",
+            ));
+        }
+        if !led.actor()?.is_human() {
+            return Err(RBError::msg_fix(
+                "E_USAGE",
+                "Nothing was dropped: RB_ACTOR names an agent here, and dropping rb's copy of what git took out is the user's to do.",
+                "Unset RB_ACTOR, then run rb doctor --forget in your own terminal. rb doctor --restore puts what git took out back, and rb doctor lists it.",
+            ));
+        }
+        let (records, aside) = led.forget_taken()?;
+        if records.is_empty() {
+            out.say("Nothing to drop: git took nothing rb wrote out of the record.");
+        } else {
+            let [n, _, _, _] = crate::shell::strings::took_fill(records.len());
+            let ids = records.iter().map(|(_, i)| i.as_str()).collect::<Vec<_>>().join(", ");
+            out.say(if aside.is_empty() {
+                crate::shell::strings::evidence("took_forgot_none", &[("ids", ids)])
+            } else if records.len() == 1 {
+                crate::shell::strings::evidence("took_forgot_one", &[("ids", ids)])
+            } else {
+                crate::shell::strings::evidence("took_forgot", &[("records", n), ("ids", ids)])
+            });
+            for a in &aside {
+                out.say(format!("  {a}"));
+            }
+        }
+        let ids: Vec<Value> = records.iter().map(|(k, i)| crate::obj! {"kind" => k.clone(), "id" => i.clone()}).collect();
+        out.data.insert("forgot".into(), Value::List(ids));
+        out.data.insert("moved_aside".into(), Value::List(aside.into_iter().map(Value::Str).collect()));
     }
     if restore {
         let restored = led.restore()?;
@@ -213,8 +252,40 @@ pub fn research_doctor(ns: &Namespace, out: &mut Out, led: &Ledger) -> R {
     let fix_edit = "rb doctor --restore puts back what rb last wrote; if the change is right, rb doctor --adopt --why \"...\" takes it";
     let mut parsed: Vec<(&'static str, Obj)> = Vec::new();
     led.forget_index();
+    // what git took out of the record, which rb kept (E1): one problem, and its files are not read as records
+    let _ = led.where_();
+    let took = led.taken_out().unwrap_or_default();
+    if !took.is_empty() {
+        let stash = took.stash.as_ref().map(|(s, _)| s.to_string()).unwrap_or_default();
+        let [records, were, are, them] = crate::shell::strings::took_fill(took.records.len());
+        let (detail, fix) = match (took.pop(), took.stash.is_some()) {
+            (Some(_), _) => (
+                evidence("took_stash_pop", &[("records", records), ("are", are), ("stash", stash.clone()), ("them", them.clone())]).split(": git stash pop").next().unwrap_or("").to_string(),
+                evidence("took_fix_pop", &[("stash", stash), ("them", them)]),
+            ),
+            (None, true) => (evidence("took_detail_stash", &[("records", records), ("were", were), ("stash", stash)]), evidence("took_fix", &[("them", them)])),
+            (None, false) => (evidence("took_detail", &[("records", records), ("were", were)]), evidence("took_fix", &[("them", them)])),
+        };
+        // records in neither the log nor rb's copy are set aside by --restore: named here first (S6)
+        let detail = match led.taken_unkept().ok().flatten() {
+            Some(s) => format!("{detail}. {}", s.trim_end_matches('.')),
+            None => detail,
+        };
+        problems.push(problem(&evidence("took_check", &[]), detail, &fix));
+    }
+    // a file a run named that changed or went where this checkout held its bytes, and rb holds no copy (E5)
+    for r in led.live::<crate::record::Run>().unwrap_or_default().iter() {
+        for f in led.named_files(r).iter().filter(|f| f.is_problem()) {
+            if let Some(said) = f.said(&r.id) {
+                problems.push(problem(&evidence("file_check", &[]), said.trim_end_matches('.').to_string(), &evidence("file_fix", &[])));
+            }
+        }
+    }
     for (kind, p) in led.record_files() {
         let rel = led.rel(&p);
+        if led.in_(kind, &p).map_or(false, |items| !items.is_empty() && items.iter().all(|(id, _)| led.took_hidden(&(kind.to_string(), id.clone())))) {
+            continue;
+        }
         let text = if p.exists() { std::fs::read(&p).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default() } else { String::new() };
         if text.contains("<<<<<<<") || text.contains(">>>>>>>") {
             problems.push(problem(

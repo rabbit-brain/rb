@@ -984,6 +984,7 @@
     "          \u00b7 run4teabd superseded for top1: bad seed",
     "          \u00b7 typed in, not read from a file or run: runf3hlli, runp5h4s6, runprswmo, runqtdhpa",
     "          \u00b7 no run config was compared with the spec (record runs with --config)",
+    "  Evidence: 4 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.",
     "  runf3hlli: top1 0.75 (typed) \u00b7 unit run4teabd \u00b7 repeats run4teabd \u00b7 seed=3",
     "  runp5h4s6: top1 0.74 (typed) \u00b7 unit seed=1 \u00b7 produced before the declaration \u00b7 seed=1",
     "  runprswmo: top1 0.77 (typed) \u00b7 unit seed=5 \u00b7 seed=5",
@@ -2384,7 +2385,8 @@
     "     \"units\": \"4 units, 1 repeat\",",
     "     \"integrity\": \"cuda is unknown (and 1 more)\",",
     "     \"review\": \"no decision\",",
-    "     \"history\": \"\"",
+    "     \"history\": \"\",",
+    "     \"evidence\": \"Evidence: 4 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.\"",
     "    },",
     "    \"n\": 4",
     "   },",
@@ -2935,7 +2937,9 @@
     "     \"dirty\": true,",
     "     \"diff_sha256\": \"b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13\",",
     "     \"untracked\": 6,",
-    "     \"tree\": \"386ae7fced32b45663a48d6d9a23ab0d6f9b34c9\"",
+    "     \"captured\": \"after\",",
+    "     \"tree\": \"386ae7fced32b45663a48d6d9a23ab0d6f9b34c9\",",
+    "     \"kept\": \"whole\"",
     "    },",
     "    \"produced\": {",
     "     \"commit\": null,",
@@ -3021,8 +3025,9 @@
     "  ran on: gpu=none",
     "  command (as given): python eval.py --seed 1",
     "  code that made it: unknown",
+    "  Its files and what it read are as recorded.",
     "  repository when recorded: no commit yet",
-    "  The code when it was recorded: git tree 386ae7fced32, kept in this repository under refs/rb/snapshots/.",
+    "  The code when it was recorded, after the run: git tree 386ae7fced32, kept in this repository under refs/rb/snapshots/.",
     "  file out/model.bin sha256 1b465fa6b6bc (8 bytes) \u00b7 here",
     "  wandb: https://example.org/r/1",
     "  note: the first",
@@ -3041,6 +3046,7 @@
     "  per-run: seed=2",
     "  read evalset (eval)",
     "  code that made it: unknown",
+    "  What it read is as recorded.",
     "  repository when recorded, not when run: no commit yet",
     "  The code when it was recorded, not when it ran: git tree 386ae7fced32, kept in this repository under refs/rb/snapshots/.",
     ""
@@ -4233,7 +4239,8 @@
     "       \"units\": \"4 units, 1 repeat\",",
     "       \"integrity\": \"cuda is unknown (and 1 more)\",",
     "       \"review\": \"no decision\",",
-    "       \"history\": \"\"",
+    "       \"history\": \"\",",
+    "       \"evidence\": \"Evidence: 4 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.\"",
     "      },",
     "      \"n\": 4",
     "     },",
@@ -5218,7 +5225,9 @@
     "     \"dirty\": true,",
     "     \"diff_sha256\": \"b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13\",",
     "     \"untracked\": 6,",
-    "     \"tree\": \"386ae7fced32b45663a48d6d9a23ab0d6f9b34c9\"",
+    "     \"captured\": \"after\",",
+    "     \"tree\": \"386ae7fced32b45663a48d6d9a23ab0d6f9b34c9\",",
+    "     \"kept\": \"whole\"",
     "    },",
     "    \"produced\": {",
     "     \"commit\": null,",
@@ -5245,8 +5254,8 @@
     "    ]",
     "   }",
     "  },",
-    "  \"canonical\": \"{\\\"arm_specs\\\":{\\\"base\\\":\\\"61aec500abba5261d7c1a60c087f73781953f7a0e401c3c6c065b51f9bfbf039\\\",\\\"thin\\\":\\\"5fc478cda7e255b67e02fe3a04d6f217c0abd82f263b30add55798cffeec523a\\\",\\\"wide\\\":\\\"37fb6c0c22ebab8f1978c2d882c2edeea1e2053287b4c282ff93be27c747a797\\\"},\\\"basis\\\":\\\"typed\\\",\\\"created_at\\\":\\\"2026-10-01T12:00:00.000+00:00\\\",\\\"created_by\\\":\\\"human:t\\\",\\\"experiment\\\":\\\"e1\\\",\\\"fingerprint\\\":\\\"da9e2c9112a3d4ef9f461aaa22728ec4054e8318b4b8820cad7c749b4a8e1c59\\\",\\\"id\\\":\\\"run4teabd\\\",\\\"kind\\\":\\\"run\\\",\\\"metrics\\\":{\\\"base.top1\\\":0.69,\\\"wide.top1\\\":0.75},\\\"per_run\\\":{\\\"seed\\\":3},\\\"produced_basis\\\":\\\"unknown\\\",\\\"rb\\\":1,\\\"receipt\\\":{\\\"actor\\\":\\\"human:t\\\",\\\"actor_via\\\":\\\"git-email\\\",\\\"at\\\":\\\"2026-10-01T12:00:00.000+00:00\\\",\\\"attached\\\":{\\\"branch\\\":\\\"main\\\",\\\"commit\\\":null,\\\"diff_sha256\\\":\\\"b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13\\\",\\\"dirty\\\":true,\\\"tree\\\":\\\"386ae7fced32b45663a48d6d9a23ab0d6f9b34c9\\\",\\\"untracked\\\":6},\\\"environment\\\":{\\\"numpy\\\":\\\"2.0.2\\\",\\\"platform\\\":\\\"Linux-6.1.0-x86_64-with-glibc2.39\\\",\\\"pydantic\\\":\\\"2.9.2\\\",\\\"python\\\":\\\"3.12.1\\\",\\\"rb\\\":\\\"0.0.0\\\",\\\"torch\\\":\\\"2.4.1\\\"},\\\"produced\\\":{\\\"commit\\\":null,\\\"from\\\":\\\"unknown\\\"},\\\"rb_version\\\":\\\"0.0.0\\\",\\\"via\\\":\\\"cli\\\"},\\\"retracted\\\":{\\\"at\\\":\\\"2026-10-01T12:00:00.000+00:00\\\",\\\"by\\\":\\\"human:t\\\",\\\"scope\\\":[\\\"top1\\\"],\\\"why\\\":\\\"bad seed\\\"},\\\"settings\\\":{\\\"base.model.width\\\":64,\\\"cuda\\\":null,\\\"data.batch_size\\\":32,\\\"optim.lr\\\":0.0003,\\\"schedule\\\":\\\"cosine\\\",\\\"thin.data.batch_size\\\":16,\\\"wide.model.width\\\":128},\\\"spec_frozen\\\":false,\\\"spec_sha256\\\":\\\"a36815406ce20fcef5c1ea8eaefbeb75d82cc0b9ad60d867dc49ddb59695cf5e\\\",\\\"synthetic\\\":false,\\\"uid\\\":\\\"run_01M3VNBWG05V7BB8DQNP9GN91M\\\",\\\"via\\\":\\\"cli\\\"}\",",
-    "  \"content_sha256\": \"ce75c6eec4186de1c01cc8409aff9706838c2f75dd699205fec2cbe0760c10e3\",",
+    "  \"canonical\": \"{\\\"arm_specs\\\":{\\\"base\\\":\\\"61aec500abba5261d7c1a60c087f73781953f7a0e401c3c6c065b51f9bfbf039\\\",\\\"thin\\\":\\\"5fc478cda7e255b67e02fe3a04d6f217c0abd82f263b30add55798cffeec523a\\\",\\\"wide\\\":\\\"37fb6c0c22ebab8f1978c2d882c2edeea1e2053287b4c282ff93be27c747a797\\\"},\\\"basis\\\":\\\"typed\\\",\\\"created_at\\\":\\\"2026-10-01T12:00:00.000+00:00\\\",\\\"created_by\\\":\\\"human:t\\\",\\\"experiment\\\":\\\"e1\\\",\\\"fingerprint\\\":\\\"da9e2c9112a3d4ef9f461aaa22728ec4054e8318b4b8820cad7c749b4a8e1c59\\\",\\\"id\\\":\\\"run4teabd\\\",\\\"kind\\\":\\\"run\\\",\\\"metrics\\\":{\\\"base.top1\\\":0.69,\\\"wide.top1\\\":0.75},\\\"per_run\\\":{\\\"seed\\\":3},\\\"produced_basis\\\":\\\"unknown\\\",\\\"rb\\\":1,\\\"receipt\\\":{\\\"actor\\\":\\\"human:t\\\",\\\"actor_via\\\":\\\"git-email\\\",\\\"at\\\":\\\"2026-10-01T12:00:00.000+00:00\\\",\\\"attached\\\":{\\\"branch\\\":\\\"main\\\",\\\"captured\\\":\\\"after\\\",\\\"commit\\\":null,\\\"diff_sha256\\\":\\\"b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13\\\",\\\"dirty\\\":true,\\\"kept\\\":\\\"whole\\\",\\\"tree\\\":\\\"386ae7fced32b45663a48d6d9a23ab0d6f9b34c9\\\",\\\"untracked\\\":6},\\\"environment\\\":{\\\"numpy\\\":\\\"2.0.2\\\",\\\"platform\\\":\\\"Linux-6.1.0-x86_64-with-glibc2.39\\\",\\\"pydantic\\\":\\\"2.9.2\\\",\\\"python\\\":\\\"3.12.1\\\",\\\"rb\\\":\\\"0.0.0\\\",\\\"torch\\\":\\\"2.4.1\\\"},\\\"produced\\\":{\\\"commit\\\":null,\\\"from\\\":\\\"unknown\\\"},\\\"rb_version\\\":\\\"0.0.0\\\",\\\"via\\\":\\\"cli\\\"},\\\"retracted\\\":{\\\"at\\\":\\\"2026-10-01T12:00:00.000+00:00\\\",\\\"by\\\":\\\"human:t\\\",\\\"scope\\\":[\\\"top1\\\"],\\\"why\\\":\\\"bad seed\\\"},\\\"settings\\\":{\\\"base.model.width\\\":64,\\\"cuda\\\":null,\\\"data.batch_size\\\":32,\\\"optim.lr\\\":0.0003,\\\"schedule\\\":\\\"cosine\\\",\\\"thin.data.batch_size\\\":16,\\\"wide.model.width\\\":128},\\\"spec_frozen\\\":false,\\\"spec_sha256\\\":\\\"a36815406ce20fcef5c1ea8eaefbeb75d82cc0b9ad60d867dc49ddb59695cf5e\\\",\\\"synthetic\\\":false,\\\"uid\\\":\\\"run_01M3VNBWG05V7BB8DQNP9GN91M\\\",\\\"via\\\":\\\"cli\\\"}\",",
+    "  \"content_sha256\": \"222272a9987f31f5f6b123a5850ec00b69f28ac15e55f48151e0466567644ab3\",",
     "  \"valid\": true,",
     "  \"problems\": []",
     " },",
@@ -5882,7 +5891,7 @@
     "    \"op\": \"retract\",",
     "    \"kind\": \"run\",",
     "    \"id\": \"run4teabd\",",
-    "    \"sha256\": \"ce75c6eec4186de1c01cc8409aff9706838c2f75dd699205fec2cbe0760c10e3\",",
+    "    \"sha256\": \"222272a9987f31f5f6b123a5850ec00b69f28ac15e55f48151e0466567644ab3\",",
     "    \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\",",
     "    \"detail\": {",
     "     \"why\": \"bad seed\",",
@@ -5899,7 +5908,7 @@
     "    \"op\": \"record\",",
     "    \"kind\": \"run\",",
     "    \"id\": \"runprswmo\",",
-    "    \"sha256\": \"0c844079d3d77043247a89ee4e6f0e26dbdc7778783ce31381212617289d5f87\",",
+    "    \"sha256\": \"580241ea3b9e8437fc08aabc04bf24d374417fcfd739bc386448e154d4d2c35a\",",
     "    \"path\": \".rb/experiments/e1/runs/runprswmo.yaml\",",
     "    \"detail\": {",
     "     \"experiment\": \"e1\",",
@@ -6933,7 +6942,8 @@
     "      \"units\": \"4 units, 1 repeat\",",
     "      \"integrity\": \"metric top1 differs from what rb wrote: it was edited outside rb: rb doctor shows it (and 2 more)\",",
     "      \"review\": \"no decision\",",
-    "      \"history\": \"\"",
+    "      \"history\": \"\",",
+    "      \"evidence\": \"Evidence: 4 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.\"",
     "     },",
     "     \"n\": 4,",
     "     \"witness\": {",
@@ -8599,7 +8609,8 @@
     "          \"units\": \"4 units, 1 repeat\",",
     "          \"integrity\": \"metric top1 differs from what rb wrote: it was edited outside rb: rb doctor shows it (and 2 more)\",",
     "          \"review\": \"no decision\",",
-    "          \"history\": \"\"",
+    "          \"history\": \"\",",
+    "          \"evidence\": \"Evidence: 4 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.\"",
     "         },",
     "         \"n\": 4",
     "        },",
@@ -9979,7 +9990,7 @@
     " \"data\": {",
     "  \"page_says\": \"The page says: no commit yet.\",",
     "  \"path\": \"@BASE@/work/shared/one.html\",",
-    "  \"bytes\": 313095",
+    "  \"bytes\": 306329",
     " },",
     " \"errors\": [],",
     " \"next\": [],",
@@ -10195,6 +10206,7 @@
     "          \u00b7 1 run outside this criterion's per-run selectors is not read: run4zuz4h (width=256)",
     "          \u00b7 typed in, not read from a file or run: run6pqyge, run7pjy2o",
     "          \u00b7 no run config was compared with the spec (record runs with --config)",
+    "  Evidence: 2 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.",
     "  c7 reverses c6: The recorded design cells do not all point in one direction.",
     "  run6pqyge: difference -0.1 (typed) \u00b7 unit loops=8 \u00b7 seed=1 \u00b7 width=512 \u00b7 seed=1, width=512, loops=8",
     "  run7pjy2o: difference -0.05 (typed) \u00b7 unit loops=6 \u00b7 seed=2 \u00b7 width=512 \u00b7 seed=2, width=512, loops=6",
@@ -10461,7 +10473,8 @@
     "    \"units\": \"2 design cells from 3 runs \\u00b7 descriptive range -0.075 to +0.02; no sampling interval across fixed cells \\u00b7 1 of 2 cells meet the threshold\",",
     "    \"integrity\": \"ok\",",
     "    \"review\": \"no decision\",",
-    "    \"history\": \"\"",
+    "    \"history\": \"\",",
+    "    \"evidence\": \"Evidence: 3 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.\"",
     "   },",
     "   \"n\": 2",
     "  },",
@@ -10684,7 +10697,8 @@
     "      \"units\": \"2 design cells from 3 runs \\u00b7 descriptive range -0.075 to +0.02; no sampling interval across fixed cells \\u00b7 1 of 2 cells meet the threshold\",",
     "      \"integrity\": \"ok\",",
     "      \"review\": \"no decision\",",
-    "      \"history\": \"\"",
+    "      \"history\": \"\",",
+    "      \"evidence\": \"Evidence: 3 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.\"",
     "     },",
     "     \"n\": 2",
     "    },",
@@ -10807,7 +10821,8 @@
     "      \"units\": \"2 units\",",
     "      \"integrity\": \"ok\",",
     "      \"review\": \"no decision\",",
-    "      \"history\": \"\"",
+    "      \"history\": \"\",",
+    "      \"evidence\": \"Evidence: 2 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.\"",
     "     },",
     "     \"n\": 2",
     "    },",
@@ -10893,6 +10908,7 @@
     "          \u00b7 the arms differ in seed: the runs of wide at loops=8 hold 1, those of wide at loops=6 hold 2, so the comparison carries that difference too",
     "          \u00b7 typed in, not read from a file or run: run6pqyge, run7pjy2o",
     "          \u00b7 no run config was compared with the spec (record runs with --config)",
+    "  Evidence: 2 runs, each with its files unchanged and its code kept when it was recorded, after the run. rb has not rerun them.",
     "  run6pqyge: wide.val_loss 0.9 (typed) \u00b7 unit seed=1 \u00b7 width=512 \u00b7 seed=1, width=512, loops=8",
     "  run7pjy2o: wide [reference].val_loss 0.95 (typed) \u00b7 unit seed=2 \u00b7 width=512 \u00b7 seed=2, width=512, loops=6",
     ""
@@ -11136,17 +11152,13 @@
   ".rb/cache/hashes.json": [
    "{\"@BASE@/work/data/eval.txt\": [4, 1790852404000000000, \"911169ddaaf146aff539f58c26c489af3b892dff0fe283c1c264c65ae5aa59a2\"], \"@BASE@/work/out/model.bin\": [8, 1790852405000000000, \"1b465fa6b6bcbc06a3199e3d2d8aec35d37494a712f888b6d5536684dd89d0f0\"], \"@BASE@/work/analysis/boot.json\": [150, 1790852402000000000, \"daf624a264c5da755f09b1b4aebf59e359dd7f6c1fdf773d69e0875311d01f97\"]}"
   ],
-  ".rb/cache/objects/07/074ec3d5d6f93bd2ec245dc2b0f5d9083aa3531c07f4b712ce1fe73e424a87f4.json.gz": {
-   "sha256": "91d694d702e233a95b5dd6184d70d23a53db49c5e7a8cb5e4708f88bdd32614c",
-   "bytes": 1174
-  },
   ".rb/cache/objects/07/076267587ed22b93e38d1ea1a517c8c4a9ee0a6fb633c3e67b64166ae229214c.json.gz": {
    "sha256": "cdf6dc1c7469025eaeca287f8b95f5e25a4827b6fc4bee2fe6731398c9adcee0",
    "bytes": 186
   },
-  ".rb/cache/objects/0c/0c844079d3d77043247a89ee4e6f0e26dbdc7778783ce31381212617289d5f87.json.gz": {
-   "sha256": "040fca08296a10e03374343d6c9e9569f535ba80bbd73d458db482fb52df1ee5",
-   "bytes": 1373
+  ".rb/cache/objects/0c/0c8dc9d23f2db503f4744135793f18fcddfe3618534158aac8c3c8856c062ed9.json.gz": {
+   "sha256": "bba062890238bae4ccaabb694efe98e7cbef3b323eff5e741de25a6c5c034c16",
+   "bytes": 1429
   },
   ".rb/cache/objects/11/11f72187ded685e5c5b64951b1cf6dee97ae05e417a6c2af8e4a711fc5fbcf8b.json.gz": {
    "sha256": "bea98e5e8ccf0e6852be73bf668a2bf2f111c16e368893e85bc8d21676f99382",
@@ -11156,13 +11168,13 @@
    "sha256": "bb7bbb2beb05e61ec6e66ca0b71eec96a4b0d4571256c3ca894b10043465fc86",
    "bytes": 639
   },
-  ".rb/cache/objects/18/18f7a9eb52a46a2530e2b99ff1f904557ad73d34f028bc827881d40497e8a7ed.json.gz": {
-   "sha256": "1040678054ce6470eea78176546e48d5f059c434a8acabff585ee02e8f91e79c",
-   "bytes": 1959
-  },
   ".rb/cache/objects/20/20ca1ebd837cdd0ac398a40bdfd5f97d78b27ff1572d643aa309e61d7d6e0a0f.json.gz": {
    "sha256": "741c5f421565be1f95b57209a09114f8882799f262226cfbbe5c398411b58d98",
    "bytes": 482
+  },
+  ".rb/cache/objects/22/222272a9987f31f5f6b123a5850ec00b69f28ac15e55f48151e0466567644ab3.json.gz": {
+   "sha256": "4d29601933a5db3da231b50f72ee90d4ff0e561815593535e2c981df9e7a3d4a",
+   "bytes": 1507
   },
   ".rb/cache/objects/23/2338fd66805f1bba59250473973049fd1af41a03d32578edfe519c7dddd6a3b2.json.gz": {
    "sha256": "54c59fa2b9ff75eba79856d02d41cf2f1cd4883e28c7a1e9243ea4c83cbd4332",
@@ -11171,6 +11183,10 @@
   ".rb/cache/objects/24/2420f146582a7fd42e626c4490cfd59c7b67a1ba501eca7cc12783074afe6694.json.gz": {
    "sha256": "97ada9c2c1c553a6bc41a7d440233a59e4f238e9b625c485ae17b1b1683492b0",
    "bytes": 690
+  },
+  ".rb/cache/objects/27/27a2de273a6c34a8584b800a9087c7a3d963d79362d79f6b4b039766e55d0129.json.gz": {
+   "sha256": "343a06a1b8aec6ebb0d0f0bb43af276cef06cb5631e0209de521271d5c1edf48",
+   "bytes": 1405
   },
   ".rb/cache/objects/2e/2e60cdf685f72250eab7fb756d00fff5d1bced2f4f2cf37634bf6658e523b1cb.json.gz": {
    "sha256": "b47d9b2a948949b054ec5476dd07bf2fbed412f68c7c4c8942a80cf1c0225636",
@@ -11183,6 +11199,10 @@
   ".rb/cache/objects/39/392d892db32ced07c4c470ae29adb2e04d53c7bb4939dc454a24355546cbf853.json.gz": {
    "sha256": "8f0053796abd363ace07c10b83179120b9a33c58ffe2cd22dcbb35aa4c501c1c",
    "bytes": 623
+  },
+  ".rb/cache/objects/3e/3e0277ffb8b2b850ebbf7980bf6fc1292407e69edd6e2ded35d8ff55a8482bde.json.gz": {
+   "sha256": "a3b2acd2efc8e50ebc32b5a3ee4d5627916961c63b26ced3af6e81f0c49a3f7d",
+   "bytes": 1407
   },
   ".rb/cache/objects/3e/3e31d043cad31030c4d92e86877e64f0a542506e6415be5aa521e83dd6effb71.json.gz": {
    "sha256": "761634ebdc5b16cef58e114c255f1da0fbd789e07b88cb1827da521929f79a41",
@@ -11208,6 +11228,10 @@
    "sha256": "e0a6710b1e351fc8a840558273716ddea27495120c960f29ef823971969f2adf",
    "bytes": 282
   },
+  ".rb/cache/objects/48/48a644e4622027e4a6b5bd0268e3f4b110276099b096aa13b31c48cd3122f111.json.gz": {
+   "sha256": "861baecf0625094cb12df34f7d0d2d7519f45b3d332668b4ccf897459b287261",
+   "bytes": 1207
+  },
   ".rb/cache/objects/4b/4b8d012d10304dc7df41c9fa5fdb44be99e41b83615b35ecfeab7f1305a4dbec.json.gz": {
    "sha256": "d39a4d76c7d430171bcbf01baaf83b751992c3b6dd5b409e80580ba0e516bcb6",
    "bytes": 191
@@ -11228,6 +11252,10 @@
    "sha256": "bcecdba61b7afd387a2cb898d9aa4a2209c981aeccdc25b88ace6f7bb9f1a669",
    "bytes": 242
   },
+  ".rb/cache/objects/58/580241ea3b9e8437fc08aabc04bf24d374417fcfd739bc386448e154d4d2c35a.json.gz": {
+   "sha256": "d122b87fd28f538de1ac86b25ca476a95e033cae272088c738ffe00f14617353",
+   "bytes": 1407
+  },
   ".rb/cache/objects/5c/5c7733cb30981da709fe03daa8e71130c624c1824a88af71d99d590f64855bf9.json.gz": {
    "sha256": "bbc974add61c7bc113aa18bb8c799b678d6d901755672887f642ce09df49e7e1",
    "bytes": 263
@@ -11239,10 +11267,6 @@
   ".rb/cache/objects/62/627c321fca03883954366b5c2380d038dd0d8ce685c9ce6ef9b7e094f519554a.json.gz": {
    "sha256": "75e3516f7ebf148079652f96b4c827fbdcdb82792c0e9fc937eca4b6167faa57",
    "bytes": 581
-  },
-  ".rb/cache/objects/62/628061bc99d3d33b89716f67173542f2b92de577495ef76e2a4797e0e3844356.json.gz": {
-   "sha256": "3ece1ec9c666d44aa1738f83a1911d281c0ae0becf42209b13058bf1a2bd653f",
-   "bytes": 1373
   },
   ".rb/cache/objects/65/65600699acc4c5f2c7f9aa7d623671b3e297610621d74b93b14c0e8961c9a3c0.json.gz": {
    "sha256": "c532819f73451549e951d322db712b0523005db84ae8eeda4a65520ac57298ae",
@@ -11256,6 +11280,10 @@
    "sha256": "67e373ccb80f283f6e18f07a72b6f19363d43d6b296615dd03acb1c86fce61b1",
    "bytes": 993
   },
+  ".rb/cache/objects/7c/7c5eccaae8e8cd54436aa66219c4e8957e8c41b5e57a35d635112012487ba2ea.json.gz": {
+   "sha256": "8f630abb6b0cb912e5a10f59ae71a795010e93160aa74500397eb2649441ee68",
+   "bytes": 1208
+  },
   ".rb/cache/objects/7c/7cdd1d8ef11eee5eadb84688040ea7dd9dd36d3e573d4c5eb80e35ce0831573b.json.gz": {
    "sha256": "f6aab6beda28ef1d185bea762cf1cea8d41549dda673659256c4b815d4e91eaf",
    "bytes": 134
@@ -11264,10 +11292,6 @@
    "sha256": "e5c05d35a0c32f0b13657c372ab6500e5bf7eb3434211f80ba1479324cdbcabe",
    "bytes": 462
   },
-  ".rb/cache/objects/80/8091da5ec0808d737850483ced1874dde1ce394df0a913b98b2f93415f83e59f.json.gz": {
-   "sha256": "ff333f73e801a7aee96d456ecafdbfddfbf9fdb4a92a17f9f31415366fe909bb",
-   "bytes": 1569
-  },
   ".rb/cache/objects/83/83aa52a820b0fd4f71766360714f164b26a38465d249cdbd11f56e545c97bc19.json.gz": {
    "sha256": "84afb288f40f998b75cdf4bc37dc6807d19836ffed7f6fb42ea4f405a752e20f",
    "bytes": 1132
@@ -11275,10 +11299,6 @@
   ".rb/cache/objects/8c/8c938d54dad1fc786f840087854edf4f45d1ff6acb94145b3230a7b8bee846af.json.gz": {
    "sha256": "8fd0e285df9ba8f047ccdec59c85954670d94ac019fc8827c7d69d2662dd58f1",
    "bytes": 464
-  },
-  ".rb/cache/objects/8d/8d7146d7ee302453b5a15b5eb8097da212ee0bf62e590c043e4e869b246459b6.json.gz": {
-   "sha256": "aadbd321aca95c836d926548a046e6d396adc85013fefd67148b7c2d88b70470",
-   "bytes": 1173
   },
   ".rb/cache/objects/8e/8e439475aeadfc8936ab55c50daa54e6ab51507eb1a66ae4212c4fffc8649190.json.gz": {
    "sha256": "21d604a3ca7d4be5ed41eb135036dd1863529fa4377e82157f719d322e52d9ed",
@@ -11291,6 +11311,10 @@
   ".rb/cache/objects/90/903b548ccc55a135efb92cdd9b6e80691f20491a3c4121284aeb85a27dbb30a0.json.gz": {
    "sha256": "50168518b76d35bf847d15eb360a216db4535d2149a7b530bf4c8ad8dfcb3ae6",
    "bytes": 484
+  },
+  ".rb/cache/objects/91/91457593f84a33fc0818ab82755bf5bc71bd1815e6495d1de147008352b950fa.json.gz": {
+   "sha256": "decfb430fdca367a823f44cca03366ee47ae7934a38ab14f2b40ec22999fb502",
+   "bytes": 1208
   },
   ".rb/cache/objects/93/93bac1623ddfe6155980db36ca60a661913859713ce053fceed81a5b7a900416.json.gz": {
    "sha256": "678a26a49e745bc9b196ba5e20243de7241ba4909aaa023c7b6cdbaec7e30c31",
@@ -11316,9 +11340,9 @@
    "sha256": "fb72360c0db3222d7be8f22bbbb4252c4ce21cb45f32cbbe4f4b5b1c5b5db51a",
    "bytes": 706
   },
-  ".rb/cache/objects/be/be3fc1f9073c57f721baacbdfb0dcc07beb8a320312d3e570a51441cca35e670.json.gz": {
-   "sha256": "0385e510038a296b8313bab6c5a0567cdd795e823afe3c93fde9108aa3dced6a",
-   "bytes": 1174
+  ".rb/cache/objects/bc/bc693326b040d04b737bbffd683285a0c18557ffb7c688b0fa0830c47442f27e.json.gz": {
+   "sha256": "8dce73a309c294107924d238d06b3c7f89e0f5dd3e618af4602d1442ba26a822",
+   "bytes": 1993
   },
   ".rb/cache/objects/be/bec37e574722e30461f08ee40c444e8401753af2fae96600093fe36d75fe3cf8.json.gz": {
    "sha256": "4b412ad692c73db5020a75a65bee5c462addd97f6f92856f47aa9e41a01983d2",
@@ -11336,21 +11360,13 @@
    "sha256": "7366547005ec2946573bb69cb8f9abbdd6933b5b32c807c0f3825269a9b2ec59",
    "bytes": 7668
   },
-  ".rb/cache/objects/ce/ce75c6eec4186de1c01cc8409aff9706838c2f75dd699205fec2cbe0760c10e3.json.gz": {
-   "sha256": "0172055fe5c014477c2e37d21edbba4de16451eba5b27600252f98b782672b2d",
-   "bytes": 1473
+  ".rb/cache/objects/cc/cc133291270511b77d1cf1f37cf0bf85bf641644641262475b08b70e5fd47887.json.gz": {
+   "sha256": "45767d4419acfc540683c6c81a107ea482069ee215bfc6d0dcc170a70a377d7c",
+   "bytes": 1603
   },
   ".rb/cache/objects/d2/d2f4336f66b64da4954845f4125d40bebb8b35aaa5b86e52e526486ad7d85c2b.json.gz": {
    "sha256": "9e69699213efdb972742b1d1658c00d660b18a8c07cfd74748e7a87af9da704f",
    "bytes": 389
-  },
-  ".rb/cache/objects/e0/e032e4a9d6a1b42e29495fc92254860804d21595a7c63835d2b804e0090e3d09.json.gz": {
-   "sha256": "149f4deebf850015090fdd0917d912cd92dcf43653cd97719aa701e0602339a0",
-   "bytes": 1371
-  },
-  ".rb/cache/objects/e6/e6dca4362f6a53cdf034fdf60510d6fd8d7ea663d8f61fd7ca06ebc72dbb1bc8.json.gz": {
-   "sha256": "5f6ffdb405b076bf4455e32ac86a3fcc1bcb58ea42ab3cebd81a4779f626eeb0",
-   "bytes": 1395
   },
   ".rb/cache/objects/ea/eabc44fd378f6d5ef5faf94ed41e153711469b6f3d9c31a7cb2dba0fff7860c6.json.gz": {
    "sha256": "869da5ff78a8ce5b37fd7b4075606812c63f2e9f64aee11bc09bf327c49d34d1",
@@ -11416,11 +11432,11 @@
    "  \"28a204a4d3af9c94\",",
    "  \"a5035be72d9aed2c\",",
    "  \"abfbad04dcf21047\",",
-   "  \"ecfebd7287732451\",",
-   "  \"567a28149194c071\",",
-   "  \"c404db1c1201c337\",",
-   "  \"e8ff9b4e3133731b\",",
-   "  \"830339a13593abe7\",",
+   "  \"224b2e9417fed517\",",
+   "  \"055fdc1e8f9c3229\",",
+   "  \"245d9c4eee15c37a\",",
+   "  \"1dcfc26391f075e3\",",
+   "  \"e94be5f490cd2b5b\",",
    "  \"fb91138f3dad0ea1\",",
    "  \"f95243d80da5e56f\",",
    "  \"27d3e5ce5260ff17\"",
@@ -12337,7 +12353,9 @@
    "    dirty: true",
    "    diff_sha256: b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13",
    "    untracked: 6",
+   "    captured: after",
    "    tree: 386ae7fced32b45663a48d6d9a23ab0d6f9b34c9",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -12400,7 +12418,9 @@
    "    dirty: true",
    "    diff_sha256: b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13",
    "    untracked: 6",
+   "    captured: after",
    "    tree: 386ae7fced32b45663a48d6d9a23ab0d6f9b34c9",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -12458,7 +12478,9 @@
    "    dirty: true",
    "    diff_sha256: b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13",
    "    untracked: 6",
+   "    captured: after",
    "    tree: 386ae7fced32b45663a48d6d9a23ab0d6f9b34c9",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -12535,7 +12557,9 @@
    "    dirty: true",
    "    diff_sha256: b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13",
    "    untracked: 6",
+   "    captured: after",
    "    tree: 386ae7fced32b45663a48d6d9a23ab0d6f9b34c9",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -12593,7 +12617,9 @@
    "    dirty: true",
    "    diff_sha256: b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13",
    "    untracked: 6",
+   "    captured: after",
    "    tree: 386ae7fced32b45663a48d6d9a23ab0d6f9b34c9",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -12656,7 +12682,9 @@
    "    dirty: true",
    "    diff_sha256: b218e6fb8df35b40600e7bc46462d9b772cd0f9dba121db83a02f66d9152df13",
    "    untracked: 6",
+   "    captured: after",
    "    tree: 386ae7fced32b45663a48d6d9a23ab0d6f9b34c9",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -12937,7 +12965,9 @@
    "    dirty: true",
    "    diff_sha256: e4521c1d8b541a9021ebeed94355f894df9abe3b29bacaf6c5aa264abc514781",
    "    untracked: 10",
+   "    captured: after",
    "    tree: 161903c8fc0c7a5df032024b2c4f65467b69ae84",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -12987,7 +13017,9 @@
    "    dirty: true",
    "    diff_sha256: e4521c1d8b541a9021ebeed94355f894df9abe3b29bacaf6c5aa264abc514781",
    "    untracked: 10",
+   "    captured: after",
    "    tree: 161903c8fc0c7a5df032024b2c4f65467b69ae84",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -13037,7 +13069,9 @@
    "    dirty: true",
    "    diff_sha256: e4521c1d8b541a9021ebeed94355f894df9abe3b29bacaf6c5aa264abc514781",
    "    untracked: 10",
+   "    captured: after",
    "    tree: 161903c8fc0c7a5df032024b2c4f65467b69ae84",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -13103,11 +13137,11 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c3\", \"sha256\": \"627c321fca03883954366b5c2380d038dd0d8ce685c9ce6ef9b7e094f519554a\", \"path\": \".rb/experiments/e1/criteria/c3.yaml\", \"detail\": {\"rule\": \"top1 = 0.83 \u00b1 0.01\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:c3\": \"primary\", \"rule:c3\": \"top1 = 0.83 \u00b1 0.01\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c4\", \"sha256\": \"5c7733cb30981da709fe03daa8e71130c624c1824a88af71d99d590f64855bf9\", \"path\": \".rb/experiments/e1/criteria/c4.yaml\", \"detail\": {\"rule\": \"top1: wide vs base better, its interval clear of 0\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:c4\": \"primary\", \"rule:c4\": \"top1: wide vs base better, its interval clear of 0\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c5\", \"sha256\": \"57a48b0f88eb7dd111a2a4edd9beb665fb8c16fcfacd355ee49722f2703cfa6b\", \"path\": \".rb/experiments/e1/criteria/c5.yaml\", \"detail\": {\"rule\": \"wide.top1 \u2265 0.9\", \"experiment\": \"e1\", \"role\": \"gate\", \"changed_parts\": {\"e1\": {\"role:c5\": \"gate\", \"rule:c5\": \"wide.top1 \u2265 0.9\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"18f7a9eb52a46a2530e2b99ff1f904557ad73d34f028bc827881d40497e8a7ed\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {\"seed\": 1}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"8091da5ec0808d737850483ced1874dde1ce394df0a913b98b2f93415f83e59f\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.71, \"wide.top1\": 0.76}, \"per_run\": {\"seed\": 2}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"628061bc99d3d33b89716f67173542f2b92de577495ef76e2a4797e0e3844356\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.69, \"wide.top1\": 0.75}, \"per_run\": {\"seed\": 3}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runf3hlli\", \"sha256\": \"e6dca4362f6a53cdf034fdf60510d6fd8d7ea663d8f61fd7ca06ebc72dbb1bc8\", \"path\": \".rb/experiments/e1/runs/runf3hlli.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.69, \"wide.top1\": 0.75}, \"per_run\": {\"seed\": 3}, \"again\": false, \"repeats\": \"run4teabd\"}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runedhdx7\", \"sha256\": \"e032e4a9d6a1b42e29495fc92254860804d21595a7c63835d2b804e0090e3d09\", \"path\": \".rb/experiments/e1/runs/runedhdx7.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"thin.top1\": 0.6, \"base.top1\": 0.7}, \"per_run\": {\"seed\": 4}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"bc693326b040d04b737bbffd683285a0c18557ffb7c688b0fa0830c47442f27e\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.74}, \"per_run\": {\"seed\": 1}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"cc133291270511b77d1cf1f37cf0bf85bf641644641262475b08b70e5fd47887\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.71, \"wide.top1\": 0.76}, \"per_run\": {\"seed\": 2}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"3e0277ffb8b2b850ebbf7980bf6fc1292407e69edd6e2ded35d8ff55a8482bde\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.69, \"wide.top1\": 0.75}, \"per_run\": {\"seed\": 3}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runf3hlli\", \"sha256\": \"0c8dc9d23f2db503f4744135793f18fcddfe3618534158aac8c3c8856c062ed9\", \"path\": \".rb/experiments/e1/runs/runf3hlli.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.69, \"wide.top1\": 0.75}, \"per_run\": {\"seed\": 3}, \"again\": false, \"repeats\": \"run4teabd\"}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runedhdx7\", \"sha256\": \"27a2de273a6c34a8584b800a9087c7a3d963d79362d79f6b4b039766e55d0129\", \"path\": \".rb/experiments/e1/runs/runedhdx7.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"thin.top1\": 0.6, \"base.top1\": 0.7}, \"per_run\": {\"seed\": 4}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"a1\", \"sha256\": \"65600699acc4c5f2c7f9aa7d623671b3e297610621d74b93b14c0e8961c9a3c0\", \"path\": \".rb/experiments/e1/analyses/a1.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"a2\", \"sha256\": \"cabafc3b795148d4f7b4d5a85ef6326afc756b0466b011220eeb68913dff144b\", \"path\": \".rb/experiments/e1/analyses/a2.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"a3\", \"sha256\": \"fa42db4009bb0f830e9500e8cd3e6521f5b6ad81865d438066967584e571e787\", \"path\": \".rb/experiments/e1/analyses/a3.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": [\"a2\"]}}",
@@ -13117,8 +13151,8 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"decide\", \"kind\": \"decision\", \"id\": \"d4teabd\", \"sha256\": \"5f3314ae575e8b96a037a15e5c2bde2f2d01c20ca8e0fd3e84b6e3ad7acce2d5\", \"path\": \".rb/decisions/d4teabd.yaml\", \"detail\": {\"subject\": \"e1/data.batch_size\", \"action\": \"accept\", \"value\": 32}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"decide\", \"kind\": \"decision\", \"id\": \"df3hlli\", \"sha256\": \"8eb095c6db6b6c2a385b2bf960b42125bc3e9f8418a9f7e885c2551e5fe78848\", \"path\": \".rb/decisions/df3hlli.yaml\", \"detail\": {\"subject\": \"q2\", \"action\": \"investigate\", \"value\": null}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"freeze\", \"kind\": \"experiment\", \"id\": \"e2\", \"sha256\": \"20ca1ebd837cdd0ac398a40bdfd5f97d78b27ff1572d643aa309e61d7d6e0a0f\", \"path\": \".rb/experiments/e2/experiment.yaml\", \"detail\": {\"sha256_spec\": \"541022141e5485aaf25602b6d467a051155e525c25ad3e4b159984e9d54b9f2a\", \"why\": \"nothing to lock\", \"after_runs\": [], \"changed_parts\": {\"e2\": {\"freeze\": \"frozen 2026-10-01\", \"freeze_why\": \"nothing to lock\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"retract\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"ce75c6eec4186de1c01cc8409aff9706838c2f75dd699205fec2cbe0760c10e3\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"why\": \"bad seed\", \"scope\": [\"top1\"]}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runprswmo\", \"sha256\": \"0c844079d3d77043247a89ee4e6f0e26dbdc7778783ce31381212617289d5f87\", \"path\": \".rb/experiments/e1/runs/runprswmo.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.72, \"wide.top1\": 0.77}, \"per_run\": {\"seed\": 5}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"retract\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"222272a9987f31f5f6b123a5850ec00b69f28ac15e55f48151e0466567644ab3\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"why\": \"bad seed\", \"scope\": [\"top1\"]}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runprswmo\", \"sha256\": \"580241ea3b9e8437fc08aabc04bf24d374417fcfd739bc386448e154d4d2c35a\", \"path\": \".rb/experiments/e1/runs/runprswmo.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.72, \"wide.top1\": 0.77}, \"per_run\": {\"seed\": 5}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e3\", \"sha256\": \"ebbbdd5481d74a8f9e29ddfa0c534e0f018e8ac9f9bd84fe47bd18cf8fcac767\", \"path\": \".rb/experiments/e3/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e3/base\", \"path\": \".rb/experiments/e3/variants/base.yaml\", \"sha256\": \"eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695\"}, {\"kind\": \"variant\", \"id\": \"e3/wide\", \"path\": \".rb/experiments/e3/variants/wide.yaml\", \"sha256\": \"4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb\"}], \"detail\": {\"variants\": [\"base\", \"wide\"], \"like\": null, \"questions\": [\"q1\"], \"changed_parts\": {\"e3\": {\"variant:base\": \"baseline\", \"variant:wide\": \"candidate\", \"question:q1\": \"q1\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"spec_set\", \"kind\": \"experiment\", \"id\": \"e3\", \"sha256\": \"568677fb6c3b31a8e827c243d96d66d2270fa8ca4a45d03320a1b0a901523b02\", \"path\": \".rb/experiments/e3/experiment.yaml\", \"detail\": {\"setting\": \"seed\", \"change\": \"setting seed: new, unknown (per-run)\", \"value\": null, \"status\": \"unknown\", \"required\": true, \"source\": null, \"changed_parts\": {\"e3\": {\"setting:seed\": \"per run\", \"source:seed\": null, \"factor:seed\": null}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"spec_set\", \"kind\": \"experiment\", \"id\": \"e3\", \"sha256\": \"af9f630b3b90588785be080cfa2391cb905678c3649f2115e73ed23c6eddfea6\", \"path\": \".rb/experiments/e3/experiment.yaml\", \"detail\": {\"setting\": \"width\", \"change\": \"setting width: new, unknown (per-run)\", \"value\": null, \"status\": \"unknown\", \"required\": true, \"source\": null, \"changed_parts\": {\"e3\": {\"setting:width\": \"per run\", \"source:width\": null}}}}",
@@ -13127,9 +13161,9 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c6\", \"sha256\": \"a6a57920f6586f49a56e4f1c88ea3491187f56bb04c436fe7a0546d80ae4e2c9\", \"path\": \".rb/experiments/e3/criteria/c6.yaml\", \"detail\": {\"rule\": \"change.val_loss [where width=512] \u2264 0\", \"experiment\": \"e3\", \"role\": \"primary\", \"changed_parts\": {\"e3\": {\"link:c6:q1\": \"when met, \\\"Width lowers val_loss at 512.\\\"\", \"role:c6\": \"primary\", \"rule:c6\": \"change.val_loss [where width=512] \u2264 0\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c7\", \"sha256\": \"47c15d7ab818d3e7ea746ad6d26b57005c19eb8516b820a0e049a98dd6ca84f5\", \"path\": \".rb/experiments/e3/criteria/c7.yaml\", \"detail\": {\"rule\": \"change.val_loss \u2264 0\", \"experiment\": \"e3\", \"role\": \"primary\", \"changed_parts\": {\"e3\": {\"role:c7\": \"primary\", \"rule:c7\": \"change.val_loss \u2264 0\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c8\", \"sha256\": \"d2f4336f66b64da4954845f4125d40bebb8b35aaa5b86e52e526486ad7d85c2b\", \"path\": \".rb/experiments/e3/criteria/c8.yaml\", \"detail\": {\"rule\": \"val_loss: wide vs wide [where width=512; subject where loops=8; reference where loops=6] \u2264 0\", \"experiment\": \"e3\", \"role\": \"primary\", \"changed_parts\": {\"e3\": {\"role:c8\": \"primary\", \"rule:c8\": \"val_loss: wide vs wide [where width=512; subject where loops=8; reference where loops=6] \u2264 0\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run6pqyge\", \"sha256\": \"8d7146d7ee302453b5a15b5eb8097da212ee0bf62e590c043e4e869b246459b6\", \"path\": \".rb/experiments/e3/runs/run6pqyge.yaml\", \"detail\": {\"experiment\": \"e3\", \"metrics\": {\"base.val_loss\": 1.0, \"wide.val_loss\": 0.9}, \"per_run\": {\"seed\": 1, \"width\": 512, \"loops\": 8}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run7pjy2o\", \"sha256\": \"074ec3d5d6f93bd2ec245dc2b0f5d9083aa3531c07f4b712ce1fe73e424a87f4\", \"path\": \".rb/experiments/e3/runs/run7pjy2o.yaml\", \"detail\": {\"experiment\": \"e3\", \"metrics\": {\"base.val_loss\": 1.0, \"wide.val_loss\": 0.95}, \"per_run\": {\"seed\": 2, \"width\": 512, \"loops\": 6}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4zuz4h\", \"sha256\": \"be3fc1f9073c57f721baacbdfb0dcc07beb8a320312d3e570a51441cca35e670\", \"path\": \".rb/experiments/e3/runs/run4zuz4h.yaml\", \"detail\": {\"experiment\": \"e3\", \"metrics\": {\"base.val_loss\": 1.0, \"wide.val_loss\": 1.02}, \"per_run\": {\"seed\": 1, \"width\": 256, \"loops\": 8}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run6pqyge\", \"sha256\": \"48a644e4622027e4a6b5bd0268e3f4b110276099b096aa13b31c48cd3122f111\", \"path\": \".rb/experiments/e3/runs/run6pqyge.yaml\", \"detail\": {\"experiment\": \"e3\", \"metrics\": {\"base.val_loss\": 1.0, \"wide.val_loss\": 0.9}, \"per_run\": {\"seed\": 1, \"width\": 512, \"loops\": 8}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run7pjy2o\", \"sha256\": \"7c5eccaae8e8cd54436aa66219c4e8957e8c41b5e57a35d635112012487ba2ea\", \"path\": \".rb/experiments/e3/runs/run7pjy2o.yaml\", \"detail\": {\"experiment\": \"e3\", \"metrics\": {\"base.val_loss\": 1.0, \"wide.val_loss\": 0.95}, \"per_run\": {\"seed\": 2, \"width\": 512, \"loops\": 6}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4zuz4h\", \"sha256\": \"91457593f84a33fc0818ab82755bf5bc71bd1815e6495d1de147008352b950fa\", \"path\": \".rb/experiments/e3/runs/run4zuz4h.yaml\", \"detail\": {\"experiment\": \"e3\", \"metrics\": {\"base.val_loss\": 1.0, \"wide.val_loss\": 1.02}, \"per_run\": {\"seed\": 1, \"width\": 256, \"loops\": 8}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"relate\", \"kind\": \"criterion\", \"id\": \"c7\", \"sha256\": \"2fecf70fa74761e38c078d010ba744bfb1fd2aff787184ff89d366b78327b74e\", \"path\": \".rb/experiments/e3/criteria/c7.yaml\", \"detail\": {\"kind\": \"reverses\", \"target\": \"c6\", \"orientation\": \"same\", \"why\": \"the same arms across the grid and at one width\", \"changed_parts\": {\"e3\": {}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"decide\", \"kind\": \"decision\", \"id\": \"dedhdx7\", \"sha256\": \"cb9ad43723259618fb54332a5735e255aab0028ad6a991e852156efe769977e1\", \"path\": \".rb/decisions/dedhdx7.yaml\", \"detail\": {\"subject\": \"q1\", \"action\": \"continue\", \"value\": null}}",
    ""
@@ -13319,12 +13353,12 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "659f83e7a012f93604e0226077dc15257707d2b6d57ceb65f5385298f25bcf8a",
-   "bytes": 313095
+   "sha256": "99e26418e72546a6e7aa9acfeb2eb04bd666bb0d1c5bd50d5857cf72635d6fd2",
+   "bytes": 306329
   },
   "shared/one.html": {
-   "sha256": "659f83e7a012f93604e0226077dc15257707d2b6d57ceb65f5385298f25bcf8a",
-   "bytes": 313095
+   "sha256": "99e26418e72546a6e7aa9acfeb2eb04bd666bb0d1c5bd50d5857cf72635d6fd2",
+   "bytes": 306329
   }
  }
 }

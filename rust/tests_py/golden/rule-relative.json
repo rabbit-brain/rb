@@ -110,6 +110,8 @@
     "          integrity: no run config was compared, as said below",
     "          \u00b7 typed in, not read from a file or run: runp5h4s6",
     "          \u00b7 no run config was compared with the spec (record runs with --config)",
+    "          \u00b7 run runp5h4s6's code was not kept: no commit to keep it at",
+    "  Evidence: 1 run. Short of whole: 1 run's code not kept (no commit to keep it at). rb has not rerun them.",
     "  runp5h4s6: int8.val_bpb 1.1346 (typed) \u00b7 unit seed=1 \u00b7 produced before the declaration \u00b7 seed=1",
     "  runp5h4s6: base.val_bpb 1.4635 (typed) \u00b7 unit seed=1 \u00b7 produced before the declaration \u00b7 seed=1",
     ""
@@ -357,6 +359,12 @@
     "     \"text\": \"no run config was compared with the spec (record runs with --config)\"",
     "    },",
     "    {",
+    "     \"code\": \"evidence_run_note\",",
+    "     \"subject\": \"c1\",",
+    "     \"problem\": false,",
+    "     \"text\": \"run run4teabd's code was not kept: no commit to keep it at; run runp5h4s6's code was not kept: no commit to keep it at; run runqtdhpa's code was not kept: no commit to keep it at\"",
+    "    },",
+    "    {",
     "     \"code\": \"straddles\",",
     "     \"subject\": \"c1\",",
     "     \"problem\": false,",
@@ -372,7 +380,8 @@
     "    \"units\": \"3 seeds\",",
     "    \"integrity\": \"ok\",",
     "    \"review\": \"no decision\",",
-    "    \"history\": \"\"",
+    "    \"history\": \"\",",
+    "    \"evidence\": \"Evidence: 3 runs. Short of whole: 3 runs' code not kept (no commit to keep it at). rb has not rerun them.\"",
     "   },",
     "   \"n\": 3",
     "  }",
@@ -421,6 +430,7 @@
     "          units:     3 seeds",
     "          \u00b7 typed in, not read from a file or run: run4teabd, runp5h4s6, runqtdhpa",
     "          \u00b7 no run config was compared with the spec (record runs with --config)",
+    "          \u00b7 run run4teabd's code was not kept: no commit to keep it at; run runp5h4s6's code was not kept: no commit to keep it at; run runqtdhpa's code was not kept: no commit to keep it at",
     "          \u00b7 the interval [-22.6, -22.37] crosses -22.5: missed on the estimate, not across the whole interval",
     "",
     "Experiments",
@@ -463,13 +473,9 @@
    "journal/",
    ""
   ],
-  ".rb/cache/objects/10/107f32a071cb934091ac75176e0bedf592e1d029d3edd1a1c5d154b541fd4513.json.gz": {
-   "sha256": "21480417dcc3bc88838730137b25d00d3b53e8b9af00fbbbdb86f7c5e06da9c4",
-   "bytes": 1057
-  },
-  ".rb/cache/objects/43/43635bbd06d94034ebefc272c91a52adad115001538486f2aa70df94849dd21c.json.gz": {
-   "sha256": "7c5257df04fc3723b6e62620ef58ea5b95c42ff359d82ce4a77aa90dc3d1a4c1",
-   "bytes": 1057
+  ".rb/cache/objects/01/0123148424c7f8b4a5c30f741e2414ef5aadfbd9cd8ab578b2db8c92d9964e33.json.gz": {
+   "sha256": "9908a44023d1bf47b6ee7edfe22a281c7c3fba716cb162840275defc5ed9ebfc",
+   "bytes": 1113
   },
   ".rb/cache/objects/6a/6a2d021ade2664903292dbeddabf1ca11008919b8cc5baabceb4efc4b9bc194e.json.gz": {
    "sha256": "2483a716a071e895faf820abddf9ba3578554ee2c71f9951cfce556ac3617bd7",
@@ -483,6 +489,14 @@
    "sha256": "23d14d59bb052776d59368cd6302697e5bda63a37b811f2212c8867340106583",
    "bytes": 296
   },
+  ".rb/cache/objects/8f/8fae223a6e795d4d5ca3b276a0961057c5d5d10a4d177241061f449014ee6b71.json.gz": {
+   "sha256": "2242149bcd8c481349cf00133179cfed339ced256ceacd76fdab1f241117be23",
+   "bytes": 1113
+  },
+  ".rb/cache/objects/9c/9c9a2ac3766c919df89a51e733e0953ca6414abf53904e09ccb8021accb36037.json.gz": {
+   "sha256": "b4fe8ec3539e3b64f60d73cceb64358ac8b6393f0118b7ed83947442106b4594",
+   "bytes": 1113
+  },
   ".rb/cache/objects/a8/a897a24bcd146c482cdb1a253bfde3d26ed6f9e288c9bd310b9046fcd1bb88b1.json.gz": {
    "sha256": "98817e5ff01da25bbb99d66aa6ac6a116ead6b31b62367ba162c3aafeb699712",
    "bytes": 145
@@ -494,10 +508,6 @@
   ".rb/cache/objects/b0/b066eec7d807583cf653b3b4938d206a2bae4c48c72278f4461dba43d041c8a8.json.gz": {
    "sha256": "7f202b88e1b6ef33f2d911df955e8a4304cd28bfaeb46883c04f4df19826248d",
    "bytes": 308
-  },
-  ".rb/cache/objects/cf/cff17d9d305fc0671ab4fdc3eadb3644c6bcb955b6f8571744e9dd58cb49c3d9.json.gz": {
-   "sha256": "c067471d43b5637ee85c3bfa91267c69a7a85105892a2b9cace4485447cd7692",
-   "bytes": 1057
   },
   ".rb/cache/objects/ea/eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695.json.gz": {
    "sha256": "a4a7d60fac003794f1d4e7a0a04959209477dff8191473a5247407635419fb79",
@@ -572,6 +582,9 @@
    "    commit: null",
    "    branch: main",
    "    dirty: false",
+   "    captured: after",
+   "    kept: none",
+   "    kept_why: no_commit",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -618,6 +631,9 @@
    "    commit: null",
    "    branch: main",
    "    dirty: false",
+   "    captured: after",
+   "    kept: none",
+   "    kept_why: no_commit",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -664,6 +680,9 @@
    "    commit: null",
    "    branch: main",
    "    dirty: false",
+   "    captured: after",
+   "    kept: none",
+   "    kept_why: no_commit",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -705,9 +724,9 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"a897a24bcd146c482cdb1a253bfde3d26ed6f9e288c9bd310b9046fcd1bb88b1\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/base\", \"path\": \".rb/experiments/e1/variants/base.yaml\", \"sha256\": \"eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695\"}, {\"kind\": \"variant\", \"id\": \"e1/int8\", \"path\": \".rb/experiments/e1/variants/int8.yaml\", \"sha256\": \"abd353600d1c5138df23b726bc5af3c643b91dd5f57373fd56a931fbf538ec27\"}], \"detail\": {\"variants\": [\"base\", \"int8\"], \"like\": null, \"questions\": [], \"changed_parts\": {\"e1\": {\"variant:base\": \"baseline\", \"variant:int8\": \"candidate\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"spec_set\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"8624ce96125a07103da087c1b7b1c120b41adca9fdfe81f00d725c9a115800dc\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"setting\": \"seed\", \"change\": \"setting seed: new, unknown (per-run)\", \"value\": null, \"status\": \"unknown\", \"required\": true, \"source\": null, \"changed_parts\": {\"e1\": {\"setting:seed\": \"per run\", \"source:seed\": null}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c1\", \"sha256\": \"b066eec7d807583cf653b3b4938d206a2bae4c48c72278f4461dba43d041c8a8\", \"path\": \".rb/experiments/e1/criteria/c1.yaml\", \"detail\": {\"rule\": \"change.val_bpb as a relative change \u2264 -22.5%\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:c1\": \"primary\", \"rule:c1\": \"change.val_bpb as a relative change \u2264 -22.5%\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"cff17d9d305fc0671ab4fdc3eadb3644c6bcb955b6f8571744e9dd58cb49c3d9\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.val_bpb\": 1.4635, \"int8.val_bpb\": 1.1346}, \"per_run\": {\"seed\": 1}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"43635bbd06d94034ebefc272c91a52adad115001538486f2aa70df94849dd21c\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.val_bpb\": 1.4602, \"int8.val_bpb\": 1.1311}, \"per_run\": {\"seed\": 2}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"107f32a071cb934091ac75176e0bedf592e1d029d3edd1a1c5d154b541fd4513\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.val_bpb\": 1.4651, \"int8.val_bpb\": 1.1362}, \"per_run\": {\"seed\": 3}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"0123148424c7f8b4a5c30f741e2414ef5aadfbd9cd8ab578b2db8c92d9964e33\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.val_bpb\": 1.4635, \"int8.val_bpb\": 1.1346}, \"per_run\": {\"seed\": 1}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"9c9a2ac3766c919df89a51e733e0953ca6414abf53904e09ccb8021accb36037\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.val_bpb\": 1.4602, \"int8.val_bpb\": 1.1311}, \"per_run\": {\"seed\": 2}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"8fae223a6e795d4d5ca3b276a0961057c5d5d10a4d177241061f449014ee6b71\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.val_bpb\": 1.4651, \"int8.val_bpb\": 1.1362}, \"per_run\": {\"seed\": 3}, \"again\": false}}",
    ""
   ],
   ".rb/metrics/val_bpb.yaml": [
@@ -733,8 +752,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "e5f71aeb71fb8d1c398ef81b173ccf113a61b2129d083dc095a1f70aeca368e3",
-   "bytes": 212406
+   "sha256": "2bb0ab81f0a287429a3d22b8bd34155ff9e60f29ce0a4073c314ad65db3d3af1",
+   "bytes": 212248
   }
  }
 }

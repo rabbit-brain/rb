@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.8.5 (2026-11-11)
+
+rb now notices when git undoes its records, and it keeps the code each run started with. Each run's evidence is listed one line at a time.
+
+- **When git undoes rb's records.** Commands like `git checkout -- .`, `git restore`, `git reset --hard` and `git stash` can quietly remove records rb wrote. rb now keeps its own copy of everything it writes, so it can tell.
+  - Switching branches, checking out an older commit or a bisect step doesn't count. rb only flags a record that no commit you have been on since holds.
+  - rb says which records git removed, in rb status, rb context, rb show, rb open, rb ui and on pages. Three places don't say it yet: see "Not yet" below.
+  - `rb doctor --restore` puts them back. `rb doctor --forget` drops rb's copy when you meant the undo. An agent session can't run `--forget`.
+  - If a stash holds them, rb names the stash and suggests `git stash pop`.
+  - rb also names a record that is in neither the log nor its copy, such as one an older rb wrote between two of rb's own. `rb doctor --restore` sets it aside.
+- **Nothing reads as settled while records are missing.** Until they are back:
+  - A rule that depends on a removed record reads "undetermined", never "met". This covers whatever its reading uses: its runs, an analysis, the criterion, the experiment, the metric's catalogue entry, a dataset's exposure, or an analysis elsewhere that replaces one it reads.
+  - Experiment and question states that depend on a removed call read "undetermined", and say why.
+  - A question's recorded interpretations stop counting while a write to the question, or to a rule's link to it, is removed.
+  - A setting whose reject or vouch was removed reads "undetermined". What it takes to run an experiment again reads "unknown" for a resource with a removed write, never "ok".
+  - A finding's timing never reads "declared before the evidence" while a run, analysis or exposure it reads is removed. Where it would have, it says the order is unknown, or that its evidence was removed.
+  - If every run behind a finding was removed, rb says so ("criterion undetermined · taken out by git"). It doesn't call the finding untested or the experiment planned. In JSON, `result` stays `untested` and `state` stays `planned`, and `state_said` says why.
+  - Every `rb status --fail-on` gate fails.
+  - In rb status and rb context, an item that may depend on a removed record says so. If the removed write was to the item's own subject, or was a call on it, the item asks for `rb doctor --restore` instead of its usual command. Other items keep their usual command.
+  - A design's confirmation is one of the records rb keeps. If git removes it, rb says so and `rb doctor --restore` brings it back.
+  - A call or a design confirmation that git removed is not offered for confirming again, and `rb confirm` refuses it until it is restored, so you never end up with two.
+- **The code each run started with.** When `rb journal run` or the SDK's run block watches a run, rb keeps the code the run started with. It does this only when it could keep all of that code. Otherwise the run gets the code as it was when you recorded it. rb run add, rb show and the run cards say when the code was captured.
+  - Each run says how much of its code rb kept (all of it, part of it, or none) and why. If git could not answer when the run was recorded, rb keeps no code and says so, instead of calling the tree clean.
+  - Files over 10 MB, and anything that isn't a regular file, are left out and listed. Reproduce rebuilds what was kept and says what is missing.
+  - With more than 2,000 changed or untracked files, rb warns you at rb run add and when `rb journal run` starts. It names the folder with the most and suggests a .gitignore or a commit.
+  - rb holds kept code with a ref under refs/rb/snapshots/, and calls it kept only while that ref exists. If git gc removed it, or this clone never had it, rb says so and offers no `git diff` or restore against it.
+  - `rb journal run` now adds such a ref even when all your files are committed. rb says so once and gives the command that removes the ref.
+  - Before your first commit, the kept code includes your staged files.
+  - A `--tree` you give is checked and kept. One this repository doesn't have is recorded as you gave it. A `--commit` this repository doesn't have is said to be missing.
+  - To get a file back, `rb show <run>` now offers `git restore --source=<tree> --worktree -- <path>`, which changes only your working files, never the index. rb 0.8.4 offered `git checkout <tree> -- <path>`.
+  - rb also notices a file the run had that your checkout is missing.
+  - A page's Rerun panel, its prompt and `rb sync` promise the code only when origin's branches, as of your last fetch, hold the commit. Otherwise they say the commit must be pushed first. If git has fetched nothing from origin, they say rb can't tell.
+  - "The code changed after the run" now ignores the run's own outputs, files a watched command wrote, and Python's __pycache__.
+- **A run's files after the run.** If a file a run used has changed or gone since, rb calls it a problem only when your checkout had it and rb has no copy. Otherwise rb notes where a copy is, or that this clone doesn't have it. rb doctor reports it, and rb reconcile no longer offers such a file as a new run.
+- **Evidence, one line at a time.** A run's evidence (its files, its config and what it read) is listed line by line, and rb never says it reran anything. A rule's card sums up its evidence in one line, in rb show, rb open, rb ui and on pages. A page shows the evidence as it was when the page was made.
+- **Smaller changes.**
+  - Reproduce marks each missing part with ✗ on its own line, and names a missing commit once.
+  - A page explains each term once, where it is first used and under "What the words on this page mean", and shows the meaning on hover after that. Pages are smaller for it.
+  - On pages and in rb open, for runs typed in without `--produced-at`, a rule card now says "rb can't tell whether it was written before its results." rb 0.8.4 said "No results yet."
+  - A page no longer names an ignore rule from a file outside the repository.
+  - `rb spec verify` names a source's commit once, and `rb spec set --from` now prints a source's commit in 7 characters.
+- **Not yet.** Three places don't yet say that git removed something.
+  - On pages and in rb open, items under "Also open" don't say a record they depend on was removed, as rb status does. A setting whose reject or vouch was removed shows only "not checked against a source".
+  - On pages and in rb open, the Your call line of a missed gate doesn't say that the call settling it was removed.
+  - When git removes a design's confirmation, a gate an agent session set loses its "· not confirmed" mark, and its `gate_by` reads empty. The design's own line still says what was removed.
+- **For scripts and tools (JSON).** Keys are only added. A few values change, listed at the end.
+  - rb status (and so rb context, MCP and the SDK's status()) gains `taken_out` (`count`, `records`, `stash`, `pop`, `said`), `state_said` and `results_taken_out`. An experiment's or a question's `state` can be `undetermined`.
+  - Items, the project and notes gain `taken_out`. A row gains `taken_under` for what it depends on that git removed, and so does `rb show <exp>/<setting>`. A design's standing gains `taken_out`.
+  - A finding gains `says.evidence`. `taken_out_by_git` is a new integrity problem and rb doctor problem.
+  - A run's receipt gains `captured`, `kept`, `kept_why`, `git_said`, `git_secs`, `listing`, `left_out_files`, `left_out_more` and `too_many`. `left_out` still counts.
+  - The shell's document is rb-shell-view/1.18 (`home.taken_out`, `findings.{id}.timing`, and `state_said` while git has removed a record). A page's manifest `repo` gains `origin_unfetched`.
+  - These values change. `dirty: true` with `tree: null` means git couldn't answer, where 0.8.4 read an empty status as a clean tree. A tree with `left_out` above 0 is the run's code, kept in part, where 0.8.4 called the code missing. A journal run entry whose start code wasn't kept whole has no `code`. When git removes a design's confirmation, `gate_by` reads empty.
+- **Teams on two versions.** rb 0.7.0 to 0.8.4 read what 0.8.5 writes, its new receipt keys included. rb keeps its copy beside its journal, where git doesn't see it. As before, 0.7.0 and 0.7.1 refuse a record that holds a format-2 file and leave it unchanged.
+
 ## 0.8.4 (2026-11-10)
 
 rb says on every interface how the checkout holds the record, opens those words one step down to what git said and how to check it yourself, and says in Reproduce whether your checkout has the code the runs ran.

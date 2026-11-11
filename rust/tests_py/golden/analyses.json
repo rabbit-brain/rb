@@ -1045,6 +1045,10 @@
    "sha256": "98817e5ff01da25bbb99d66aa6ac6a116ead6b31b62367ba162c3aafeb699712",
    "bytes": 145
   },
+  ".rb/cache/objects/b5/b562ed331c23640fa3264400f393032e0d219fc2164ad272e185b0dace1fc433.json.gz": {
+   "sha256": "8c2b4dc0825cbb10c22b7fd765187dd41f4f28660ef1d6600201604d017d0931",
+   "bytes": 1156
+  },
   ".rb/cache/objects/ba/ba8b459334062dbe26e4b0dac6047ecedab2c44e90a35c223ec26e6552f495af.json.gz": {
    "sha256": "55f29c3e838f93367cabd6702e4f03b15edd0d7a8865828c1d7c8f5b75d61d19",
    "bytes": 867
@@ -1056,10 +1060,6 @@
   ".rb/cache/objects/ea/eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695.json.gz": {
    "sha256": "a4a7d60fac003794f1d4e7a0a04959209477dff8191473a5247407635419fb79",
    "bytes": 116
-  },
-  ".rb/cache/objects/f9/f9b6dfaf5cb9b9c3490ad521704e9fd2568e979b7b93cbf0ee836b8b089a05a5.json.gz": {
-   "sha256": "3da22660f52f4c1cb6bba4216d8ae776a75a8b0d0db5de510bb085399ada68c2",
-   "bytes": 1122
   },
   ".rb/experiments/e1/analyses/a1.yaml": [
    "rb: 1",
@@ -1377,7 +1377,9 @@
    "    dirty: true",
    "    diff_sha256: c281c35639e6f341c42c8d40f0bd650e83618d0f94c1213a794d92f79941b770",
    "    untracked: 2",
+   "    captured: after",
    "    tree: 488cf2470699ba58c07dd2c2c2581112b588dc4c",
+   "    kept: whole",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -1418,7 +1420,7 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"a897a24bcd146c482cdb1a253bfde3d26ed6f9e288c9bd310b9046fcd1bb88b1\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"parts\": [{\"kind\": \"variant\", \"id\": \"e1/base\", \"path\": \".rb/experiments/e1/variants/base.yaml\", \"sha256\": \"eabf9deee1d5dd12da87a011adc4fb925b16e9c257a8c98e546d6d123cf88695\"}, {\"kind\": \"variant\", \"id\": \"e1/wide\", \"path\": \".rb/experiments/e1/variants/wide.yaml\", \"sha256\": \"4be01544964ddcc0b1475cf3a2c1f758cb3e3aa18daa696f108fc2953d752abb\"}], \"detail\": {\"variants\": [\"base\", \"wide\"], \"like\": null, \"questions\": [], \"changed_parts\": {\"e1\": {\"variant:base\": \"baseline\", \"variant:wide\": \"candidate\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"metric\", \"id\": \"top1\", \"sha256\": \"809b07776692655afa61faa24409a3d709875f63f4dfc8334031cc08fbef7d15\", \"path\": \".rb/metrics/top1.yaml\"}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c1\", \"sha256\": \"58decc8cd4fdcb77be7d1afb30ae81be5ebd84f27188cf18426dd61f2d70948b\", \"path\": \".rb/experiments/e1/criteria/c1.yaml\", \"detail\": {\"rule\": \"top1: wide vs base better, its interval clear of 0\", \"experiment\": \"e1\", \"role\": \"primary\", \"changed_parts\": {\"e1\": {\"role:c1\": \"primary\", \"rule:c1\": \"top1: wide vs base better, its interval clear of 0\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"f9b6dfaf5cb9b9c3490ad521704e9fd2568e979b7b93cbf0ee836b8b089a05a5\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.72}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"b562ed331c23640fa3264400f393032e0d219fc2164ad272e185b0dace1fc433\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"base.top1\": 0.7, \"wide.top1\": 0.72}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"a1\", \"sha256\": \"d7135a3feb421460b4ed54f8e9acea79520d3207c23bf14deaf7905caa2f04d5\", \"path\": \".rb/experiments/e1/analyses/a1.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"ap5h4s6\", \"sha256\": \"7ffae84d9cb45553687b75895b8a18b01cd68edb907eb442f4536adc3783f275\", \"path\": \".rb/experiments/e1/analyses/ap5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"analyze\", \"kind\": \"analysis\", \"id\": \"aqtdhpa\", \"sha256\": \"7df11792559e08bce00b7007ca623af370a52b85e05a2e30fcdf7cf49dbb9cf8\", \"path\": \".rb/experiments/e1/analyses/aqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"comparisons\": 1, \"supersedes\": []}}",

@@ -1,5 +1,5 @@
 {
-  "contract": "rb-shell-view/1.16",
+  "contract": "rb-shell-view/1.18",
   "surface": "open",
   "tier": "live",
   "rb_version": "0.6.0",
@@ -19,6 +19,7 @@
     "uncited": 1,
     "uncited_line": "1 changed file nothing in the record cites: configs/calib.yaml, changed since 3f2a9c1.",
     "uncited_short": "1 changed file nothing cites",
+    "taken_out": "",
     "found": [
       {
         "request_id": "f7q2",
@@ -377,6 +378,7 @@
       "observed_short": "1 of 3 runs was recorded in exp-b · .worktrees/b",
       "observed_places": [{"id": "exp-b", "label": "exp-b · .worktrees/b"}],
       "other_code": "",
+      "timing": "before",
       "witness": {"total": 3, "afterwards": 0},
       "on_estimate": false,
       "receipt_rows": [
@@ -460,6 +462,7 @@
       "observed_short": "1 of 3 runs was recorded in exp-b · .worktrees/b",
       "observed_places": [{"id": "exp-b", "label": "exp-b · .worktrees/b"}],
       "other_code": "",
+      "timing": "after_evidence",
       "witness": {"total": 3, "afterwards": 0},
       "on_estimate": false,
       "receipt_rows": [
@@ -525,6 +528,7 @@
       "observed_short": "",
       "observed_places": [],
       "other_code": "",
+      "timing": "before",
       "witness": {"total": 1, "afterwards": 0},
       "on_estimate": false,
       "receipt_rows": [
@@ -594,6 +598,7 @@
       "observed_short": "",
       "observed_places": [],
       "other_code": "",
+      "timing": "before",
       "witness": {"total": 3, "afterwards": 0},
       "on_estimate": false,
       "receipt_rows": [
@@ -696,6 +701,7 @@
       "observed_short": "",
       "observed_places": [],
       "other_code": "",
+      "timing": "before",
       "witness": {"total": 4, "afterwards": 0},
       "on_estimate": false,
       "receipt_rows": [
@@ -770,6 +776,7 @@
       "observed_short": "",
       "observed_places": [],
       "other_code": "",
+      "timing": "after_evidence",
       "witness": {"total": 1, "afterwards": 1},
       "on_estimate": false,
       "receipt_rows": [

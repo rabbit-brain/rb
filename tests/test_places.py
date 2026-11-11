@@ -35,6 +35,16 @@ def rec(tmp_path, monkeypatch):
     return places_record(tmp_path)
 
 
+def short(path: Path) -> str:
+    """A place's path as label_short writes it (places.rs short_path) for the main checkout: from ~ under the home folder,
+    else whole. GitHub's Windows temp folder is under the home folder; a Linux box's is not."""
+    whole = path.resolve().as_posix()
+    home = Path.home().resolve().as_posix()
+    if len(Path(home).parts) > 1 and (whole == home or whole.startswith(home.rstrip("/") + "/")):
+        return "~" + whole[len(home.rstrip("/")):]
+    return whole
+
+
 def places(root: Path, place: str = "") -> dict:
     return _rb.call("places", {"place": place}, root=root, via="cli")
 
@@ -104,7 +114,7 @@ def test_a_record_s_versions_are_its_commits_by_sha_and_time(rec):
     assert v["label"].startswith(sha[:12] + " · 20") and v["shown"].startswith(f"main · {rec.root.resolve().as_posix()} at {sha[:12]}, 20")
     assert v["label"].endswith(" UTC") and v["shown"].endswith(" UTC: a past version, read only")
     # rb ui's line names it by the UTC day it was committed, with no commit: one version listed, so no minute
-    assert v["shown_day"] == f"main · {rec.root.resolve().as_posix()} as of {v['label'].split(' · ')[1][:10]} · read only"
+    assert v["shown_day"] == f"main · {short(rec.root)} as of {v['label'].split(' · ')[1][:10]} · read only"
     text = json.dumps(answer["versions"])
     assert "the record, as of" not in text and "ana" not in text           # never a commit's subject or its author
     # a place's versions are its own record's: the sibling's branch has the same commit, the separate project none

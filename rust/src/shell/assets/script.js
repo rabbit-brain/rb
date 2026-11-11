@@ -74,6 +74,9 @@
 
   function init() {
     main = byId('main');
+    // a page writes each term's line once: its later uses take it from the glossary entry they name (rb open writes
+    // every use's, and leaves a run card's checkout term to enhanceAll)
+    if (!byId('rb-live')) $$('.term[aria-describedby]:not([data-hint])').forEach(t => { const g = byId(t.getAttribute('aria-describedby')); if (g) t.dataset.hint = g.textContent; });
     if (!VIEWER) setViewer(viewer());
     ownWords(document);
     keepStore();

@@ -580,7 +580,15 @@ fn code_words(code: Option<&Dict>) -> String {
     }
     let commit = crate::checkout::short(&code.and_then(|c| c.get("commit")).map(py_str).unwrap_or_default());
     let at = if commit.is_empty() { String::new() } else { format!("{}{commit}", w::AT_COMMIT) };
-    let mut said = format!("{}{}{at}. Readers who rerun it get the code with the record.", w::CODE_WHEN_MADE, if at.is_empty() { crate::cli::address_said(&url) } else { url });
+    // readers who rerun it get the code only where origin held its commit when the page was made (E4)
+    let lacks = match (code.and_then(|c| c.get("at_origin")), code.and_then(|c| c.get("origin_unfetched")).map_or(false, Value::truthy)) {
+        _ if commit.is_empty() => None,
+        (Some(Value::Bool(false)), _) => Some(w::rerun_origin_lacks(&commit, &url, true)),
+        (_, true) => Some(w::rerun_origin_lacks(&commit, &url, false)),
+        _ => None,
+    };
+    let promise = lacks.unwrap_or_else(|| "Readers who rerun it get the code with the record.".to_string());
+    let mut said = format!("{}{}{at}. {promise}", w::CODE_WHEN_MADE, if at.is_empty() { crate::cli::address_said(&url) } else { url.clone() });
     // what the checkout changes of that commit, which a rerun does not get, as rb export says it
     let changed: Vec<String> = code.and_then(|c| c.get("changed")).and_then(Value::as_list).map(|l| l.iter().map(py_str).collect()).unwrap_or_default();
     if let Some(line) = crate::export::not_committed_said(&changed) {

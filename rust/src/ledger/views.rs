@@ -649,8 +649,14 @@ impl Ledger {
         Ok(out)
     }
 
-    /// planned, open, or what the latest decision on it made it.
+    /// planned, open, or what the latest decision on it made it; undetermined while a call on it rests on a write git
+    /// took out of the record (L1), since rb cannot read what the call made it until it is put back.
     pub fn experiment_state(&self, exp: &Experiment, runs: Option<&[Run]>) -> Res<String> {
+        let (st, took) = self.traced_calls(|| self.experiment_state_now(exp, runs))?;
+        Ok(if took.is_empty() && !self.took_retraction("experiment", &exp.id)? { st } else { UNDETERMINED_STATE.into() })
+    }
+
+    pub(crate) fn experiment_state_now(&self, exp: &Experiment, runs: Option<&[Run]>) -> Res<String> {
         let decs = self.decisions_on(&exp.id)?;
         if let Some(d) = decs.last() {
             return Ok(state_of(&d.action).to_string());
@@ -664,12 +670,28 @@ impl Ledger {
         Ok(if has_runs || analyses || in_repo { "open".into() } else { "planned".into() })
     }
 
+    /// open, or what the latest decision on it made it; undetermined while a call on it rests on a write git took out
+    /// of the record (L1).
     pub fn question_state(&self, q: &Question) -> Res<String> {
+        let (st, took) = self.traced_calls(|| self.question_state_now(q))?;
+        Ok(if took.is_empty() && !self.took_retraction("question", &q.id)? { st } else { UNDETERMINED_STATE.into() })
+    }
+
+    fn question_state_now(&self, q: &Question) -> Res<String> {
         let decs = self.decisions_on(&q.id)?;
         Ok(match decs.last() {
             Some(d) => question_state_of(&d.action).to_string(),
             None => "open".into(),
         })
+    }
+
+    /// A question's state in words: a state that rests on a call git took out says so (L1).
+    pub fn question_state_said(&self, q: &Question, state: &str) -> Res<String> {
+        if state != UNDETERMINED_STATE {
+            return Ok(state.to_string());
+        }
+        let (_, took) = self.traced_calls(|| self.question_state_now(q))?;
+        self.took_calls_state(&if took.is_empty() { vec![("question".to_string(), q.id.clone())] } else { took })
     }
 
     /// The questions an experiment is filed under, and every question above them.
@@ -741,6 +763,8 @@ impl Ledger {
         let mut results: IndexMap<String, i64> = IndexMap::new();
         let mut states: IndexMap<String, i64> = IndexMap::new();
         let mut untested: Vec<String> = Vec::new();
+        let mut taken_results: i64 = 0;
+        let mut taken_lines: Vec<String> = Vec::new();
         for e in experiments {
             if !under.contains(&e.id) {
                 continue;
@@ -748,7 +772,15 @@ impl Ledger {
             let st = self.experiment_state(e, None)?;
             *states.entry(st.clone()).or_insert(0) += 1;
             if st == "planned" {
-                untested.push(format!("experiment {} is planned: {}", e.id, if e.hypothesis.is_empty() { &e.title } else { &e.hypothesis }));
+                // S4: rb keeps the runs git took out of it, so it is not planned
+                let said = self.experiment_state_said(e, &st)?;
+                let line = |what: String| format!("experiment {} {what}: {}", e.id, if e.hypothesis.is_empty() { &e.title } else { &e.hypothesis });
+                // S1: one whose runs git took out is no untested one: said apart, under its own label
+                if said == st {
+                    untested.push(line("is planned".to_string()));
+                } else {
+                    taken_lines.push(line(format!("has {said}")));
+                }
             }
         }
         let mut selected: Vec<String> = selected.into_iter().collect();
@@ -761,6 +793,10 @@ impl Ledger {
             let w = assess::rule_word(&f.rule_outcome, &f.role, &f.origin);
             *rules.entry(w).or_insert(0) += 1;
             *results.entry(f.result.clone()).or_insert(0) += 1;
+            // S4: a result untested because git took its evidence out is said so, apart (the code stays)
+            if f.result == "untested" && f.integrity.iter().any(|p| p.code == "taken_out_by_git") && self.taken_evidence_of(&f.experiment)? != (0, 0) {
+                taken_results += 1;
+            }
             if f.rule_outcome == "untested" {
                 untested.push(format!("criterion {} is untested: {}", f.criterion, f.statement));
             }
@@ -773,11 +809,18 @@ impl Ledger {
             }
         }
         let counts = |m: IndexMap<String, i64>| Value::Dict(m.into_iter().map(|(k, v)| (k, Value::Int(v))).collect());
-        Ok(crate::dict! {
+        let mut out = crate::dict! {
             "rules" => counts(rules), "results" => counts(results), "experiments" => counts(states),
             "children" => Value::list_of_str(kids.iter().map(|k| k.id.clone())), "open_children" => Value::list_of_str(open_kids),
             "untested" => Value::list_of_str(untested)
-        })
+        };
+        if !taken_lines.is_empty() {
+            out.insert("taken_out".into(), Value::list_of_str(taken_lines));
+        }
+        if taken_results > 0 {
+            out.insert("results_taken_out".into(), Value::Int(taken_results));
+        }
+        Ok(out)
     }
 
     /// What the repository holds against what the record indexed.
@@ -896,7 +939,9 @@ impl Ledger {
                 .map(|a| format!("{} says {}", Path::new(a.get_str("path").unwrap_or("")).file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default(), a.get_str("says").unwrap_or("")))
                 .collect();
             failing.extend(checks.iter().filter(|c| c.get("ok") == Some(&Value::Bool(false))).map(|c| format!("{} {}", c.get_str("path").unwrap_or(""), c.get_str("state").unwrap_or(""))));
-            let last = self.decisions_on(&e.id)?.into_iter().last();
+            // L1: the call it reads, traced: one that rests on a write git took out says so
+            let (last, took) = self.traced_calls(|| Ok(self.decisions_on(&e.id)?.into_iter().last()))?;
+            let took = if took.is_empty() { String::new() } else { format!("; {}", self.took_part("the call it reads", &took)?) };
             if let Some(l) = last {
                 if !failing.is_empty() && matches!(l.action.as_str(), "accept" | "continue" | "ship") {
                     item(
@@ -904,7 +949,7 @@ impl Ledger {
                         "human",
                         "call_on_failed_check",
                         &e.id,
-                        &format!("{}: {}{} on {}, and now {}", e.id, made(&l.action), actor::by_writer(&l.by), truncate(&l.at, 10), crate::assess::first_few(&failing, 2, "; ")),
+                        &format!("{}: {}{} on {}, and now {}{took}", e.id, made(&l.action), actor::by_writer(&l.by), truncate(&l.at, 10), crate::assess::first_few(&failing, 2, "; ")),
                         &format!("rb show {}   (then rb decide {} <call> --why \"...\" on what the repository says now)", e.id, e.id),
                         vec![],
                     );
@@ -1111,7 +1156,9 @@ impl Ledger {
                 gate.insert("late".into(), true);
             }
             let hint = self.run_hint(c)?;
-            let last = self.decisions_on(&c.id)?.into_iter().last();
+            // the review's should (f13h): the criterion's last call, traced, so one git took a write of says so
+            let (last, took_last) = self.traced_calls(|| Ok(self.decisions_on(&c.id)?.into_iter().last()))?;
+            let took_last = if took_last.is_empty() { String::new() } else { format!("; {}", self.took_part("the call it reads", &took_last)?) };
             // a past call was made on no reading rb holds: its readings moving asks nobody to decide again
             let outdated = f.review.as_ref().map_or(false, |r| !r.current) && last.as_ref().map_or(false, |l| l.past.is_none());
             let says = |k: &str| f.says.get(k).cloned().unwrap_or_default();
@@ -1155,7 +1202,9 @@ impl Ledger {
                     if !unit_first {
                         item(&mut items, "agent", "no_interval", &c.id, &format!("{}: {why}", c.id), &format!("{hint}   (rb gives an interval from 3 units)"), vec![]);
                     }
-                } else if why.contains("edited outside rb") || why.contains("the clone is shallow") {
+                } else if why.contains("edited outside rb") || why.contains("the clone is shallow") || f.integrity.iter().any(|p| p.code == "taken_out_by_git") {
+                    // what git took out asks for rb doctor --restore (taken_out_by_git), never a call on a reading rb
+                    // cannot read
                 } else if claim && (last.is_none() || outdated) {
                     gate.insert("undecided".into(), true);
                     item(&mut items, "human", "undecided", &c.id, &format!("{}: {why}", c.id), &decide_do(&c.id, UNDECIDED_ACTIONS), vec![]);
@@ -1164,29 +1213,36 @@ impl Ledger {
             if f.rule_outcome == "misses" && c.role == "gate" {
                 let mut lines = vec![c.experiment.clone()];
                 lines.extend(self.gate_questions(c)?);
-                let mut calls: Vec<Decision> = Vec::new();
-                for subject in &lines {
-                    for d in self.decisions_on(subject)? {
-                        if DIRECTION_ACTIONS.contains(&d.action.as_str()) {
-                            calls.push(d);
+                // L1: the calls on those lines, traced, with those git took a write of out of the record
+                let (mut calls, took) = self.traced_calls(|| {
+                    let mut calls: Vec<Decision> = Vec::new();
+                    for subject in &lines {
+                        for d in self.decisions_on(subject)? {
+                            if DIRECTION_ACTIONS.contains(&d.action.as_str()) {
+                                calls.push(d);
+                            }
                         }
                     }
-                }
+                    Ok(calls)
+                })?;
                 // a call recorded as made earlier (--past) comes before every call recorded as made when it was recorded
                 calls.sort_by(|a, b| (a.past.is_none(), &a.at).cmp(&(b.past.is_none(), &b.at)));
                 // the latest call settles the miss while it holds the gate's reading as it stands, and is current
-                let current = match calls.last() {
-                    Some(d) => d.basis.get(&c.id) == Some(&assess::basis_of_finding(f)) && self.decision_current(d)?.0,
-                    None => false,
-                };
+                // while what settles it rests on a write git took out, nothing settles it: the miss stays, saying why
+                let current = took.is_empty()
+                    && match calls.last() {
+                        Some(d) => d.basis.get(&c.id) == Some(&assess::basis_of_finding(f)) && self.decision_current(d)?.0,
+                        None => false,
+                    };
                 if !current {
                     gate.insert("undecided".into(), true);
+                    let why = if took.is_empty() { String::new() } else { format!("; {}", self.took_part("the call that settles it", &took)?) };
                     item(
                         &mut items,
                         "human",
                         "gate_missed",
                         &c.id,
-                        &format!("{} gate missed ({}): a priority call, not a refutation", c.id, says("comparison")),
+                        &format!("{} gate missed ({}): a priority call, not a refutation{why}", c.id, says("comparison")),
                         &decide_do(&c.experiment, GATE_ACTIONS),
                         vec![],
                     );
@@ -1219,7 +1275,7 @@ impl Ledger {
                         "human",
                         "decision_outdated",
                         &c.id,
-                        &format!("{} ({}) was made on {}; {} now reads {}", l.id, made(&l.action), f.review.as_ref().unwrap().was, c.id, says("comparison")),
+                        &format!("{} ({}) was made on {}; {} now reads {}{took_last}", l.id, made(&l.action), f.review.as_ref().unwrap().was, c.id, says("comparison")),
                         &format!("{}   (on the reading as it stands)", decide_do(&c.id, UNDECIDED_ACTIONS)),
                         vec![],
                     );
@@ -1378,6 +1434,18 @@ impl Ledger {
                             vec![],
                         );
                     }
+                    "evidence_file_changed" => {
+                        // a file a counted run named changed or went, and rb holds no copy of its recorded bytes (E5)
+                        item(
+                            &mut items,
+                            "anyone",
+                            &p.code,
+                            &p.subject,
+                            &format!("{}: {}", c.id, p.text),
+                            &format!("rb show {}   ({})", p.subject, crate::shell::strings::evidence("file_fix", &[])),
+                            vec![],
+                        );
+                    }
                     "unit_separates_arms" => {
                         let amend = if self.load::<Experiment>(&c.experiment)?.frozen.is_some() { " --amend --why \"...\"" } else { "" };
                         item(
@@ -1434,7 +1502,8 @@ impl Ledger {
             }
         }
         for e in &experiments {
-            let last = self.decisions_on(&e.id)?.into_iter().last();
+            let (last, took) = self.traced_calls(|| Ok(self.decisions_on(&e.id)?.into_iter().last()))?;
+            let took = if took.is_empty() { String::new() } else { format!("; {}", self.took_part("the call it reads", &took)?) };
             if let Some(l) = last.filter(|l| !l.basis.is_empty() && l.past.is_none()) {
                 let (ok, moved) = self.decision_current(&l)?;
                 if !ok {
@@ -1444,7 +1513,7 @@ impl Ledger {
                         "human",
                         "decision_outdated",
                         &e.id,
-                        &format!("{} ({} {}) was made on readings that have moved since: {}", l.id, made(&l.action), e.id, crate::assess::first_few(&moved, 4, ", ")),
+                        &format!("{} ({} {}) was made on readings that have moved since: {}{took}", l.id, made(&l.action), e.id, crate::assess::first_few(&moved, 4, ", ")),
                         &format!("rb decide {} {} --why \"...\"   (or another call, on the readings as they stand)", e.id, l.action),
                         vec![],
                     );
@@ -1452,7 +1521,8 @@ impl Ledger {
             }
         }
         for q in &questions {
-            let mut last = self.decisions_on(&q.id)?.into_iter().last();
+            let (mut last, took) = self.traced_calls(|| Ok(self.decisions_on(&q.id)?.into_iter().last()))?;
+            let took = if took.is_empty() { String::new() } else { format!("; {}", self.took_part("the call it reads", &took)?) };
             if last.as_ref().map_or(false, |l| l.basis.is_empty() && l.inquiry_basis.is_none()) && self.inquiry_criterion_ids(&q.id)?.is_empty() {
                 last = None;
             }
@@ -1465,7 +1535,7 @@ impl Ledger {
                         "human",
                         "decision_outdated",
                         &q.id,
-                        &format!("{} ({} {}) was made on readings that have moved since: {}", l.id, made(&l.action), q.id, crate::assess::first_few(&moved, 4, ", ")),
+                        &format!("{} ({} {}) was made on readings that have moved since: {}{took}", l.id, made(&l.action), q.id, crate::assess::first_few(&moved, 4, ", ")),
                         &format!("rb decide {} {} --why \"...\"   (or another call, on the readings as they stand)", q.id, l.action),
                         vec![],
                     );
@@ -1482,6 +1552,32 @@ impl Ledger {
         let unseen: Vec<&Dict> = all_tamper.iter().filter(|t| cut(t)).collect();
         if (!tamper.is_empty() || !twice.is_empty() || !merged.is_empty() || !unseen.is_empty()) && experiment.is_none() {
             gate.insert("integrity".into(), true);
+        }
+        // what git took out of the record, which rb kept (E1): said, and put back only when asked; while it stands the
+        // record is not what rb wrote, so the integrity gate fails (and, in rb status, every gate: B1)
+        let took = self.taken_out()?;
+        if !took.is_empty() {
+            gate.insert("integrity".into(), true);
+        }
+        if experiment.is_none() {
+            if !took.is_empty() {
+                let ids: Vec<String> = took.records.iter().take(6).map(|(_, i)| i.clone()).collect();
+                let [_, _, _, them] = crate::shell::strings::took_fill(took.records.len());
+                let do_ = match took.pop() {
+                    Some(name) => format!("git stash pop {name}   (puts {them} back)"),
+                    None => format!("rb doctor --restore   ({})", crate::shell::strings::evidence("took_fix", &[("them", them)]).replacen("rb doctor --restore ", "", 1)),
+                };
+                item(
+                    &mut items,
+                    "anyone",
+                    "taken_out_by_git",
+                    &format!("{}{}", ids.join(", "), if took.records.len() > 6 { " ..." } else { "" }),
+                    &(crate::shell::strings::taken_out_line(took.records.len(), took.stash.as_ref().map(|(s, p)| (s.as_str(), *p)))
+                        + &self.taken_unkept()?.map(|s| format!(" {s}")).unwrap_or_default()),
+                    &do_,
+                    vec![],
+                );
+            }
         }
         if !merged.is_empty() {
             let ids: Vec<String> = merged.iter().take(6).map(|t| t.get("id").map(pyjson::py_str).unwrap_or_default()).collect();
@@ -1815,6 +1911,40 @@ impl Ledger {
             }
         }
         let mut items: Vec<Dict> = merged.into_values().collect();
+        // f13i: an item on a subject that rests on a write git took out says so, and asks for that write back, never
+        // for its own command (a vouch, a run, a call): rb reads it again once it is put back
+        if !self.taken_out()?.is_empty() {
+            let back = match self.taken_out()?.pop() {
+                Some(stash) => format!("git stash pop {stash}"),
+                None => "rb doctor --restore".to_string(),
+            };
+            for it in items.iter_mut() {
+                let code = it.get_str("code").unwrap_or("");
+                if matches!(code, "taken_out_by_git" | "edited_outside_rb" | "merged_outside_rb" | "state_newer" | "id_collision" | "shallow_clone") {
+                    continue;
+                }
+                let subjects: Vec<String> = it.get_str("subject").unwrap_or("").split(", ").map(str::to_string).collect();
+                let (mut said, mut direct) = (None, false);
+                for s in &subjects {
+                    if let Some(x) = self.took_scope_said(s, true)? {
+                        said = Some(x);
+                        direct = self.took_direct(s)?;
+                        break;
+                    }
+                }
+                let Some(said) = said else { continue };
+                let what = it.get_str("what").unwrap_or("").to_string();
+                if !what.contains(&said) {
+                    it.insert("what".into(), Value::Str(format!("{what} · {said}")));
+                }
+                it.insert("taken_out".into(), Value::Str(said));
+                // what rests on its own write, or a call on it, asks for that write back, never its own command; an
+                // item that asks for nothing keeps asking for nothing
+                if direct && it.get_str("do").map_or(false, |d| !d.is_empty()) {
+                    it.insert("do".into(), Value::Str(back.clone()));
+                }
+            }
+        }
         let rank = |w: &str| match w {
             "human" => 0,
             "agent" => 1,
@@ -1859,6 +1989,12 @@ impl Ledger {
                 "blocking" => Value::list_of_str(blocking), "run_count" => standing.len(), "retracted_count" => allr.len() - standing.len(),
                 "analysis_count" => analyses.iter().filter(|a| a.experiment == e.id && a.retracted.is_none()).count()
             };
+            // S4: where rb keeps runs git took out of an experiment with none left, its state in words (the code stays)
+            let st = self.experiment_state(e, Some(&standing))?;
+            let said = self.experiment_state_said(e, &st)?;
+            if let (true, Value::Dict(d)) = (said != st, &mut row) {
+                d.insert("state_said".into(), Value::Str(said));
+            }
             // the words given with its gate, when there were any, as `words` is on a note
             if let (Some((w, by)), Value::Dict(d)) = (gate_words.get(&e.id).filter(|_| !e.if_holds.is_empty() || !e.if_not.is_empty()), &mut row) {
                 if !w.is_empty() {
@@ -1898,7 +2034,13 @@ impl Ledger {
         let exps_v: Vec<Experiment> = experiments.clone();
         for q in &questions {
             let mut d = q.dump(false);
-            d.insert("state".into(), Value::Str(self.question_state(q)?));
+            let st = self.question_state(q)?;
+            let said = self.question_state_said(q, &st)?;
+            d.insert("state".into(), Value::Str(st.clone()));
+            // L1: a state that rests on a call git took out says so (additive, as an experiment's state_said)
+            if said != st {
+                d.insert("state_said".into(), Value::Str(said));
+            }
             d.insert("rollup".into(), Value::Dict(self.rollup(q, &findings, &exps_v)?));
             d.insert("inquiry".into(), Value::Dict(self.inquiry(&q.id, &findings)?));
             q_rows.push(Value::Dict(d));
@@ -1920,6 +2062,10 @@ impl Ledger {
             let after = self.runs_after_past_call(d)?;
             if !after.is_empty() {
                 dd.insert("runs_after".into(), Value::list_of_str(after));
+            }
+            // L1: a call git took a write of out of the record says so wherever it is listed (additive)
+            if let Some(m) = self.took_call_mark(&d.id)? {
+                dd.insert("taken_out".into(), Value::Str(m));
             }
             dec_rows.push(Value::Dict(dd));
         }
@@ -1969,6 +2115,10 @@ impl Ledger {
             "project" => {
                 let mut d = proj.dump(false);
                 d.insert("notes".into(), notes_value(&proj.notes, &note_words));
+                // a write to the project git took out (its title, a note on it) says so, as each row does (f13i)
+                if let Some(said) = self.took_said("project", &proj.id)? {
+                    d.insert("taken_out".into(), Value::Str(said));
+                }
                 Value::Dict(d)
             },
             "root" => crate::sys::slashed(&self.root),
@@ -2006,6 +2156,43 @@ impl Ledger {
             "open" => Value::List(items.into_iter().map(Value::Dict).collect()),
             "gate" => Value::Dict(gate.into_iter().map(|(k, v)| (k, Value::Bool(v))).collect())
         };
+        let took = self.taken_out_value();
+        if !took.is_null() {
+            st.insert("taken_out".into(), took);
+            // L1: each row of a record git took a write of out of the record says so, as rb show <id> does (additive)
+            for (list, kind) in [("experiments", "experiment"), ("runs", "run"), ("analyses", "analysis"), ("questions", "question"), ("resources", "resource"), ("metrics", "metric")] {
+                if let Some(Value::List(rows)) = st.get_mut(list) {
+                    for row in rows.iter_mut() {
+                        let Some(id) = row.get_str("id").map(str::to_string) else { continue };
+                        if let (Some(said), Value::Dict(d)) = (self.took_said(kind, &id)?, &mut *row) {
+                            d.insert("taken_out".into(), Value::Str(said));
+                        }
+                        // f13i: and what under it git took out, or what it rests on (took_scope), as its rb show opens;
+                        // a run's or an analysis's row, a write git took out of its experiment
+                        let under = match kind {
+                            "experiment" | "question" => self.took_scope_said(&id, false)?,
+                            "run" | "analysis" => match row.get_str("experiment_id").or_else(|| row.get_str("experiment")).map(str::to_string) {
+                                Some(e) => self.took_said("experiment", &e)?,
+                                None => None,
+                            },
+                            _ => None,
+                        };
+                        if let (Some(said), Value::Dict(d)) = (under, &mut *row) {
+                            d.insert("taken_under".into(), Value::Str(said));
+                        }
+                        // each note on it git took a write of out (its retraction) says so too
+                        if let Some(Value::List(notes)) = row.as_dict_mut().and_then(|d| d.get_mut("notes")) {
+                            for n in notes.iter_mut() {
+                                let Some(nid) = n.get_str("id").map(str::to_string) else { continue };
+                                if let (Some(said), Value::Dict(d)) = (self.took_said("note", &nid)?, n) {
+                                    d.insert("taken_out".into(), Value::Str(said));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         // a linked worktree nested in the record's checkout, with no record of its own: the checkout it ran in
         if let Some(c) = crate::elsewhere::checkout_value(self) {
             st.insert("checkout".into(), c);
@@ -2213,6 +2400,7 @@ pub fn open_head(code: &str) -> (&'static str, &'static str) {
         "arms" => "Roles that name more than one variant",
         "input_retracted" => "Readings that rest on something taken back",
         "input_superseded" => "Readings that rest on a superseded analysis",
+        "evidence_file_changed" => "Runs whose files changed, with no copy of what they recorded",
         "cited_unchecked" => "Cited numbers rb did not check",
         "cited_source_changed" => "Cited sources changed since they were read",
         "analysis_source_changed" => "Analysis documents changed since they were read",
@@ -2255,6 +2443,7 @@ pub fn open_head(code: &str) -> (&'static str, &'static str) {
         "edited_outside_rb" => "Records changed outside rb",
         "merged_outside_rb" => "Records a merge changed",
         "shallow_clone" => "Records a shallow clone cannot account for",
+        "taken_out_by_git" => "Records git took out of the record",
         "id_collision" => "Ids two branches gave to two records",
         "state_newer" => "Records only a newer rb reads",
         _ => "Open in the record",

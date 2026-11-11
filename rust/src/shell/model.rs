@@ -1,4 +1,4 @@
-//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.16` of a record for one tier
+//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.18` of a record for one tier
 //! and place, from view::home and the per-object fields the build plan adds. It holds the fields rb computes today
 //! (M0), each object in the contract's shape and nothing outside it; the later phases add theirs. It names no writer:
 //! no actor, session, channel or "by <name>" enters it, and the Owner tier holds none of the Live tier's own values.
@@ -16,7 +16,7 @@ use crate::view::{self, ExperimentBrief, FindingLine, Home};
 use indexmap::IndexMap;
 
 /// The contract's version, as the document's `contract` names it.
-pub const CONTRACT: &str = "rb-shell-view/1.16";
+pub const CONTRACT: &str = "rb-shell-view/1.18";
 
 /// The document of `led` for `tier`, at `place` (rb open's chosen place and version; none on a page): drawn on rb open
 /// for the Live tier, on rb page for the Owner tier.
@@ -279,6 +279,12 @@ fn blanks(doc: &mut Value, tier: Tier, served: bool) {
             if !tier.has(Row::YourWords) {
                 f.insert("your_words".into(), "".into());
             }
+            // the reading's evidence (E5), as a page says it: as of when the page was made
+            if tier == Tier::Owner {
+                if let Some(Value::Str(e)) = f.get_mut("says").and_then(Value::as_dict_mut).and_then(|s| s.get_mut("evidence")) {
+                    *e = crate::ledger::evidence::finding_evidence_on_page(e);
+                }
+            }
             if !tier.has(Row::RecordedIn) {
                 for k in ["observed", "observed_short"] {
                     f.insert(k.into(), "".into());
@@ -362,7 +368,7 @@ fn home_value(h: &Home, st: &Value) -> Value {
         .collect();
     crate::obj! {
         "began" => or(&h.began), "scope" => or(&h.scope), "scope_short" => or(&h.scope_short), "uncited" => h.uncited,
-        "uncited_line" => or(&h.uncited_line), "uncited_short" => or(&h.uncited_short),
+        "uncited_line" => or(&h.uncited_line), "uncited_short" => or(&h.uncited_short), "taken_out" => or(&h.taken_out),
         "found" => Value::List(h.found.iter().map(|a| crate::obj! {
             "request_id" => a.request_id.clone(), "title" => a.title.clone(), "hint" => a.hint.clone(), "at" => minute(&a.asked_at),
             // the whole command, rb first, as rb ui runs it and as every argv of the contract reads
@@ -410,7 +416,7 @@ fn who_line(e: &Value) -> String {
     let n = e.get("run_count").and_then(Value::as_i64).unwrap_or(0);
     format!(
         "experiment · {} · {} · {n} run{}",
-        e.get("state").map(py_str).unwrap_or_else(|| "planned".into()),
+        crate::view::state_said(e),
         if e.get("frozen").map_or(false, Value::truthy) { "locked" } else { "not locked" },
         if n == 1 { "" } else { "s" }
     )
@@ -481,6 +487,10 @@ fn questions_value(led: &Ledger, h: &Home, st: &Value) -> Res<Value> {
                     "parent" => Value::opt_str(b.parent.clone()), "rollup" => b.rollup.clone(), "overview" => Value::Dict(overview),
                     "lead" => b.overview.get("lead").cloned().unwrap_or(Value::Null), "more" => b.overview.get("more").cloned().unwrap_or(Value::Int(0))
                 };
+                // L1: a state that rests on a call git took out, in words (additive: only then)
+                if !b.state_said.is_empty() {
+                    d.insert("state_said".into(), b.state_said.clone().into());
+                }
                 d.insert("findings".into(), Value::list_of_str(b.inquiry_findings.iter().map(|f| f.criterion_id.clone())));
                 d.insert("experiments".into(), Value::list_of_str(b.experiments.iter().map(|e| e.id.clone())));
                 for (k, v) in [("changed", &b.changed), ("still_open", &b.still_open), ("ruled", &b.ruled), ("summary", &b.summary)] {
@@ -526,7 +536,8 @@ fn calls_value(led: &Ledger, h: &Home, at: Option<&At>) -> Res<(Vec<Value>, Vec<
     for subject in subjects {
         let Some(d) = led.decisions_on(&subject)?.pop() else { continue };
         let confirms = led.confirms(&d.id)?;
-        let line = view::with_words(&crate::ledger::call_line(&d.action, &d.by, &d.at, &d.why, d.past.as_ref(), confirms), &d.words, &d.by);
+        let line = view::with_words(&crate::ledger::call_line(&d.action, &d.by, &d.at, &d.why, d.past.as_ref(), confirms), &d.words, &d.by)
+            + &led.took_call_mark(&d.id)?.map(|m| format!(" · {m}")).unwrap_or_default();
         // the reason a session gave, which the line says as its note, never as what the call rests on
         let as_note = confirms || (d.past.is_some() && !view::words_are_theirs(&d.by));
         let at = match &d.past {
@@ -931,6 +942,13 @@ fn integrity_of(doc: &Dict, st: &Value, home: &Home, replacers: &IndexMap<String
         let line = if k == 1 { "1 record was edited outside rb.".to_string() } else { format!("{k} records were edited outside rb.") };
         parts.push(part("edited", k, 0, line, edited));
     }
+    // what git took out of the record, which rb kept (E1): on rb open only, where the record's other doctor problems are
+    if text(&Value::Dict(doc.clone()), "surface") == "open" {
+        if let Some(t) = st.get("taken_out").filter(|t| t.truthy()) {
+            let ids: Vec<String> = list(t, "records").iter().map(|r| text(r, "id")).collect();
+            parts.push(part("taken_out", ids.len(), 0, text(t, "said"), ids));
+        }
+    }
     let has = |k: &str| parts.iter().any(|p| text(p, "kind") == k);
     let affects = if has("after_evidence") || has("without_command") {
         "Treat them as a record of what happened, not as a test planned in advance."
@@ -1220,6 +1238,13 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
             "observed" => f.observed.clone(), "observed_short" => f.observed_short.clone(),
             "observed_places" => Value::List(f.observed_places.iter().map(|(id, label)| crate::obj! {"id" => id.clone(), "label" => label.clone()}).collect()),
             "other_code" => f.other_code.clone(),
+            // S2 (MP-1111-0219): the timing's code, which the rule card's words are chosen by, never by rb's sentence
+            // (before, after_evidence, after_exposure, unknown, untested; taken_out where git took out what it reads)
+            "timing" => {
+                let code = text(found, "timing");
+                let taken = list(found, "integrity").iter().any(|p| text(p, "code") == "taken_out_by_git") && led.taken_evidence_of(&text(found, "experiment"))? != (0, 0);
+                if code == "untested" && taken { "taken_out".to_string() } else { code }
+            },
             "witness" => found.get("witness").cloned().unwrap_or_else(|| crate::obj! {"total" => 0, "afterwards" => 0}),
             // a rule met on the estimate alone, which a tally says apart (ledger/views.rs on_estimate_alone)
             "on_estimate" => g.finding(&id).map_or(false, |(_, fd)| crate::ledger::views::on_estimate_alone(fd))
@@ -1234,7 +1259,9 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
                 .and_then(Value::as_list)
                 .map(|cs| {
                     cs.iter()
-                        .filter(|c| text(c, "code") != "single_unit" && !(comparable_said && text(c, "code") == "cited_differs"))
+                        // a counted run's code and config (E5's run note) are its card's to say on a page and rb open,
+                        // which say them under the run: the small page keeps its budget (guarantee 29)
+                        .filter(|c| text(c, "code") != "single_unit" && text(c, "code") != "evidence_run_note" && !(comparable_said && text(c, "code") == "cited_differs"))
                         .map(|c| text(c, "text"))
                         .filter(|t| !t.is_empty())
                         .collect()
@@ -2423,7 +2450,7 @@ fn experiments_value(led: &Ledger, h: &Home, st: &Value, recipes: &crate::reprod
             .into_iter()
             .map(|e| -> Res<Value> {
                 let v = e.to_value();
-                let mut d = pick(&v, &["id", "title", "short_title", "state"]);
+                let mut d = pick(&v, &["id", "title", "short_title", "state", "state_said"]);
                 d.insert("who_line".into(), rows.get(&e.id).map(|r| who_line(r)).unwrap_or_default().into());
                 d.extend(pick(&v, &["arms", "varies", "counted", "runs", "hypothesis", "purpose", "why_part", "gate_parts", "gate_words_said", "notes", "note_ids", "relations", "folder", "repo_brief", "design"]));
                 // a rule a design's line adds, in a page's words: its metric by its title (Look 8); a rule changed or
@@ -2505,7 +2532,7 @@ fn metrics_text(exp: Option<&Experiment>, r: &Run) -> String {
 /// A run's receipt as rows of the receipt's field, rb's words for it and the ids they name (`view::run_parts`, the
 /// run card's own lines), as `tier` shows them (shell/tier.rs): no writer, session or branch on any tier, and the
 /// machine's platform on the Live tier alone, a row of its own apart from the environment.
-fn receipt_rows(r: &Run, tier: Tier) -> Value {
+fn receipt_rows(led: &Ledger, r: &Run, tier: Tier, git_root: Option<&std::path::Path>) -> Value {
     let mut card = view::receipt_card(r);
     let platform = r.receipt.environment.get("platform").map(py_str).filter(|_| tier.has(Row::Platform));
     if let Some(Value::Dict(env)) = card.get_mut("environment") {
@@ -2515,6 +2542,24 @@ fn receipt_rows(r: &Run, tier: Tier) -> Value {
         .into_iter()
         .map(|p| Value::List(vec![p.field.into(), p.row_text().into(), Value::list_of_str(p.refs)]))
         .collect();
+    // what rb kept of the code short of the whole, on the run's card (E3): files named on rb open, counts and reasons on
+    // a page, which names no file it did not cite and quotes no git message
+    // when the code it names was captured, at its command's start or as given (E2), in rb show's words; how your
+    // checkout differs is Reproduce's to say
+    for line in crate::cmds::code_lines(git_root, r, tier == Tier::Owner, false) {
+        rows.push(Value::List(vec!["code".into(), line.into(), Value::List(Vec::new())]));
+    }
+    let cap = crate::capture::Capture::of_run(r);
+    for line in crate::capture::state_lines(&cap, tier == Tier::Owner) {
+        rows.push(Value::List(vec!["code".into(), line.into(), Value::List(Vec::new())]));
+    }
+    // its evidence, line by line (E5), worked out in the checkout the view is drawn from: never a bundle's copy, which
+    // holds no file a run named
+    if git_root.is_some() {
+        for line in led.run_evidence_lines(r, tier == Tier::Owner) {
+            rows.push(Value::List(vec!["evidence".into(), line.into(), Value::List(Vec::new())]));
+        }
+    }
     if let Some(p) = platform {
         rows.push(Value::List(vec!["platform".into(), p.into(), Value::List(Vec::new())]));
     }
@@ -2527,6 +2572,13 @@ fn runs_value(led: &Ledger, tier: Tier, recipes: &crate::reproduce::Recipes, g: 
     let rows: IndexMap<String, view::RunRow> = view::run_rows(led, usize::MAX)?.into_iter().map(|r| (r.run_id.clone(), r)).collect();
     let experiments: IndexMap<String, Experiment> = led.all::<Experiment>()?.iter().map(|x| (x.id.clone(), x.clone())).collect();
     let mut out = Dict::new();
+    // a bundle's copy has no git: a tree it names is said as given, never as absent
+    // ... and a page drawn from a bundle's copy works its runs' files out in the checkout it was exported from (E5)
+    let drawn = crate::ledger::evidence::drawn_root();
+    let git_root = match &drawn {
+        Some(p) => Some(p.as_path()),
+        None => crate::sources::git(&led.root, &["rev-parse", "--git-dir"]).map(|_| led.root.as_path()),
+    };
     for r in led.all::<Run>()?.iter() {
         let row = rows.get(&r.id).cloned().unwrap_or_default();
         let exp = experiments.get(&r.experiment);
@@ -2563,7 +2615,7 @@ fn runs_value(led: &Ledger, tier: Tier, recipes: &crate::reproduce::Recipes, g: 
                 "same_bytes" => Value::List(g.same_bytes(r).into_iter().map(|s| crate::obj! {"run" => s.run, "experiment" => s.experiment, "retracted" => s.retracted, "made" => strs(&s.made)}).collect()),
                 "made" => strs(&crate::graph::made(r)), "reproduce" => recipes.run(r)?,
                 "label" => crate::reproduce::run_label(led, exp, r), "at" => minute(if r.receipt.at.is_empty() { &r.created_at } else { &r.receipt.at }),
-                "metrics_text" => metrics_text(exp, r), "receipt_rows" => receipt_rows(r, tier), "command" => command,
+                "metrics_text" => metrics_text(exp, r), "receipt_rows" => receipt_rows(led, r, tier, git_root), "command" => command,
                 "witness" => crate::ledger::support::run_witness(r).to_value()
             },
         );
@@ -2709,6 +2761,12 @@ fn name_in_prose(v: &mut Value, names: &IndexMap<String, String>, replacing: &[(
         }
         Value::Str(s) if rbs(s) => *s = crate::cmds::reading::name_ids(s, &|id| names.get(id).cloned()),
         Value::List(xs) => xs.iter_mut().for_each(|x| name_in_prose(x, names, replacing)),
+        // a caveat of E5's (a run's files, code and config) is rb's sentence about runs, which it names by what they are
+        Value::Dict(d) if d.get("code").and_then(Value::as_str).map_or(false, |c| c.starts_with("evidence_")) && d.contains_key("problem") => {
+            if let Some(Value::Str(t)) = d.get_mut("text") {
+                *t = crate::cmds::reading::name_ids(t, &|id| names.get(id).cloned());
+            }
+        }
         Value::Dict(d) => {
             // a line of rb's that says what someone wrote beside it (an interpretation's line, its when_met words) keeps
             // those words as they read in their own field

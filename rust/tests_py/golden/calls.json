@@ -1481,8 +1481,8 @@
     "no commit yet",
     "",
     "the question (open)",
-    "  Recorded interpretation: declared when met: 'The wider model is worth shipping.'; why: the bar the team ships on. Interpretation active for c3 (estimate meets criterion). c3: wide.top1: 0.78 \u00b7 mean, 1 run (rb); estimate meets criterion: estimate 0.78 \u2265 0.75. c3: criterion and question link declared; order unknown: when run4teabd was produced is unknown; c3: result: point only: 1 unit: rb gives an interval from 3; c3: units: 1 run; c3: 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); c3: typed in, not read from a file or run: run4teabd; c3: no run config was compared with the spec (record runs with --config); c3: 1 run: nothing yet shows how it varies.",
-    "  unassigned (filed here, no question link): cp5h4s6: late one. wide.top1: 0.78 \u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \u2265 0.6; declared; order unknown: when run4teabd was produced is unknown. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); 1 run: nothing yet shows how it varies. Link it here: rb criterion file cp5h4s6 q1 --why \"<why it bears on this question>\" --amend",
+    "  Recorded interpretation: declared when met: 'The wider model is worth shipping.'; why: the bar the team ships on. Interpretation active for c3 (estimate meets criterion). c3: wide.top1: 0.78 \u00b7 mean, 1 run (rb); estimate meets criterion: estimate 0.78 \u2265 0.75. c3: criterion and question link declared; order unknown: when run4teabd was produced is unknown; c3: result: point only: 1 unit: rb gives an interval from 3; c3: units: 1 run; c3: 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); c3: typed in, not read from a file or run: run4teabd; c3: no run config was compared with the spec (record runs with --config); c3: run run4teabd's code was not kept: no commit to keep it at; c3: 1 run: nothing yet shows how it varies.",
+    "  unassigned (filed here, no question link): cp5h4s6: late one. wide.top1: 0.78 \u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \u2265 0.6; declared; order unknown: when run4teabd was produced is unknown. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); run run4teabd's code was not kept: no commit to keep it at; 1 run: nothing yet shows how it varies. Link it here: rb criterion file cp5h4s6 q1 --why \"<why it bears on this question>\" --amend",
     "  call: investigating: \"the question\" (not settled) \u00b7 made on an earlier reading",
     "  call: shipped: \"e\" (done) \u00b7 made on an earlier reading",
     "  call: accepted: \"e1/lr\" (read it off the paper)",
@@ -1518,6 +1518,7 @@
     "          \u00b7 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa)",
     "          \u00b7 typed in, not read from a file or run: run4teabd",
     "          \u00b7 no run config was compared with the spec (record runs with --config)",
+    "          \u00b7 run run4teabd's code was not kept: no commit to keep it at",
     "  c3      wide reaches 0.75",
     "          estimate meets criterion \u00b7 point only \u00b7 wide.top1 \u2265 0.75",
     "          reads:     wide.top1: 0.78 \u00b7 mean, 1 run (rb)",
@@ -1583,8 +1584,8 @@
    "out": [
     "Question q1 (open): the question",
     "  experiments: e1",
-    "  Recorded interpretation: declared when met: 'The wider model is worth shipping at this bar.'; why: say which bar. Interpretation active for c3 (estimate meets criterion). c3: wide.top1: 0.78 \u00b7 mean, 1 run (rb); estimate meets criterion: estimate 0.78 \u2265 0.75. c3: criterion and question link declared; order unknown: when run4teabd was produced is unknown; c3: result: point only: 1 unit: rb gives an interval from 3; c3: units: 1 run; c3: 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); c3: typed in, not read from a file or run: run4teabd; c3: no run config was compared with the spec (record runs with --config); c3: 1 run: nothing yet shows how it varies.",
-    "  unassigned (filed here, no question link): cp5h4s6: late one. wide.top1: 0.78 \u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \u2265 0.6; declared; order unknown: when run4teabd was produced is unknown. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); 1 run: nothing yet shows how it varies. Link it here: rb criterion file cp5h4s6 q1 --why \"<why it bears on this question>\" --amend",
+    "  Recorded interpretation: declared when met: 'The wider model is worth shipping at this bar.'; why: say which bar. Interpretation active for c3 (estimate meets criterion). c3: wide.top1: 0.78 \u00b7 mean, 1 run (rb); estimate meets criterion: estimate 0.78 \u2265 0.75. c3: criterion and question link declared; order unknown: when run4teabd was produced is unknown; c3: result: point only: 1 unit: rb gives an interval from 3; c3: units: 1 run; c3: 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); c3: typed in, not read from a file or run: run4teabd; c3: no run config was compared with the spec (record runs with --config); c3: run run4teabd's code was not kept: no commit to keep it at; c3: 1 run: nothing yet shows how it varies.",
+    "  unassigned (filed here, no question link): cp5h4s6: late one. wide.top1: 0.78 \u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \u2265 0.6; declared; order unknown: when run4teabd was produced is unknown. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); run run4teabd's code was not kept: no commit to keep it at; 1 run: nothing yet shows how it varies. Link it here: rb criterion file cp5h4s6 q1 --why \"<why it bears on this question>\" --amend",
     "  linked here, by rule: 1 criterion met \u00b7 by result: 1 point only",
     "  decision d4teabd: investigating at 2026-10-01T12:00:00.000+00:00: not settled \u00b7 made on readings that have moved since (c1, cp5h4s6, c3)",
     "  decision dprswmo: investigating at 2026-10-01T12:00:00.000+00:00: on the linked reading \u00b7 made on readings that have moved since (c3)",
@@ -1804,6 +1805,12 @@
     "      \"text\": \"no run config was compared with the spec (record runs with --config)\"",
     "     },",
     "     {",
+    "      \"code\": \"evidence_run_note\",",
+    "      \"subject\": \"c3\",",
+    "      \"problem\": false,",
+    "      \"text\": \"run run4teabd's code was not kept: no commit to keep it at\"",
+    "     },",
+    "     {",
     "      \"code\": \"single_unit\",",
     "      \"subject\": \"c3\",",
     "      \"problem\": false,",
@@ -1819,7 +1826,8 @@
     "     \"units\": \"1 run\",",
     "     \"integrity\": \"ok\",",
     "     \"review\": \"no decision\",",
-    "     \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\"",
+    "     \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\",",
+    "     \"evidence\": \"Evidence: 1 run. Short of whole: 1 run's code not kept (no commit to keep it at). rb has not rerun them.\"",
     "    },",
     "    \"n\": 1,",
     "    \"witness\": {",
@@ -1969,6 +1977,12 @@
     "      \"text\": \"no run config was compared with the spec (record runs with --config)\"",
     "     },",
     "     {",
+    "      \"code\": \"evidence_run_note\",",
+    "      \"subject\": \"cp5h4s6\",",
+    "      \"problem\": false,",
+    "      \"text\": \"run run4teabd's code was not kept: no commit to keep it at\"",
+    "     },",
+    "     {",
     "      \"code\": \"single_unit\",",
     "      \"subject\": \"cp5h4s6\",",
     "      \"problem\": false,",
@@ -1984,7 +1998,8 @@
     "     \"units\": \"1 run\",",
     "     \"integrity\": \"ok\",",
     "     \"review\": \"no decision\",",
-    "     \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\"",
+    "     \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\",",
+    "     \"evidence\": \"Evidence: 1 run. Short of whole: 1 run's code not kept (no commit to keep it at). rb has not rerun them.\"",
     "    },",
     "    \"n\": 1,",
     "    \"witness\": {",
@@ -2451,6 +2466,12 @@
     "          \"text\": \"no run config was compared with the spec (record runs with --config)\"",
     "         },",
     "         {",
+    "          \"code\": \"evidence_run_note\",",
+    "          \"subject\": \"c3\",",
+    "          \"problem\": false,",
+    "          \"text\": \"run run4teabd's code was not kept: no commit to keep it at\"",
+    "         },",
+    "         {",
     "          \"code\": \"single_unit\",",
     "          \"subject\": \"c3\",",
     "          \"problem\": false,",
@@ -2466,7 +2487,8 @@
     "         \"units\": \"1 run\",",
     "         \"integrity\": \"ok\",",
     "         \"review\": \"no decision\",",
-    "         \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\"",
+    "         \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\",",
+    "         \"evidence\": \"Evidence: 1 run. Short of whole: 1 run's code not kept (no commit to keep it at). rb has not rerun them.\"",
     "        },",
     "        \"n\": 1",
     "       },",
@@ -2508,10 +2530,11 @@
     "        \"2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa)\",",
     "        \"typed in, not read from a file or run: run4teabd\",",
     "        \"no run config was compared with the spec (record runs with --config)\",",
+    "        \"run run4teabd's code was not kept: no commit to keep it at\",",
     "        \"1 run: nothing yet shows how it varies\"",
     "       ],",
     "       \"integrity\": [],",
-    "       \"summary\": \"wide reaches 0.75. wide.top1: 0.78 \\u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \\u2265 0.75; rule and question link declared; order unknown: when run4teabd was produced is unknown. Interpretation: declared when met: 'The wider model is worth shipping at this bar.'; why: say which bar. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); 1 run: nothing yet shows how it varies.\"",
+    "       \"summary\": \"wide reaches 0.75. wide.top1: 0.78 \\u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \\u2265 0.75; rule and question link declared; order unknown: when run4teabd was produced is unknown. Interpretation: declared when met: 'The wider model is worth shipping at this bar.'; why: say which bar. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); run run4teabd's code was not kept: no commit to keep it at; 1 run: nothing yet shows how it varies.\"",
     "      }",
     "     ],",
     "     \"unmapped\": [",
@@ -2660,6 +2683,12 @@
     "          \"text\": \"no run config was compared with the spec (record runs with --config)\"",
     "         },",
     "         {",
+    "          \"code\": \"evidence_run_note\",",
+    "          \"subject\": \"cp5h4s6\",",
+    "          \"problem\": false,",
+    "          \"text\": \"run run4teabd's code was not kept: no commit to keep it at\"",
+    "         },",
+    "         {",
     "          \"code\": \"single_unit\",",
     "          \"subject\": \"cp5h4s6\",",
     "          \"problem\": false,",
@@ -2675,7 +2704,8 @@
     "         \"units\": \"1 run\",",
     "         \"integrity\": \"ok\",",
     "         \"review\": \"no decision\",",
-    "         \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\"",
+    "         \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\",",
+    "         \"evidence\": \"Evidence: 1 run. Short of whole: 1 run's code not kept (no commit to keep it at). rb has not rerun them.\"",
     "        },",
     "        \"n\": 1",
     "       },",
@@ -2693,10 +2723,11 @@
     "        \"2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa)\",",
     "        \"typed in, not read from a file or run: run4teabd\",",
     "        \"no run config was compared with the spec (record runs with --config)\",",
+    "        \"run run4teabd's code was not kept: no commit to keep it at\",",
     "        \"1 run: nothing yet shows how it varies\"",
     "       ],",
     "       \"integrity\": [],",
-    "       \"summary\": \"late one. wide.top1: 0.78 \\u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \\u2265 0.6; declared; order unknown: when run4teabd was produced is unknown. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); 1 run: nothing yet shows how it varies.\"",
+    "       \"summary\": \"late one. wide.top1: 0.78 \\u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \\u2265 0.6; declared; order unknown: when run4teabd was produced is unknown. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); run run4teabd's code was not kept: no commit to keep it at; 1 run: nothing yet shows how it varies.\"",
     "      }",
     "     ],",
     "     \"withdrawn\": [",
@@ -2845,6 +2876,12 @@
     "          \"text\": \"no run config was compared with the spec (record runs with --config)\"",
     "         },",
     "         {",
+    "          \"code\": \"evidence_run_note\",",
+    "          \"subject\": \"c3\",",
+    "          \"problem\": false,",
+    "          \"text\": \"run run4teabd's code was not kept: no commit to keep it at\"",
+    "         },",
+    "         {",
     "          \"code\": \"single_unit\",",
     "          \"subject\": \"c3\",",
     "          \"problem\": false,",
@@ -2860,7 +2897,8 @@
     "         \"units\": \"1 run\",",
     "         \"integrity\": \"ok\",",
     "         \"review\": \"no decision\",",
-    "         \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\"",
+    "         \"history\": \"was 0.715 \\u00b7 mean, 2 runs (rb), under an earlier spec: lr 0.002 -> unknown\",",
+    "         \"evidence\": \"Evidence: 1 run. Short of whole: 1 run's code not kept (no commit to keep it at). rb has not rerun them.\"",
     "        },",
     "        \"n\": 1",
     "       },",
@@ -2914,6 +2952,7 @@
     "        \"2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa)\",",
     "        \"typed in, not read from a file or run: run4teabd\",",
     "        \"no run config was compared with the spec (record runs with --config)\",",
+    "        \"run run4teabd's code was not kept: no commit to keep it at\",",
     "        \"1 run: nothing yet shows how it varies\"",
     "       ],",
     "       \"integrity\": [",
@@ -2924,7 +2963,7 @@
     "         \"text\": \"this question link was withdrawn\"",
     "        }",
     "       ],",
-    "       \"summary\": \"wide reaches 0.75. wide.top1: 0.78 \\u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \\u2265 0.75; rule and question link declared; order unknown: when run4teabd was produced is unknown. Conditional interpretation (not active): declared when met: 'The wider model is worth shipping.'; why: the bar the team ships on. Inquiry integrity: this question link was withdrawn. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); 1 run: nothing yet shows how it varies.\"",
+    "       \"summary\": \"wide reaches 0.75. wide.top1: 0.78 \\u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \\u2265 0.75; rule and question link declared; order unknown: when run4teabd was produced is unknown. Conditional interpretation (not active): declared when met: 'The wider model is worth shipping.'; why: the bar the team ships on. Inquiry integrity: this question link was withdrawn. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); run run4teabd's code was not kept: no commit to keep it at; 1 run: nothing yet shows how it varies.\"",
     "      }",
     "     ],",
     "     \"relations\": [],",
@@ -2944,8 +2983,8 @@
     "      \"untested\": []",
     "     },",
     "     \"summary\": [",
-    "      \"Recorded interpretation: declared when met: 'The wider model is worth shipping at this bar.'; why: say which bar. Interpretation active for c3 (estimate meets criterion). c3: wide.top1: 0.78 \\u00b7 mean, 1 run (rb); estimate meets criterion: estimate 0.78 \\u2265 0.75. c3: criterion and question link declared; order unknown: when run4teabd was produced is unknown; c3: result: point only: 1 unit: rb gives an interval from 3; c3: units: 1 run; c3: 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); c3: typed in, not read from a file or run: run4teabd; c3: no run config was compared with the spec (record runs with --config); c3: 1 run: nothing yet shows how it varies.\",",
-    "      \"unassigned (filed here, no question link): cp5h4s6: late one. wide.top1: 0.78 \\u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \\u2265 0.6; declared; order unknown: when run4teabd was produced is unknown. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); 1 run: nothing yet shows how it varies. Link it here: rb criterion file cp5h4s6 q1 --why \\\"<why it bears on this question>\\\" --amend\"",
+    "      \"Recorded interpretation: declared when met: 'The wider model is worth shipping at this bar.'; why: say which bar. Interpretation active for c3 (estimate meets criterion). c3: wide.top1: 0.78 \\u00b7 mean, 1 run (rb); estimate meets criterion: estimate 0.78 \\u2265 0.75. c3: criterion and question link declared; order unknown: when run4teabd was produced is unknown; c3: result: point only: 1 unit: rb gives an interval from 3; c3: units: 1 run; c3: 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); c3: typed in, not read from a file or run: run4teabd; c3: no run config was compared with the spec (record runs with --config); c3: run run4teabd's code was not kept: no commit to keep it at; c3: 1 run: nothing yet shows how it varies.\",",
+    "      \"unassigned (filed here, no question link): cp5h4s6: late one. wide.top1: 0.78 \\u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; estimate meets criterion: estimate 0.78 \\u2265 0.6; declared; order unknown: when run4teabd was produced is unknown. units: 1 run; 2 runs not counted: under an earlier spec: lr 0.002 -> unknown (runp5h4s6, runqtdhpa); typed in, not read from a file or run: run4teabd; no run config was compared with the spec (record runs with --config); run run4teabd's code was not kept: no commit to keep it at; 1 run: nothing yet shows how it varies. Link it here: rb criterion file cp5h4s6 q1 --why \\\"<why it bears on this question>\\\" --amend\"",
     "     ],",
     "     \"descendants\": []",
     "    }",
@@ -3209,6 +3248,12 @@
     "          \"subject\": \"c3\",",
     "          \"problem\": false,",
     "          \"text\": \"no run config was compared with the spec (record runs with --config)\"",
+    "         },",
+    "         {",
+    "          \"code\": \"evidence_run_note\",",
+    "          \"subject\": \"c3\",",
+    "          \"problem\": false,",
+    "          \"text\": \"run run4teabd's code was not kept: no commit to keep it at\"",
     "         },",
     "         {",
     "          \"code\": \"single_unit\",",
@@ -3552,6 +3597,10 @@
    "journal/",
    ""
   ],
+  ".rb/cache/objects/02/02a147eea495dbd25221dc4e36526b2b4ffa7c32f3f39d2c594ce2d8747224d1.json.gz": {
+   "sha256": "bcb8170e12ef6fa2396a01aaea3f249a11ae959309fb3806d608610a203e2ea2",
+   "bytes": 1058
+  },
   ".rb/cache/objects/03/03ee47c82a401e00cbf56dd18c52e3cb0c24bb2f092dadd48498ba4648ebfbe7.json.gz": {
    "sha256": "d145ce4b21a2c3aba05732d403e539655bf73755352fc3f6f61ae12529b52b6f",
    "bytes": 349
@@ -3580,6 +3629,10 @@
    "sha256": "ef845d60118e85903a5868434fe69ecd4d2f34930abcb2c0e5ed474212c74539",
    "bytes": 116
   },
+  ".rb/cache/objects/26/263ba14e72c8ea67157ca36b8b8538b7034ffc6997b0d51c1135aac5e07263f1.json.gz": {
+   "sha256": "3593e9997a143440d22bccc57a7969514e693b7253e8ac3cc56a1f8aeba0e0b7",
+   "bytes": 1077
+  },
   ".rb/cache/objects/36/3646d99a25188ae3d10074ad0cffe6b898faf7e3e2cae8fc6399036cd2e72515.json.gz": {
    "sha256": "c8411e2e297c55cf369d2f27eb6b2d87f92b2ccb69c56fc4d6c69d3d9bdb1404",
    "bytes": 332
@@ -3596,9 +3649,9 @@
    "sha256": "f57650628da077a03cd38aa1b76c2eff1e10a147134ca5eb5f368e92f9a6849d",
    "bytes": 152
   },
-  ".rb/cache/objects/4a/4ae1ac92873a6d0852b2ab743e1f8fcf22911e86617d24cbdf0cad47001f1b6c.json.gz": {
-   "sha256": "9dccc65860b465b4a7b706a32c934d60e366a992de0c482349f4a3a4fa5aa401",
-   "bytes": 1858
+  ".rb/cache/objects/45/45d8a16469bfe059c58ca23f8b0d2a20ceee62388111db4d78885bc87d9ff4b2.json.gz": {
+   "sha256": "8564766a7f511cd2bf0e79c41da7f3f95206d86204351055821b54be82f3d34e",
+   "bytes": 1051
   },
   ".rb/cache/objects/4a/4afadac929f63a18edb455bdb47c642003464ff7418973399abde9e0c7b16517.json.gz": {
    "sha256": "5066afa801ac825095de3b0e8313c9f14dc736d4cdf32a00d2ca50baaddfd3e3",
@@ -3616,10 +3669,6 @@
    "sha256": "6c75f80de2a71e3012484424990a7244cc6633561191c499ad78d46c254deba3",
    "bytes": 395
   },
-  ".rb/cache/objects/6d/6def0d33508e201ddb9ce860333d86ea1669e36aae5ead7e22ae0558e28a01c2.json.gz": {
-   "sha256": "0d24ca4dc7c875ba93ac2a847fb1416208e30215b946f24020cb05fd7b69088e",
-   "bytes": 995
-  },
   ".rb/cache/objects/73/732d6a104bed3c33cb779585f6dd374cf36aa691335a93a2f6cc3238429765f1.json.gz": {
    "sha256": "37ccb00fefcd9a3d1990d38560e01df584b20d884d0ad37d1ce6c5dee62aa8cf",
    "bytes": 254
@@ -3632,13 +3681,13 @@
    "sha256": "f4b21263f137efd588fbe28115c501e02f30fb539a5e1eee86a5bbf837719aca",
    "bytes": 362
   },
-  ".rb/cache/objects/90/902d093ca26963335b1fa2e11b9e9c04e1b4f768d353287f85d489700513c0a3.json.gz": {
-   "sha256": "25342589ceda1da072d4265bcca7829da3ba7c8e1b50395ac833b95dd5648981",
-   "bytes": 1021
-  },
   ".rb/cache/objects/bd/bd0b852b93edaaa9a0f30fff1f59e1d209e6e1316c445a14f48f156322e4601a.json.gz": {
    "sha256": "4e64fd37aef10cf08f15388b9480e1cad4126556fd4513e459795fb35fcf8d36",
    "bytes": 163
+  },
+  ".rb/cache/objects/c8/c8cc8d5cf0badfa3cbf9e87d8f8341b159bd9b2d52d87516018e0b534dd591a7.json.gz": {
+   "sha256": "0e3abad6bd61a2a23594af4c16b9884d07be8f9e4d3dffbce6a01cebbbc8817f",
+   "bytes": 1986
   },
   ".rb/cache/objects/cd/cd7ef722073d8318d21a280a230d7af3ec1fafa84d4483308e9bf9302125e95e.json.gz": {
    "sha256": "7a6f6e6051c2b7a04b9465be4d818fdc4eabc9d4bed8c7837a6d42b10fb914a7",
@@ -3651,10 +3700,6 @@
   ".rb/cache/objects/d8/d84cc6ce1d93e4c6978f746e81f238446b56c2c4bd0ad5e748ba7c21d5e8fefb.json.gz": {
    "sha256": "3e3c8f174954900605a7d4dd8b50da0b2cb1796fc5d5df407a955d21c7816cea",
    "bytes": 491
-  },
-  ".rb/cache/objects/e5/e543c878c188f2d66f299efe37281a77e5d17cac4b3782e04576888955a49474.json.gz": {
-   "sha256": "aa7ef22b56b924c2b0f44294f598944ebbfba71b10dca5ac475d6e1289c879c7",
-   "bytes": 1002
   },
   ".rb/cache/objects/ea/ea6b61fc32f7ff678000ad057972ad0758ef2c5b97a10a2e99b2e1c84f84c57b.json.gz": {
    "sha256": "b836b35f0420e81f12708a1183421b0dd1a82da68d87e207751e6fd827a6b133",
@@ -3682,8 +3727,8 @@
    "  \"5c8828d34b492a5a\",",
    "  \"549db0639d6326b8\",",
    "  \"2cf10867651fe55d\",",
-   "  \"613df286c57e7121\",",
-   "  \"acaa2b45305f6791\",",
+   "  \"178b3aa7b713a3f7\",",
+   "  \"0ebd3a93f4cb7737\",",
    "  \"eb66e3cad95e9974\",",
    "  \"2b64c0b4b7e8e827\"",
    " ],",
@@ -3869,6 +3914,10 @@
    "            subject: c3",
    "            problem: false",
    "            text: no run config was compared with the spec (record runs with --config)",
+   "          - code: evidence_run_note",
+   "            subject: c3",
+   "            problem: false",
+   "            text: \"run run4teabd's code was not kept: no commit to keep it at\"",
    "          - code: single_unit",
    "            subject: c3",
    "            problem: false",
@@ -4080,6 +4129,9 @@
    "    commit: null",
    "    branch: main",
    "    dirty: false",
+   "    captured: after",
+   "    kept: none",
+   "    kept_why: no_commit",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -4125,6 +4177,9 @@
    "    commit: null",
    "    branch: main",
    "    dirty: false",
+   "    captured: after",
+   "    kept: none",
+   "    kept_why: no_commit",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -4171,6 +4226,9 @@
    "    commit: null",
    "    branch: main",
    "    dirty: false",
+   "    captured: after",
+   "    kept: none",
+   "    kept_why: no_commit",
    "  produced:",
    "    commit: null",
    "    from: unknown",
@@ -4216,8 +4274,8 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"spec_set\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"cd7ef722073d8318d21a280a230d7af3ec1fafa84d4483308e9bf9302125e95e\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"setting\": \"lr\", \"change\": \"setting lr: 0.001 -> 0.002\", \"value\": 0.002, \"status\": \"provisional\", \"required\": true, \"source\": null, \"why\": \"the paper said 0.002\", \"amendment\": {\"why\": \"the paper said 0.002\", \"change\": \"setting lr: 0.001 -> 0.002\", \"before\": \"042e5ab20ac552fd9adc71d500449c02f9abc4e524b7c696d523f36183fb2a84\", \"after\": \"383b13297eb25e1bab65470220cd3477a72286cc8c9824a15ca2da77efd3c5fa\"}, \"changed_parts\": {\"e1\": {\"amendment:1\": \"setting lr: 0.001 -> 0.002\", \"amendment_why:1\": \"the paper said 0.002\", \"setting:lr\": \"0.002\", \"source:lr\": null}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"amend\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"41079725e5d095629fb31d97ee89b8c24baad85d78fccaf3423b10b01158fe98\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"amendment\": {\"why\": \"one more\", \"change\": \"new criterion cp5h4s6: wide.top1 \u2265 0.6\", \"before\": \"383b13297eb25e1bab65470220cd3477a72286cc8c9824a15ca2da77efd3c5fa\", \"after\": \"2cfa98cff188833c1e3ed3176d174d466c2d1d84cc1942fa16d36c928e5f5375\"}, \"changed_parts\": {\"e1\": {\"amendment:2\": \"new criterion cp5h4s6: wide.top1 \u2265 0.6\", \"amendment_why:2\": \"one more\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"cp5h4s6\", \"sha256\": \"732d6a104bed3c33cb779585f6dd374cf36aa691335a93a2f6cc3238429765f1\", \"path\": \".rb/experiments/e1/criteria/cp5h4s6.yaml\", \"detail\": {\"rule\": \"wide.top1 \u2265 0.6\", \"experiment\": \"e1\", \"role\": \"primary\", \"why\": \"one more\", \"amendment\": {\"why\": \"one more\", \"change\": \"new criterion cp5h4s6: wide.top1 \u2265 0.6\", \"before\": \"383b13297eb25e1bab65470220cd3477a72286cc8c9824a15ca2da77efd3c5fa\", \"after\": \"2cfa98cff188833c1e3ed3176d174d466c2d1d84cc1942fa16d36c928e5f5375\"}, \"changed_parts\": {\"e1\": {\"role:cp5h4s6\": \"primary\", \"rule:cp5h4s6\": \"wide.top1 \u2265 0.6\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"e543c878c188f2d66f299efe37281a77e5d17cac4b3782e04576888955a49474\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.71, \"base.top1\": 0.69}, \"per_run\": {}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"902d093ca26963335b1fa2e11b9e9c04e1b4f768d353287f85d489700513c0a3\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.72, \"base.top1\": 0.69}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runp5h4s6\", \"sha256\": \"02a147eea495dbd25221dc4e36526b2b4ffa7c32f3f39d2c594ce2d8747224d1\", \"path\": \".rb/experiments/e1/runs/runp5h4s6.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.71, \"base.top1\": 0.69}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"runqtdhpa\", \"sha256\": \"263ba14e72c8ea67157ca36b8b8538b7034ffc6997b0d51c1135aac5e07263f1\", \"path\": \".rb/experiments/e1/runs/runqtdhpa.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.72, \"base.top1\": 0.69}, \"per_run\": {}, \"again\": false}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"decide\", \"kind\": \"decision\", \"id\": \"dp5h4s6\", \"sha256\": \"040aa450b970df7465023b80bdb24cb4e92b3d6bb0808c3e12b0fa20f5d737f1\", \"path\": \".rb/decisions/dp5h4s6.yaml\", \"detail\": {\"subject\": \"c1\", \"action\": \"accept\", \"value\": null}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"agent:claude-code\", \"actor_via\": \"detected:CLAUDECODE\", \"via\": \"cli\", \"op\": \"decide\", \"kind\": \"decision\", \"id\": \"dqtdhpa\", \"agent\": {\"name\": \"claude-code\", \"provider\": \"anthropic\", \"provider_from\": \"inferred\"}, \"words\": \"park it for now\", \"sha256\": \"5b0574f83070859b3aab39b4807a51fd43df63a1822f4f77acb19f4ad177ef94\", \"path\": \".rb/decisions/dqtdhpa.yaml\", \"detail\": {\"subject\": \"e1\", \"action\": \"park\", \"value\": null}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"decide\", \"kind\": \"decision\", \"id\": \"d4teabd\", \"sha256\": \"7477c24a96252f7a5c4d2f57bc3ca98ce3a0029ac79a4dc4aa3234b55507076c\", \"path\": \".rb/decisions/d4teabd.yaml\", \"detail\": {\"subject\": \"q1\", \"action\": \"investigate\", \"value\": null}}",
@@ -4229,8 +4287,8 @@
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"title\", \"kind\": \"project\", \"id\": \"calls\", \"sha256\": \"5050b9007fedaaab50588bfeb1c8dc9760a0ca56614048572b9feace322c0773\", \"path\": \".rb/project.yaml\", \"detail\": {\"before\": \"calls\", \"title\": \"Calls on the width study\", \"why\": \"name the work, not one question\"}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"amend\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"ea6b61fc32f7ff678000ad057972ad0758ef2c5b97a10a2e99b2e1c84f84c57b\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"amendment\": {\"why\": \"the bar the team ships on\", \"change\": \"new criterion c3: wide.top1 \u2265 0.75\", \"before\": \"92398a2811e8aecd837059a9c961a2dbf867ccba6e97aa97c2a66894bc829599\", \"after\": \"8fc4107c92a18ca5122dcda9731dfb5d5123de611b56d513687cbc2549c238f7\"}, \"changed_parts\": {\"e1\": {\"amendment:5\": \"new criterion c3: wide.top1 \u2265 0.75\", \"amendment_why:5\": \"the bar the team ships on\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"add\", \"kind\": \"criterion\", \"id\": \"c3\", \"sha256\": \"d84cc6ce1d93e4c6978f746e81f238446b56c2c4bd0ad5e748ba7c21d5e8fefb\", \"path\": \".rb/experiments/e1/criteria/c3.yaml\", \"detail\": {\"rule\": \"wide.top1 \u2265 0.75\", \"experiment\": \"e1\", \"role\": \"primary\", \"why\": \"the bar the team ships on\", \"amendment\": {\"why\": \"the bar the team ships on\", \"change\": \"new criterion c3: wide.top1 \u2265 0.75\", \"before\": \"92398a2811e8aecd837059a9c961a2dbf867ccba6e97aa97c2a66894bc829599\", \"after\": \"8fc4107c92a18ca5122dcda9731dfb5d5123de611b56d513687cbc2549c238f7\"}, \"changed_parts\": {\"e1\": {\"link:c3:q1\": \"when met, \\\"The wider model is worth shipping.\\\"\", \"role:c3\": \"primary\", \"rule:c3\": \"wide.top1 \u2265 0.75\"}}}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"6def0d33508e201ddb9ce860333d86ea1669e36aae5ead7e22ae0558e28a01c2\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.78, \"base.top1\": 0.7}, \"per_run\": {}, \"again\": false}}",
-   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"decide\", \"kind\": \"decision\", \"id\": \"dprswmo\", \"sha256\": \"4ae1ac92873a6d0852b2ab743e1f8fcf22911e86617d24cbdf0cad47001f1b6c\", \"path\": \".rb/decisions/dprswmo.yaml\", \"detail\": {\"subject\": \"q1\", \"action\": \"investigate\", \"value\": null}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"record\", \"kind\": \"run\", \"id\": \"run4teabd\", \"sha256\": \"45d8a16469bfe059c58ca23f8b0d2a20ceee62388111db4d78885bc87d9ff4b2\", \"path\": \".rb/experiments/e1/runs/run4teabd.yaml\", \"detail\": {\"experiment\": \"e1\", \"metrics\": {\"wide.top1\": 0.78, \"base.top1\": 0.7}, \"per_run\": {}, \"again\": false}}",
+   "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"decide\", \"kind\": \"decision\", \"id\": \"dprswmo\", \"sha256\": \"c8cc8d5cf0badfa3cbf9e87d8f8341b159bd9b2d52d87516018e0b534dd591a7\", \"path\": \".rb/decisions/dprswmo.yaml\", \"detail\": {\"subject\": \"q1\", \"action\": \"investigate\", \"value\": null}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"amend\", \"kind\": \"experiment\", \"id\": \"e1\", \"sha256\": \"ce3e82939dad250fdd4bfecc2f2792c3e4b4cb8e47fc6d052e78d7f6e787734a\", \"path\": \".rb/experiments/e1/experiment.yaml\", \"detail\": {\"amendment\": {\"why\": \"say which bar\", \"change\": \"criterion c3: file under question q1\", \"before\": \"8fc4107c92a18ca5122dcda9731dfb5d5123de611b56d513687cbc2549c238f7\", \"after\": \"2e8ea5bdc3048dd16edc4d8dc2e90308dc517f4cc5540fdc041194296a505a0f\"}, \"changed_parts\": {\"e1\": {\"amendment:6\": \"criterion c3: file under question q1\", \"amendment_why:6\": \"say which bar\"}}}}",
    "{\"at\": \"2026-10-01T12:00:00.000+00:00\", \"actor\": \"human:t\", \"actor_via\": \"git-email\", \"via\": \"cli\", \"op\": \"file\", \"kind\": \"criterion\", \"id\": \"c3\", \"sha256\": \"1882fdd7fd2dd5acf867cb78f508703dd19a4ca99cb3aad5cb7ae6c18e484199\", \"path\": \".rb/experiments/e1/criteria/c3.yaml\", \"detail\": {\"question\": \"q1\", \"when_met\": \"The wider model is worth shipping at this bar.\", \"why\": \"say which bar\", \"amendment\": {\"why\": \"say which bar\", \"change\": \"criterion c3: file under question q1\", \"before\": \"8fc4107c92a18ca5122dcda9731dfb5d5123de611b56d513687cbc2549c238f7\", \"after\": \"2e8ea5bdc3048dd16edc4d8dc2e90308dc517f4cc5540fdc041194296a505a0f\"}, \"changed_parts\": {\"e1\": {\"link:c3:q1\": \"when met, \\\"The wider model is worth shipping at this bar.\\\"\"}}}}",
    ""
@@ -4257,8 +4315,8 @@
    ""
   ],
   "rb-page.html": {
-   "sha256": "db6af017eb31565531a4e8b6a64b403cc3cb930f80e61dbc6d006fba23ce924b",
-   "bytes": 208136
+   "sha256": "b2f43b38d6c4e3a29fef0d7778bce21c247598408c6174e4895c74f3daacfcab",
+   "bytes": 207544
   }
  }
 }

@@ -232,9 +232,7 @@ fn recorded_code(r: &Run) -> Option<Code> {
     if !at.get("dirty").map_or(false, Value::truthy) {
         return Some(Code { tree: commit.clone(), commit });
     }
-    if at.get("left_out").map_or(false, Value::truthy) {
-        return None;
-    }
+    // part of the code kept is kept (E3): Reproduce rebuilds its tree under the line that names what it lacks
     Some(Code { tree: field(at, "tree")?, commit })
 }
 
@@ -630,7 +628,15 @@ impl<'a> Recipes<'a> {
         let given: Vec<(&Run, Given)> = runs.iter().filter_map(|r| support::run_command(r).map(|g| (*r, g))).collect();
         let as_given = as_given_line(runs, &given, one);
         if !runs.is_empty() {
-            steps.push(self.command_step(runs, &given, one));
+            let mut step = self.command_step(runs, &given, one);
+            // where the run's code is not here, its command is what it ran, never a step to run (E4)
+            if step.runnable && !steps.iter().any(|s| s.what == "code" && s.runnable) && self.code_away(runs).is_some() {
+                if let Some((_, g)) = given.first() {
+                    step.label = g.line();
+                }
+                step.runnable = false;
+            }
+            steps.push(step);
         }
         let (per_run, per_run_lines) = self.per_run(exp, runs, one);
         let (settings, settings_lines) = self.settings(exp, one)?;
@@ -770,6 +776,7 @@ impl<'a> Recipes<'a> {
                 } else {
                     Some(r.receipt.attached.clone().unwrap_or_default())
                 }
+                .map(|c| crate::ledger::with_run(c, &r.id))
             })
             .collect();
         let envs: Vec<&Dict> = runs.iter().zip(&before).filter(|(r, b)| !**b && !r.receipt.environment.is_empty()).map(|(r, _)| &r.receipt.environment).collect();
@@ -881,6 +888,13 @@ impl<'a> Recipes<'a> {
                 detail = format!("{label}: retracted ({})", rt.why);
                 word = format!("retracted ({})", rt.why);
             }
+            // N1 (f13i): a resource git took a write of out of the record (its retraction, a location) reads as rb
+            // cannot tell, never as it stands on disk, until it is put back
+            if let Some(mark) = led.took_mark("resource", &res.id)? {
+                state = "unknown";
+                detail = format!("{label}: {mark}");
+                word = mark;
+            }
             let read: BTreeSet<String> = uses.iter().filter_map(|u| u.sha256.clone().filter(|s| !s.is_empty())).collect();
             let here = av.get("locations").and_then(|l| l.as_list()).and_then(|l| {
                 l.iter().find(|x| x.get_str("provider") == Some("local") && x.get_str("state") != Some("gone")).map(|x| led.local(x.get_str("ref").unwrap_or("")))
@@ -991,14 +1005,47 @@ impl<'a> Recipes<'a> {
                             )
                         }
                     };
+                    // a tree kept with files left out is not the run's whole code: the step says what it lacks, and that
+                    // those files go in place after its commands (E3): by name on the user's own screens, by count and reason on a page
+                    let mut label = label;
+                    if let Some(line) = runs
+                        .iter()
+                        .filter(|r| ids.contains(&r.id))
+                        .map(|r| crate::capture::Capture::attached(r))
+                        .find(|cap| cap.kept == crate::capture::Kept::Part && tree.is_some() && cap.tree.as_deref().map_or(false, |t| tree.as_deref().map_or(false, |x| x.starts_with(t) || t.starts_with(x))))
+                        .and_then(|cap| cap.rebuild_line(self.tier == Tier::Owner))
+                    {
+                        label.push_str(&format!(". {line}"));
+                    }
                     let checkout = self.your_checkout(&c, tree.as_deref(), &ids);
                     Step { what: "code".into(), label, refs: ids, command, from: String::new(), runnable: true, code: Some((c, tree)), checkout }
                 })
                 .collect();
         }
         let row = rows.iter().find(|r| r.what == "code" && r.resource.is_none());
-        let label = row.map_or_else(|| "code: unknown".to_string(), |r| format!("code · {}: {}", r.state, r.detail));
+        let mut label = row.map_or_else(|| "code: unknown".to_string(), |r| format!("code · {}: {}", r.state, r.detail));
+        if let (Some(why), Some(r)) = (self.code_away(runs), row) {
+            label = format!("code · {}: {why}", r.state);
+        }
         vec![Step { what: "code".into(), label, ..Default::default() }]
+    }
+
+    /// Why a run's code is not here, in E4's words: kept as a tree in the clone that recorded it, or not kept (E3's line
+    /// for the reason). None where every run's code is here, or is its commit.
+    fn code_away(&self, runs: &[&Run]) -> Option<String> {
+        let page = self.tier == Tier::Owner;
+        // a run made before it was recorded keeps the recorder's code, which is not the run's to say as away
+        runs.iter().filter(|r| !crate::ledger::made_before_recorded(r)).find_map(|r| {
+            let cap = crate::capture::Capture::attached(r);
+            match cap.tree.as_deref() {
+                Some(t) if cap.dirty && crate::capture::tree_here(&self.led.root, t) == crate::capture::Here::Absent => {
+                    let t12: String = t.chars().take(12).collect();
+                    Some(if page { crate::shell::strings::evidence("not_here_page", &[("tree", t12)]) } else { crate::shell::strings::evidence("not_here", &[("tree", t12)]) })
+                }
+                None if cap.kept == crate::capture::Kept::None => crate::capture::state_lines(&cap, page).into_iter().next(),
+                _ => None,
+            }
+        })
     }
 
     /// Your checkout against the code the runs `ids` ran (the commit `commit`, or the tree rb kept of their uncommitted
@@ -1010,7 +1057,19 @@ impl<'a> Recipes<'a> {
         let top = sources::git_top(root)?;
         let record = sources::rel_to(&sources::resolve_path(&root.join(crate::ledger::DIR)), &top)?;
         let holds = self.tree_files(&top, commit)?;
-        let named: HashSet<String> = ids.iter().filter_map(|id| self.run_by(id)).flat_map(|r| self.named_paths(r)).collect();
+        let mut named: HashSet<String> = ids.iter().filter_map(|id| self.run_by(id)).flat_map(|r| self.named_paths(r)).collect();
+        // and what the journal says the runs' commands wrote, where the commit holds no such file: a run's outputs are
+        // no code your checkout lacks (E4), and a file of the code the command changed still is
+        let commands: Vec<String> = ids.iter().filter_map(|id| self.run_by(id)).filter_map(|r| r.receipt.command.clone()).collect();
+        if !commands.is_empty() {
+            for e in crate::journal::entries(root, None).iter().filter(|e| e.get_str("op") == Some("run")) {
+                if e.get_str("command").map_or(false, |c| commands.iter().any(|k| crate::journal::same_command(c, k))) {
+                    if let Some(Value::List(w)) = e.get("wrote") {
+                        named.extend(w.iter().filter_map(Value::as_str).filter(|p| !holds.contains_key(*p)).map(str::to_string));
+                    }
+                }
+            }
+        }
         crate::checkout::compare(viewer, tree.unwrap_or(commit), &record, &holds, &named)
     }
 
@@ -1551,7 +1610,8 @@ fn code_differs(led: &Ledger, commit: &str, taken: &[String]) -> Option<Vec<(Str
     let record = sources::rel_to(&sources::resolve_path(&root.join(crate::ledger::DIR)), &top).unwrap_or_else(|| crate::ledger::DIR.to_string());
     let named: HashSet<String> = led.all::<Run>().map(|rs| rs.iter().flat_map(|r| r.files.iter().map(|f| f.path.clone())).collect()).unwrap_or_default();
     // each path as git keeps it, never quoted: a status, then its path, each ended by a NUL
-    let listed = sources::git_bytes(&top, &["diff", "-z", "--name-status", "--no-renames", commit, "--", ".", &format!(":(exclude){record}")])?;
+    // asked of a copy of the index, as checkout::compare asks: git diff rewrites the index it reads (E4)
+    let listed = sources::git_diff_bytes(&top, &["-z", "--name-status", "--no-renames", commit, "--", ".", &format!(":(exclude){record}")])?;
     let theirs = |p: &str| taken.iter().any(|t| t == p || (t.ends_with('/') && p.starts_with(t.as_str())));
     let fields: Vec<String> = listed.split(|b| *b == 0).map(|f| String::from_utf8_lossy(f).into_owned()).collect();
     let mut out: Vec<(String, String)> = fields.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0].chars().take(1).collect::<String>(), c[1].clone())).collect();
@@ -1673,7 +1733,10 @@ pub fn rerun(led: &Ledger) -> Res<Option<Value>> {
                 d.insert("code_here".into(), Value::Dict(here));
             }
         }
-        let first = commands.first().and_then(|c| c.get_str("command")).map(|c| format!("rb journal run -- {c}")).unwrap_or_default();
+        // a parent's run whose code is a tree this clone lacks ran other code than the bundle's commit: its command is
+        // what it ran, never a first step to run here (E4)
+        let away = |c: &Value| c.get_str("tree").map_or(false, |t| !t.is_empty()) && c.get("code_here").and_then(|h| h.get_str("state")) == Some("absent");
+        let first = commands.first().filter(|c| !away(c)).and_then(|c| c.get_str("command")).map(|c| format!("rb journal run -- {c}")).unwrap_or_default();
         experiments.push(crate::obj! {
             "id" => exp.id.clone(), "title" => exp.title.clone(), "criterion" => plan.get("criterion").cloned().unwrap_or(Value::Null),
             "commands" => Value::List(commands), "first" => first, "runs_here" => runs.iter().filter(|r| r.experiment == exp.id).count()
@@ -1705,7 +1768,12 @@ fn command_said(c: &Value) -> String {
         let files = |k: &str| here.get(k).and_then(Value::as_list).map(|l| l.iter().map(|x| one_line(&pyjson::py_str(x))).collect::<Vec<_>>()).unwrap_or_default();
         match here.get_str("state") {
             Some("same") => parts.push(format!("your checkout's code is {that}'s")),
-            Some("absent") => parts.push(format!("{} your checkout does not hold", if tree.is_empty() { "a commit" } else { "a tree" })),
+            Some("absent") if tree.is_empty() => parts.push("a commit your checkout does not hold".to_string()),
+            Some("absent") => {
+                // E4's words, inside this sentence: "this run's code is not in this clone: ..."
+                let said = crate::shell::strings::evidence("not_here", &[("tree", c.get_str("tree").unwrap_or("").chars().take(12).collect())]);
+                parts.push(format!("t{}", said.trim_end_matches('.').strip_prefix('T').unwrap_or(&said)));
+            }
             Some("differs") => {
                 let (held, extra, untracked) = (files("differs"), files("extra"), files("untracked"));
                 let mut said = format!("your checkout's code is not {that}'s");
@@ -3379,7 +3447,10 @@ mod tests {
         assert_eq!(text(get(c, "code_here"), "state"), "absent", "{c:?}");
         let line = rerun_lines(&v).last().unwrap().clone();
         let (cs, ts): (String, String) = (commit.chars().take(12).collect(), tree.chars().take(12).collect());
-        assert!(line.contains(&format!("ran at {cs}, with changes outside the record not committed that rb kept as git tree {ts}; a tree your checkout does not hold")), "{line}");
+        assert!(line.contains(&format!("ran at {cs}, with changes outside the record not committed that rb kept as git tree {ts}; this run's code is not in this clone: it had changes outside the record not committed, and rb kept them as git tree {ts} in the clone that recorded the run")), "{line}");
+        // its command is what it ran, never a first step to run here (E4)
+        assert_eq!(text(&list(&v, "experiments")[0], "first"), "", "{v:?}");
+        assert!(rerun_next(&v).iter().all(|n| !n.contains("python eval.py")), "{:?}", rerun_next(&v));
         // where the tree is here, the code is compared with it
         let here = fork_root_in(&rec.root, &commit, plans["e4"].clone());
         let v = rerun(&here).unwrap().unwrap();

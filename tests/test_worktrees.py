@@ -589,11 +589,12 @@ def test_runs_tied_across_places_are_said_by_the_code_they_ran(repo, capsys, mon
 
 def test_a_single_checkout_keeps_what_it_kept_before(repo, capsys):
     clean = rb(capsys, "run", "add", "e1", "fp32.top1=0.761", "int8.top1=0.758").data["object"]["id"]
-    assert set(receipt(repo, clean)["attached"]) == {"commit", "branch", "dirty", "tree"}
+    # E3's capture keys beside the code they describe: when it was captured, and how much was kept
+    assert set(receipt(repo, clean)["attached"]) == {"commit", "branch", "dirty", "tree", "captured", "kept"}
     Path("train.py").write_text("lr = 0.2\n", encoding="utf-8")
     Path("notes.txt").write_text("try a larger batch\n", encoding="utf-8")
     dirty = rb(capsys, "run", "add", "e1", "fp32.top1=0.762", "int8.top1=0.759").data["object"]["id"]
-    assert set(receipt(repo, dirty)["attached"]) == {"commit", "branch", "dirty", "diff_sha256", "untracked", "tree"}
+    assert set(receipt(repo, dirty)["attached"]) == {"commit", "branch", "dirty", "diff_sha256", "untracked", "tree", "captured", "kept"}
     assert "worktree" not in log_line(repo, "record", dirty) and "checkout" not in rb(capsys, "status").data
     main(["status"])
     assert "This worktree" not in capsys.readouterr().out
@@ -702,7 +703,9 @@ def test_a_tree_is_said_to_be_kept_only_where_git_has_it(repo, capsys, tmp_path_
         there = capsys.readouterr().out
     finally:
         os.chdir(repo)
-    assert "not in this clone: the clone that recorded the run kept it." in there
+    # E4's words: kept on the machine that recorded the run, never "kept" here
+    assert "This run's code is not in this clone: it had changes outside the record not committed, and rb kept them as git tree" in there
+    assert "in the clone that recorded the run." in there and "the clone that recorded the run kept it" not in there
     assert "kept in this repository" not in there and "See the changes: git diff" not in there
 
 

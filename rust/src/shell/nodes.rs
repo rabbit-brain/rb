@@ -449,6 +449,8 @@ fn ready_glyph(state: &str) -> &'static str {
     match state {
         "ok" => "\u{2713}",
         "partial" => "\u{25d0}",
+        // a missing part is marked as the summary line marks it (item 5)
+        "missing" => "\u{2717}",
         _ => "\u{25cb}",
     }
 }
@@ -945,8 +947,7 @@ impl Doc<'_> {
             dl += &format!("<dt>margin</dt><dd>{}</dd>", link(&format!("{id}:reading"), &said));
         }
         // when it was written, in plain words; rb's line (which runs, how many) in Details
-        let timing_raw = s(f, "says.timing");
-        let mut timing = esc(timing_said(timing_raw));
+        let mut timing = esc(&timing_said(f));
         if let Some(am) = at(f, "unit_amended") {
             let x = s(f, "experiment");
             // the amendment that changed the unit, else the lock it was made after, else the experiment
@@ -978,7 +979,13 @@ impl Doc<'_> {
             // every problem, one a line, never "(and 1 more)"
             let all = strs(f, "says.problems");
             let said = if all.len() > 1 { all.iter().map(|p| esc(p)).collect::<Vec<_>>().join("<br>") } else { esc(integrity) };
-            dl += &format!("<dt>{}</dt><dd{cls}>{said}</dd>", term("integrity", "checks"));
+            dl += &format!("<dt>{}</dt><dd{cls}>{}</dd>", term("integrity", "checks"), self.runs_linked(&said));
+        }
+        // what the reading's runs rest on (E5): recorded, unchanged, here and rerun kept apart, in one line
+        let evidence = s(f, "says.evidence");
+        if !evidence.is_empty() {
+            // the row names it: the line without its own "Evidence:"
+            dl += &format!("<dt>evidence</dt><dd>{}</dd>", self.runs_linked(&esc(evidence.strip_prefix("Evidence: ").unwrap_or(evidence))));
         }
         let history = s(f, "says.history");
         if !history.is_empty() {
@@ -992,8 +999,28 @@ impl Doc<'_> {
             review += &format!("{DOT}<a href=\"#{}:decide\">{}</a>", esc(&id), self.calls_view());
         }
         dl += &format!("<dt>review</dt><dd>{review}</dd>");
-        let notes = notes_list(f);
+        let notes = self.runs_linked(&notes_list(f));
         format!("<section class=\"part\" id=\"{}:rule\"><h4>{AS_WRITTEN}</h4><dl class=\"ax\">{dl}</dl>{notes}</section>", esc(id))
+    }
+
+    /// E5's sentences name a run as the page does ("since run fp32 and int8 · seed 1 was recorded"): that name (`named`), in
+    /// escaped `html`, links to the run's card, as the design asks of rb open and pages (review5 S3).
+    fn runs_linked(&self, html: &str) -> String {
+        if !html.contains("since run ") {
+            return html.to_string();
+        }
+        let mut out = html.to_string();
+        if let Some(Value::Dict(runs)) = self.doc.as_dict().and_then(|d| d.get("runs")) {
+            for (id, r) in runs {
+                let named = s(r, "named");
+                if named.is_empty() {
+                    continue;
+                }
+                let was = format!("since {} was recorded", esc(named));
+                out = out.replace(&was, &format!("since <a href=\"#run-{}\">{}</a> was recorded", esc(id), esc(named)));
+            }
+        }
+        out
     }
 
     /// What the reading rests on: an analysis, the design cells, or each run's observation, counted or not and why.
@@ -1134,7 +1161,12 @@ impl Doc<'_> {
             // each value carries its unit, as the verdict says it (FIX5)
             body += &format!("<div class=\"wrap\"><table class=\"obs obsr\"><thead><tr><th>arm</th><th>run</th><th>value</th></tr></thead><tbody>{rows}</tbody></table></div>");
         } else {
-            body += "<p class=\"dim sm\">No recorded run is read yet.</p>";
+            let none = if s(f, "timing") == "taken_out" {
+                crate::shell::strings::evidence("took_runs", &[])
+            } else {
+                "No recorded run is read yet.".to_string()
+            };
+            body += &format!("<p class=\"dim sm\">{}</p>", esc(&none));
         }
         format!("<section class=\"part\" id=\"{}:runs\"><h4>{RESTS_ON}{n}</h4>{body}</section>", esc(id))
     }
@@ -3667,20 +3699,24 @@ pub(crate) fn sentence_text(text: &str) -> String {
 
 /// When a rule was written against its results, in plain words, from rb's timing line (its lead): the rest of rb's
 /// line stays in Details.
-fn timing_said(timing: &str) -> &'static str {
-    if timing.starts_with("declared before") {
-        "Written before its results."
-    } else if timing.starts_with("declared after the data") {
-        "Written after the data was seen."
-    } else if timing.starts_with("declared after") {
-        "Written after its results came in."
-    } else if timing.is_empty() {
-        ""
-    } else if timing.starts_with("order unknown") {
-        "rb can't tell whether it was written before its results."
-    } else {
-        // rb's "no evidence recorded yet": nothing to be before or after
-        "No results yet."
+/// S2 (MP-1111-0219): chosen by the finding's timing code (`timing`), never by the words of rb's sentence, which open
+/// "declared; order unknown: ..." where the code is unknown. A finding with no evidence to be before or after
+/// (untested) says so, or, where git took its evidence out, that its results were taken out.
+fn timing_said(f: &Value) -> String {
+    timing_of_code(s(f, "timing"))
+}
+
+fn timing_of_code(code: &str) -> String {
+    match code {
+        "before" => "Written before its results.".into(),
+        "after_exposure" => "Written after the data was seen.".into(),
+        "after_evidence" => "Written after its results came in.".into(),
+        "unknown" => "rb can't tell whether it was written before its results.".into(),
+        "" => String::new(),
+        // S-d: rb keeps the runs git took out; they are not read until they are put back
+        "taken_out" => crate::shell::strings::evidence("took_results", &[]),
+        // untested: nothing to be before or after
+        _ => "No results yet.".into(),
     }
 }
 
@@ -4664,8 +4700,13 @@ mod tests {
         let fig = figure::draw(&f, true);
         assert!(fig.contains("calib images 128: 88.20") && fig.contains("calib images 512: 89.92") && !fig.contains(": +"), "{fig}");
         // a rule with no results says so
-        assert_eq!(timing_said("no evidence recorded yet"), "No results yet.");
-        assert_eq!(timing_said("order unknown"), "rb can't tell whether it was written before its results.");
+        // S2: by the timing's code, never by the words of rb's sentence ("declared; order unknown: ...")
+        assert_eq!(timing_of_code("untested"), "No results yet.");
+        assert_eq!(timing_of_code("unknown"), "rb can't tell whether it was written before its results.");
+        assert_eq!(timing_of_code("before"), "Written before its results.");
+        assert_eq!(timing_of_code("after_evidence"), "Written after its results came in.");
+        assert_eq!(timing_of_code("after_exposure"), "Written after the data was seen.");
+        assert_eq!(timing_of_code("taken_out"), crate::shell::strings::evidence("took_results", &[]));
         // the record's text cannot open a link that never closes
         let mut f = c5.clone();
         let cells = f.as_dict_mut().unwrap().get_mut("design_cells").unwrap().as_list_mut().unwrap();

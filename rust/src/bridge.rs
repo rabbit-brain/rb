@@ -695,6 +695,7 @@ fn op_add_run(led: &Ledger, a: &Args) -> Res<Value> {
         row,
         table_row,
         block: a.flag("block")?,
+        start: a.present("start").and_then(Value::as_dict).cloned(),
     };
     let shape = if new.basis == "file" { crate::cmds::record::Shape::File } else { crate::cmds::record::Shape::Sdk };
     let got = led.add_run(&a.need_text("experiment")?, new)?;
@@ -736,6 +737,22 @@ fn op_add_run(led: &Ledger, a: &Args) -> Res<Value> {
 
 fn op_compare(led: &Ledger, a: &Args) -> Res<Value> {
     Ok(Value::Dict(led.compare(&a.need_text("experiment")?)?))
+}
+
+/// The code a run block starts with (the SDK's `with exp.run()`), as rb journal run keeps a command's start: null where
+/// it is not kept whole, so the block's run names the code it was recorded with, as a run with no start does. Its tree
+/// is pinned when the run is recorded, as rb journal run pins a command's at its start.
+fn op_code_start(led: &Ledger, _a: &Args) -> Res<Value> {
+    if crate::dry::active() {
+        return Ok(Value::Null);
+    }
+    // no ref yet: the run pins its code when it is recorded, and a block that raises records nothing
+    let (_, _, mut code, whole) = crate::sources::unpinned(|| crate::journal::code_at_start(led));
+    if !whole || code.get("commit").and_then(Value::as_str).is_none() {
+        return Ok(Value::Null);
+    }
+    code.insert("at".into(), Value::Str(crate::sources::now()));
+    Ok(Value::Dict(code))
 }
 
 fn op_rerunnability(led: &Ledger, a: &Args) -> Res<Value> {
@@ -987,6 +1004,7 @@ fn op_named(op: &str) -> Option<Op> {
         "add_run" => op_add_run,
         "compare" => op_compare,
         "rerunnability" => op_rerunnability,
+        "code_start" => op_code_start,
         "freeze" => op_freeze,
         "set_setting" => op_set_setting,
         "verify_settings" => op_verify_settings,

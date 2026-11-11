@@ -101,7 +101,9 @@ def test_a_watched_command_keeps_the_code_it_ran_with(repo, capsys):
     Path("train.py").write_text("lr = 0.9\n", encoding="utf-8")                  # edited after the run, before recording
     code, env = repo(*item.argv)
     run = state().get(env.data["object"]["id"], "run")
-    assert run.receipt.produced == {"commit": ran["commit"], "tree": ran["tree"], "from": "flag"}
+    # the code the watched command started with (E2): captured at its start, with the command and when it ran
+    produced = run.receipt.produced
+    assert {k: produced[k] for k in ("commit", "tree", "from", "captured", "kept", "dirty")} == {"commit": ran["commit"], "tree": ran["tree"], "from": "flag", "captured": "start", "kept": "whole", "dirty": True}
     assert git("show", f"{run.receipt.produced['tree']}:train.py") == "lr = 0.5\n"     # what ran, not what is there now
 
 

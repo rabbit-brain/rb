@@ -864,11 +864,15 @@ pub fn result_phrase(r: &str) -> &'static str {
 
 /// A finding's timing in a few words, as timing_word says it, but for a rule written down before its subject's runs
 /// after its baseline's: "declared before its runs", as its timing says it.
-pub fn timing_said(f: &crate::record::Finding) -> &'static str {
+pub fn timing_said(f: &crate::record::Finding) -> String {
+    let took = crate::shell::strings::evidence("took_timing", &[]);
     if f.timing == "before" && f.says.get("timing").map_or(false, |t| t.contains("before its runs")) {
-        "declared before its runs"
+        "declared before its runs".to_string()
+    } else if f.says.get("timing").map_or(false, |t| t.ends_with(&took)) {
+        // S-d: rb keeps the evidence git took out
+        took
     } else {
-        timing_word(&f.timing)
+        timing_word(&f.timing).to_string()
     }
 }
 

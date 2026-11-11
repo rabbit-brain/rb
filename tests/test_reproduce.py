@@ -297,14 +297,14 @@ def test_only_a_command_rb_watched_reads_as_observed(int8):
     own = int8.of_run("owner", "watched")
     assert own["steps"][-1]["label"].startswith(f"command (as given) · {how}") and own["steps"][-1]["runnable"], own["steps"][-1]
     assert f"\n# command (as given) · {how}" in own["script"] and f"\n{int8.watched}\n" in own["script"]
-    # it wrote its file into a tree with a change nobody committed, which rb kept: its recipe gets that code back
+    # its code is what the command started with (E2): a clean checkout of its commit, without the file the run wrote
     code = own["steps"][0]
-    assert code["runnable"] and " read-tree -u --reset " in code["command"], code
+    assert code["runnable"] and code["command"].startswith("git worktree add --detach ") and " read-tree " not in code["command"], code
     worktree = Path(code["command"].split()[4])
     try:
         for line in code["command"].splitlines():
             subprocess.run(line.split(), check=True, capture_output=True)
-        assert (worktree / "out" / "bench.json").read_text(encoding="utf-8") == Path("out/bench.json").read_text(encoding="utf-8")
+        assert not (worktree / "out" / "bench.json").exists()
         assert (worktree / "bench.py").read_text(encoding="utf-8") == Path("bench.py").read_text(encoding="utf-8")
     finally:
         shutil.rmtree(worktree, ignore_errors=True)

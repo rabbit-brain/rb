@@ -511,6 +511,7 @@ def build_parser(version: str = VERSION) -> argparse.ArgumentParser:
     s = sub.add_parser("doctor", parents=[common], help=RESEARCH_DOCTOR_HELP)
     s.add_argument("--restore", action="store_true", help="put back what rb last wrote for every record changed outside rb")
     s.add_argument("--adopt", action="store_true", help="take every change made outside rb as it stands (with --why); edits to who wrote or decided what are refused")
+    s.add_argument("--forget", action="store_true", help="drop rb's copy of the writes git took out of the record (a checkout, restore or reset), when that was meant: their files are set aside as <file>.outside-rb")
     s.add_argument("-m", "--why", default=None, help="the reason, recorded with --adopt")
     s.add_argument("--words", default=None, metavar="TEXT",
                    help="the user's words from the chat that this acts on, verbatim (an agent quoting them); kept beside the reason")

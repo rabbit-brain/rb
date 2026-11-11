@@ -253,7 +253,8 @@ def test_init_off_a_terminal_changes_no_file_that_was_here_and_says_what_to_add(
     assert "AGENTS.md was here before rb, so rb left it as it is. rb skill add --agents-md --yes adds rb's section at its end" in said
     assert '.mcp.json was here before rb, so rb left it as it is. To add rb\'s MCP server, put "rabbit-brain": {"command": "rb", "args": ["mcp"]} in its mcpServers' in said
     # rb's folder in git, the skill, the session hook's new settings file, the journal
-    assert [line["how"] for line in _ledger(team.cwd)] == ["dir", "created", "created", "dir"]
+    # the journal's folder is made with the record's first log line, where rb keeps its copy of what it wrote (E1)
+    assert [line["how"] for line in _ledger(team.cwd)] == ["dir", "dir", "created", "created"]
 
 
 def test_yes_adds_to_the_files_that_were_here_byte_for_byte(team):

@@ -813,6 +813,7 @@ class HomeScreen(Screen):
             yield Static(id="since")
         yield PlaceLine(id="place")           # which place and version the screen shows: one quiet line
         yield Static(id="began")              # the record's line, when anything was recorded afterwards: one quiet line
+        yield Static(id="took")               # what git took out of the record, which rb kept: one line
         with Horizontal(id="top"):
             with Vertical(id="tree-panel"):
                 yield OptionList(id="tree-list")
@@ -985,6 +986,9 @@ class HomeScreen(Screen):
         began = self.query_one("#began", Static)
         began.update(f"[{DIM}]{_esc(h.get('began') or '')}[/{DIM}]" if h.get("began") else "")
         began.display = bool(h.get("began"))
+        took = self.query_one("#took", Static)
+        took.update(f"[{WARN}]{_esc(h.get('taken_out') or '')}[/{WARN}]" if h.get("taken_out") else "")
+        took.display = bool(h.get("taken_out"))
         muted = h.get("muted", ())
         tally = tally_text(h.tally, muted)     # one line, cut with a '…' past the screen's width
         self.query_one("#tally", Static).update(tally if h.tally else "")
@@ -1296,6 +1300,7 @@ class RBApp(App):
     #head {{ width: 1fr; text-wrap: nowrap; text-overflow: ellipsis; }}
     #since {{ width: auto; margin-left: 2; }}
     #began {{ height: auto; text-wrap: nowrap; text-overflow: ellipsis; }}
+    #took {{ height: auto; }}
     #place {{ height: auto; text-wrap: nowrap; text-overflow: ellipsis; }}
     #place.away {{ text-wrap: wrap; text-overflow: fold; }}
     #tally {{ height: 1; margin-bottom: 1; text-wrap: nowrap; text-overflow: ellipsis; }}

@@ -637,6 +637,14 @@ impl Plan {
         let refs: Vec<String> = crate::sources::git(top, &["for-each-ref", "--format=%(refname)", "refs/rb/"]).unwrap_or_default().lines().map(str::to_string).filter(|r| !r.is_empty()).collect();
         let home = common.join("rb");
         let seen = common.join("rb-last-seen.json");
+        // rb's kept copy of what it wrote to this record (E1) always goes, whoever else holds a record
+        let kept = crate::journal::read_dir(root).join(crate::ledger::kept::KEPT_FILE);
+        if kept.is_file() {
+            let folder = kept.parent().map(|f| format!("{}/", shown(f))).unwrap_or_default();
+            let said = crate::shell::strings::evidence("took_remove", &[("folder", folder.clone())]);
+            let why = said.split_once(": ").map(|(_, w)| w.to_string()).unwrap_or(said);
+            self.remove.push(Item { path: folder, why, acts: vec![Act::File(kept)] });
+        }
         if !self.others.is_empty() {
             let why = "shared by every checkout of this repository, and another one holds a record (below): rb remove in the last checkout that holds one takes it";
             if !refs.is_empty() {

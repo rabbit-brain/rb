@@ -805,7 +805,7 @@ def test_a_run_records_its_numbers_and_a_receipt(lab, capsys):
     assert re.fullmatch(r"run_[0-9A-Z]{26}", run["uid"]), run["uid"]
     r = run["receipt"]
     assert r["actor"] == HUMAN and r["command"] == "python eval.py --int8"
-    assert r["produced"] == {"commit": "abc1234", "from": "flag"}
+    assert r["produced"] == {"commit": "abc1234", "from": "flag", "captured": "given"}
     assert r["attached"]["commit"] == git("rev-parse", "HEAD") and r["attached"]["branch"]
     assert run["files"][0]["path"] == "out.txt" and run["files"][0]["sha256"] == sha256_file(lab / "out.txt")
     assert run["links"] == {"wandb": "https://wandb.ai/x/y"}

@@ -202,7 +202,15 @@ impl Ledger {
     /// The calls that wait for a confirmation, oldest first: live, what rb wrote, neither confirmed nor answered since.
     pub fn pending_calls(&self) -> Res<Vec<(Decision, Authority)>> {
         let auth = self.authorities()?;
-        Ok(self.all::<Decision>()?.iter().filter_map(|d| auth.get(&d.id).filter(|a| a.pending).map(|a| (d.clone(), a.clone()))).collect())
+        // a call whose confirmation git took out waits no more (the f13h review): rb last wrote it confirmed, and its
+        // state reads undetermined until the confirmation is put back, so it is never offered to be confirmed again
+        let confirmed = self.taken_confirms()?;
+        Ok(self
+            .all::<Decision>()?
+            .iter()
+            .filter(|d| !confirmed.contains(&d.id))
+            .filter_map(|d| auth.get(&d.id).filter(|a| a.pending).map(|a| (d.clone(), a.clone())))
+            .collect())
     }
 
     /// Where what a waiting call was recorded on reads otherwise now: one line per criterion whose rule moved since.

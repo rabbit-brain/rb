@@ -555,8 +555,7 @@ def test_no_record_says_how_to_record_the_work_already_done(rb):
 
 
 def test_the_paste_line_is_the_same_everywhere_it_is_given(rb, workdir):
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert PASTE in readme.splitlines()                      # a line of its own, to copy whole
+    # the README gives a whole prompt for one's own project since Nov 12 (test_docs pins it); the line stays in these
     assert PASTE in (ROOT / "llms.txt").read_text(encoding="utf-8")
     assert f"`{PASTE}`" in (ROOT / "AGENTS.md").read_text(encoding="utf-8") and PASTE in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     code, env = rb("ui")

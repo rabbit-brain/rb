@@ -213,13 +213,12 @@ def test_every_integrity_problem_rb_can_read_is_in_the_manual():
 
 def test_the_integrity_gate_says_it_fails_on_links_and_relations():
     """The integrity gate, and the CI gate that takes it in, fail on a question link or a declared relation rb cannot
-    read as well as on a finding's problem: the gate's line and every line of the manual and the README that says what
-    the CI gate fails on say so."""
+    read as well as on a finding's problem: the gate's line and every line of the manual that says what the CI gate
+    fails on say so (the README says nothing of CI since readme-2; the docs' Findings page does)."""
     [gate] = [line for line in DOC.splitlines() if line.startswith("- `integrity`: ")]
     assert "question link" in gate and "relation" in gate
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    ci = [line for text in (DOC, readme) for line in text.splitlines() if "the CI gate" in line]
-    assert len(ci) >= 2 and all("question link" in line and "relation" in line for line in ci), ci
+    ci = [line for line in DOC.splitlines() if "the CI gate" in line]
+    assert len(ci) >= 1 and all("question link" in line and "relation" in line for line in ci), ci
 
 
 def test_rb_status_prints_its_parts_in_the_order_the_manual_gives(workdir, monkeypatch, capsys):
@@ -300,16 +299,10 @@ def test_the_manual_names_the_words_the_writer_check_reads_as_words():
     assert "the words `agent`, `session`, `memory` or `UNSUPPORTED` where they speak of the record's own writing" in DOC
 
 
-def test_the_readme_says_what_rb_cannot_promise_of_a_design_and_what_it_does():
-    """Oct 13: where the README says what rb keeps honest, it says in plain sentences what rb cannot promise of a
-    method (a choice that only lived in the chat, whether a method fits the question) and what it does, and the manual
-    says the same limit beside the design's standing."""
-    readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
-    for said in ("It cannot make an agent record a choice that only lived in the chat, and it cannot judge whether a method fits the question.",
-                 "nothing a session wrote reads as yours until you confirm it, every setting says where its value came from, and every finding is "
-                 "computed from the files, not from the agent's account.",
-                 "An experiment's design an agent wrote any part of (its hypothesis, settings, criteria and gate) reads `design not confirmed` until you confirm it"):
-        assert said in readme, said
+def test_the_manual_says_what_rb_cannot_promise_of_a_design_and_what_it_does():
+    """Oct 13: the manual says in plain sentences what rb cannot promise of a method (a choice that only lived in the
+    chat, whether a method fits the question) beside the design's standing. The README said it too until readme-2; the
+    docs' The record page says it now (What rb does not do)."""
     assert "it cannot make an agent record a choice that only lived in the chat, and it cannot judge whether a method fits the question" in DOC
     # the snapshot rule (Oct 14): a gate a session wrote waits with its design until it reads as in one the user owns, in
     # a session's voice, the user's later branch or words beside it included (review of the snapshot rule, round 1)
@@ -363,19 +356,14 @@ def test_the_manual_says_a_found_file_in_the_top_folder_is_counted_in_both_lines
     assert "a folder the walk reads that rb already lists as found" not in said
 
 
-def test_the_manual_and_the_readme_state_rb_s_limits_and_where_it_looks():
+def test_the_manual_states_rb_s_limits():
     """Oct 14, decision 6: the manual's boundaries carry the Oct 13 line (what rb cannot promise of a method, and what it
-    does), and the README says where rb looks on its own and what it reads only where the record points to it."""
+    does). The README said where rb looks until readme-2; the docs' The record page says it (What rb sees)."""
     bounds = " ".join(DOC.split("## Boundaries", 1)[1].split("## ", 1)[0].split())
     for said in ("It cannot make an agent record a choice that only lived in the chat, and it cannot judge whether a method fits the question.",
                  "What it does: nothing a session wrote reads as the user's until they confirm it, every setting says where its value came from, "
                  "and every finding is computed from the files, not from the agent's account."):
         assert said in bounds, said
-    readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
-    assert ("on its own it looks in `out/`, `outputs/`, `results/`, `eval-out/`, `metrics/`, every folder named for results down to four levels "
-            "(`reports/stage1/eval/`, `artifacts/`) and any folder a recorded run named, at the files in "
-            "the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed, and it reads what code, configs, docs "
-            "and database rows say only where the record points to them.") in readme
 
 
 def test_the_security_policy_offers_a_private_contact_before_private_reporting_is_on():
@@ -394,86 +382,16 @@ def test_the_manual_states_the_format_rule():
     assert "A field rb does not know in a format-1 file is therefore most likely a hand edit" in said
 
 
-def test_the_readme_says_how_to_keep_going_after_uvx():
-    """After uvx, rb is not on the path: the README says how to run what the tour suggests next."""
-    readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
-    assert ("After `uvx`, `rb` is not on your path: run the tour's next commands as `uvx --from rabbit-brain rb ui`, "
-            "or keep `rb` with `uv tool install rabbit-brain`.") in readme
-
-
-TRAIN = "optim:\n  name: sgd\n  lr: 0.1\n  momentum: 0.9\ndata:\n  dataset: imagenet\n  batch_size: 256\n"
-
-
-@pytest.mark.skipif(shutil.which("git") is None, reason="the Quick start runs in a git repository")
-def test_the_readme_s_finding_is_what_rb_show_prints_after_its_quick_start(workdir, monkeypatch, tmp_path_factory, capsys):
-    """The README's `rb show` block is real output of this build: its Quick start, run as written in the layout it
-    describes (each out/seed<N>/metrics.json in the shape it shows), seeds 2 and 3 recorded the same way, then rb show of
-    the criterion, line for line once the ids are named in order."""
-    as_the_user(monkeypatch)
-    cfg = tmp_path_factory.mktemp("gitconfig") / "config"
-    cfg.write_text("[user]\n\tname = ana\n\temail = ana@example.com\n", encoding="utf-8")
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(cfg))
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    git = lambda *a: subprocess.run(["git", *a], check=True, capture_output=True)  # noqa: E731
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    quick = shell_command_lines(readme.split("## Quick start", 1)[1].split("## Reading a finding", 1)[0])
-    shown = readme.split("## Reading a finding", 1)[1].split("```\n", 1)[1].split("```", 1)[0]
-    shape = re.search(r"`(\{\"fp32\": \{\"val_loss\": [0-9.]+\}, \"int8\": \{\"val_loss\": [0-9.]+\}\})` gives `fp32.val_loss` and `int8.val_loss`", readme)
-    assert shape and json.loads(shape.group(1)) == {"fp32": {"val_loss": 1.2}, "int8": {"val_loss": 1.23}}
-
-    def seed(n, fp32, int8):
-        Path(f"out/seed{n}").mkdir(parents=True)
-        Path(f"out/seed{n}/config.yaml").write_text(TRAIN + f"seed: {n}\n", encoding="utf-8")
-        Path(f"out/seed{n}/metrics.json").write_text(json.dumps({"fp32": {"val_loss": fp32}, "int8": {"val_loss": int8}}), encoding="utf-8")
-
-    git("init", "-q")
-    Path("configs").mkdir()
-    for name, text in (("train", TRAIN), ("fp32", "precision: fp32\n"), ("int8", "precision: int8\n")):
-        Path(f"configs/{name}.yaml").write_text(text, encoding="utf-8")
-    git("add", "-A")
-    git("commit", "-qm", "configs")
-    time.sleep(1.1)                                     # the first seed's output comes after the configs' commit
-    seed(1, 1.2, 1.23)
-    git("add", "-A")
-    git("commit", "-qm", "the first seed")
-    for line in quick:
-        assert main(shlex.split(line)[1:]) == 0, line
-    seed(2, 1.21, 1.23)
-    seed(3, 1.19, 1.22)
-    for n in (2, 3):
-        assert main(["run", "add", "int8", "--from", f"out/seed{n}/metrics.json", "--set", f"seed={n}", "--config", f"out/seed{n}/config.yaml"]) == 0
-    capsys.readouterr()
-    assert main(["status", "--json"]) == 0
-    criterion = Envelope.model_validate_json(capsys.readouterr().out).data["findings"][0]["criterion"]
-    assert main(["show", criterion]) == 0
-    printed = capsys.readouterr().out
-
-    def named(text):
-        ids = [re.match(r"Criterion (\S+) on", text).group(1)] + re.findall(r"^  (run\S+):", text, flags=re.M)
-        for n, i in enumerate(ids):
-            text = re.sub(rf"\b{i}\b", f"<id{n}>", text)
-        return text
-    assert named(shown) == named(printed)
-
-
-def test_the_readme_says_where_a_waiting_call_is_listed():
-    """rb status lists a call waiting on the user under Proposed, not made, and names rb confirm first."""
-    readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
-    assert "`rb status` lists each one waiting under **Proposed, not made**, with that command, and its Next line names `rb confirm` first." in readme
-    assert "lists the ones waiting under **Needs a human**" not in readme
-
-
-def test_llms_txt_states_the_limits_the_readme_states():
-    """llms.txt, which agents and crawlers read, says what rb cannot do, where it looks and what a receipt is, as the
-    README does."""
+def test_llms_txt_states_rb_s_limits():
+    """llms.txt, which agents and crawlers read, says what rb cannot do, where it looks and what a receipt is (the
+    README said the same until readme-2)."""
     llms = " ".join((ROOT / "llms.txt").read_text(encoding="utf-8").split())
-    readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
     for said in ("It cannot make an agent record a choice that only lived in the chat, and it cannot judge whether a method fits the question.",
                  "It sees only what is in the repository and what runs through `rb journal run`: on its own it looks in `out/`, `outputs/`, "
                  "`results/`, `eval-out/`, `metrics/`, every folder named for results down to four levels (`reports/stage1/eval/`, `artifacts/`) "
                  "and any folder a recorded run named,",
                  "not proof of what produced it."):
-        assert said in llms and said in readme, said
+        assert said in llms, said
 
 
 def test_the_guides_say_a_miss_in_rb_s_words():
@@ -494,21 +412,28 @@ def test_the_changelog_says_where_rb_looks_what_nothing_cites_and_names_a_place_
 def test_no_punctuation_touches_an_address_in_the_manual_or_the_readme():
     """Nov 7: a terminal's link took the full stop after the schema's address, and sent readers to a page that is not
     there. Every web address in AGENTS.md and README.md stands with nothing touching it: in angle brackets in a
-    sentence, alone at the end of a link definition, or between spaces in a command. A placeholder (`https://...`)
-    is no address."""
+    sentence, alone at the end of a link definition, between spaces in a command, or, in the README, as markup: in
+    quotes as the value of an attribute of its picture (the <picture> block's srcset and src), or as the target of a
+    Markdown link, `[Docs](https://...)`, which GitHub and PyPI render as a link to exactly that address. A
+    placeholder (`https://...`) is no address. Since Nov 12 the quick start's prompt holds its addresses between
+    spaces or at a line's end, so it is checked as every other line is."""
     for name in ("AGENTS.md", "README.md"):
         text = (ROOT / name).read_text(encoding="utf-8")
         for n, line in enumerate(text.splitlines(), 1):
             for m in re.finditer(r"https?://", line):
                 end = m.start()
-                while end < len(line) and not line[end].isspace() and line[end] not in "<>":
+                opened = line[max(m.start() - 2, 0):m.start()]
+                stops = '<>"' if opened.endswith('"') else "<>)" if opened == "](" else "<>"   # an attribute, a link target
+                while end < len(line) and not line[end].isspace() and line[end] not in stops:
                     end += 1
                 url, before, after = line[m.start():end], line[m.start() - 1:m.start()], line[end:end + 1]
                 if url.startswith("https://...") or url.startswith("http://..."):
                     continue
                 bracketed = before == "<" and after == ">"
+                quoted = name == "README.md" and (before, after) in (('"', '"'), ("(", ")"))   # an attribute, a link target
+                quoted &= (before == '"' or opened == "](") and url[-1] not in ".,;:)]!?'\"`"
                 spaced = before in ("", " ") and after in ("", " ") and url[-1] not in ".,;:)]!?'\"`"
-                assert bracketed or spaced, f"{name}:{n}: punctuation touches {url!r} (before it {before!r}, after it {after!r})"
+                assert bracketed or spaced or quoted, f"{name}:{n}: punctuation touches {url!r} (before it {before!r}, after it {after!r})"
 
 
 def test_the_privacy_note_covers_rb_and_points_to_the_website_s():
@@ -562,3 +487,253 @@ def test_the_manual_says_two_rules_of_what_changed_apart():
     assert "the enclosing command tells it, and so does" not in DOC
     assert "the enclosing command tells it. A command beside a note's file that does not read" in DOC
     assert "a read that stops at that file fails, and tells nothing" in DOC
+
+
+# ---------------------------------------------------------------- the README: plain, specific sentences, its structure kept
+
+README = (ROOT / "README.md").read_text(encoding="utf-8")
+# Nov 12, the owner: every public text cut to plain, specific sentences with its structure kept. The README's first line,
+# word for word, is also the package's description on PyPI.
+OWNER_LINE = ("**Know where your research stands.** Your AI agent records what was tried, what the results show, and "
+              "what's still open, with the code and settings.")
+SECTIONS = ["Quick start: a sample study", "Use it on your own project", "What rb shows you", "How it works",
+            "The record doesn't take the agent's word", "What it doesn't do", "Install by hand", "More"]
+# The owner's quick start (Nov 12 2026), word for word on every public surface: the README, the landing, the docs home
+# and the sample study's README (/srv/rb/notes/QUICKSTART.md). Its words change on all of them together, never here alone.
+QUICKSTART_HEADING = 'Quick start: a sample study'
+QUICKSTART_LEAD = ("Try Rabbit Brain on a sample study, so you don't need to set up any experiments or use your own research. "
+                   'Just open Claude Code or Codex in an empty folder and paste the prompt below.')
+QUICKSTART_PROMPT = "\n".join([
+    'Clone https://github.com/rabbit-brain/think-step-by-step and work inside it.',
+    'Install rabbit-brain from PyPI into a virtual environment in that folder.',
+    "It's open source: https://github.com/rabbit-brain/rb",
+    "Start rb login in the background and show me the sign-in link it prints. I'll sign in.",
+    "When I'm signed in, run rb sync and give me the link it prints.",
+    "Run rb context and tell me in three lines what the study found and what's still open.",
+    "Don't run any experiments.",
+])
+QUICKSTART_AFTER = ("Your agent gives you a sign-in link (an email code, no password). Then the study opens in your private "
+                    "account on rabbitbrain.ai. No account? Ask your agent to run rb page instead.")
+RAW = "https://raw.githubusercontent.com/rabbit-brain/rb/main/"
+BLOB = "https://github.com/rabbit-brain/rb/blob/main/"
+
+
+def readme_section(heading: str) -> str:
+    """The text of the README's `## <heading>` section, up to the next one."""
+    return README.split(f"\n## {heading}\n\n", 1)[1].split("\n## ", 1)[0]
+
+
+def readme_prose(text: str) -> list[str]:
+    """The README's words a visitor reads as prose: not its commands and prompts (fenced blocks), its picture or its
+    headings."""
+    text = re.sub(r"^ *```.*?^ *```[^\n]*$", "", text, flags=re.S | re.M)
+    text = re.sub(r"<picture>.*?</picture>", "", text, flags=re.S)
+    text = "\n".join(line for line in text.splitlines() if not line.startswith("#"))
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    return re.findall(r"[^\s#*>`|-]\S*", text)
+
+
+def test_the_readme_opens_with_the_owner_s_line_and_keeps_its_structure():
+    """Nov 12, the owner: the README is plain, specific sentences with its structure kept. It opens with the owner's
+    line, word for word, which is the package's description too; its sections are these, in this order; its prose stays
+    at 550 words or fewer (457 by this count when it was written; prompts, commands and headings not counted), so it does not grow back; and
+    More links the docs and the repository's own notes."""
+    first = README.split("\n\n")[1]
+    assert README.startswith("# Rabbit Brain\n\n") and first == OWNER_LINE, first
+    description = re.search(r'^description = "([^"]+)"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"), flags=re.M).group(1)
+    assert description == OWNER_LINE.replace("**", ""), description
+    assert re.findall(r"^## (.+)$", README, flags=re.M) == SECTIONS
+    words = readme_prose(README)
+    assert len(words) <= 550, f"the README's prose is {len(words)} words; keep it at 550 or fewer and move the rest to the docs"
+    more = readme_section("More")
+    assert "[Docs](https://rabbitbrain.ai/docs/)" in more
+    for name in ("PRIVACY.md", "CHANGELOG.md", "CONTRIBUTING.md"):
+        assert f"[{name}]({BLOB}{name})" in more, name
+    assert README.rstrip("\n").endswith(f"License: [Apache-2.0]({BLOB}LICENSE)")
+
+
+def readme_commands() -> list[str]:
+    """Every command the README shows in its ```sh blocks, an alternative named in a comment (`# or: ...`) included."""
+    found = []
+    for block in re.findall(r"```sh\n(.*?)```", README, flags=re.S):
+        for line in block.splitlines():
+            line, _, comment = line.strip().partition("#")
+            comment = comment.strip()
+            found += [part.strip() for part in (line, comment.removeprefix("or:") if comment.startswith("or:") else "") if part.strip()]
+    return found
+
+
+def test_every_command_in_the_readme_is_real(capsys):
+    """Each command the README shows runs as written: an rb line is one rb accepts, uvx runs rb from the package this
+    repository builds, and an install names that package. The work typed by hand starts with rb init, and Install by
+    hand gives the tour. Every `rb ...` code span the README gives in a sentence or a prompt names a command rb has, or one it plans and answers E_NOT_AVAILABLE for (`rb paper`)."""
+    package = re.search(r'^name = "([^"]+)"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"), flags=re.M).group(1)
+    commands = readme_commands()
+    parser = cli_parser.build_parser()
+    rb_lines = []
+    for command in commands:
+        argv = shlex.split(re.sub(r"<[^>]*>", "X", command))
+        if argv[:3] == ["uvx", "--from", package] and argv[3] == "rb":
+            rb_lines.append(argv[4:])
+        elif argv[0] == "rb":
+            rb_lines.append(argv[1:])
+        else:
+            assert argv in (["uv", "tool", "install", package], ["pip", "install", package]), f"the README shows {command}"
+    for argv in rb_lines:
+        try:
+            parser.parse_args(argv)
+        except cli_parser.UsageError as exc:
+            raise AssertionError(f"the README shows a command rb does not accept: rb {' '.join(argv)}\n  {exc.message}") from None
+    assert rb_lines[0][0] == "init" and rb_lines[-1] == ["tour"], rb_lines
+    assert {"uv tool install " + package, "pip install " + package} <= set(commands)
+    real = registered_commands()
+    named = re.findall(r"`rb ([a-z]+(?: [a-z]+)?)", README)
+    assert named
+    for words in named:
+        base = words.split()[0]
+        assert words in real or base in real or answers_not_available(base, capsys), f"the README names `rb {words}`, which rb does not have"
+
+
+def png_text(path: Path) -> dict:
+    """The tEXt chunks of a PNG file."""
+    data = path.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n", path
+    text, at = {}, 8
+    while at < len(data):
+        size, kind = int.from_bytes(data[at:at + 4], "big"), data[at + 4:at + 8]
+        if kind == b"tEXt":
+            key, _, value = data[at + 8:at + 8 + size].partition(b"\0")
+            text[key.decode("latin-1")] = value.decode("latin-1")
+        at += 12 + size
+    return text
+
+
+def test_the_readme_s_picture_is_rb_open_in_light_and_dark():
+    """The picture is what a visitor sees on first open: rb open's first screen, made by tools-readme/picture.sh from a
+    build (its tEXt chunk says which), a light and a dark image chosen by the reader's colour scheme, and an <img>
+    fallback, which is what PyPI shows. Each under 300 KB, at an absolute address PyPI can load, with alt text that says
+    what it shows."""
+    [picture] = re.findall(r"<picture>.*?</picture>", README, flags=re.S)
+    sources = dict(re.findall(r'<source media="\(prefers-color-scheme: (dark|light)\)" srcset="([^"]+)">', picture))
+    [(alt, src)] = re.findall(r'<img alt="([^"]+)" src="([^"]+)"', picture)
+    assert set(sources) == {"dark", "light"} and src == sources["light"] and sources["dark"] != src
+    assert len(alt.split()) >= 10 and "rb open" in alt, alt
+    for scheme, url in sources.items():
+        assert url.startswith(RAW), url
+        image = ROOT / url[len(RAW):]
+        assert image.is_file() and image.stat().st_size < 300_000, (image, image.stat().st_size if image.exists() else None)
+        made = png_text(image).get("Source", "")
+        assert made.startswith("rb open, first screen, ") and f"{scheme} scheme" in made and "rabbit-brain " in made, made
+
+
+def test_the_readme_s_links_to_repository_files_resolve():
+    """Every address the README gives into this repository (a file on main, or its raw bytes) names a file that is here."""
+    urls = re.findall(r"https://(?:raw\.githubusercontent\.com|github\.com)/rabbit-brain/rb/\S+?(?=[\s\"<>)]|$)", README)
+    assert urls
+    for url in urls:
+        path = url[len(RAW):] if url.startswith(RAW) else url[len(BLOB):] if url.startswith(BLOB) else None
+        assert path and (ROOT / path).exists(), url
+
+
+def test_the_readme_holds_the_owner_s_quick_start():
+    """Nov 12, the owner: "somewhere in our landing or doc or github or all we need a quick start as started .... a
+    sample study, so you don't need to set up any experiments or use your own research". The README's first section
+    after its picture is the owner's quick start, word for word: its heading, its lead, the prompt byte for byte in a
+    fenced block of its own (GitHub gives it a copy button; its line 2 is two lines since Nov 12, so no line runs far
+    off the page), and the line after it, and nothing more."""
+    assert re.findall(r"^## (.+)$", README, flags=re.M)[0] == QUICKSTART_HEADING
+    body = readme_section(QUICKSTART_HEADING)
+    assert body == f"{QUICKSTART_LEAD}\n\n```\n{QUICKSTART_PROMPT}\n```\n\n{QUICKSTART_AFTER}\n", body
+    assert README.index("</picture>") < README.index(f"## {QUICKSTART_HEADING}") < README.index("## Use it on your own project")
+
+
+def test_the_readme_s_own_project_prompt_names_what_an_agent_runs_first():
+    """Use it on your own project: one fenced prompt for the agent, and `rb open` for the user, in their own terminal
+    (rb open refuses an agent session). The prompt starts the record from the start protocol and rb context, leaves the
+    calls on results to the user with the `rb confirm` command, and names the page and the sync it can write."""
+    body = readme_section("Use it on your own project")
+    assert body.startswith("Open Claude Code or Codex in your project and paste this prompt. Then run `rb open` in your own terminal to see the record.\n\n```\n")
+    [prompt] = re.findall(r"^```\n(.*?)^```$", body, flags=re.S | re.M)
+    for said in ("`rb docs --start`", "`rb context --model <your model id>`", "`rb journal run`", "Calls on results are mine.",
+                 "`rb confirm`", "`rb page`", "`rb login`", "`rb sync`", "`rb status` exactly as printed"):
+        assert said in prompt, said
+    assert "rb open" not in prompt and "rb ui" not in prompt
+
+
+def test_the_readme_says_what_the_record_does_and_does_not_do():
+    """The README's two lists, as the manual's Boundaries says them: what the record does not take on the agent's word,
+    and what rb does not do. The manual keeps the long form (test_the_manual_states_rb_s_limits)."""
+    record = readme_section("The record doesn't take the agent's word")
+    for said in ("- Settings are checked against your files. A value rb can't find where it is cited shows as provisional.",
+                 "- Results are worked out from the runs each time you read them. None is stored.",
+                 "- A pass mark written after its results says so on every reading.",
+                 "- Every decision keeps who made it and why."):
+        assert said in record.splitlines(), said
+    limits = readme_section("What it doesn't do")
+    for said in ("- It doesn't choose or launch your experiments. `rb journal run` only wraps a command you give it.",
+                 "- It doesn't train or certify models.",
+                 "- It can't record a choice that only lived in the chat.",
+                 "- It sees only your repository and what runs through `rb journal run`."):
+        assert said in limits.splitlines(), said
+    how = readme_section("How it works")
+    assert "4. You make the final decisions. If your agent accepts or rejects a result, it waits until you run `rb confirm`." in how
+
+
+TRAIN = "optim:\n  name: sgd\n  lr: 0.1\n  momentum: 0.9\ndata:\n  dataset: imagenet\n  batch_size: 256\n"
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="the work typed by hand runs in a git repository")
+def test_the_readme_s_finding_is_what_rb_show_prints_after_its_work_typed_by_hand(workdir, monkeypatch, tmp_path_factory, capsys):
+    """The README's `rb show` block (What rb shows you) is real output of this build: the work typed by hand (How it
+    works), run as written in the layout it describes (its configs in configs/, each seed's results in out/seed<N>/),
+    seeds 2 and 3 recorded as its seed 1 is, then rb show of the criterion, line for line once the ids are named in
+    order. The sentence under the block says the numbers the block shows."""
+    as_the_user(monkeypatch)
+    cfg = tmp_path_factory.mktemp("gitconfig") / "config"
+    cfg.write_text("[user]\n\tname = ana\n\temail = ana@example.com\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(cfg))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    git = lambda *a: subprocess.run(["git", *a], check=True, capture_output=True)  # noqa: E731
+    how = readme_section("How it works")
+    assert "The same work typed by hand, in a repository with its configs in `configs/` and each seed's results in `out/seed<N>/`:" in how
+    by_hand = shell_command_lines(how)
+    shows = readme_section("What rb shows you")
+    shown = shows.split("```\n", 1)[1].split("```", 1)[0]
+
+    def seed(n, fp32, int8):
+        Path(f"out/seed{n}").mkdir(parents=True)
+        Path(f"out/seed{n}/config.yaml").write_text(TRAIN + f"seed: {n}\n", encoding="utf-8")
+        Path(f"out/seed{n}/metrics.json").write_text(json.dumps({"fp32": {"val_loss": fp32}, "int8": {"val_loss": int8}}), encoding="utf-8")
+
+    git("init", "-q")
+    Path("configs").mkdir()
+    for name, text in (("train", TRAIN), ("fp32", "precision: fp32\n"), ("int8", "precision: int8\n")):
+        Path(f"configs/{name}.yaml").write_text(text, encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "configs")
+    time.sleep(1.1)                                     # the first seed's output comes after the configs' commit
+    seed(1, 1.2, 1.23)
+    git("add", "-A")
+    git("commit", "-qm", "the first seed")
+    assert by_hand[0].startswith("rb init ") and any(line.startswith("rb run add ") for line in by_hand)
+    for line in by_hand:
+        assert main(shlex.split(line)[1:]) == 0, line
+    seed(2, 1.21, 1.23)
+    seed(3, 1.19, 1.22)
+    for n in (2, 3):
+        assert main(["run", "add", "int8", "--from", f"out/seed{n}/metrics.json", "--set", f"seed={n}", "--config", f"out/seed{n}/config.yaml"]) == 0
+    capsys.readouterr()
+    assert main(["status", "--json"]) == 0
+    criterion = Envelope.model_validate_json(capsys.readouterr().out).data["findings"][0]["criterion"]
+    assert main(["show", criterion]) == 0
+    printed = capsys.readouterr().out
+
+    def named(text):
+        ids = [re.match(r"Criterion (\S+) on", text).group(1)] + re.findall(r"^  (run\S+):", text, flags=re.M)
+        for n, i in enumerate(ids):
+            text = re.sub(rf"\b{i}\b", f"<id{n}>", text)
+        return text
+    assert named(shown) == named(printed)
+    estimate = float(re.search(r"estimate \+([0-9.]+) ≤ 0\.05", shown).group(1))
+    assert (f"The rule allows 0.05 more validation loss. Over 3 seeds INT8 adds {estimate:.3f}, so the rule is met. Seed 1 "
+            "existed before the rule was written, and rb says so on every reading.") in " ".join(shows.split())

@@ -7,7 +7,7 @@ build-backend = "maturin"
 [project]
 name = "rabbit-brain"
 version = "0.8.5"
-description = "Track the state of ML research you run with coding agents: questions, criteria, runs and decisions as plain YAML next to your code."
+description = "Know where your research stands. Your AI agent records what was tried, what the results show, and what's still open, with the code and settings."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "THIRD-PARTY-NOTICES"]   # the notices of the crates built into rb: rust/gen/gen_notices.py

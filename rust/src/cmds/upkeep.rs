@@ -429,6 +429,10 @@ pub fn research_doctor(ns: &Namespace, out: &mut Out, led: &Ledger) -> R {
     if let Some((check, detail, fix)) = crate::checkout::Checkout::of(&led.root).doctor_problem() {
         problems.push(problem(check, detail, fix));
     }
+    // what PLAIN.md names that the record does not hold: said, never a problem
+    if let Some(c) = crate::plainfile::doctor_check(led) {
+        checks.push(c);
+    }
     checks.extend(problems.iter().cloned());
     for c in &checks {
         let ok = c.get("ok").map_or(false, |v| v.truthy());

@@ -67,7 +67,8 @@ def shell_command_lines(text: str) -> list[str]:
 @pytest.mark.parametrize("name, at_least", [("AGENTS.md", 40), ("README.md", 10)], ids=["manual", "readme"])
 def test_every_command_line_in_the_doc_parses(name, at_least):
     """Worked examples are copied and run as written: each rb line in a shell block of the manual or the README must
-    be a command line rb accepts, with <placeholders> standing for a value and [--optional parts] left out."""
+    be a command line rb accepts, with <placeholders> standing for a value and [--optional parts] left out. The
+    README's work typed by hand (How it works) is such a block again since Nov 12."""
     lines = shell_command_lines((ROOT / name).read_text(encoding="utf-8"))
     assert len(lines) > at_least and any(line.startswith("rb run add ") for line in lines)
     parser = cli_parser.build_parser()
@@ -237,7 +238,7 @@ def test_rb_status_prints_its_parts_in_the_order_the_manual_gives(workdir, monke
                  ["resource", "add", "holdout", "--type", "dataset", "--name", "held-out set"]):
         assert main([*argv, "--json"]) == 0, argv
     capsys.readouterr()
-    main(["status"])
+    main(["status", "--full"])
     lines = capsys.readouterr().out.splitlines()
     parts = [("the project, and the last", lambda line: line.startswith("Ordering · ")),
              ("where each question stands", lambda line: line.startswith("Does the order hold? (")),
@@ -250,7 +251,7 @@ def test_rb_status_prints_its_parts_in_the_order_the_manual_gives(workdir, monke
              ("the analyses, and which", lambda line: line == "Analyses"),
              ("the notes on the project", lambda line: line == "Notes on the project"),
              ("each resource with its availability", lambda line: line == "Resources")]
-    listed = DOC[DOC.index("`rb status [<exp>]` prints, in order:"):DOC.index("**What changed since you last looked.**")]
+    listed = DOC[DOC.index("`rb status --full [<exp>]` prints the long form, in order:"):DOC.index("**What changed since you last looked.**")]
     numbered = {int(n): text for n, text in re.findall(r"^(\d+)\. (.*)$", listed, flags=re.M)}
     in_manual = [next(n for n, text in numbered.items() if phrase in text) for phrase, _ in parts]
     printed = [next(i for i, line in enumerate(lines) if said(line)) for _, said in parts]
@@ -380,6 +381,9 @@ def test_the_manual_states_the_format_rule():
     said = " ".join(DOC.split())
     assert "Format 1 is fixed: a new field means a new format, so a later rb that adds a field to a record writes that file in format 2, and an older rb says to upgrade" in said
     assert "A field rb does not know in a format-1 file is therefore most likely a hand edit" in said
+
+
+
 
 
 def test_llms_txt_states_rb_s_limits():
@@ -687,7 +691,9 @@ def test_the_readme_s_finding_is_what_rb_show_prints_after_its_work_typed_by_han
     """The README's `rb show` block (What rb shows you) is real output of this build: the work typed by hand (How it
     works), run as written in the layout it describes (its configs in configs/, each seed's results in out/seed<N>/),
     seeds 2 and 3 recorded as its seed 1 is, then rb show of the criterion, line for line once the ids are named in
-    order. The sentence under the block says the numbers the block shows."""
+    order. The sentence under the block says the numbers the block shows. Since the card (int, Nov 12), `rb show
+    <criterion>` prints the card and `rb show <criterion> --long` the axes the README shows, so the block is held to
+    the long form, and the sentence above it names `rb show <id> --long` (Nov 13)."""
     as_the_user(monkeypatch)
     cfg = tmp_path_factory.mktemp("gitconfig") / "config"
     cfg.write_text("[user]\n\tname = ana\n\temail = ana@example.com\n", encoding="utf-8")
@@ -698,6 +704,7 @@ def test_the_readme_s_finding_is_what_rb_show_prints_after_its_work_typed_by_han
     assert "The same work typed by hand, in a repository with its configs in `configs/` and each seed's results in `out/seed<N>/`:" in how
     by_hand = shell_command_lines(how)
     shows = readme_section("What rb shows you")
+    assert "Here is `rb show <id> --long` on the INT8 example further down:" in shows
     shown = shows.split("```\n", 1)[1].split("```", 1)[0]
 
     def seed(n, fp32, int8):
@@ -725,7 +732,7 @@ def test_the_readme_s_finding_is_what_rb_show_prints_after_its_work_typed_by_han
     capsys.readouterr()
     assert main(["status", "--json"]) == 0
     criterion = Envelope.model_validate_json(capsys.readouterr().out).data["findings"][0]["criterion"]
-    assert main(["show", criterion]) == 0
+    assert main(["show", criterion, "--long"]) == 0
     printed = capsys.readouterr().out
 
     def named(text):

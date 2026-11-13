@@ -27,7 +27,7 @@ PENDING = ("call_proposed", "past_call_unconfirmed")      # what waits for a con
 
 def elements(demo) -> dict:
     """Each element of the demo, by name: whether rb's own reads show it."""
-    st = demo.rb("status")
+    st = demo.rb("status", "--full")
     shown = {r["id"]: demo.rb("show", r["id"])["object"] for r in st["runs"]}
     replaced = {o["replaces"]: o for o in shown.values() if o.get("replaces")}
     gone = {rid: demo.rb("show", rid)["object"] for rid in replaced}
@@ -52,7 +52,7 @@ def elements(demo) -> dict:
             by_sha.setdefault(f["sha256"], set()).add(rid)
     cells = [f for f in findings if (f.get("comparison") or {}).get("design")]
     analyses = {a["id"] for a in st["analyses"]}
-    there = demo.rb("status", cwd=demo.worktree) if demo.worktree else {"pending": []}
+    there = demo.rb("status", "--full", cwd=demo.worktree) if demo.worktree else {"pending": []}
     elsewhere = [d for row in st["elsewhere"] if row["same_project"] for d in row["added"].get("", {}).get("decision", [])]
     notes = [n["text"] for e in st["experiments"] for n in e["notes"]]
     return {
@@ -124,7 +124,7 @@ def test_each_question_of_the_int8_demo_reads_one_interpretation_at_most(int8_de
     """An interpretation says what meeting a criterion would mean for the question it is filed under, so no question of
     the demo has two in force: c7's, about per-channel scales, is under q1b, which it answers, not beside c1's on q1."""
     said = {q["id"]: sorted({r["link"]["when_met"] for r in q["inquiry"]["direct"]
-                             if r.get("link") and r["link"]["when_met"] and r["interpretation_active"]}) for q in int8_demo.rb("status")["questions"]}
+                             if r.get("link") and r["link"]["when_met"] and r["interpretation_active"]}) for q in int8_demo.rb("status", "--full")["questions"]}
     assert {q: w for q, w in said.items() if w} == {"q1": ["INT8 is accurate enough to ship"], "q1b": ["per-channel scales stay the default"]}
 
 
@@ -139,7 +139,7 @@ def test_a_record_is_made_from_the_command_line_in_a_folder_of_its_own(tmp_path)
 
 
 def test_the_scale_record_holds_its_counts(scale_record):
-    st = scale_record.rb("status")
+    st = scale_record.rb("status", "--full")
     log = (scale_record.root / ".rb" / "log.jsonl").read_text(encoding="utf-8").splitlines()
     counts = {"experiments": len(st["experiments"]), "runs": len(st["runs"]), "criteria": len(st["findings"]), "analyses": len(st["analyses"]),
               "resources": len(st["resources"]), "writes": len(log)}
@@ -157,7 +157,7 @@ def test_the_found_folders_record_holds_its_folders_and_found_results(tmp_path):
     """As made by default, as the list caps are measured on it: 600 folders no recorded run names, and 60 found results."""
     from rbtest import found_folders_record
     rec = found_folders_record(tmp_path)
-    st = rec.rb("status")
+    st = rec.rb("status", "--full")
     assert len(st["repository"]["unindexed"]) == 600 and st["found_unrecorded"] == 60
     assert [i["code"] for i in st["open"] if i["who"] == "agent"] == ["unindexed_folder"]
 

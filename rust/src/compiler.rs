@@ -543,7 +543,7 @@ fn state_lines(led: &Ledger) -> Res<Vec<String>> {
         );
     }
     for r in list("resources") {
-        let state = r.get("availability").map(|a| gs(a, "state", "")).unwrap_or_default();
+        let state = r.get("availability").map(|a| gs(a, "said", "")).unwrap_or_default();
         lines.push(format!("resource {}: {} ({}) · {state}", gs(&r, "id", ""), gs(&r, "name", ""), gs(&r, "type", "")));
     }
     let mut metrics: Vec<String> = list("metrics").iter().map(|m| gs(m, "id", "")).collect();

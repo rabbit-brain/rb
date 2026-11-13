@@ -58,10 +58,10 @@ def test_arms_that_share_no_value_of_a_per_run_setting_say_so(rb):
               "--at-least", "-1").data["object"]["id"]
     rb("run", "add", "int8", "top1=76.1", "--variant", "fp32", "--set", "seed=1", "--set", "images=250", "--produced-at", "2030-01-01T00:00:00Z")
     rb("run", "add", "int8", "top1=75.6", "--variant", "int8", "--set", "seed=1", "--set", "images=500", "--produced-at", "2030-01-01T00:00:00Z")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     notes = {c["code"]: c["text"] for c in f["caveats"]}
     assert notes["arms_differ"] == "the arms differ in images: int8's runs hold 500, fp32's 250, so the comparison carries that difference too"
-    code, out = rb("show", crit, text=True)
+    code, out = rb("show", "--long", crit, text=True)
     assert notes["arms_differ"] in out
     assert notes["arms_differ"] in page_text(rb)
 
@@ -73,7 +73,7 @@ def test_arms_that_share_a_value_say_nothing(rb):
               "--at-least", "-1").data["object"]["id"]
     for seed, variant, top1 in ((1, "fp32", 76.1), (2, "fp32", 76.0), (2, "int8", 75.6)):
         rb("run", "add", "int8", f"top1={top1}", "--variant", variant, "--set", f"seed={seed}", "--produced-at", "2030-01-01T00:00:00Z")
-    assert not any(c["code"] == "arms_differ" for c in rb("show", crit).data["finding"]["caveats"])
+    assert not any(c["code"] == "arms_differ" for c in rb("show", "--long", crit).data["finding"]["caveats"])
 
 
 def test_a_rule_that_pools_a_per_run_setting_says_so_and_names_the_value_that_misses(rb):
@@ -87,7 +87,7 @@ def test_a_rule_that_pools_a_per_run_setting_says_so_and_names_the_value_that_mi
         for valset, top1 in (("imagenet-val", 76.0), ("imagenet-v2", 74.2), ("imagenet-real", 76.5)):
             rb("run", "add", "int8", f"top1={top1 + seed / 100}", "--variant", "int8", "--set", f"seed={seed}", "--set", f"valset={valset}",
                "--produced-at", "2030-01-01T00:00:00Z")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["rule_outcome"] == "meets"
     assert f["says"]["headline"].endswith("· pooled over 3 valset values, criterion not met at valset=imagenet-v2"), f["says"]["headline"]
     notes = {c["code"]: c["text"] for c in f["caveats"]}
@@ -97,7 +97,7 @@ def test_a_rule_that_pools_a_per_run_setting_says_so_and_names_the_value_that_mi
     assert notes["pooled_misses"] in page and notes["pooled_setting"] in page
     # the card's reading leads with rb show's headline words for the pooling, on the question's row and the rule's
     assert page.count("Pooled over 3 valset values, criterion not met at valset=imagenet-v2: INT8 is ") >= 2, page
-    status = rb("status")
+    status = rb("status", "--full")
     assert "pooled over 3 valset values, criterion not met at valset=imagenet-v2" in status.data["findings"][0]["says"]["headline"]
 
 
@@ -115,10 +115,10 @@ def test_a_pooled_value_is_judged_on_the_difference_of_arms_recorded_apart(rb):
         for valset, int8, fp32 in (("imagenet-val", 60 + seed, 40 + seed), ("imagenet-v2", 40 + seed, 41 + seed)):
             rb("run", "add", "int8", f"top1={int8}", "--variant", "int8", "--set", f"seed={seed}", "--set", f"valset={valset}", "--produced-at", "2030-01-01")
             rb("run", "add", "int8", f"top1={fp32}", "--variant", "fp32", "--set", f"seed={seed}", "--set", f"valset={valset}", "--produced-at", "2030-01-01")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["says"]["headline"].endswith("pooled over 2 valset values, criterion not met at valset=imagenet-v2"), f["says"]["headline"]
     assert "the runs at valset=imagenet-v2 (-1, 3 units) alone would not meet the rule" in {c["code"]: c["text"] for c in f["caveats"]}["pooled_misses"]
-    g = rb("show", wide).data["finding"]
+    g = rb("show", "--long", wide).data["finding"]
     assert not any(c["code"] == "pooled_misses" for c in g["caveats"]), g["caveats"]        # 20 and -1 both within 30
 
 
@@ -132,7 +132,7 @@ def test_arms_that_differ_within_each_unit_say_so(rb):
     for seed, a, b in ((1, 500, 250), (2, 250, 500)):
         rb("run", "add", "int8", "top1=75.6", "--variant", "int8", "--set", f"seed={seed}", "--set", f"images={a}", "--produced-at", "2030-01-01")
         rb("run", "add", "int8", "top1=76.1", "--variant", "fp32", "--set", f"seed={seed}", "--set", f"images={b}", "--produced-at", "2030-01-01")
-    notes = {c["code"]: c["text"] for c in rb("show", crit).data["finding"]["caveats"]}
+    notes = {c["code"]: c["text"] for c in rb("show", "--long", crit).data["finding"]["caveats"]}
     assert notes["arms_differ"] == "the arms differ in images: within a unit, the two arms' runs hold different values, so the comparison carries that difference too"
 
 
@@ -146,7 +146,7 @@ def test_a_variant_compared_with_itself_names_each_arm_by_its_selection(rb):
               "--subject-where", "batch=64", "--reference-where", "batch=32", "--at-least", "-1").data["object"]["id"]
     rb("run", "add", "int8", "top1=75.6", "--variant", "int8", "--set", "seed=1", "--set", "batch=64", "--produced-at", "2030-01-01T00:00:00Z")
     rb("run", "add", "int8", "top1=75.4", "--variant", "int8", "--set", "seed=2", "--set", "batch=32", "--produced-at", "2030-01-01T00:00:00Z")
-    notes = {c["code"]: c["text"] for c in rb("show", crit).data["finding"]["caveats"]}
+    notes = {c["code"]: c["text"] for c in rb("show", "--long", crit).data["finding"]["caveats"]}
     assert notes["arms_differ"] == ("the arms differ in seed: the runs of int8 at batch=64 hold 1, those of int8 at batch=32 hold 2, "
                                     "so the comparison carries that difference too")
 
@@ -177,7 +177,7 @@ def test_arms_each_at_one_value_pool_nothing_and_say_only_that_they_differ(rb):
     for seed in (1, 2):
         rb("run", "add", "int8", "top1=76.1", "--variant", "fp32", "--set", f"seed={seed}", "--set", "images=250", "--produced-at", "2030-01-01T00:00:00Z")
         rb("run", "add", "int8", "top1=75.6", "--variant", "int8", "--set", f"seed={seed}", "--set", "images=500", "--produced-at", "2030-01-01T00:00:00Z")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     codes = [c["code"] for c in f["caveats"]]
     assert "arms_differ" in codes and "pooled_setting" not in codes and "pooled over" not in f["says"]["headline"], (codes, f["says"]["headline"])
 
@@ -191,7 +191,7 @@ def test_a_pooled_miss_of_an_equals_rule_names_the_unit_farthest_from_its_number
               "--tolerance", "0.1", "--each").data["object"]["id"]
     for seed, valset, top1 in ((1, "a", 4.0), (2, "a", 5.2), (1, "b", 6.0), (2, "b", 4.8)):
         rb("run", "add", "int8", f"top1={top1}", "--variant", "int8", "--set", f"seed={seed}", "--set", f"valset={valset}", "--produced-at", "2030-01-01T00:00:00Z")
-    text = {c["code"]: c["text"] for c in rb("show", crit).data["finding"]["caveats"]}.get("pooled_misses", "")
+    text = {c["code"]: c["text"] for c in rb("show", "--long", crit).data["finding"]["caveats"]}.get("pooled_misses", "")
     # 4.0 is farther from 5 than 5.2 is: the farthest, whichever side it is on
     assert "valset=a (all 2 units outside 5 \u00b1 0.1, farthest 4)" in text and "valset=b (all 2 units outside 5 \u00b1 0.1, farthest 6)" in text, text
 

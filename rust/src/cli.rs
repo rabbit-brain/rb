@@ -152,6 +152,8 @@ pub struct Out {
     pub told: Option<Vec<String>>,
     /// The log lines a quiet command printed, by digest: only those writes count as told.
     pub told_lines: Option<Vec<String>>,
+    /// the text leaves out its Next line (rb status's dashboard ends on its own last line); `next` stays in the JSON
+    pub next_quiet: bool,
     /// A write previewed with --dry-run: what it would write, in rb's text, said after the command's own lines.
     pub dry: Option<Vec<String>>,
     /// What a command previewed says of itself in place of the files' contents (rb init --dry-run's plan).
@@ -160,6 +162,9 @@ pub struct Out {
     /// where something a session wrote can wait for the user (`Ledger::shows_escapes`), once worked out: only where what
     /// it draws holds a character a screen would hide. --json keeps the text as written.
     shown: Option<bool>,
+    /// Whether its lines are drawn already (rb status's one screen, which draws someone's text as its screens do and may
+    /// colour it): printed as they are.
+    pub drawn: bool,
 }
 
 impl Out {
@@ -175,9 +180,11 @@ impl Out {
             delta: Vec::new(),
             told: None,
             told_lines: None,
+            next_quiet: false,
             dry: None,
             plan: None,
             shown: None,
+            drawn: false,
         }
     }
 
@@ -247,7 +254,7 @@ impl Out {
                 println_out(if said { "Dry run: nothing was written. The write would say:" } else { "Dry run: nothing was written." });
             }
             if !self.lines.is_empty() {
-                let shown = self.shown == Some(true);
+                let shown = self.shown == Some(true) && !self.drawn;
                 let lines: Vec<String> = if shown { self.lines.iter().map(|l| crate::ledger::design::shown(l)).collect() } else { self.lines.clone() };
                 println_out(&lines.join("\n"));
             }
@@ -260,7 +267,7 @@ impl Out {
             if !self.delta.is_empty() {
                 println_out(&crate::delta::lines(&self.delta).join("\n"));
             }
-            if !self.next.is_empty() {
+            if !self.next.is_empty() && !self.next_quiet {
                 let next = self.next.join("  ·  ");
                 println_out(&format!("\nNext: {}", if self.shown == Some(true) { crate::ledger::design::shown(&next) } else { next }));
             }

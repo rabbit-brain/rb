@@ -472,7 +472,7 @@ def test_the_tab_says_what_rb_looks_at(served, tmp_path_factory):
     """rb open serves the scope line as rb status says it; the tab draws it under the line about calls, on the overview
     alone, with the time it last looked on one line."""
     rb, url, _ = served
-    st = rb("status")[1].data
+    st = rb("status", "--full")[1].data
     home = json.loads(_get(url + "/state.json")[1])["home"]
     assert home["scope"].startswith("rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder") and home["scope"].endswith(st["scope"]["said"].split(" UTC. ", 1)[1])
     node = shutil.which("node")
@@ -549,19 +549,20 @@ def test_the_resources_drawer_says_where_each_resource_stands_now(served):
     [row] = home["resources"]
     assert (row["resource_id"], row["name"], row["type"], row["availability"]) == ("imagenet", "ImageNet-1k validation", "dataset", "present")
     assert row["exact"] and row["identity"].startswith("sha256 ") and row["used_by"] == 1
-    assert row["where"] == ["local:data/imagenet.bin · here"] and row["how"] == ""
-    assert {r["id"]: (r["kind"], r["standing"]) for r in home["tree"]}["imagenet"] == ("resource", "present")
+    assert row["where"] == ["copy here: data/imagenet.bin"] and row["how"] == ""
+    # the tree says where a reader gets it, never present or remote (getit.rs)
+    assert {r["id"]: (r["kind"], r["standing"]) for r in home["tree"]}["imagenet"] == ("resource", "get it: https://example.org/imagenet")
     Path("data/imagenet.bin").unlink()
     _, body = _get(url + "/state.json")
     [row] = json.loads(body)["home"]["resources"]
     assert row["availability"] == "reconstructible" and row["how"] == "https://example.org/imagenet"
-    assert row["where"] == ["local:data/imagenet.bin · gone"] and row["used_by"] == 1
+    assert row["where"] == ["missing from this checkout: data/imagenet.bin"] and row["used_by"] == 1
     # The shell row and card are pinned by
     # test_shell_resource_availability_is_recomputed_in_its_row_and_card.
     _, cbody = _get(url + "/card.json?ref=o:imagenet")
     card = json.loads(cbody)["card"]
-    assert card["title"] == "ImageNet-1k validation" and card["lead"] == "dataset · reconstructible"
-    assert "how to get it again: https://example.org/imagenet" in card["facts"] and len(card["runs"]) == 1
+    assert card["title"] == "ImageNet-1k validation" and card["lead"] == "dataset · get it: https://example.org/imagenet"
+    assert "missing from this checkout: data/imagenet.bin" in card["facts"] and len(card["runs"]) == 1
 
 
 @pytest.mark.xfail(strict=True, reason="4b gap (pins-4b.md), an old page pin that cannot pass on the shell; the fix ports it, owner C (nodes.rs): the criterion card omits its declaration's words")
@@ -883,9 +884,9 @@ def test_two_places_that_hold_the_same_record_read_apart(placed):
     _, s = _answer(server.url + "/state.json")
     d = next(x for x in s["places"] if x["branch"] == "exp-d")
     _, there = _answer(f"{server.url}/state.json?place={d['id']}")
-    def same(v):            # but where each run was recorded and what code it ran, which are said against the place shown
+    def same(v):            # but where each run was recorded, what code it ran and the header's chips, said against the place shown
         if isinstance(v, dict):
-            return {k: same(x) for k, x in v.items() if k not in ("live", "found", "unplaced", "observed_in", "observed", "observed_short", "other_code", "scope", "scope_short")}
+            return {k: same(x) for k, x in v.items() if k not in ("live", "found", "unplaced", "observed_in", "observed", "observed_short", "other_code", "scope", "scope_short", "head")}
         return [same(x) for x in v] if isinstance(v, list) else v
     assert same(there["home"]) == same(s["home"]) and there["digest"] != s["digest"]
     main_at = rec.start                                              # where run_main was recorded, before the record's commit
@@ -970,19 +971,19 @@ def test_elsewhere_leaves_out_a_call_or_gate_merged_here(placed):
     agent = {"CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "sess-merged-3"}
     proposed = rec.rb("decide", "e1", "accept", "--why", "the sibling's runs hold", cwd=c, who=agent)["object"]["id"]
     rec.rb("experiment", "gate", "e1", "--if-holds", "ship int8", "--if-not", "keep fp32", cwd=c, who=agent)
-    there = rec.rb("status", cwd=c)
+    there = rec.rb("status", "--full", cwd=c)
     assert [d["id"] for d in there["pending"]] == [proposed] and len(there["gates_pending"]) == 1
     rec.git("add", ".rb", cwd=c)
     rec.git("commit", "-qm", "the call and the gate", cwd=c)
     rec.git("merge", "-q", "--no-edit", "exp-c")
-    here = rec.rb("status")
+    here = rec.rb("status", "--full")
     assert [d["id"] for d in here["pending"]] == [proposed] and here["gates_pending"] == there["gates_pending"]
     _, s = _answer(server.url + "/state.json")
     [row] = [r for r in s["elsewhere"] if r["branch"] == "exp-c"]
     assert row["waiting"] == []
     assert re.fullmatch(r"rb confirm e1@[0-9a-f]{64}", here["gates_pending"][0]["confirm"])
     rec.rb("confirm", proposed, here["gates_pending"][0]["confirm"].split(" ")[-1])
-    assert rec.rb("status")["pending"] == []
+    assert rec.rb("status", "--full")["pending"] == []
     again = Open(rec.root)                          # the list as worked out now, not ten seconds ago
     try:
         _, s = _answer(again.url + "/state.json")
@@ -1070,9 +1071,9 @@ def test_a_past_version_reads_as_a_checkout_of_its_commit_and_leaves_nothing(ver
             _, there = _answer(live.url + "/state.json")
         finally:
             live.close()
-        def same(v):        # but its live panel, and where runs were recorded, said against the place each shows
+        def same(v):        # but its live panel, where runs were recorded and the header's chips, said against the place each shows
             if isinstance(v, dict):
-                return {k: same(x) for k, x in v.items() if k not in ("live", "observed_in", "observed", "observed_short", "scope", "scope_short")}
+                return {k: same(x) for k, x in v.items() if k not in ("live", "observed_in", "observed", "observed_short", "scope", "scope_short", "head")}
             return [same(x) for x in v] if isinstance(v, list) else v
         assert same(v1["home"]) == same(there["home"])
         # a card and the page of the version, and what was not listed
@@ -1080,8 +1081,11 @@ def test_a_past_version_reads_as_a_checkout_of_its_commit_and_leaves_nothing(ver
         status, page = _get(f"{server.url}/page.html?at={shas[0]}")
         # About's line 2 states the version's own checkout: every record file committed, at that commit; the live page
         # states this checkout, with the note not committed
-        assert status == 200 and f'<span><a href="#in-git">all record files committed</a> \u00b7 at commit {shas[0][:12]}</span>' in page
-        assert f'<span><a href="#in-git">2 record files not committed</a> \u00b7 at commit {shas[-1][:12]}</span>' in _get(f"{server.url}/page.html")[1]
+        # (About's strip, owner Nov 13 2026: the git chip and, only where record files are not committed, the amber chip)
+        strip = lambda p: p.split('<div class="astrip" id="in-git"', 1)[1].split('<p class="dim sm honest1">', 1)[0]
+        assert status == 200 and f'<span class="gsha mono">{shas[0][:7]}</span>' in strip(page) and "not committed</summary>" not in strip(page)
+        live = strip(_get(f"{server.url}/page.html")[1])
+        assert f'<span class="gsha mono">{shas[-1][:7]}</span>' in live and ">2 not committed</summary>" in live
         start = git("rev-parse", "HEAD~4")
         for sha in ("0" * 40, start, shas[0][:12]):
             status, answer = _answer(f"{server.url}/state.json?at={sha}")
@@ -1417,6 +1421,15 @@ def shell_placed(monkeypatch, request):
     return request.getfixturevalue("placed")
 
 
+def _prompts(el) -> list:
+    """The prompts an element's prompt buttons copy for their agent (closed form, owner, Nov 13 2026)."""
+    return [b.attrs.get("data-text", "") for b in el.all("button", **{"class": "ibtn ico cpprompt rbcmd"})]
+
+
+_CALL_PROMPT = "In this repository, use Rabbit Brain to show me what waits for my confirmation on {}, and how I confirm it."
+_DESIGN_PROMPT = 'In this repository, use Rabbit Brain to show me the design of "{}" that waits for my confirmation, part by part, and how I confirm it.'
+
+
 def _shell(url, query=""):
     status, html = _get(url + "/" + query)
     assert status == 200 and html.startswith("<!doctype html>")
@@ -1572,25 +1585,27 @@ def test_shell_sqlite_receipt_names_the_row_and_each_column(shell_served):
 
 
 def test_shell_scope_and_uncited_files_stay_on_the_overview(shell_served):
-    """The Overview draws rb's scope and uncited-file count, separate from the calls and criteria."""
+    """rb's scope and uncited-file count are drawn where a reader finds them, separate from the calls and criteria: since
+    UX5 round 1 (1.3) at the head of History, one click from the Overview, which draws neither."""
     rb, url, _ = shell_served
     Path("configs").mkdir()
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\n", encoding="utf-8")
     subprocess.run(["git", "add", "-A"], check=True)
     subprocess.run(["git", "commit", "-qm", "Record the INT8 evaluation config"], check=True)
-    assert rb("status")[0] == 0
+    assert rb("status", "--full")[0] == 0
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
     subprocess.run(["git", "commit", "-qam", "Resize the evaluation images"], check=True)
-    assert rb("status")[0] == 0
+    assert rb("status", "--full")[0] == 0
     home = _answer(url + "/state.json")[1]["home"]
     assert home["uncited"] == 1
     doc = _shell(url)
-    [scope] = doc.at("overview").all("p", **{"data-live": "scope"})
+    [scope] = doc.at("history").all("p", **{"data-live": "scope"})
     assert scope.text.startswith("rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results")
     assert scope.text.split(" UTC. ")[1] == home["scope"].split(" UTC. ")[1]
-    assert home["uncited_line"] in doc.at("overview").text
-    assert home["uncited_line"] not in doc.at("criteria").text
-    assert not doc.at("criteria").all("p", **{"data-live": "scope"})
+    assert home["uncited_line"] in doc.at("history").text
+    for elsewhere in ("overview", "criteria", "your-call"):
+        assert home["uncited_line"] not in doc.at(elsewhere).text, elsewhere
+        assert not doc.at(elsewhere).all("p", **{"data-live": "scope"}), elsewhere
 
 
 def test_shell_fixed_cells_keep_rbs_digits_and_descriptive_range(shell_served):
@@ -1620,7 +1635,9 @@ def test_shell_interpretation_has_its_label_without_a_writer(shell_served, monke
     assert rb("run", "add", "e1", "top1=0.76")[0] == 0
     doc = _shell(url)
     assert "INT8 keeps ResNet-50 accuracy" in doc.at("q-q1").text
-    [label] = [k for k in doc.at("q-q1:ip:1").all("span", **{"class": "k"}) if "note" in k.text.lower()]  # the note's term (design pass 1)
+    # closed form (owner, Nov 13 2026): the note's term is a link that opens when and why it was declared
+    [label] = [k for k in doc.at("q-q1:ip:1").all("a", **{"class": "k"}) if "note" in k.text.lower()]  # the note's term (design pass 1)
+    assert label.attrs.get("href") == "#q-q1:ip:1:when" and doc.at("q-q1:ip:1:when")
     assert "A note, not confirmed" in label.text
     assert "claude" not in label.text.lower() and "agent" not in label.text.lower()
     assert "not confirmed" in doc.at("q-q1").text
@@ -1646,21 +1663,28 @@ def test_shell_recorded_in_links_only_to_a_readable_record(shell_placed):
 
 
 def test_shell_calls_wait_until_the_result_has_a_call(shell_served):
-    """A missed criterion leaves a call on the Overview and in Your call; after the call, nothing waits on it."""
+    """A missed criterion leaves a call in the Overview's Decisions and in Your call; after the call, nothing waits on
+    it. Decisions counts what waits in a filter chip by kind (its heading carries no count; the pin and Your call do),
+    and the call is one row, wholly a link to the rule's card."""
     rb, url, _ = shell_served
     assert confirm_designs() == ["e1"]
     assert rb("run", "add", "e1", "top1=0.5")[0] == 0
     doc = _shell(url)
-    # the Overview's queue (Overview v2): its heading counts nothing (the line under it says the counts), and the
-    # call's one row
-    queue = doc.at("queue")
-    assert doc.at("h-queue").text.split() == ["Needs", "your", "judgment"]
-    assert [li.attrs.get("data-kind") for li in queue.all("li")].count("call") == 1
-    assert "Nothing waits on your judgment" not in doc.at("overview").text
-    assert "c1" in doc.at("your-call").text
+    overview = doc.at("overview")
+    [rows] = overview.all("ul", **{"class": "dq dql"})
+    decide = [li for li in rows.all("li", **{"class": "dr dl1"}) if li.attrs.get("data-kind") == "decide"]
+    assert len(decide) == 1 and doc.at("decisions").text.split() == ["Decisions"]
+    assert [a.attrs.get("href") for a in decide[0].all("a")] == ["#c-c1"]
+    assert [b.text for b in overview.all("button", **{"class": "dchip"})] == ["1 decision"]
+    assert "Nothing waits" not in overview.text
+    assert "c1" in doc.at("your-call").text and doc.at("h-your-call").text == "Your call (1)"
     assert rb("decide", "c1", "reject", "-m", "INT8 misses the accuracy budget")[0] == 0
     doc = _shell(url)
-    assert "Nothing waits on your judgment." in doc.at("queue").text and not doc.at("queue").all("li")
+    overview = doc.at("overview")
+    assert [e.text for e in overview.all("span", **{"class": "echip"})] == ["Nothing waits"]
+    assert not overview.all("li", **{"class": "dr dl1"}) and not overview.all("button", **{"class": "dchip"})
+    # no count on the heading, and the call made one click away in History
+    assert doc.at("decisions").text.split() == ["Decisions", "made", "1", "\u203a"]
     assert "Your call (0)" in doc.at("your-call").text
 
 
@@ -1699,14 +1723,21 @@ def test_shell_away_design_pane_names_the_directory(shell_placed):
     data = _answer(server.url + "/state.json")[1]
     p = next(p for p in data["places"] if p["branch"] == "exp-c")
     doc = _shell(server.url, f"?place={p['id']}")
-    listing = f"design not confirmed · list it to confirm: cd {p['record_dir']} && rb confirm lat"
-    assert doc.at("x-lat:design").text.count(listing) == 1
-    cmds = doc.at("to-confirm").all("pre", **{"class": "cmd"})
-    assert cmds and all(c.text.startswith(f"cd {p['record_dir']} && rb confirm ") and c.text.count("cd ") == 1 for c in cmds)
+    # closed form (owner, Nov 13 2026): one plain line and a prompt for their agent that names the checkout where
+    # it is confirmed, never a command to type
+    pane = doc.at("x-lat:design")
+    there = f"In the checkout at {p['record_dir']},"
+    assert pane.text.count("This experiment's design is not confirmed.") == 1 and "rb confirm" not in pane.text
+    assert _prompts(pane) == [_DESIGN_PROMPT.format("INT8 latency").replace("In this repository,", there)]
+    waiting = doc.at("to-confirm")
+    asks = _prompts(waiting)
+    assert asks and all(a.startswith(there + " use Rabbit Brain") and a.count("checkout at") == 1 for a in asks), asks
+    assert not waiting.all("pre", **{"class": "cmd"}) and "rb confirm" not in waiting.text
 
 
 def test_shell_proposed_call_words_move_only_on_confirmation(shell_served, monkeypatch):
-    """A proposed call keeps its words and confirm apart from Your call until it is confirmed."""
+    """A proposed call's words read as given until it is confirmed: listed under what waits for a confirmation (folded in
+    Experiments), and on Your call's list as a confirm row with its command (the rulings of Nov 12 07:15 +08)."""
     rb, url, _ = shell_served
     monkeypatch.setenv("CLAUDECODE", "1")
     code, env = rb("decide", "e1", "accept", "-m", "INT8 clears the bar", "--words", "Ship INT8 when top1 holds")
@@ -1715,8 +1746,13 @@ def test_shell_proposed_call_words_move_only_on_confirmation(shell_served, monke
     did = env.data["object"]["id"]
     doc = _shell(url)
     assert 'words (as given): "Ship INT8 when top1 holds"' in doc.at("to-confirm").text
-    assert f"rb confirm {did}" in doc.at("to-confirm").text
-    assert "Ship INT8 when top1 holds" not in doc.at("your-call").text
+    # closed form (owner, Nov 13 2026): the waiting call offers a prompt for their agent, never rb confirm
+    assert _CALL_PROMPT.format("e1") in _prompts(doc.at("to-confirm")) and "rb confirm" not in doc.at("to-confirm").text
+    assert doc.at("experiments").all(id="to-confirm")
+    # Your call lists it as a confirm row with its prompt (the rulings of Nov 12 07:15 +08), its words only as given
+    yc = doc.at("your-call").text
+    assert _CALL_PROMPT.format("e1") in _prompts(doc.at("your-call")) and "rb confirm" not in yc
+    assert yc.replace('words (as given): "Ship INT8 when top1 holds"', "").count("Ship INT8 when top1 holds") == 0
     assert rb("confirm", did)[0] == 0
     doc = _shell(url)
     assert "Ship INT8 when top1 holds" not in doc.at("to-confirm").text
@@ -1759,7 +1795,7 @@ def test_shell_each_waiting_call_is_listed_once_under_its_deepest_inquiry(workdi
     rb("criterion", "file", "c-calib", "q1", "--why", "calibration bears on whether INT8 holds")     # the parent reads it too
     rb("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.2")
     rb("run", "add", "calib", "c1024.top1=75.9", "c512.top1=75.4", "c1024.top5=92.8", "c512.top5=92.5")
-    assert [i["subject"] for i in rb("status").data["open"] if i["who"] == "human"] == ["c-top1", "c-calib", "c-calib5"]
+    assert [i["subject"] for i in rb("status", "--full").data["open"] if i["who"] == "human"] == ["c-top1", "c-calib", "c-calib5"]
 
     clock = None
     monkeypatch.delenv("RB_TEST_NOW")
@@ -1776,7 +1812,8 @@ def test_shell_each_waiting_call_is_listed_once_under_its_deepest_inquiry(workdi
         doc = _shell(server.url)
         assert doc.at("your-call").text.startswith("Your call (3)")
         assert "summary.json" not in doc.at("your-call").text
-        assert "summary.json" in doc.at("overview").text
+        # what rb found is said where rb says how it reads the repository: at the head of History since UX5 1.3
+        assert "summary.json" in doc.at("history").text and "summary.json" not in doc.at("overview").text
     finally:
         server.close()
 
@@ -1794,8 +1831,11 @@ def test_shell_escaped_question_and_waiting_design_parts_fit(shell_served, monke
     doc = _shell(url)
     assert "\\udb40\\udc20" in doc.at("q-q2").text and tags[0] not in doc.at("main").text
     # the waiting row names the design and its command once; the design's parts, the gate's words among them, are on its card
-    assert "rb confirm e1" in doc.at("to-confirm").text
-    assert "ship  INT8" in doc.at("x-e1").text and "rb confirm e1" in doc.at("x-e1").text
+    # closed form (owner, Nov 13 2026): the waiting row names the design and offers a prompt for their agent,
+    # never the command; its own view says one plain line with the same prompt
+    assert _DESIGN_PROMPT.format("the experiment") in _prompts(doc.at("to-confirm")) and "rb confirm" not in doc.at("to-confirm").text
+    assert "ship  INT8" in doc.at("x-e1").text and "This experiment's design is not confirmed." in doc.at("x-e1").text
+    assert _DESIGN_PROMPT.format("the experiment") in _prompts(doc.at("x-e1:design")) and "rb confirm" not in doc.at("x-e1").text
     _walked_whole(harness(url, "--generic", timeout=600))
 
 
@@ -1823,16 +1863,18 @@ def test_shell_resource_availability_is_recomputed_in_its_row_and_card(shell_ser
     home = _answer(url + "/state.json")[1]["home"]
     identity = home["resources"][0]["identity"]
     rid = home["runs"][0]["run_id"]
-    for availability, where in (("present", "here"), ("reconstructible", "gone")):
+    for availability, where in (("present", "copy here: data/imagenet.bin"), ("reconstructible", "missing from this checkout: data/imagenet.bin")):
         doc = _shell(url)
         card = doc.at("r-imagenet")
-        assert availability in doc.at("resources").text and availability in card.text
+        # where a reader gets it on both, and on the owner's own screen whether the copy is here (getit.rs)
+        assert "Get it" in doc.at("resources").text and "Get it" in card.text and availability not in card.text
+        assert where in doc.at("resources").text
         assert doc.at("resources").all(**{"data-for": "r-imagenet"})
         assert "ImageNet-1k validation" in card.text and identity in card.text
         assert card.all("a", href="#run-" + rid)
-        assert f"local:data/imagenet.bin · {where}" in card.text
+        assert where in card.text
         assert "1 run" in card.text
-        if where == "here":
+        if availability == "present":
             Path("data/imagenet.bin").unlink()
         else:
             assert "https://example.org/imagenet" in card.text
@@ -1851,7 +1893,8 @@ def test_shell_waiting_reasons_keep_the_wrap_rule_on_their_element(shell_served,
     waiting = doc.at("to-confirm")
     [reason] = [e for e in waiting.all("p", **{"class": "wt"}) if "INT8 needs calibration" in e.text]
     assert "\\udb40\\udc20" in reason.text and tags[0] not in reason.text
-    assert f"rb confirm {env.data['object']['id']}" in waiting.text
+    # closed form (owner, Nov 13 2026): the waiting call offers a prompt for their agent, never rb confirm
+    assert _CALL_PROMPT.format("e1") in _prompts(waiting) and "rb confirm" not in waiting.text
     css = "".join(e.text for e in doc.all("style"))
     rules = re.findall(r"([^{}]+)\{([^{}]*)\}", css)
     assert any(".wt" in [s.strip() for s in selector.split(",")] and "overflow-wrap:break-word" in re.sub(r"\s+", "", body)
@@ -1873,9 +1916,14 @@ def _where(url, query=""):
     doc = _shell(url, query)
     [pick] = doc.at("where").all("details", **{"data-pick": "where"})
     [summary] = pick.all("summary")
-    [words] = summary.all("span", **{"class": "gs"}) or [None]
+    [words] = [w for w in summary.all("span") if "gs" in w.attrs.get("class", "").split()] or [None]
     [picks] = pick.all("ul", **{"class": "picks"})
-    face = _text_outside(doc.at("top"), lambda e: e.tag == "ul" and "picks" in e.attrs.get("class", "").split())
+    # the open lists aside, and the git chip's commit (owner, Nov 13 2026: the Version picker says the commit the place is
+    # at, and the amber chip's list the record files not committed): the rest of the bar says no commit and none of git's
+    # words
+    face = _text_outside(doc.at("top"), lambda e: (e.tag == "ul" and "picks" in e.attrs.get("class", "").split())
+                         or e.attrs.get("data-pick") == "version" or "gsha" in e.attrs.get("class", "").split()
+                         or "gpop" in e.attrs.get("class", "").split())
     assert not FACE_HYGIENE.search(face), face
     return " ".join(summary.text.split()), words, picks, face
 

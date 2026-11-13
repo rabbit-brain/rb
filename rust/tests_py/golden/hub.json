@@ -1,7 +1,7 @@
 {
  "steps": [
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/ok",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/ok --wait",
    "exit": 0,
    "out": [
     "Signed in as t on <http://127.0.0.1:47821/m/ok>.",
@@ -30,7 +30,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/complete",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/complete --wait",
    "exit": 0,
    "out": [
     "Signed in as t on <http://127.0.0.1:47821/m/complete>.",
@@ -63,7 +63,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/slow",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/slow --wait",
    "exit": 0,
    "out": [
     "Signed in as t on <http://127.0.0.1:47821/m/slow>.",
@@ -100,7 +100,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/denied",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/denied --wait",
    "exit": 2,
    "out": [
     ""
@@ -136,7 +136,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/expired",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/expired --wait",
    "exit": 2,
    "out": [
     ""
@@ -172,7 +172,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/described",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/described --wait",
    "exit": 2,
    "out": [
     ""
@@ -208,7 +208,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/undescribed",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/undescribed --wait",
    "exit": 2,
    "out": [
     ""
@@ -244,7 +244,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/notoken",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/notoken --wait",
    "exit": 2,
    "out": [
     ""
@@ -280,7 +280,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/nohandle",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/nohandle --wait",
    "exit": 0,
    "out": [
     "Signed in as you on <http://127.0.0.1:47821/m/nohandle>.",
@@ -321,7 +321,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/nullhandle",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/nullhandle --wait",
    "exit": 0,
    "out": [
     "Signed in as you on <http://127.0.0.1:47821/m/nullhandle>.",
@@ -366,7 +366,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/code500",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/code500 --wait",
    "exit": 2,
    "out": [
     ""
@@ -403,7 +403,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/code404",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/code404 --wait",
    "exit": 2,
    "out": [
     ""
@@ -440,7 +440,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/codejunk",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/codejunk --wait",
    "exit": 2,
    "out": [
     ""
@@ -477,7 +477,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/nocode",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/nocode --wait",
    "exit": 2,
    "out": [
     ""
@@ -514,7 +514,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/nousercode",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/nousercode --wait",
    "exit": 2,
    "out": [
     ""
@@ -551,7 +551,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/expiresnow",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/expiresnow --wait",
    "exit": 2,
    "out": [
     ""
@@ -595,7 +595,7 @@
    }
   },
   {
-   "run": "login: rb login --hub http://127.0.0.1:47821/m/strinterval",
+   "run": "login: rb login --hub http://127.0.0.1:47821/m/strinterval --wait",
    "exit": 0,
    "out": [
     "Signed in as t on <http://127.0.0.1:47821/m/strinterval>.",
@@ -644,7 +644,7 @@
    }
   },
   {
-   "run": "login unreachable: rb login --hub http://127.0.0.1:1",
+   "run": "login unreachable: rb login --hub http://127.0.0.1:1 --wait",
    "exit": 2,
    "out": [
     ""
@@ -685,7 +685,7 @@
    }
   },
   {
-   "run": "login no scheme: rb login --hub rabbitbrain",
+   "run": "login no scheme: rb login --hub rabbitbrain --wait",
    "exit": 2,
    "out": [
     ""
@@ -726,7 +726,7 @@
    }
   },
   {
-   "run": "login odd scheme: rb login --hub localhost:1",
+   "run": "login odd scheme: rb login --hub localhost:1 --wait",
    "exit": 2,
    "out": [
     ""
@@ -767,7 +767,7 @@
    }
   },
   {
-   "run": "login no host: rb login --hub https://",
+   "run": "login no host: rb login --hub https:// --wait",
    "exit": 2,
    "out": [
     ""
@@ -808,11 +808,11 @@
    }
   },
   {
-   "run": "login nowhere: rb login --hub http://rb-nowhere.invalid",
+   "run": "login nowhere: rb login --hub http://rb-nowhere.invalid --wait",
    "exit": 2
   },
   {
-   "run": "login json: rb login --hub http://127.0.0.1:47821/m/ok/ --json",
+   "run": "login json: rb login --hub http://127.0.0.1:47821/m/ok/ --json --wait",
    "exit": 0,
    "out": [
     "{",
@@ -821,6 +821,7 @@
     " \"command\": \"login\",",
     " \"data\": {",
     "  \"hub\": \"http://127.0.0.1:47821/m/ok\",",
+    "  \"state\": \"signed_in\",",
     "  \"handle\": \"t\",",
     "  \"credentials\": \"@BASE@/cfg/credentials.json\"",
     " },",
@@ -871,7 +872,7 @@
    }
   },
   {
-   "run": "login env: rb login",
+   "run": "login env: rb login --wait",
    "exit": 0,
    "out": [
     "Signed in as t on <http://127.0.0.1:47821/m/complete>.",
@@ -992,7 +993,7 @@
    }
   },
   {
-   "run": "login for norevoke: rb login --hub http://127.0.0.1:47821/m/norevoke",
+   "run": "login for norevoke: rb login --hub http://127.0.0.1:47821/m/norevoke --wait",
    "exit": 0,
    "out": [
     "Signed in as t on <http://127.0.0.1:47821/m/norevoke>.",
@@ -1051,7 +1052,8 @@
     " \"data\": {",
     "  \"hub\": \"http://127.0.0.1:47821/m/norevoke\",",
     "  \"revoked\": false,",
-    "  \"removed\": true",
+    "  \"removed\": true,",
+    "  \"pending_removed\": false",
     " },",
     " \"errors\": [],",
     " \"next\": [],",
@@ -1089,7 +1091,7 @@
    }
   },
   {
-   "run": "login for revokejunk: rb login --hub http://127.0.0.1:47821/m/revokejunk",
+   "run": "login for revokejunk: rb login --hub http://127.0.0.1:47821/m/revokejunk --wait",
    "exit": 0,
    "out": [
     "Signed in as t on <http://127.0.0.1:47821/m/revokejunk>.",
@@ -1341,6 +1343,7 @@
     "  \"handle\": \"t\",",
     "  \"url\": \"http://127.0.0.1:47821/m/query/u/t/proj\",",
     "  \"with_record\": false,",
+    "  \"signed_in\": false,",
     "  \"repo\": null",
     " },",
     " \"errors\": [],",
@@ -1392,6 +1395,7 @@
     "  \"url\": \"http://127.0.0.1:47821/m/ok/u/t/proj\",",
     "  \"clone\": \"rb clone http://127.0.0.1:47821/m/ok/u/t/proj/bundle.zip\",",
     "  \"with_record\": true,",
+    "  \"signed_in\": false,",
     "  \"repo\": null",
     " },",
     " \"errors\": [],",
@@ -1964,7 +1968,7 @@
    }
   },
   {
-   "run": "login nulltoken: rb login --hub http://127.0.0.1:47821/m/nulltoken",
+   "run": "login nulltoken: rb login --hub http://127.0.0.1:47821/m/nulltoken --wait",
    "exit": 2,
    "out": [
     ""
@@ -2008,7 +2012,7 @@
    }
   },
   {
-   "run": "login emptytoken: rb login --hub http://127.0.0.1:47821/m/emptytoken",
+   "run": "login emptytoken: rb login --hub http://127.0.0.1:47821/m/emptytoken --wait",
    "exit": 2,
    "out": [
     ""
@@ -2052,7 +2056,7 @@
    }
   },
   {
-   "run": "login token500: rb login --hub http://127.0.0.1:47821/m/token500",
+   "run": "login token500: rb login --hub http://127.0.0.1:47821/m/token500 --wait",
    "exit": 2,
    "out": [
     ""
@@ -2066,7 +2070,7 @@
     "  Open http://127.0.0.1:47821/m/token500/link on any device; it signs you in first if needed, and approve the code.",
     "  Waiting (Ctrl-C stops; nothing is created until you approve) ..",
     "rb login: The hub answered 500 and gave no reason.",
-    "  \u2192 Run rb login again; nothing was stored on this machine.",
+    "  \u2192 Run rb login again; no credential was stored.",
     ""
    ],
    "credentials": {
@@ -2096,7 +2100,7 @@
    }
   },
   {
-   "run": "login hugeexpiry: rb login --hub http://127.0.0.1:47821/m/hugeexpiry",
+   "run": "login hugeexpiry: rb login --hub http://127.0.0.1:47821/m/hugeexpiry --wait",
    "exit": 0,
    "out": [
     "Signed in as t on <http://127.0.0.1:47821/m/hugeexpiry>.",
@@ -2145,7 +2149,7 @@
    }
   },
   {
-   "run": "login for revoke204: rb login --hub http://127.0.0.1:47821/m/revoke204",
+   "run": "login for revoke204: rb login --hub http://127.0.0.1:47821/m/revoke204 --wait",
    "exit": 0,
    "out": [
     "Signed in as t on <http://127.0.0.1:47821/m/revoke204>.",
@@ -2208,7 +2212,8 @@
     " \"data\": {",
     "  \"hub\": \"http://127.0.0.1:47821/m/revoke204\",",
     "  \"revoked\": true,",
-    "  \"removed\": true",
+    "  \"removed\": true,",
+    "  \"pending_removed\": false",
     " },",
     " \"errors\": [],",
     " \"next\": [],",
@@ -2366,6 +2371,310 @@
      },
      "http://127.0.0.1:47821/m/hugeexpiry": {
       "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login pending: rb login --hub http://127.0.0.1:47821/m/later",
+   "exit": 0,
+   "out": [
+    "",
+    "  First, this terminal gets a code:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/later/link on any device; it signs you in first if needed, and approve the code.",
+    "Approve it there, then run rb sync --hub http://127.0.0.1:47821/m/later (or rb login --hub http://127.0.0.1:47821/m/later again) here.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login again pending: rb login --hub http://127.0.0.1:47821/m/later",
+   "exit": 0,
+   "out": [
+    "",
+    "  This terminal's code is not approved yet:",
+    "",
+    "      ABCD-EFGH",
+    "",
+    "  Open http://127.0.0.1:47821/m/later/link on any device; it signs you in first if needed, and approve the code.",
+    "Approve it there, then run rb sync --hub http://127.0.0.1:47821/m/later (or rb login --hub http://127.0.0.1:47821/m/later again) here.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync finishes sign-in: rb sync --hub http://127.0.0.1:47821/m/later",
+   "exit": 0,
+   "out": [
+    "Signed in as t on <http://127.0.0.1:47821/m/later>.",
+    "The token lives in @BASE@/cfg/credentials.json (mode 0600), not in your environment; RB_HUB_TOKEN still overrides it for CI.",
+    "Synced, privately: http://127.0.0.1:47821/m/later/u/t/proj",
+    "Only you can open it, signed in. It shows the record as computed at this sync; run rb sync again after new runs.",
+    "Share it from its page on the site, with a link you can revoke; rb sync again updates what the link shows.",
+    "Its page went alone: the record stays in this repository, the store, and rb sync --with-record sends it too.",
+    "A share link's readers can rerun only a sync made with --with-record.",
+    "The page says: no commit yet.",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/later": {
+      "token": "rb_stub_later",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "login pending json: rb login --hub http://127.0.0.1:47821/m/waiting --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"login\",",
+    " \"data\": {",
+    "  \"hub\": \"http://127.0.0.1:47821/m/waiting\",",
+    "  \"state\": \"pending\",",
+    "  \"code\": \"ABCD-EFGH\",",
+    "  \"link\": \"http://127.0.0.1:47821/m/waiting/link\",",
+    "  \"expires\": \"EXPIRES\",",
+    "  \"replaced\": null",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/later": {
+      "token": "rb_stub_later",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "sync while pending: rb sync --hub http://127.0.0.1:47821/m/waiting",
+   "exit": 2,
+   "out": [
+    ""
+   ],
+   "err": [
+    "rb sync: Not signed in yet: approve the code ABCD-EFGH at http://127.0.0.1:47821/m/waiting/link, then run rb sync --hub http://127.0.0.1:47821/m/waiting again.",
+    "  \u2192 Nothing was sent. rb login --hub http://127.0.0.1:47821/m/waiting shows the code again.",
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/later": {
+      "token": "rb_stub_later",
+      "handle": "t"
+     }
+    },
+    "mode": "0o600"
+   }
+  },
+  {
+   "run": "logout pending: rb logout --hub http://127.0.0.1:47821/m/waiting --json",
+   "exit": 0,
+   "out": [
+    "{",
+    " \"ok\": true,",
+    " \"rb_version\": \"0.0.0\",",
+    " \"command\": \"logout\",",
+    " \"data\": {",
+    "  \"hub\": \"http://127.0.0.1:47821/m/waiting\",",
+    "  \"revoked\": false,",
+    "  \"removed\": false,",
+    "  \"pending_removed\": true",
+    " },",
+    " \"errors\": [],",
+    " \"next\": [],",
+    " \"rb_delta\": []",
+    "}",
+    ""
+   ],
+   "err": [
+    ""
+   ],
+   "credentials": {
+    "entries": {
+     "http://127.0.0.1:47821/m/complete": {
+      "token": "rb_stub_complete",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/slow": {
+      "token": "rb_stub_slow",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/nohandle": {
+      "token": "rb_stub_nohandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/nullhandle": {
+      "token": "rb_stub_nullhandle",
+      "handle": ""
+     },
+     "http://127.0.0.1:47821/m/strinterval": {
+      "token": "rb_stub_strinterval",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/hugeexpiry": {
+      "token": "rb_stub_hugeexpiry",
+      "handle": "t"
+     },
+     "http://127.0.0.1:47821/m/later": {
+      "token": "rb_stub_later",
       "handle": "t"
      }
     },

@@ -84,7 +84,7 @@ def offline(workdir, monkeypatch, tmp_path_factory, capsys):
 
 def test_status_answers_where_the_record_stands_with_no_network_and_no_account(offline):
     ok, _, tried = offline
-    st = ok("status")
+    st = ok("status", "--full")
     deps = {r["id"]: r["availability"] for r in st["resources"]}
     assert deps["imagenet"]["state"] == "present" and deps["imagenet"]["identity"]["level"] == "exact"  # declared, resolved, here
     assert deps["resnet50"]["state"] == "lost" and deps["resnet50"]["identity"]["level"] == "name"      # known by name only: said
@@ -101,7 +101,7 @@ def test_status_answers_where_the_record_stands_with_no_network_and_no_account(o
 def test_every_command_that_says_what_the_record_means_runs_offline(offline, tmp_path_factory):
     ok, rb, tried = offline
     away = tmp_path_factory.mktemp("elsewhere")                         # outside the project: a fork starts its own
-    run_id = ok("status")["runs"][0]["id"]
+    run_id = ok("status", "--full")["runs"][0]["id"]
     for argv in (("show", "c1"), ("show", "e1"), ("show", run_id), ("show", "imagenet"), ("show", "q1"), ("show", "e1/seed"),
                  ("compare", "e1"), ("context",), ("log",), ("doctor",), ("env", "check"), ("fmt", "--check"),
                  ("schema", "all"), ("show", ".rb/experiments/e1/criteria/c1.yaml"), ("page", "--out", str(away / "p.html")),
@@ -117,7 +117,7 @@ def test_a_receipt_is_checked_and_a_changed_dependency_is_said_offline(offline):
     after the runs read it is `changed`, with the runs' own record of what they read beside it."""
     ok, rb, tried = offline
     Path("data/imagenet-val.npz").write_bytes(b"the evaluation images, regenerated")
-    st = ok("status")
+    st = ok("status", "--full")
     imagenet = next(r for r in st["resources"] if r["id"] == "imagenet")
     assert imagenet["availability"]["state"] == "changed"
     exp = ok("show", "e1")
@@ -127,7 +127,7 @@ def test_a_receipt_is_checked_and_a_changed_dependency_is_said_offline(offline):
     doc = rbyaml.loads(run.read_text(encoding="utf-8"))
     doc["metrics"]["int8.val_loss"] -= 0.03                                         # a better number, typed in by hand
     run.write_text(rbyaml.dumps(doc), encoding="utf-8")
-    code, env = rb("status", "--fail-on", "unestablished")
+    code, env = rb("status", "--full", "--fail-on", "unestablished")
     assert code == 1
     assert any(i["code"] == "edited_outside_rb" for i in env.data["open"])
     assert tried == []

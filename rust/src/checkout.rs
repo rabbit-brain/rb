@@ -612,8 +612,30 @@ impl Checkout {
     /// drawn from say the same.
     pub fn add_page_facts(&self, minute: &str, d: &mut crate::value::Dict) {
         d.insert("record_files".into(), self.record_files().map(|m| Value::Int(m as i64)).unwrap_or(Value::Null));
+        d.insert("chip".into(), self.chip());
         let when = When::Page(minute.to_string());
         d.insert("page_evidence".into(), Value::List(self.page_evidence(minute).iter().map(|l| l.to_value(Some(&when))).collect()));
+    }
+
+    /// The header's git chips (owner, Nov 13 2026: "where is the git aware thingy?"): `ref`, the branch HEAD names ("" on a
+    /// detached HEAD; the checkout's, never a writer's), HEAD's commit ("" with no commit yet), and the record files git's status lists, each by its path from the
+    /// repository's top (the amber chip's count and the list it opens). Null where git cannot say.
+    pub fn chip(&self) -> Value {
+        if !self.in_git() || matches!(self.state, State::Unreadable) {
+            return Value::Null;
+        }
+        crate::obj! {
+            "ref" => self.branch.clone().unwrap_or_default(),
+            "commit" => self.commit.clone().unwrap_or_default(),
+            "not_committed" => self.listed.len() as i64,
+            "files" => Value::list_of_str(self.record_uncommitted()),
+        }
+    }
+
+    /// The record files not committed (git's status lists them: new, changed, deleted, renamed), each by its path from
+    /// the repository's top, in git's order; none outside git.
+    pub fn record_uncommitted(&self) -> Vec<String> {
+        self.listed.clone()
     }
 
     /// What a page published with its code's address adds (PARITY 9.5): `origin_holds`, whether origin's branches, as

@@ -442,6 +442,7 @@ fn op_scan(led: &Ledger, _a: &Args) -> Res<Value> {
     let scope = crate::journal::Scope::of(led);
     s.insert("scope".into(), Value::Str(scope.said()));
     s.insert("scope_short".into(), Value::Str(scope.said_short()));
+    s.insert("as_of".into(), Value::Str(crate::view::as_of(&scope)));
     Ok(Value::Dict(s))
 }
 
@@ -847,9 +848,17 @@ fn op_declare_varies(led: &Ledger, a: &Args) -> Res<Value> {
 
 fn op_home(led: &Ledger, a: &Args) -> Res<Value> {
     let since = a.whole("since_baseline")?;
-    let mut v = crate::view::for_a_screen(|| Ok::<_, RBError>(crate::view::home(led, Some(since))?.to_value()))?;
+    let story = a.opt_text("story")?.filter(|q| !q.is_empty());
+    let mut v = crate::view::for_a_screen(|| Ok::<_, RBError>(crate::view::home_story(led, Some(since), story.as_deref())?.to_value()))?;
     drawn(led, &mut v)?;
     Ok(v)
+}
+
+/// The project's files with their marks, and the citations they hold, as rb files and rb open's Files tab give them
+/// (UX5 1.4): what rb ui's Files tab lists and a file's card shows.
+fn op_files(led: &Ledger, _a: &Args) -> Res<Value> {
+    let doc = crate::shell::model::build_on(led, crate::shell::Surface::Open, None)?;
+    Ok(crate::obj! {"files" => doc.get("files").cloned().unwrap_or(Value::List(Vec::new())), "citations" => doc.get("citations").cloned().unwrap_or(Value::empty_dict())})
 }
 
 /// The places a screen can show (rb ui's w): each worktree of the clone, with what its record is to this one, and the
@@ -929,6 +938,65 @@ fn op_object_card(led: &Ledger, a: &Args) -> Res<Value> {
     Ok(v)
 }
 
+/// The card of `subject` as fields and cites (UX5 2.1, crate::card): what rb ui's evidence pane draws, the card rb show
+/// prints, for a check, run, setting, commit, file (path, path:a-b, path#key, path@commit), folder, decision or
+/// experiment, or null where nothing goes by that name.
+fn op_card_model(led: &Ledger, a: &Args) -> Res<Value> {
+    let subject = a.need_text("subject")?;
+    let mut v = crate::view::for_a_screen(|| Ok::<_, RBError>(crate::card::of(led, &subject)?.map(|c| c.to_value(led)).unwrap_or(Value::Null)))?;
+    // a check's Result chips as the page's card draws them (shell::model::finding_chips): rb ui draws the same words
+    if v.get("kind").and_then(Value::as_str) == Some("check") {
+        let st = crate::view::for_a_screen(|| led.locked(|| led.status(None)))?;
+        let found = st.get("findings").and_then(Value::as_list).and_then(|fs| {
+            fs.iter().find(|f| f.get("criterion").and_then(Value::as_str) == Some(subject.as_str())).cloned()
+        });
+        if let (Some(found), Value::Dict(d)) = (found, &mut v) {
+            // "not decided" only where rb status asks a call on it, as the page's card reads it (shell::model findings_value)
+            let text = |v: &Value, k: &str| v.get(k).and_then(Value::as_str).unwrap_or_default().to_string();
+            let asked = st.get("open").and_then(Value::as_list).map_or(false, |open| {
+                open.iter().any(|i| match text(i, "code").as_str() {
+                    "undecided" => text(i, "subject") == subject,
+                    "gate_missed" => {
+                        text(i, "subject") == text(&found, "experiment") && text(&found, "role") == "gate" && text(&found, "rule_outcome") == "misses"
+                    }
+                    _ => false,
+                })
+            });
+            d.insert("chips".into(), crate::shell::model::finding_chips(&found, asked));
+        }
+    }
+    drawn(led, &mut v)?;
+    Ok(v)
+}
+
+/// The Overview of `question` (any question: its own checks and its sub-questions'): what rb ui's question card draws,
+/// its checks as chart rows (UX lead, Nov 12 05:30, ruling 8).
+fn op_overview(led: &Ledger, a: &Args) -> Res<Value> {
+    let q = a.need_text("question")?;
+    let mut v = crate::view::for_a_screen(|| led.locked(|| crate::overview::of_question(led, &Value::Dict(led.status(None)?), Some(&q))))?;
+    drawn(led, &mut v)?;
+    Ok(v)
+}
+
+/// A waiting design's listing as rows, with the command that confirms it as listed (TUI-PARITY M21): rb ui's `c`.
+fn op_design_listing(led: &Ledger, a: &Args) -> Res<Value> {
+    let exp = a.need_text("experiment")?;
+    for (e, d) in led.pending_designs()? {
+        if e.id == exp {
+            let mut v = led.design_items(&e)?;
+            if let Value::Dict(m) = &mut v {
+                m.insert("experiment".into(), Value::Str(e.id.clone()));
+                m.insert("title".into(), Value::Str(e.title.clone()));
+                m.insert("confirm".into(), Value::Str(d.confirm()));
+                // as rb confirm <exp> ends its listing: the notes that stay not confirmed, which are not the design
+                m.insert("notes_left".into(), Value::Str(crate::cmds::record::notes_left(&e).map(|x| crate::ledger::design::visible(&x)).unwrap_or_default()));
+            }
+            return Ok(v);
+        }
+    }
+    Ok(Value::Null)
+}
+
 fn op_dismiss(led: &Ledger, a: &Args) -> Res<Value> {
     let (key, why) = (a.need_text("key")?, a.text("why")?);
     crate::journal::dismiss(led, &key, &why)?;
@@ -946,7 +1014,7 @@ const RECORD_WRITES: &[&str] = &[
 ];
 
 /// The ops a screen reads another place or a past version with ("place", "at"): read, never written.
-const ELSEWHERE_READS: &[&str] = &["home", "card", "object_card", "status", "journal"];
+const ELSEWHERE_READS: &[&str] = &["home", "card", "object_card", "card_model", "overview", "status", "journal"];
 
 /// The ops that answer where there is no record yet: who is asking, and the places a screen can show.
 const RECORD_FREE: &[&str] = &["who", "actor", "places", "update_notice"];
@@ -1010,10 +1078,14 @@ fn op_named(op: &str) -> Option<Op> {
         "verify_settings" => op_verify_settings,
         "declare_varies" => op_declare_varies,
         "home" => op_home,
+        "files" => op_files,
         "places" => op_places,
         "mark_seen" => op_mark_seen,
         "card" => op_card,
         "object_card" => op_object_card,
+        "card_model" => op_card_model,
+        "overview" => op_overview,
+        "design_listing" => op_design_listing,
         "dismiss" => op_dismiss,
         _ => return None,
     })

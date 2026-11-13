@@ -432,7 +432,7 @@ def test_rb_context_gives_the_briefing_when_it_cannot_keep_the_model(rec, capsys
     finally:
         if blocked == "a read-only record":
             subprocess.run(["chmod", "-R", "u+w", str(rec / ".rb")], check=True)
-    assert code == 0 and said.out.startswith("# The record: who wrote it"), said
+    assert code == 0 and said.out.splitlines()[0] == "To read this record yourself: rb status in a terminal, or rb ui." and said.out.splitlines()[1].startswith("# The record: who wrote it"), said
     assert "rb context: what you gave is not kept for this session's writes" in said.err, said.err
     assert env.ok and env.data["markdown"].startswith("# The record: who wrote it") and "model" not in env.data["actor"]["agent"]
     assert not [x for x in log(rec) if x["op"] == "session"]

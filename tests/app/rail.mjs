@@ -18,9 +18,10 @@ const RAIL = `(() => { const a = document.querySelector('aside.insp'), m = docum
     sheet: document.documentElement.classList.contains('sheet'), rail: document.documentElement.classList.contains('irail') }; })()`;
 // the rail's state once it is what `want` (a function of that state, as source) asks and has settled: no transition or
 // animation running on the page and every width the same over two frames in a row. Never a fixed wait: a slow runner
-// (GitHub's macOS) can still be mid-transition after one. After 10 s it gives the state as it is, `late` set, and
-// a check fails on any late state: what it tests never passes unsettled.
-const STEADY = (want = 's => true') => `new Promise(res => { const until = performance.now() + 10000; let last = null;
+// (GitHub's macOS) can still be mid-transition after one, and under load it has taken longer than 10 s to get there
+// (run 43275492449). After 60 s, a bound only a page that never settles reaches, it gives the state as it is, `late`
+// set, and a check fails on any late state: what it tests never passes unsettled.
+const STEADY = (want = 's => true') => `new Promise(res => { const until = performance.now() + 60000; let last = null;
   const look = () => { const s = ${RAIL}, k = JSON.stringify(s), moving = document.getAnimations().some(x => x.playState === 'running');
     if ((${want})(s) && !moving && k === last) return res(s);
     if (performance.now() > until) return res(Object.assign(s, { late: true }));

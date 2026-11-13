@@ -98,12 +98,17 @@ home.standing[].text	string	M6	model.rs standing_of: per top-level question, rb'
 home.standing[].state	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
 home.standing[].state_word	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
 home.standing[].line	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].more	number	M6	contract 1.22 (cf-2, Nov 13 2026): model.rs standing_of, G3: how many reasons the line leaves out (it says two)	both
 home.standing[].reasons	list	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
 home.standing[].reasons[]	object	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
 home.standing[].reasons[].kind	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
 home.standing[].reasons[].text	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
 home.standing[].reasons[].criteria	list	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
 home.standing[].reasons[].criteria[]	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
+home.standing[].reasons[].subjects	list	M6	contract 1.22 (cf-2, Nov 13 2026): model.rs standing_of, G3: what each reason is about (its rules, the designs and the calls that wait), each kind and id, uncut	both
+home.standing[].reasons[].subjects[]	object	M6	contract 1.22 (cf-2, Nov 13 2026): model.rs standing_of, G3: what each reason is about (its rules, the designs and the calls that wait), each kind and id, uncut	both
+home.standing[].reasons[].subjects[].kind	string	M6	contract 1.22 (cf-2, Nov 13 2026): model.rs standing_of, G3: what each reason is about (its rules, the designs and the calls that wait), each kind and id, uncut	both
+home.standing[].reasons[].subjects[].id	string	M6	contract 1.22 (cf-2, Nov 13 2026): model.rs standing_of, G3: what each reason is about (its rules, the designs and the calls that wait), each kind and id, uncut	both
 home.standing[].tallies	list	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
 home.standing[].tallies[]	object	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
 home.standing[].tallies[].state	string	M6	model.rs standing_of: per top-level question, rb's state word, the line on why with its reasons, the tallies	both
@@ -137,6 +142,127 @@ home.queue[].targets	list	M6	model.rs queue_of: Needs your judgment, in the fixe
 home.queue[].targets[]	string	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
 home.queue[].action	string	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
 home.queue[].rank	number	M6	model.rs queue_of: Needs your judgment, in the fixed order, no command, hash or path	both
+overview	object	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.project	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.taken_out	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.question	object	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.question.id	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.question.text	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.question.plain	null|string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, the question's line in PLAIN.md, the file's words; null where it has none	both
+overview.question.plain_cite	null|string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, where that line is (PLAIN.md:7); null where it has none	both
+overview.question.state	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.question.subs	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip	object	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups	list	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[]	object	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[].state	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[].mark	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[].label	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[].n	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[].checks	list	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[].checks[]	object	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[].checks[].id	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[].checks[].late	bool	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.groups[].checks[].taken_out	bool	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.said	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.strip.text	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart	list	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[]	object	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].id	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].group	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].label	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].est	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].lo	null|number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].hi	null|number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].n	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].unit	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].threshold	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].tol	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].side	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].difference	bool	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].state	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].late	bool	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].taken_out	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].said	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].short	bool	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].est_text	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].range_text	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].claim	bool	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].measure_unit	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].result_text	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.chart[].edge_text	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests	list	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[]	object	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].key	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].runs	null|number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].label	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].ok	bool|null	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].n	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].of	null|number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].said	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].opens	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].taken_out	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.rests[].text	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions	list	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[]	object	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].kind	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].chip	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].code	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].subject	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].title	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].mark	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].cmd	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].do	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].said	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.decisions[].taken_out	string	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.made	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.made_taken_out	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.others	list	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.plain	null|object	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.file	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.voice	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project	object	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.kind	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.id	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.experiment	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.about	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.text	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.file	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.line	number	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.cite	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.voice	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.project.holds_a_result	bool	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines	list	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[]	object	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].kind	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].id	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].experiment	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].about	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].text	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].file	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].line	number	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].cite	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].voice	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.lines[].holds_a_result	bool	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.unknown	list	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.unknown[]	object	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.unknown[].about	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.unknown[].kind	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.unknown[].text	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.unknown[].file	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.unknown[].line	number	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.unknown[].cite	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.twice	list	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.twice[]	object	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.twice[].about	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.twice[].line	number	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.twice[].cite	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.twice[].first	number	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.plain.twice[].first_cite	string	1b	contract 1.19 (plain-1, UX3 4.2 D1 (b)): plainfile.rs, PLAIN.md's lines as the file's words (voice: file), each with its place in the file; null where there is no PLAIN.md	both
+overview.counts	object	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.counts.questions	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.counts.checks	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
+overview.counts.runs	number	1b	contract 1.19 (round 14, UX5 1.1): overview.rs, the Overview's view model every surface draws (the question, the strip, the chart, what it rests on, the decisions), as rb status --json gives it	both
 your_call	object	1a	new: Home.calls count, one source	both
 your_call.n	number	1a	new: Home.calls count, one source	both
 your_call.first	string	1a	new: Home.calls count, one source	both
@@ -383,6 +509,14 @@ findings.{id}.observed_places[].id	string	today	FindingLine	live
 findings.{id}.observed_places[].label	string	today	FindingLine	live
 findings.{id}.other_code	string	today	FindingLine	both
 findings.{id}.timing	string	1b	contract 1.18 (round 13, MP-1111-0219 S2): the finding's timing code (before, after_evidence, after_exposure, unknown, untested; taken_out where git took out what it reads), which the rule card's words are chosen by	both
+findings.{id}.when	object	1b	contract 1.19 (nogloss-1, Nov 12 20:35 +08): model.rs first_result_day, the days the rule was written and its first counted result made, which the screens place in time	both
+findings.{id}.when.rule	string	1b	contract 1.19 (nogloss-1, Nov 12 20:35 +08): model.rs first_result_day, the days the rule was written and its first counted result made, which the screens place in time	both
+findings.{id}.when.results	string	1b	contract 1.19 (nogloss-1, Nov 12 20:35 +08): model.rs first_result_day, the days the rule was written and its first counted result made, which the screens place in time	both
+findings.{id}.chips	list	1b	contract 1.20 (mnav-1, Nov 13 01:00 +08): model.rs finding_chips, the states a reading carries in a few words, which the rule card draws under its Result	both
+findings.{id}.chips[]	object	1b	contract 1.20 (mnav-1, Nov 13 01:00 +08): model.rs finding_chips, the states a reading carries in a few words, which the rule card draws under its Result	both
+findings.{id}.chips[].kind	string	1b	contract 1.20 (mnav-1, Nov 13 01:00 +08): model.rs finding_chips, the states a reading carries in a few words, which the rule card draws under its Result	both
+findings.{id}.chips[].text	string	1b	contract 1.20 (mnav-1, Nov 13 01:00 +08): model.rs finding_chips, the states a reading carries in a few words, which the rule card draws under its Result	both
+findings.{id}.mixes	list	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ among the runs the reading counts, with how many runs hold each value and how rb reads it (arms_differ, pooled)	both
 findings.{id}.witness	object	WIT	WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards	both
 findings.{id}.witness.total	number	WIT	WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards	both
 findings.{id}.witness.afterwards	number	WIT	WITNESS: support.rs Witness, seen as_it_ran (rb saw it happen: its journal watched the command, or it was recorded within the hour of its output; a call not past; a note written here; a declaration) or afterwards (made before it was recorded or at a time nobody knows; a past call; read from a results folder; brought by a clone), with its basis code: the runs its reading rests on (an analysis's, through what it read) and how many were recorded afterwards	both
@@ -401,6 +535,13 @@ findings.{id}.verdict	string	P4B	model.rs verdict: the rule's one sentence (stat
 findings.{id}.tags	list	M6	at most two ontology tags	both
 findings.{id}.reads_baseline	bool	M6	it reads the baseline or control arm alone	both
 findings.{id}.pooled	string	M6	added under 1.11 (fix round 2), marked at 1.12: rb show's headline words for a reading that pools a per-run setting's values; empty where none	both
+findings.{id}.mixes[]	object	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ among the runs the reading counts, with how many runs hold each value and how rb reads it (arms_differ, pooled)	both
+findings.{id}.mixes[].setting	string	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ among the runs the reading counts, with how many runs hold each value and how rb reads it (arms_differ, pooled)	both
+findings.{id}.mixes[].values	list	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ among the runs the reading counts, with how many runs hold each value and how rb reads it (arms_differ, pooled)	both
+findings.{id}.mixes[].values[]	object	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ among the runs the reading counts, with how many runs hold each value and how rb reads it (arms_differ, pooled)	both
+findings.{id}.mixes[].values[].value	string	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ among the runs the reading counts, with how many runs hold each value and how rb reads it (arms_differ, pooled)	both
+findings.{id}.mixes[].values[].runs	number	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ among the runs the reading counts, with how many runs hold each value and how rb reads it (arms_differ, pooled)	both
+findings.{id}.mixes[].how	string	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ among the runs the reading counts, with how many runs hold each value and how rb reads it (arms_differ, pooled)	both
 findings.{id}.cited.path	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
 findings.{id}.cited.line	number	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
 findings.{id}.cited.locator	string	1b	the criterion's source: path, line, the quote as the file reads it, commit, sha256	both
@@ -561,6 +702,7 @@ experiments[].reproduce.settings.shared[].name	string	1c	new: reproduce.rs; reru
 experiments[].reproduce.settings.shared[].value	string	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.shared[].source	string	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.shared[].status	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.shared[].said	string	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.by_arm	object	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.by_arm.{key}	list	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.by_arm.{key}[]	object	1c	new: reproduce.rs; rerunnability today	both
@@ -568,6 +710,7 @@ experiments[].reproduce.settings.by_arm.{key}[].name	string	1c	new: reproduce.rs
 experiments[].reproduce.settings.by_arm.{key}[].value	string	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.by_arm.{key}[].source	string	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.by_arm.{key}[].status	string	1c	new: reproduce.rs; rerunnability today	both
+experiments[].reproduce.settings.by_arm.{key}[].said	string	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.unknown	list	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.unknown[]	string	1c	new: reproduce.rs; rerunnability today	both
 experiments[].reproduce.settings.counts	object	1c	new: reproduce.rs; rerunnability today	both
@@ -606,6 +749,13 @@ experiments[].amendments[].why	string	1b	the experiment's amendments[] after fro
 experiments[].amendments[].refs	list	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
 experiments[].amendments[].refs[]	string	1b	the experiment's amendments[] after frozen.at (unit_amended links here)	both
 experiments[].compares	string	M6	model.rs compares, arms labelled	both
+experiments[].mixes	list	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ across the experiment's standing runs, not its unit, a repeat index or a design factor, with how many runs hold each value	both
+experiments[].mixes[]	object	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ across the experiment's standing runs, not its unit, a repeat index or a design factor, with how many runs hold each value	both
+experiments[].mixes[].setting	string	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ across the experiment's standing runs, not its unit, a repeat index or a design factor, with how many runs hold each value	both
+experiments[].mixes[].values	list	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ across the experiment's standing runs, not its unit, a repeat index or a design factor, with how many runs hold each value	both
+experiments[].mixes[].values[]	object	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ across the experiment's standing runs, not its unit, a repeat index or a design factor, with how many runs hold each value	both
+experiments[].mixes[].values[].value	string	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ across the experiment's standing runs, not its unit, a repeat index or a design factor, with how many runs hold each value	both
+experiments[].mixes[].values[].runs	number	1b	rec-2 part 5 (owner, Nov 13 2026: the grader badge): model.rs mixes_among, each per-run setting whose words differ across the experiment's standing runs, not its unit, a repeat index or a design factor, with how many runs hold each value	both
 experiments[].gate_parts[]	list	today	ExperimentBrief	both
 experiments[].gate_parts[][]	string	today	ExperimentBrief	both
 experiments[].design.not_recorded[]	string	today	ExperimentBrief	both
@@ -692,6 +842,7 @@ runs.{id}.reproduce.settings.shared[].name	string	1c	new: reproduce.rs, the reci
 runs.{id}.reproduce.settings.shared[].value	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.shared[].source	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.shared[].status	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.shared[].said	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.by_arm	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.by_arm.{key}	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.by_arm.{key}[]	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
@@ -699,6 +850,7 @@ runs.{id}.reproduce.settings.by_arm.{key}[].name	string	1c	new: reproduce.rs, th
 runs.{id}.reproduce.settings.by_arm.{key}[].value	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.by_arm.{key}[].source	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.by_arm.{key}[].status	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
+runs.{id}.reproduce.settings.by_arm.{key}[].said	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.unknown	list	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.unknown[]	string	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
 runs.{id}.reproduce.settings.counts	object	1c	new: reproduce.rs, the recipe narrowed to the run (Reproduce this run)	both
@@ -759,6 +911,20 @@ resources.{id}.where_short[]	string	today	ResourceRow	live
 resources.{id}.identity	string	today	ResourceRow	both
 resources.{id}.exact	bool	today	ResourceRow	both
 resources.{id}.how	string	today	ResourceRow	both
+resources.{id}.said	string	RES	getit.rs said: where a reader gets it, in words, with its chips	both
+resources.{id}.get	object	RES	getit.rs get: {kind hf|url|repo|none, href, text}, from what the record holds, never fetched	both
+resources.{id}.get.kind	string	RES	getit.rs get: {kind hf|url|repo|none, href, text}, from what the record holds, never fetched	both
+resources.{id}.get.href	string	RES	getit.rs get: {kind hf|url|repo|none, href, text}, from what the record holds, never fetched	both
+resources.{id}.get.text	string	RES	getit.rs get: {kind hf|url|repo|none, href, text}, from what the record holds, never fetched	both
+resources.{id}.get.public	bool	RES	getit.rs get: {kind hf|url|repo|none, href, text}, from what the record holds, never fetched	both
+resources.{id}.cite	list	RES	getit.rs cite: what it comes from (a citation, a licence), as chips	both
+resources.{id}.asks	bool	RES	getit.rs asks: rb asks for a download link (the owner's Next step)	live
+resources.{id}.copies	list	RES	getit.rs: the local copies, each with whether it is here (copy_said)	live
+resources.{id}.copies[]	object	RES	getit.rs: the local copies, each with whether it is here (copy_said)	live
+resources.{id}.copies[].ref	string	RES	getit.rs: the local copies, each with whether it is here (copy_said)	live
+resources.{id}.copies[].state	string	RES	getit.rs: the local copies, each with whether it is here (copy_said)	live
+resources.{id}.copies[].outside	bool	RES	getit.rs: the local copies, each with whether it is here (copy_said)	live
+resources.{id}.copies[].said	string	RES	getit.rs: the local copies, each with whether it is here (copy_said)	live
 resources.{id}.acquisition	null|object	1c	computed on read from Acquisition.recipe	both
 resources.{id}.acquisition.command	string	1c	computed on read from Acquisition.recipe	both
 resources.{id}.acquisition.from	string	1c	computed on read from Acquisition.recipe	both
@@ -843,6 +1009,12 @@ checkout.fold[].text	string	1b	contract 1.15 (round 12): checkout.rs Checkout::t
 checkout.fold[].kind	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
 checkout.fold[].sha	string	1b	contract 1.15 (round 12): checkout.rs Checkout::to_value of the place shown, now, null at a past version; page_value (state, said, commit, line) on the Owner tier	live
 checkout.record_files	null|number	1b	contract 1.16 (round 13): checkout.rs add_page_facts, what About's block under line 2 says of the checkout (PARITY 9), on both tiers	both
+checkout.chip	object	1b	rec-2 part 2 (owner, Nov 13 2026: the git state as a header chip): checkout.rs chip, `ref` (the branch HEAD names), HEAD's commit and the record files git's status lists, by their paths from the repository's top; on both tiers	both
+checkout.chip.ref	string	1b	rec-2 part 2 (owner, Nov 13 2026: the git state as a header chip): checkout.rs chip, `ref` (the branch HEAD names), HEAD's commit and the record files git's status lists, by their paths from the repository's top; on both tiers	both
+checkout.chip.commit	string	1b	rec-2 part 2 (owner, Nov 13 2026: the git state as a header chip): checkout.rs chip, `ref` (the branch HEAD names), HEAD's commit and the record files git's status lists, by their paths from the repository's top; on both tiers	both
+checkout.chip.not_committed	number	1b	rec-2 part 2 (owner, Nov 13 2026: the git state as a header chip): checkout.rs chip, `ref` (the branch HEAD names), HEAD's commit and the record files git's status lists, by their paths from the repository's top; on both tiers	both
+checkout.chip.files	list	1b	rec-2 part 2 (owner, Nov 13 2026: the git state as a header chip): checkout.rs chip, `ref` (the branch HEAD names), HEAD's commit and the record files git's status lists, by their paths from the repository's top; on both tiers	both
+checkout.chip.files[]	string	1b	rec-2 part 2 (owner, Nov 13 2026: the git state as a header chip): checkout.rs chip, `ref` (the branch HEAD names), HEAD's commit and the record files git's status lists, by their paths from the repository's top; on both tiers	both
 checkout.not_committed_files	list	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
 checkout.not_committed_files[]	object	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
 checkout.not_committed_files[].path	string	1b	contract 1.16 (round 13): checkout.rs add_evidence, the evidence one step down from the words as your own screens say it (PARITY 10), Live only	live
@@ -949,6 +1121,27 @@ citations.{key}.cited_by	list	CITE	ledger/cite.rs of_document: the cited lines, 
 citations.{key}.cited_by[]	object	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
 citations.{key}.cited_by[].kind	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
 citations.{key}.cited_by[].id	string	CITE	ledger/cite.rs of_document: the cited lines, commit and sha256; a shared page quotes only what git tracks, no log or transcript	both
+files	list	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[]	object	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].path	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].folder	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].name	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].named	bool	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].marks	list	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].marks[]	object	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].marks[].key	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].marks[].glyph	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].marks[].ascii	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].marks[].n	null|number	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].marks[].said	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].cited_by	list	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].cited_by[]	object	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].cited_by[].kind	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].cited_by[].id	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].lines	list	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].lines[]	number	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].changed_since	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
+files[].git	string	1b	contract 1.19 (round 14, UX5 1.4): files.rs, the project's files with their marks, the Files tab and rb files; on a page only the files the record names	both
 places.scope_bar.line	string	4b	new	live
 places.scope_bar.back	string	4b	new	live
 places.scope_bar.href	string	4b	new	live

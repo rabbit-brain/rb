@@ -1236,7 +1236,8 @@ impl Ledger {
                     };
                 if !current {
                     gate.insert("undecided".into(), true);
-                    let why = if took.is_empty() { String::new() } else { format!("; {}", self.took_part("the call that settles it", &took)?) };
+                    let settles = if took.is_empty() { String::new() } else { self.took_part("the call that settles it", &took)? };
+                    let why = if settles.is_empty() { String::new() } else { format!("; {settles}") };
                     item(
                         &mut items,
                         "human",
@@ -1246,6 +1247,11 @@ impl Ledger {
                         &decide_do(&c.experiment, GATE_ACTIONS),
                         vec![],
                     );
+                    // what it rests on, apart, as every item says it: each screen's line for the call says it
+                    // (MP-1111-0952's F2)
+                    if let (false, Some(it)) = (settles.is_empty(), items.last_mut()) {
+                        it.insert("taken_out".into(), Value::Str(settles));
+                    }
                 }
             } else if f.rule_outcome == "misses" && claim && last.is_none() {
                 gate.insert("undecided".into(), true);
@@ -1756,6 +1762,16 @@ impl Ledger {
                 );
             }
         }
+        // a dataset, checkpoint or model with no way a reader gets it that rb can see: record where it is downloaded
+        if experiment.is_none() {
+            for res in &resources {
+                let get = crate::getit::get(self, res);
+                if crate::getit::asks(res, &get) {
+                    let (_, cmd) = crate::getit::ask_words(res);
+                    item(&mut items, "agent", "no_download_link", &res.id, &format!("record where {} can be downloaded (its URL or Hugging Face id) with rb", res.id), &cmd, vec![]);
+                }
+            }
+        }
         // a record with no question in a repository with work in it: the start protocol says how to record that work
         if experiment.is_none() && questions.is_empty() {
             if let Some(h) = crate::repo::history(&self.root) {
@@ -1933,11 +1949,15 @@ impl Ledger {
                     }
                 }
                 let Some(said) = said else { continue };
-                let what = it.get_str("what").unwrap_or("").to_string();
-                if !what.contains(&said) {
-                    it.insert("what".into(), Value::Str(format!("{what} · {said}")));
+                // an item that already says what git took out of what it rests on (a missed gate's settling call)
+                // keeps its own words
+                if it.get_str("taken_out").map_or(true, str::is_empty) {
+                    let what = it.get_str("what").unwrap_or("").to_string();
+                    if !what.contains(&said) {
+                        it.insert("what".into(), Value::Str(format!("{what} · {said}")));
+                    }
+                    it.insert("taken_out".into(), Value::Str(said));
                 }
-                it.insert("taken_out".into(), Value::Str(said));
                 // what rests on its own write, or a call on it, asks for that write back, never its own command; an
                 // item that asks for nothing keeps asking for nothing
                 if direct && it.get_str("do").map_or(false, |d| !d.is_empty()) {
@@ -2418,6 +2438,7 @@ pub fn open_head(code: &str) -> (&'static str, &'static str) {
         "unread_comparison" => "Comparisons the analyses report that no rule reads",
         "planned" => "Experiments nothing tests yet",
         "open_question" => "Questions with nothing filed under them",
+        "no_download_link" => "Resources with no download link recorded",
         "no_question" => "No question recorded yet",
         "reindex" => "Results folders changed since they were indexed",
         "unindexed_folder" => "Results not yet in any experiment",

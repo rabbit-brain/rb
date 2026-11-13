@@ -145,7 +145,7 @@ def test_a_rule_worked_out_in_python_is_said_as_it_was_meant(project, capsys):
     f = c2.finding()
     assert f.rule == c2.data.rule() == "int8.acc ≥ 0.65" and f.says["rule"] == "estimate meets criterion: estimate 0.65 ≥ 0.65"
     assert f.says["comparison"].startswith("int8.acc: 0.65 [0.6252, 0.6748] · ")
-    assert main(["show", c3.id]) == 0
+    assert main(["show", "--long", c3.id]) == 0
     shown = capsys.readouterr().out
     assert "0.64999" not in shown and " 0.65 (logged)" in shown
 
@@ -380,7 +380,7 @@ def test_every_research_command_has_an_mcp_tool_or_a_recorded_reason(mcp):
         "journal run": "command execution stays off the MCP surface; agents have their own shell",
         "clone": "like init, it creates a project where none exists; MCP serves an existing one",
         "fmt": "it rewrites the layout of Rabbit Brain YAML files and changes no content, so nothing is recorded; upkeep for the shell, like a code formatter",
-        "login": "the device flow shows a code and waits until someone approves it on the site; a tool call would block on that wait, so it runs in a shell",
+        "login": "it keeps a sign-in for this machine beside the credentials file, outside the record; it runs in a shell, where rb sync finishes it once the code is approved on the site",
         "logout": "it revokes and removes this machine's credential, the other half of login, and runs in a shell like it",
         "sync": "it uploads with the credential login stored on this machine, so it runs in the same shell; anyone may run it there",
         "env check": "it reads the machine it runs on; over MCP that is the agent's machine, and the CLI is its home",

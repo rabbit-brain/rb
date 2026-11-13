@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -103,7 +104,8 @@ def test_init_puts_a_session_hook_in_each_agent_s_project_file(repo):
         handler = handler.get("hooks", [handler])[0]
         assert handler["timeout"] == 10
     assert json.loads(cursor.read_text(encoding="utf-8"))["version"] == 1
-    assert items(codex, "Stop")[0]["hooks"][0]["commandWindows"] == "rb journal scan --hook codex"
+    windows = items(codex, "Stop")[0]["hooks"][0]["commandWindows"]
+    assert windows.startswith("# 2>nul || rb journal scan --hook codex 2>nul || "), windows
     assert "Codex runs it once it is trusted in /hooks" in said
     # no writer, no em dash in what rb says
     assert "—" not in said
@@ -238,22 +240,121 @@ def test_the_hook_finds_rb_where_uv_tool_puts_it_under_a_home_with_a_space(repo,
     assert seen and seen[0]["by"] == "agent:claude-code"
 
 
-def test_the_windows_forms_have_nothing_to_quote(repo):
-    """Where the hook may run in PowerShell or cmd (Codex's commandWindows, Cursor everywhere), it is one plain word
-    list, the same in every shell; the POSIX form quotes every path it builds from a variable."""
+def shells() -> list:
+    """The shells an agent may run rb's hook in here, each as the argv that runs one command line: a POSIX sh, then
+    PowerShell (pwsh, and Windows PowerShell where it is), then cmd on Windows."""
+    found = []
+    if shutil.which("sh"):
+        found.append(("sh", [shutil.which("sh"), "-c"]))
+    for ps in ("pwsh", "powershell"):
+        if shutil.which(ps):
+            found.append((ps, [shutil.which(ps), "-NoProfile", "-NonInteractive", "-Command"]))
+    return found
+
+
+def run_in(shell: list, command: str, cwd: Path, env: dict) -> subprocess.CompletedProcess:
+    if shell == ["cmd"]:
+        # cmd reads the whole line as given, as an agent hands it over: /s /c "<the command>"
+        line = f'cmd.exe /d /s /c "{command}"'
+        return subprocess.run(line, cwd=cwd, env=env, capture_output=True, text=True, timeout=60)
+    return subprocess.run([*shell, command], cwd=cwd, env=env, capture_output=True, text=True, timeout=60)
+
+
+# the command each agent's hook runs where it may run in PowerShell or cmd: Claude Code's and Cursor's command, Codex's
+# commandWindows
+WINDOWS_FORMS = {"claude-code": (".claude/settings.json", "Stop", "command"), "codex": (".codex/hooks.json", "Stop", "commandWindows"),
+                 "cursor": (".cursor/hooks.json", "stop", "command")}
+
+
+def windows_form(repo: Repo, name: str) -> str:
+    rel, event, key = WINDOWS_FORMS[name]
+    group = items(repo.root / rel, event)[0]
+    return group.get("hooks", [group])[0][key]
+
+
+@pytest.mark.parametrize("name", sorted(WINDOWS_FORMS))
+@pytest.mark.parametrize("where", ["path", "home", "nowhere"])
+def test_each_agent_s_hook_finds_rb_and_says_nothing_in_every_shell(repo, tmp_path, name, where):
+    """The command a hook runs where the agent may start it in PowerShell or cmd (Claude Code without Git Bash, Cursor
+    on Windows, Codex's commandWindows) runs in each shell found here, a POSIX sh, PowerShell and cmd: it finds rb on the
+    PATH, else where uv tool and pipx put it (~/.local/bin), looks once as the agent's, and with no rb anywhere exits 0
+    too; on every shell it prints nothing."""
+    if len(command()) > 1:
+        pytest.skip("rb runs through an interpreter here")
+    for d in (".claude", ".codex", ".cursor"):
+        (repo.root / d).mkdir()
+    exe = Path(shutil.which(command()[0]) or command()[0])
+    if where == "nowhere":
+        # on Windows the forms also try the rb that ran rb init, where it is in none of the places they try anyway: here
+        # that is a copy, taken away before the hook runs, so no rb is anywhere
+        installer = tmp_path / "installed from" / exe.name
+        installer.parent.mkdir()
+        shutil.copy2(exe, installer)
+        r = subprocess.run([str(installer), "init", "INT8 ResNet-50"], cwd=repo.root, env=repo.env, capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL)
+        assert r.returncode == 0, r.stderr
+        installer.unlink()
+    else:
+        repo.rb("init", "INT8 ResNet-50")
+    form = windows_form(repo, name)
+    if where == "nowhere" and sys.platform == "win32":
+        assert "installed from" in form, form
+    tools = tmp_path / "tools"   # what the shells need beside rb: git, which rb asks, and the shells themselves
+    tools.mkdir()
+    keep = [str(Path(shutil.which(p)).parent) for p in ("git", "sh", "pwsh", "powershell", "cmd") if shutil.which(p)]
+    if sys.platform == "win32":
+        keep.append(os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32"))
+    home = tmp_path / "Ana Lopez"
+    rb_dir = {"path": tmp_path / "on path", "home": home / ".local" / "bin", "nowhere": None}[where]
+    if rb_dir is not None:
+        rb_dir.mkdir(parents=True)
+        # on the PATH a POSIX shell and PowerShell both find `rb`; in ~/.local/bin PowerShell and cmd look for rb.exe,
+        # which is what uv tool puts there on Windows, and a POSIX shell for rb (Git Bash finds rb.exe as rb)
+        names = ["rb.exe"] if sys.platform == "win32" else (["rb"] if where == "path" else ["rb", "rb.exe"])
+        for n in names:
+            shutil.copy2(exe, rb_dir / n)
+        if where == "path":
+            keep.insert(0, str(rb_dir))
+    # no rb on the PATH but where the case puts it: the folders the tools sit in hold no rb of their own
+    assert where != "nowhere" or not any((Path(k) / n).exists() for k in keep for n in ("rb", "rb.exe")), keep
+    env = {**{k: v for k, v in repo.env.items() if k not in ("PATH", "Path")}, "PATH": os.pathsep.join(dict.fromkeys(keep)),
+           "HOME": str(home), "USERPROFILE": str(home), "CLAUDE_PROJECT_DIR": str(repo.root)}
+    runs = shells() + ([("cmd", ["cmd"])] if sys.platform == "win32" else [])
+    assert len(runs) >= (3 if sys.platform == "win32" else 1), runs
+    for k, (shell, argv) in enumerate(runs):
+        landed = repo.root / "out" / f"{shell}-{where}" / "metrics.json"
+        landed.parent.mkdir(parents=True)
+        landed.write_text('{"int8": {"top1": 75.4}}\n', encoding="utf-8")
+        r = run_in(argv, form, repo.root, env)
+        assert (r.returncode, r.stdout, r.stderr) == (0, "", ""), (shell, r)
+        seen = [e for e in repo.journal() if e.get("path") == landed.relative_to(repo.root).as_posix()]
+        if where == "nowhere":
+            assert not seen, (shell, seen)
+        else:
+            assert seen and seen[0]["by"] == f"agent:{name}", (shell, seen)
+
+
+def test_the_forms_a_shell_reads_apart_stay_apart(repo):
+    """The command every shell reads is cmd's line, then the line a POSIX shell and PowerShell share: cmd's tries each
+    quiet, ending in `(call )` (0); PowerShell's part holds no double quote, which a program that starts PowerShell may
+    drop; the POSIX part holds nothing that ends PowerShell's block comment early; every path built from a variable is
+    quoted."""
     for d in (".claude", ".codex", ".cursor"):
         (repo.root / d).mkdir()
     repo.rb("init", "INT8 ResNet-50")
-    plain = [items(repo.root / ".codex/hooks.json", "Stop")[0]["hooks"][0]["commandWindows"],
-             items(repo.root / ".cursor/hooks.json", "stop")[0]["command"]]
-    # Cursor's runs in PowerShell on Windows and a POSIX shell elsewhere: `; exit 0` reads the same in both
-    assert plain == ["rb journal scan --hook codex", "rb journal scan --hook cursor; exit 0"]
-    for p in plain:
-        assert all(ch.isalnum() or ch in " -;" for ch in p), p
-    for cmd in (sh_command(repo), items(repo.root / ".codex/hooks.json", "Stop")[0]["hooks"][0]["command"]):
+    for name in WINDOWS_FORMS:
+        form = windows_form(repo, name)
+        cmd_line, rest = form.split("\n")
+        assert cmd_line.startswith("# 2>nul || rb journal scan --hook ") and cmd_line.endswith(" 2>nul || (call )"), cmd_line
+        assert "'" not in cmd_line
+        posix, ps = rest.split(" #> ")
+        assert posix.startswith("echo `# <#` >/dev/null; ") and "#>" not in posix
+        assert '"' not in ps and ps.endswith("; exit 0"), ps
         for var in ("$HOME", "$CLAUDE_PROJECT_DIR", "$(git"):
-            if var in cmd:
-                assert f'"{var}' in cmd, (var, cmd)
+            if var in posix:
+                assert f'"{var}' in posix, (var, posix)
+    codex = items(repo.root / ".codex/hooks.json", "Stop")[0]["hooks"][0]["command"]
+    assert codex.endswith("/.venv/Scripts/rb\" journal scan --hook codex >/dev/null 2>&1 || true"), codex
 
 
 def test_the_look_is_the_agent_s_observation_and_tells_the_session_nothing(repo):
@@ -264,7 +365,7 @@ def test_the_look_is_the_agent_s_observation_and_tells_the_session_nothing(repo)
     log = (repo.root / ".rb" / "log.jsonl").read_bytes()
     session = {"CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "sess-hooks-4b1d"}
     # the session's first command: what is outstanding is told then, and remembered as told
-    repo.run("status", env=session)
+    repo.run("status", "--full", env=session)
     (repo.root / "out" / "seed1").mkdir(parents=True)
     (repo.root / "out" / "seed1" / "metrics.json").write_text('{"int8": {"top1": 75.4}}\n', encoding="utf-8")
     # someone else writes to the record: a fact the session has not been told
@@ -298,14 +399,14 @@ def test_a_repository_holding_only_what_rb_installs_has_no_work_before_the_recor
     repo.rb("init", "INT8 ResNet-50")
     repo.git("add", "-A")
     repo.git("-c", "commit.gpgsign=false", "commit", "-qm", "rb init")
-    data = repo.rb("status")
+    data = repo.rb("status", "--full")
     codes = [i["code"] for i in data["open"]]
     assert "no_question" not in codes, codes
     # a commit of anything else is work, and asks for the start protocol: the check reads commits
     (repo.root / "train.py").write_text("lr = 0.1\n", encoding="utf-8")
     repo.git("add", "-A")
     repo.git("-c", "commit.gpgsign=false", "commit", "-qm", "the training script")
-    assert "no_question" in [i["code"] for i in repo.rb("status")["open"]]
+    assert "no_question" in [i["code"] for i in repo.rb("status", "--full")["open"]]
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the lock is held here with fcntl")
@@ -388,20 +489,39 @@ AGENTS = {
 }
 
 
-def earlier(command: str) -> str:
-    """The command the first rb that wrote a session hook put there: each POSIX try quiet on stderr alone, and Cursor's
-    with no `exit 0` after it."""
-    return command.replace(" >/dev/null 2>&1", " 2>/dev/null").replace("; exit 0", "")
+def earlier(command: str, form: str = "first") -> str:
+    """The command an earlier rb put where today's `command` is: the first rb that wrote a session hook (0.6.2) tried rb
+    on the PATH, ~/.local/bin and the project's .venv/bin, each quiet on stderr alone, and gave Codex's commandWindows
+    and Cursor's command rb on the PATH alone; 0.6.3 to 0.8.5 ("before") quieted both streams and put `; exit 0` after
+    Cursor's. Neither tried the Windows venv's Scripts, nor read in PowerShell or cmd."""
+    name = re.search(r"--hook ([a-z-]+)", command).group(1)
+    windows = command.startswith("# 2>nul || ")
+    if name == "cursor":
+        return "rb journal scan --hook cursor" + ("; exit 0" if form == "before" else "")
+    if name == "codex" and windows:
+        return "rb journal scan --hook codex"
+    top = "$CLAUDE_PROJECT_DIR" if name == "claude-code" else "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    quiet = ">/dev/null 2>&1" if form == "before" else "2>/dev/null"
+    tries = ["rb", '"$HOME/.local/bin/rb"', f'"{top}/.venv/bin/rb"']
+    return " || ".join(f"{t} journal scan --hook {name} {quiet}" for t in tries) + " || true"
 
 
-def to_earlier(path: Path) -> str:
+def earlier_handler(handler: dict, form: str = "first") -> None:
+    """A handler of rb's, today's, made the earlier rb's in place: every command in it."""
+    for k in ("command", "commandWindows"):
+        if k in handler:
+            handler[k] = earlier(handler[k], form)
+
+
+def to_earlier(path: Path, form: str = "first") -> str:
     """The file with each of rb's handlers in the earlier form, by its own bytes; returns the file as it was."""
     text = path.read_text(encoding="utf-8")
-    cmds = {c for e in json.loads(text)["hooks"].values() for c in rb_commands(e) if "journal scan --hook" in c}
+    cmds = {c for e in json.loads(text)["hooks"].values() for group in e for h in group.get("hooks", [group])
+            for c in (h.get("command"), h.get("commandWindows")) if c and "journal scan --hook" in c}
     was = text
     for c in cmds:
-        assert earlier(c) != c
-        was = was.replace(json.dumps(c), json.dumps(earlier(c)))
+        assert earlier(c, form) != c
+        was = was.replace(json.dumps(c), json.dumps(earlier(c, form)))
     path.write_text(was, encoding="utf-8")
     return text
 
@@ -429,14 +549,15 @@ def setup_agent(repo: Repo, agent: str, theirs: bool) -> tuple[Path, tuple, list
 
 @pytest.mark.parametrize("agent", sorted(AGENTS))
 @pytest.mark.parametrize("theirs", [True, False], ids=["file-was-there", "file-rb-made"])
-def test_an_upgrade_brings_rb_s_earlier_handler_up_to_date_in_place(repo, agent, theirs):
+@pytest.mark.parametrize("form", ["first", "before"])
+def test_an_upgrade_brings_rb_s_earlier_handler_up_to_date_in_place(repo, agent, theirs, form):
     """An earlier rb wrote its handler (in a file that was there, or one it made); this rb's skill add puts today's in
     its place, one handler under each event, and changes no other byte. The ledger reads it as rb's: rb remove takes it
     out, and the file goes back to what it was before any rb (or goes, where rb made it)."""
     path, events, flags = setup_agent(repo, agent, theirs)
     before = path.read_bytes() if theirs else None
     repo.rb("init", "INT8 ResNet-50", "--yes")
-    today = to_earlier(path)
+    today = to_earlier(path, form)
     as_an_earlier_rb_left_it(repo, path)
     r = repo.run("skill", "add", *flags, "--yes")
     assert r.returncode == 0, r.stderr
@@ -527,7 +648,7 @@ def beside(path: Path, events: tuple, agent: str) -> None:
     for e in events:
         old = json.loads(json.dumps(cfg["hooks"][e][0]))
         handler = old if agent == "cursor" else old["hooks"][0]
-        handler["command"] = earlier(handler["command"])
+        earlier_handler(handler)
         cfg["hooks"][e].append(old)
     path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
 
@@ -637,7 +758,7 @@ def test_a_cut_handler_comes_back_at_its_place_in_the_team_s_order(repo, agent):
         (today,) = cfg["hooks"][e]
         old = json.loads(json.dumps(today))
         handler = old if agent == "cursor" else old["hooks"][0]
-        handler["command"] = earlier(handler["command"])
+        earlier_handler(handler)
         cfg["hooks"][e] = [old, their_handler(agent), today]
     path = repo.root / rel
     path.parent.mkdir()
@@ -696,7 +817,7 @@ def test_a_cut_handler_the_user_put_back_beside_rb_s_comes_back_at_its_place(rep
         (today,) = cfg["hooks"][e]
         old[e] = json.loads(json.dumps(today))
         handler = old[e] if agent == "cursor" else old[e]["hooks"][0]
-        handler["command"] = earlier(handler["command"])
+        earlier_handler(handler)
         cfg["hooks"][e] = [old[e], their_handler(agent), today]
     path = repo.root / rel
     path.parent.mkdir()
@@ -735,7 +856,7 @@ def clone_with(repo: Repo, agent: str, order) -> tuple[Path, tuple, list, dict, 
         (today,) = cfg["hooks"][e]
         old[e] = json.loads(json.dumps(today))
         handler = old[e] if agent == "cursor" else old[e]["hooks"][0]
-        handler["command"] = earlier(handler["command"])
+        earlier_handler(handler)
         cfg["hooks"][e] = [{"old": old[e], "theirs": their_handler(agent), "today": today}[x] for x in order]
     path = repo.root / rel
     path.parent.mkdir()

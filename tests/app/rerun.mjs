@@ -18,7 +18,7 @@
 // The last line on stdout is JSON: {"ok", "checks": [{"name", "pass", "detail"}]}; exit 0, 1 on a failed check, 3 with
 // no Chrome.
 import { readFileSync } from 'node:fs';
-import { findChrome, launchChrome, parseArgs, progress, run, sleep } from './cdp.mjs';
+import { findChrome, launchChrome, onTheClipboard, parseArgs, progress, run, sleep } from './cdp.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 if (!a.none || !a.meta || !a.expect) { process.stderr.write('give --none, --meta and --expect\n'); process.exit(2); }
@@ -122,7 +122,8 @@ await run(async () => {
     // at 390 the bar has no room for it, and inside the hub (want.bar false) the page's own bar is folded away: the
     // Overview's Reproduce place offers it there
     const inBar = w >= 640 && want.bar !== false;
-    const OPENER = inBar ? `document.querySelector('header a[href="#rerun"]')` : `document.querySelector('#overview a.rrov[href="#rerun"]')`;
+    // (the Overview's own opener is the link under its title since UX5 1.2: its Reproduce place is History's now)
+    const OPENER = inBar ? `document.querySelector('header a[href="#rerun"]')` : `document.querySelector('#overview > p.rrhd > a[href="#rerun"]')`;
     check(`rerun: with the rb-clone meta the bar and the Overview offer it, the panel closed [${at}]`, (inBar ? s0.bar : !s0.bar) && s0.ov && s0.dialog && !s0.open && !s0.panel && s0.fills.every(f => !f.includes('‹')), j(s0));
     await p.clickEl(OPENER);
     const s1 = await p.ev(SHOWN);
@@ -155,7 +156,7 @@ await run(async () => {
     let real = null; try { real = await p.ev(`navigator.clipboard.readText()`); } catch {}
     const said1 = await p.ev(`(() => { const r = document.querySelector('dialog.rerundlg [aria-live]'); return r ? r.textContent : null; })()`);
     check(`rerun: Copied is said aloud from inside the open panel [${at}]`, said1 === 'Copied', j(said1));
-    check(`rerun: Copy prompt puts the exact prompt on the clipboard and says Copied [${at}]`, c1.length === 1 && c1[0] === want.prompt + '\n' && l1 === 'Copied' && (real === null || typeof real !== 'string' || real === c1[0]), j({ c1, l1, real: typeof real === 'string' ? real.slice(0, 80) : real }));
+    check(`rerun: Copy prompt puts the exact prompt on the clipboard and says Copied [${at}]`, c1.length === 1 && c1[0] === want.prompt + '\n' && l1 === 'Copied' && (real === null || typeof real !== 'string' || real === onTheClipboard(c1[0])), j({ c1, l1, real: typeof real === 'string' ? real.slice(0, 80) : real }));
     await sleep(1300);
     const l15 = await p.ev(LABEL('#rerun [data-copybtn="rerun-prompt"] .cp'));
     await sleep(900);
@@ -181,7 +182,7 @@ await run(async () => {
     const s2 = await p.ev(SHOWN);
     check(`rerun: Esc closes the panel and focus goes back to the link [${at}]`, !s2.open && /\brrb\b/.test(s2.focus || ''), j(s2));
     // the Overview's link opens it; Close closes it; a click outside closes it
-    await p.clickEl(`document.querySelector('#overview a.rrov[href="#rerun"]')`);
+    await p.clickEl(`document.querySelector('#overview > p.rrhd > a[href="#rerun"]')`);
     const s3 = await p.ev(SHOWN);
     await p.clickEl(`document.querySelector('dialog.rerundlg .rerun-x')`);
     const s4 = await p.ev(SHOWN);
@@ -332,7 +333,7 @@ await run(async () => {
       const focus = await ask('focus');
       check(`rerun: in the hub's sandboxed frame focus stays on Copy prompt after it copies [${w}]`, /^cp\b.*\b(Copy prompt|Copied)$/.test(focus || ''), j(focus));
       let clip = null; try { clip = await p.ev(`navigator.clipboard.readText()`); } catch {}
-      check(`rerun: in the hub's sandboxed frame Copy prompt copies the prompt itself [${w}]`, label === 'Copied' && clip === want.prompt + '\n', j({ label, clip: typeof clip === 'string' ? clip.slice(0, 80) : clip, r }));
+      check(`rerun: in the hub's sandboxed frame Copy prompt copies the prompt itself [${w}]`, label === 'Copied' && clip === onTheClipboard(want.prompt + '\n'), j({ label, clip: typeof clip === 'string' ? clip.slice(0, 80) : clip, r }));
     }
   }
   if (a.framednone) {

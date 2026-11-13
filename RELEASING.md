@@ -6,7 +6,7 @@ A version tag on a reviewed commit releases that commit. [publish.yml](.github/w
 
 - Set the version in `pyproject.toml`, `src/rabbit_brain/__init__.py` and `rust/src/lib.rs`, and the matching Rust version in `rust/Cargo.toml` and its package entry in `rust/Cargo.lock` (`0.6.0-dev.0` for `0.6.0.dev0`). The workflow stops when the tag and the version differ.
 - Date the version's `CHANGELOG.md` entry, as `## 0.6.0 (2026-10-20)`; the workflow stops at an undated one. Check the README, the manual and the guides against what the version does.
-- Run the checks in [CONTRIBUTING.md](CONTRIBUTING.md), and keep the passing CI and native wheel runs for the exact commit you tag.
+- Run the checks in [CONTRIBUTING.md](CONTRIBUTING.md), and keep the passing release check (tests.yml's `release-check` job, Windows and macOS) and native wheel runs for the exact commit you tag.
 - The workflows run every action at a commit, with its version in a comment beside it, and the wheel builder at a fixed maturin version. Move one on purpose: its new commit and version together, then a native wheel run.
 
 ## What the workflow needs
@@ -23,7 +23,7 @@ A version tag on a reviewed commit releases that commit. [publish.yml](.github/w
 Create `v<version>` on the reviewed commit, with the exact package version (a prerelease suffix included), and push that one tag. The publish workflow then:
 
 1. Builds five native wheels and the source distribution.
-2. Checks the tag against the package and binary versions, checks the package metadata, installs the built Linux and Windows wheels, and runs `rb version`, `rabbit-brain version` and a short set of tests that drive the installed rb end to end (`WHEEL_TESTS` in publish.yml), the page rb page writes among them. Each check stops after 20 minutes. They prove the wheels install and run, not the whole of rb: the full suites run in [tests.yml](.github/workflows/tests.yml), on every push to `main` and every pull request, and on our own machines, before the tag. The publish workflow does not wait for tests.yml, so tag a commit whose tests.yml run passed (Before tagging).
+2. Checks the tag against the package and binary versions, checks the package metadata, installs the built Linux and Windows wheels, and runs `rb version`, `rabbit-brain version` and a short set of tests that drive the installed rb end to end (`WHEEL_TESTS` in publish.yml), the page rb page writes among them. Each check stops after 20 minutes. They prove the wheels install and run, not the whole of rb. [tests.yml](.github/workflows/tests.yml) runs its release check on every push to `main` and every pull request: rb built on Windows and macOS and the tests of what differs there, in about 15 minutes; the full suites run on our own machines before the tag, and in tests.yml after it, daily and by hand. The publish workflow does not wait for tests.yml, so tag a commit whose release check passed (Before tagging).
 3. Checks that the build carries its analytics destination. In a job of its own, which installs nothing and is the only one to receive the release denylist, it runs the content check's own tests, then checks the committed files and every built file against the denylist. It stops after 20 minutes too.
 4. Publishes to PyPI through the trusted publisher once both test jobs and the content check pass.
 5. Attaches the same files, `SHA256SUMS` and `THIRD-PARTY-NOTICES` (the licenses of the crates built into rb) to the GitHub release. Development, alpha, beta and release-candidate versions are marked as prereleases.

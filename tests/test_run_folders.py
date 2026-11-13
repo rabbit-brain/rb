@@ -126,11 +126,11 @@ def test_the_printed_line_records_a_run_with_its_command_logged_and_recorded_aft
     added = rb(*shlex.split(line)[1:])
     run = added.data["object"]
     assert run["receipt"]["produced"]["commit"] == COMMIT
-    shown = rb("show", run["id"])
+    shown = rb("show", "--long", run["id"])
     assert shown.data["command"]["given"] == "logged"                  # the folded command is the log line it cites
     assert shown.data["made_before_recorded"] is True                  # recorded afterwards, as every run reconcile reads is
     assert "the code had uncommitted changes when it ran" in shown.data["config_dirty"]
-    code, out = rb("show", run["id"], text=True)
+    code, out = rb("show", "--long", run["id"], text=True)
     assert "results/r03_int8_s2/config.yaml:4 says dirty: true: the code had uncommitted changes when it ran" in out
 
 
@@ -152,7 +152,7 @@ def test_command_source_takes_a_command_yaml_folds_over_two_lines(rb):
     cmd = "python eval.py --precision fp32 --seed 1 --out results/r01_fp32_s1 --images 50000 --batch-size 256"
     env = rb("run", "add", "int8", "--from", "results/r01_fp32_s1/metrics.json", "--variant", "fp32", "--command", cmd,
              "--command-source", "results/r01_fp32_s1/config.yaml:1", "--produced-at", "2026-05-01T11:00:00Z")
-    assert rb("show", env.data["object"]["id"]).data["command"]["given"] == "logged"
+    assert rb("show", "--long", env.data["object"]["id"]).data["command"]["given"] == "logged"
     bad = rb("run", "add", "int8", "--from", "results/r02_int8_s1/metrics.json", "--variant", "int8", "--command", cmd + " --extra",
              "--command-source", "results/r02_int8_s1/config.yaml:1", ok=False)
     assert not bad.ok and bad.errors[0].code == "E_SOURCE_UNRESOLVED"
@@ -200,10 +200,10 @@ def test_a_recorded_folder_says_its_run_and_a_dirty_run_reads_on_what_it_takes(r
              "--produced-at", "2026-05-02T11:00:00Z").data["object"]["id"]
     folders = {r["folder"]: r for r in rb("reconcile").data["run_folders"]}
     assert folders["results/r03_int8_s2/"]["recorded_as"] == run and folders["results/r01_fp32_s1/"]["recorded_as"] is None
-    code, out = rb("show", "int8", text=True)
+    code, out = rb("show", "--long", "int8", text=True)
     assert "config says the code had uncommitted changes when it ran" in out
     Path(rb.root, "results/r03_int8_s2/config.yaml").write_text("command: edited\n", encoding="utf-8")
-    code, out = rb("show", run, text=True)
+    code, out = rb("show", "--long", run, text=True)
     assert "results/r03_int8_s2/config.yaml changed since the run was recorded" in out and "uncommitted changes when it ran" not in out
 
 
@@ -224,7 +224,7 @@ def test_the_printed_line_pasted_as_it_is_records_the_run_on_its_variant(rb):
     run = rb(*shlex.split(line)[1:]).data["object"]
     assert run["metrics"] == {"int8.top1": 75.6} and run["per_run"] == {"seed": 1}
     rb(*shlex.split(lines["results/r01_fp32_s1/"])[1:])
-    assert rb("show", crit).data["finding"]["rule_outcome"] != "untested"
+    assert rb("show", "--long", crit).data["finding"]["rule_outcome"] != "untested"
 
 
 def test_a_run_that_names_no_variant_is_refused_where_variants_are_compared(rb):
@@ -254,9 +254,9 @@ def test_a_dirty_run_reaches_the_rules_that_read_it_on_the_terminal_and_the_page
     rb("run", "add", "int8", "--from", "results/r01_fp32_s1/metrics.json", "--variant", "fp32", "--config", "results/r01_fp32_s1/config.yaml",
        "--produced-at", "2026-05-01T11:00:00Z")
     said = f"{run}: results/r03_int8_s2/config.yaml:4 says dirty: true: the code had uncommitted changes when it ran"
-    notes = {c["code"]: c["text"] for c in rb("show", crit).data["finding"]["caveats"]}
+    notes = {c["code"]: c["text"] for c in rb("show", "--long", crit).data["finding"]["caveats"]}
     assert notes.get("uncommitted_code") == said, notes
-    code, out = rb("show", crit, text=True)
+    code, out = rb("show", "--long", crit, text=True)
     assert said in out
     rb("page", "--out", "page.html")
     page = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", Path(rb.root, "page.html").read_text(encoding="utf-8"))).split())

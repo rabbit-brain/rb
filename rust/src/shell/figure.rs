@@ -6,9 +6,9 @@
 use crate::shell::nodes;
 use crate::value::Value;
 
-/// The figure of a finding's reading, with rb's legend line under it when `legend` is true; nothing where the reading
-/// has no number to place.
-pub fn draw(f: &Value, legend: bool) -> String {
+/// The figure of a finding's reading, with no legend: its marks sit on an axis with the rule's number and 0, and the
+/// card says the numbers beside it; nothing where the reading has no number to place.
+pub fn draw(f: &Value) -> String {
     let num = |key: &str| at(f, key).and_then(Value::as_f64).filter(|v| v.is_finite());
     let (est, lo, hi) = (num("reading.estimate"), num("reading.lo"), num("reading.hi"));
     let cells: Vec<(String, f64, bool)> = list(f, "design_cells")
@@ -146,15 +146,6 @@ pub fn draw(f: &Value, legend: bool) -> String {
             ));
         }
     }
-    let shaded = if band.is_some() { "shaded: what the rule accepts \u{b7} " } else { "" };
-    let leg = if !cells.is_empty() {
-        let tick = if est.is_some() { " \u{b7} tick: the estimate" } else { "" };
-        format!("{shaded}dots: design cells \u{b7} filled: a cell outside the rule{tick}")
-    } else if lo.is_some() && hi.is_some() {
-        format!("{shaded}dot: estimate \u{b7} bar: interval")
-    } else {
-        format!("{shaded}dot: estimate (no interval)")
-    };
     // what each mark is, in words beside the SVG, where a reader and a screen reader both get it: no raw-text element
     // (a title) goes inside the SVG, which the hub's gate refuses. A reading's estimate and interval are on its card
     // already; across cells, each cell's key and value, and rb's estimate where it gives one, are said here.
@@ -185,11 +176,10 @@ pub fn draw(f: &Value, legend: bool) -> String {
     // the rule's verdict, in the one sentence the card says it in (FIX2): never rb's rule line
     let aria = nodes::sentence_text(&nodes::verdict(f));
     format!(
-        "<div class=\"figw\"><svg class=\"fig\" viewBox=\"0 0 {W} {}\" role=\"img\" aria-label=\"{}\">{}</svg>{values}{}</div>",
+        "<div class=\"figw\"><svg class=\"fig\" viewBox=\"0 0 {W} {}\" role=\"img\" aria-label=\"{}\">{}</svg>{values}</div>",
         58.0 + top,
         esc(&aria),
         p.concat(),
-        if legend { format!("<p class=\"figleg\">{leg}</p>") } else { String::new() }
     )
 }
 
@@ -223,6 +213,62 @@ impl Band {
             _ => None,
         }
     }
+}
+
+/// The rule's number as the card's Result says it beside rb's (the UX lead's card, Nov 13): a cited number as what was
+/// claimed ("Claimed", "3.6 points"), else the rule's side and number ("Rule", "≥ 5 points"); none where the figure
+/// draws no band.
+pub fn claim(f: &Value) -> Option<(&'static str, String)> {
+    let b = Band::of(f)?;
+    let said = |v: f64| nodes::rule_number_said(f, v);
+    // a cited number is claimed as it; a cited ordering ("at least 0") is claimed as its side
+    if at(f, "cited").is_some() {
+        return Some(match b.side {
+            Side::AtLeast => ("Claimed", format!("\u{2265} {}", said(b.tick))),
+            Side::AtMost => ("Claimed", format!("\u{2264} {}", said(b.tick))),
+            Side::Within(_) => ("Claimed", said(b.tick)),
+        });
+    }
+    Some(match b.side {
+        Side::AtLeast => ("Rule", format!("\u{2265} {}", said(b.tick))),
+        Side::AtMost => ("Rule", format!("\u{2264} {}", said(b.tick))),
+        Side::Within(e) => ("Rule", format!("{} \u{b1} {}", said(b.tick), said(e))),
+    })
+}
+
+/// The rule's target as a small band for the card's Rule part: what passes shaded, the target a tick, the band's ends
+/// and the target said under it ("3.55", "3.6", "3.65"); a one-sided rule shades from its number on. Nothing where the
+/// rule has no band.
+pub fn target_band(f: &Value) -> String {
+    let Some(b) = Band::of(f) else { return String::new() };
+    let said = |v: f64| nodes::fixed(v, nodes::digits(v), false);
+    let (w, x0, x1) = (240.0, 30.0, 210.0);
+    let (rect, marks): (String, Vec<(f64, String)>) = match b.side {
+        Side::Within(e) if e > 0.0 => (
+            format!("<rect class=\"rg\" x=\"{x0}\" y=\"6\" width=\"{}\" height=\"16\" rx=\"3\"/>", x1 - x0),
+            vec![(x0, said(b.lo)), ((x0 + x1) / 2.0, said(b.tick)), (x1, said(b.hi))],
+        ),
+        Side::Within(_) => (String::new(), vec![((x0 + x1) / 2.0, said(b.tick))]),
+        Side::AtLeast => (format!("<rect class=\"rg\" x=\"{}\" y=\"6\" width=\"{}\" height=\"16\" rx=\"3\"/>", (x0 + x1) / 2.0, w - (x0 + x1) / 2.0 - 4.0), vec![((x0 + x1) / 2.0, said(b.tick))]),
+        Side::AtMost => (format!("<rect class=\"rg\" x=\"4\" y=\"6\" width=\"{}\" height=\"16\" rx=\"3\"/>", (x0 + x1) / 2.0 - 4.0), vec![((x0 + x1) / 2.0, said(b.tick))]),
+    };
+    // a one-sided rule on a difference is set against 0, where "no difference" is
+    let mut marks = marks;
+    if nodes::compared(f) && b.tick != 0.0 && !matches!(b.side, Side::Within(_)) {
+        let zx = match b.side {
+            Side::AtLeast if b.tick > 0.0 => x0,
+            Side::AtMost if b.tick < 0.0 => x1,
+            Side::AtLeast => x1,
+            _ => x0,
+        };
+        marks.push((zx, "0".to_string()));
+    }
+    let mut p = vec![rect, format!("<line class=\"ax\" x1=\"4\" y1=\"22\" x2=\"{}\" y2=\"22\"/>", w - 4.0)];
+    for (x, t) in &marks {
+        p.push(format!("<line class=\"tk\" x1=\"{x:.1}\" y1=\"4\" x2=\"{x:.1}\" y2=\"26\"/>"));
+        p.push(format!("<text x=\"{x:.1}\" y=\"38\" text-anchor=\"middle\">{}</text>", esc(t)));
+    }
+    format!("<svg class=\"tband\" viewBox=\"0 0 {w} 42\" width=\"{w}\" height=\"42\" role=\"img\" aria-label=\"{}\">{}</svg>", esc(&claim(f).map(|c| c.1).unwrap_or_default()), p.join(""))
 }
 
 fn at<'a>(v: &'a Value, key: &str) -> Option<&'a Value> {
@@ -274,24 +320,24 @@ mod tests {
     /// interval; the interval's bar spans lo to hi with the estimate inside, in that order on the axis.
     #[test]
     fn the_band_is_what_the_rule_accepts() {
-        let svg = draw(&finding("c1"), true);
+        let svg = draw(&finding("c1"));
         let band = xs(&svg, "rg");
         let iv = xs(&svg, "iv");
         let est = xs(&svg, "est");
         assert_eq!((band.len(), iv.len(), est.len()), (2, 2, 1), "{svg}");
         assert!(band[0] < iv[0] && iv[0] < est[0] && est[0] < iv[1] && iv[1] <= band[1], "{band:?} {iv:?} {est:?}");
         // the figure is described by the card's own status sentence, never rb's rule line (DESIGN-PASS-1 P8)
-        assert!(svg.contains("aria-label=\"Met: INT8 is 0.0029 lower than the FP32 baseline (-0.0046 to -0.0012), 0.0071 past the -0.01 it asks for.\""), "{svg}");
+        assert!(svg.contains("aria-label=\"Holds: INT8 is 0.0029 lower than the FP32 baseline (-0.0046 to -0.0012), 0.0071 past the -0.01 it asks for.\""), "{svg}");
         // the axis says the rule's number and 0, the shaded part what the rule is, the dot its value (plain words pass 4)
         assert!(svg.contains(">the rule: -0.01 or more</text>") && svg.contains(">-0.01</text>") && svg.contains(">0</text>"), "{svg}");
         assert!(svg.contains("class=\"k\"") && svg.contains(">-0.0029</text>"), "{svg}");
-        assert!(svg.contains("shaded: what the rule accepts \u{b7} dot: estimate \u{b7} bar: interval"));
+        // no legend: the marks sit on the axis with their numbers (no glossary, show instead)
+        assert!(!svg.contains("figleg") && !svg.contains("dot: estimate"), "{svg}");
         // c6, "at most 0.6" with its one run above it: the band ends at the target, left of the estimate, and no bar
-        let svg = draw(&finding("c6"), true);
+        let svg = draw(&finding("c6"));
         assert!(xs(&svg, "rg")[1] < xs(&svg, "est")[0] && xs(&svg, "iv").is_empty(), "{svg}");
-        assert!(svg.contains("dot: estimate (no interval)"));
         // c2, "within 0.001 of 0.7613": a band around the target, the estimate outside it
-        let svg = draw(&finding("c2"), false);
+        let svg = draw(&finding("c2"));
         let (band, est) = (xs(&svg, "rg"), xs(&svg, "est")[0]);
         assert!(est < band[0], "{svg}");
         assert_eq!(xs(&svg, "rge").len(), 4, "both edges dashed");
@@ -308,7 +354,7 @@ mod tests {
             band.insert("comparator".into(), Value::str(cmp));
             band.insert("target".into(), Value::Float(target));
             band.insert("tolerance".into(), tol.map_or(Value::Null, Value::Float));
-            let svg = draw(&f, false);
+            let svg = draw(&f);
             assert!(svg.contains(&format!(">{label}</text>")) && svg.contains(&format!(">{}</text>", nodes::fixed(target, nodes::digits(target), false))), "{label}: {svg}");
             // every label stays inside the figure
             for el in svg.split("<text ").skip(1) {
@@ -317,13 +363,13 @@ mod tests {
             }
         }
         // c2 reads a level, fp32's own top1: no 0 on its axis
-        assert!(!draw(&finding("c2"), false).contains(">0</text>"));
+        assert!(!draw(&finding("c2")).contains(">0</text>"));
     }
 
     /// Across design cells: a dot per cell, the one outside the rule filled and named, a tick at the mean.
     #[test]
     fn design_cells_are_dots_and_the_one_outside_is_named() {
-        let svg = draw(&finding("c5"), true);
+        let svg = draw(&finding("c5"));
         assert_eq!(svg.matches("class=\"cell\"").count(), 3, "{svg}");
         assert_eq!(svg.matches("class=\"cell out\"").count(), 1);
         // in words, never rb's key (DESIGN-PASS-1 P8)
@@ -331,7 +377,7 @@ mod tests {
         // each cell's key and value, beside the SVG, the one outside the rule said so, the values in digits said alike
         let beside = svg.split("</svg>").nth(1).unwrap();
         assert!(beside.contains("calib images 128: -0.0184 (outside the rule)") && beside.contains("calib images 512: -0.0043"), "{beside}");
-        assert!(draw(&finding("c5"), false).contains("calib images 128: -0.0184 (outside the rule)"), "the call's figure says them too");
+        assert!(draw(&finding("c5")).contains("calib images 128: -0.0184 (outside the rule)"), "the call's figure says them too");
         let out = xs(&svg, "cell out")[0];
         assert!(out < xs(&svg, "rg")[0], "the cell outside sits left of the band at -0.01");
         // rb gives c5 no one estimate across its cells: the figure draws no tick and computes no mean
@@ -355,19 +401,19 @@ mod tests {
     /// labels of cells outside the rule never overlap or leave the figure.
     #[test]
     fn cells_mark_rbs_estimate_and_their_labels_stay_inside() {
-        let svg = draw(&with_cells(&[("a=1", "1", false), ("a=2", "3", false)], Some(2.5)), true);
+        let svg = draw(&with_cells(&[("a=1", "1", false), ("a=2", "3", false)], Some(2.5)));
         let tick = xs(&svg, "tk");
         let (cells, est_x) = (xs(&svg, "cell"), tick[tick.len() - 1]);
         // 2.5 sits three quarters of the way from the cell at 1 to the cell at 3, not at their mean, 2
         assert!((est_x - (cells[0] + 0.75 * (cells[1] - cells[0]))).abs() < 0.2, "{svg}");
-        assert!(svg.split("</svg>").nth(1).unwrap().contains("a 1: +1.00 \u{b7} a 2: +3.00 \u{b7} estimate: +2.50") && svg.contains("tick: the estimate"), "{svg}");
-        let svg = draw(&with_cells(&[("a=1", "\u{2212}1", true), ("a=2", "3", false)], None), true);
+        assert!(svg.split("</svg>").nth(1).unwrap().contains("a 1: +1.00 \u{b7} a 2: +3.00 \u{b7} estimate: +2.50") && !svg.contains("tick: the estimate"), "{svg}");
+        let svg = draw(&with_cells(&[("a=1", "\u{2212}1", true), ("a=2", "3", false)], None));
         assert_eq!(svg.matches("class=\"cell out\"").count(), 1, "{svg}");
         let long = "calib_images=2048 \u{b7} seed_group=dddd";
-        let svg = draw(&with_cells(&[(long, "-1", true), ("b", "-1.01", true), ("c", "-0.99", true), ("d", "5", false)], None), true);
+        let svg = draw(&with_cells(&[(long, "-1", true), ("b", "-1.01", true), ("c", "-0.99", true), ("d", "5", false)], None));
         assert_eq!(svg.matches("<text class=\"k\"").count(), 1, "{svg}");
         assert!(svg.contains(">3 cells outside the rule</text>"));
-        let svg = draw(&with_cells(&[("d", "-5", false), (long, "9", true)], None), true);
+        let svg = draw(&with_cells(&[("d", "-5", false), (long, "9", true)], None));
         let label = svg.split("<text class=\"k\" x=\"").nth(1).unwrap();
         let lx: f64 = label.split('"').next().unwrap().parse().unwrap();
         let said = nodes::cell_said(long);
@@ -380,8 +426,8 @@ mod tests {
     #[test]
     fn nothing_inside_the_svg_is_raw_text() {
         let raw = ["style", "script", "title", "textarea", "xmp", "iframe", "noembed", "noframes", "noscript", "plaintext"];
-        let mut figures: Vec<String> = ["c1", "c2", "c3", "c4", "c5", "c6"].iter().flat_map(|id| [draw(&finding(id), true), draw(&finding(id), false)]).collect();
-        figures.push(draw(&with_cells(&[("a=1", "1", true), ("a=2", "3", false)], Some(2.5)), true));
+        let mut figures: Vec<String> = ["c1", "c2", "c3", "c4", "c5", "c6"].iter().flat_map(|id| [draw(&finding(id))]).collect();
+        figures.push(draw(&with_cells(&[("a=1", "1", true), ("a=2", "3", false)], Some(2.5))));
         for fig in figures.iter().filter(|f| !f.is_empty()) {
             let svg = fig.split("<svg").nth(1).unwrap().split("</svg>").next().unwrap();
             for name in raw {
@@ -399,7 +445,7 @@ mod tests {
         r.insert("estimate".into(), Value::Float(1e308));
         r.insert("lo".into(), Value::Float(-1e308));
         r.insert("hi".into(), Value::Float(1.5e308));
-        assert_eq!(draw(&f, true), "");
+        assert_eq!(draw(&f), "");
     }
 
     /// The figure is neutral and draws nothing it cannot place: no standing colour, no style, no script; no number,
@@ -407,17 +453,17 @@ mod tests {
     #[test]
     fn the_figure_is_neutral_and_never_guesses() {
         for id in ["c1", "c2", "c3", "c4", "c5", "c6"] {
-            let svg = draw(&finding(id), true);
+            let svg = draw(&finding(id));
             for banned in ["good", "bad", "warn", "style=", "fill=", "stroke=", "<script", "\u{2014}"] {
                 assert!(!svg.contains(banned), "{id}: {banned}");
             }
         }
         let mut f = finding("c1");
         f.as_dict_mut().unwrap().get_mut("check_band").unwrap().as_dict_mut().unwrap().insert("comparator".into(), Value::str("better"));
-        let svg = draw(&f, true);
-        assert!(!svg.contains("class=\"rg\"") && svg.contains(">dot: estimate \u{b7} bar: interval<"), "{svg}");
+        let svg = draw(&f);
+        assert!(!svg.contains("class=\"rg\"") && !svg.contains("dot: estimate"), "{svg}");
         let mut f = finding("c1");
         f.as_dict_mut().unwrap().insert("reading".into(), Value::Null);
-        assert_eq!(draw(&f, true), "");
+        assert_eq!(draw(&f), "");
     }
 }

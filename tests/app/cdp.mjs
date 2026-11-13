@@ -119,12 +119,26 @@ export function holders(name, { platform = process.platform } = {}) {
   return r.status === 0 && typeof r.stdout === 'string' ? r.stdout.split(/\r?\n/).filter(l => l.includes(name)) : [];
 }
 
+// the process ids of each process running that holds `name` in its command line, this one aside
+export function holderPids(name, { platform = process.platform } = {}) {
+  const [cmd, args] = platform === 'win32'
+    ? ['powershell', ['-NoProfile', '-NonInteractive', '-Command', 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }']]
+    : ['ps', ['-A', '-ww', '-o', 'pid=,command=']];
+  const r = spawnSync(cmd, args, { encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  if (r.status !== 0 || typeof r.stdout !== 'string') return [];
+  return r.stdout.split(/\r?\n/).filter(l => l.includes(name)).map(l => Number(l.trim().split(/\s+/)[0]))
+    .filter(pid => Number.isInteger(pid) && pid > 0 && pid !== process.pid);
+}
+
 // Chrome's folder, removed once no process started with its profile runs, for `ms` at most: a helper can still write into
-// the profile (its cache's index) as it ends, after Chrome itself, and would leave the folder behind. Synchronous, so
-// node's exit handler can use it
+// the profile (its cache's index) as it ends, after Chrome itself, and would leave the folder behind. One still running
+// then is stopped: a Chrome its first process handed its start to (Windows' chrome.exe does) is no child of this one,
+// and nothing else would end it. Synchronous, so node's exit handler can use it
 function removeFolder(dir, ms = 10000) {
   const until = Date.now() + ms;
   while (holders(basename(dir)).length && Date.now() < until) nap(100);
+  for (const pid of holderPids(basename(dir))) { try { process.kill(pid, 'SIGKILL'); } catch {} }
+  if (holderPids(basename(dir)).length) nap(500);
   // Windows holds a file a moment after its process ends
   try { rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch {}
   folders.delete(dir);
@@ -260,6 +274,20 @@ class Connection {
   on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
 }
 
+// Chrome's environment. On Linux and macOS a home of its own, so nothing it writes lands outside its folder. On Windows
+// the account's own profile folder as USERPROFILE, whatever the caller's says: a runner given a stand-in home (the
+// tests give rb one beside the record) leaves Chrome no AppData there, so it cannot find its default data folder, and
+// Chrome refuses remote debugging when it cannot tell that folder from its own ("DevTools remote debugging requires a
+// non-default data directory"), whatever --user-data-dir says. os.userInfo() reads the account's folder from the
+// system, not from the environment. `account` and `platform` are given by a test, to check the rule on any system.
+export function chromeEnv({ home, platform = process.platform, env = process.env, account } = {}) {
+  if (platform !== 'win32') return { ...env, HOME: home, XDG_CONFIG_HOME: join(home, '.config'), XDG_CACHE_HOME: join(home, '.cache') };
+  if (account === undefined) { try { account = userInfo().homedir; } catch { account = null; } }
+  // Windows reads its variables whatever their case: one USERPROFILE, in the case it was given
+  const name = Object.keys(env).find(k => k.toUpperCase() === 'USERPROFILE') || 'USERPROFILE';
+  return account ? { ...env, [name]: account } : { ...env };
+}
+
 // a headless Chrome on a free port with a profile of its own; `.page()` opens a tab. `tree` is killTree's options for
 // its process tree, which a test gives to record the call on any system
 export async function launchChrome({ chrome = findChrome(), timeoutMs = 30000, tree } = {}) {
@@ -274,8 +302,7 @@ export async function launchChrome({ chrome = findChrome(), timeoutMs = 30000, t
   // Ubuntu's runners refuse Chrome the user namespaces its sandbox needs; the pages it opens are rb's own, on this machine
   if (process.platform === 'linux') args.push('--no-sandbox');
   args.push('about:blank');
-  // its own home on Linux and macOS, so nothing it writes lands outside its folder
-  const env = process.platform === 'win32' ? process.env : { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, '.config'), XDG_CACHE_HOME: join(home, '.cache') };
+  const env = chromeEnv({ home });
   const proc = track(spawn(chrome, args, { env, stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true }), tree);
   started.chrome_pid = proc.pid ?? null;
   started.chrome_profile = profile;
@@ -297,7 +324,8 @@ export async function launchChrome({ chrome = findChrome(), timeoutMs = 30000, t
     try { [port, path] = readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').split(/\r?\n/); } catch {}
     if (port && path) break;
     if (failed) throw new Error(`Chrome could not be started (${chrome}): ${failed.message}`);
-    if (!alive(proc)) throw new Error(`Chrome ended on starting (exit ${proc.exitCode}): ${said.trim().slice(-2000)}`);
+    // an exit 0 hands the start to another Chrome on this profile (Windows' chrome.exe does), which writes the port
+    if (!alive(proc) && proc.exitCode !== 0) throw new Error(`Chrome ended on starting (exit ${proc.exitCode ?? proc.signalCode}): ${said.trim().slice(-2000)}`);
     if (Date.now() > until) throw new Error(`Chrome did not start in ${timeoutMs / 1000} s: ${said.trim().slice(-2000)}`);
     await sleep(50);
   }
@@ -461,6 +489,12 @@ async function openPage(conn) {
   };
   try { await conn.send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] }); } catch {}
   return page;
+}
+
+// what the system's clipboard holds once a page writes `text` there: on Windows Chrome writes each line ending as \r\n,
+// as Windows' own text does (Blink's SystemClipboard::WritePlainText), and reads it back so; elsewhere the text as written
+export function onTheClipboard(text, platform = process.platform) {
+  return platform === 'win32' ? String(text).replace(/\r?\n/g, '\r\n') : String(text);
 }
 
 // ---------------------------------------------------------------- the command line

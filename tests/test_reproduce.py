@@ -266,7 +266,9 @@ def test_an_input_without_a_recipe_is_a_sentence(int8):
         assert "\n# evaluation data · imagenet-val · scripts/README.md:5\npython get_data.py --split val\n" in r["script"]
     for tier in ("live", "owner"):
         doc = int8.document(tier)
-        assert "https://" not in flat([e["reproduce"] for e in doc["experiments"]] + [r["reproduce"] for r in doc["runs"].values()])
+        # a recipe holds no resource's address: a public one is said only as where a reader gets it (getit.rs)
+        reproduce = flat([e["reproduce"] for e in doc["experiments"]] + [r["reproduce"] for r in doc["runs"].values()])
+        assert "https://" not in reproduce.replace("get it: https://", "")
 
 
 def test_only_a_command_rb_watched_reads_as_observed(int8):
@@ -329,7 +331,7 @@ def test_a_recipe_names_no_writer_no_branch_and_no_platform(int8):
     words or em dash on either tier, and on a page none of the Live tier's own values."""
     needs("P1")
     from test_shell_contract import WORDING, WRITER_WORDS
-    platforms = {int8.ok("show", rid)["object"]["receipt"]["environment"].get("platform") for rid in int8.runs.values()} - {None, ""}
+    platforms = {int8.ok("show", "--long", rid)["object"]["receipt"]["environment"].get("platform") for rid in int8.runs.values()} - {None, ""}
     assert platforms, "the record keeps the platform each run was recorded on"
     for tier in ("live", "owner"):
         doc = int8.document(tier)
@@ -415,7 +417,7 @@ class Yours:
 
     def checkout(self, of: str = "e1", env: dict = None) -> list:
         """rb show's checkout entries on the code row of what it takes to run `of` again."""
-        rows = [r for r in self.ok("show", of, env=env)["rerunnability"] if r["what"] == "code"]
+        rows = [r for r in self.ok("show", "--long", of, env=env)["rerunnability"] if r["what"] == "code"]
         return rows[0].get("checkout", []) if rows else []
 
     def said(self, of: str = "e1", env: dict = None) -> list:
@@ -488,14 +490,14 @@ def test_your_checkout_has_the_code_or_says_where_it_differs(yours):
     [entry] = yours.checkout()
     assert entry["state"] == "same" and entry["said"] == "your checkout has this code" and entry["code"] == c and entry["runs"] == [yours.run_id]
     assert entry["files"] == [] and entry["more"] == 0 and entry["diff"] == ""
-    text = yours.run("show", "e1").stdout
+    text = yours.run("show", "--long", "e1").stdout
     assert f"      code · commit {c[:12]}, which fp32 and int8 ran at\n      your checkout has this code\n" in text, text
     # a tracked edit
     Path("train.py").write_text("# train.py, edited\n", encoding="utf-8")
     [entry] = yours.checkout()
     diff = f'git diff {c} -- ":(top)" ":(top,exclude).rb"'
     assert (entry["state"], entry["said"], entry["files"], entry["diff"]) == ("differs", "your checkout differs in 1 file: train.py", ["train.py"], diff)
-    text = yours.run("show", "e1").stdout
+    text = yours.run("show", "--long", "e1").stdout
     assert f"      your checkout differs in 1 file: train.py\n      show code diff:\n        {diff}\n      rebuild:\n        git worktree add --detach ../e1-{c[:7]} {c}\n" in text, text
     assert "git checkout" not in text and "git restore" not in text
     Path("eval.py").write_text("# eval.py, edited\n", encoding="utf-8")
@@ -518,7 +520,7 @@ def test_your_checkout_has_the_code_or_says_where_it_differs(yours):
     _git("commit", "-qam", "eval v2")
     assert yours.said() == ["your checkout differs in 1 file: eval.py"]
     # the run's own show says it under the checkout it was recorded in, which is the code it ran
-    lines = yours.run("show", yours.run_id).stdout.splitlines()
+    lines = yours.run("show", "--long", yours.run_id).stdout.splitlines()
     i = next(i for i, l in enumerate(lines) if l.startswith("  repository when recorded"))
     assert lines[i + 1] == "    your checkout differs in 1 file: eval.py", lines
     [entry] = yours.checkout(yours.run_id)
@@ -559,9 +561,9 @@ def test_your_checkout_is_said_under_the_code_a_watched_run_ran(yours):
     later = _git("rev-parse", "HEAD")
     assert later != start
     yours.ok("reconcile", "--apply")
-    runs = yours.ok("status")["runs"]
+    runs = yours.ok("status", "--full")["runs"]
     watched = next(x["id"] for x in runs if x["id"] != yours.run_id)
-    lines = yours.run("show", watched).stdout.splitlines()
+    lines = yours.run("show", "--long", watched).stdout.splitlines()
     i = next(i for i, l in enumerate(lines) if l.startswith("  code that made it:"))
     assert start[:12] in lines[i] and lines[i + 1] == "    your checkout differs in 1 file: train.py", lines
     j = next(i for i, l in enumerate(lines) if l.startswith("  repository when recorded"))
@@ -626,7 +628,7 @@ def test_a_reverted_edit_reads_as_the_same_code_again_on_rb_open(yours):
         while json.loads(urllib.request.urlopen(server.url + "/digest.json", timeout=60).read())["key"] == key:
             assert time.monotonic() < deadline, "the key never moved"
             time.sleep(0.5)
-        assert "your checkout</span> has this code" in line()
+        assert "your checkout has this code" in line()
     finally:
         server.close()
 

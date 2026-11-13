@@ -9,8 +9,7 @@ and open calls around it. Older work waits and can be backfilled later.
 1. Run rb context --model <your model id>. With no record here, run rb init
    "<the work's theme>". In a running session it installs nothing; keep the
    commands it gives for later sessions.
-2. Read the files: rb reconcile, then rb compile with the reports, notes,
-   results files and databases.
+2. Read the files: rb reconcile, then rb compile <reports, results, databases>.
 3. Infer the current frontier, never assert it: from the session's context and
    the files, or the files alone when you have no context. Uncommitted plans and
    scripts say what is on now first, then the latest activity in the store, then
@@ -107,12 +106,11 @@ and open calls around it. Older work waits and can be backfilled later.
     nothing that kept running.
 11. A claim no file states goes in a note that says which files were read: "no
     file I read records this: <files>". Where memory and a file differ, record
-    the file and note the difference ("results.csv row 12 gives 0.761; 0.767 was
-    a working figure"). Before calling memory's number different from a file's,
-    check it with its own --equals rule (step 4): a file's rounding is not a
-    difference. A note names no one and says no memory: no "as recalled", "as
-    believed" or "remembered". Your interpretation is a note, or --when-met,
-    with what it rests on; rb shows it as not confirmed.
+    the file and note the difference. Before calling memory's number different
+    from a file's, check it with its own --equals rule (step 4): a file's
+    rounding is not a difference. A note names no one and says no memory: no "as
+    recalled", "as believed" or "remembered". Your interpretation is a note, or
+    --when-met, with what it rests on; rb shows it as not confirmed.
 12. Never name yourself, your model or your session in the record's text: rb
     keeps who wrote each line. Your text (a note, a --why, a statement, a gate's
     reason) calls nothing the researcher's and names no chat or session as its
@@ -121,6 +119,8 @@ and open calls around it. Older work waits and can be backfilled later.
     file and its line; a rule or gate from a next step stated in this chat takes
     its words in --words and no --why. A --why never restates a claim as fact.
     Compute no finding: read rb status.
+13. Write PLAIN.md beside .rb/: per name, a heading and one plain line, for a
+    layman: what it is, never what it found. Keep it true as names change.
 
 Then report to the researcher. It ends with no question at all: what you would
 ask stays open in the record (a call that waits, a rule with no threshold, a

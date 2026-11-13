@@ -280,7 +280,9 @@ def test_the_owner_tier_holds_none_of_the_live_tiers_own(docs):
     assert (owner["resources"]["imagenet-val"]["url"], live["resources"]["imagenet-val"]["url"]) == ("", "https://www.image-net.org/")
     # the download address is the url's alone: how to get it again names a recipe or a source, never the address
     assert live["resources"]["imagenet-val"]["how"] == owner["resources"]["imagenet-val"]["how"] == ""
-    assert not [p for p, t in texts(owner) if "image-net.org" in t]
+    # a public address is how a reader gets it (getit.rs): only the Get it fields and the words for them hold it
+    assert not [p for p, t in texts(owner) if "image-net.org" in t and p[-1] not in ("said", "href", "text", "standing")]
+    assert owner["resources"]["imagenet-val"]["get"]["href"] == "https://www.image-net.org/"
     assert "where_short" not in owner["resources"]["imagenet-val"] and live["resources"]["imagenet-val"]["where_short"] == []
     place, [only] = live["places"]["place"], live["places"]["places"]
     assert place["start"] is True and place["read_only"] is False and place["version"] is None
@@ -1312,7 +1314,9 @@ def test_receipt_rows_by_tier(m4_docs, m4):
             env = [row[1] for row in r["receipt_rows"] if row[0] == "environment"]
             assert env and env[0].startswith("python ") and "Linux" not in env[0] and "Darwin" not in env[0]
         rows = m4_docs[tier]["runs"][m4.ids["r_none"]]["receipt_rows"]
-        assert ["inputs", "read: holdout (eval) · reconstructible when recorded", ["holdout"]] in rows
+        # where its bytes stood on the recording machine is the owner's: a page says only what it read
+        said = "read: holdout (eval) · no copy was on the machine that recorded it" if tier == "live" else "read: holdout (eval)"
+        assert ["inputs", said, ["holdout"]] in rows
         assert [r for r in rows if r[0] == "outputs"][0][2] == ["int8-ckpt"]
 
 
@@ -1412,11 +1416,11 @@ def test_a_check_of_a_setting_is_said_as_what_rb_found(int8_demo, tmp_path):
 
 def test_home_within_budget(scale_record, monkeypatch):
     """The bridge's home op (what rb ui reads on every change) and rb open's /state.json stay within phase 0's
-    figures (20% in size, 25% in time) for this system (tests/shell_baselines.py, for_this_machine) on the scale record, in size and in time, time
+    figures (20% in size, 25% in time) for this system (tests/shell_baselines.py, to_hold) on the scale record, in size and in time, time
     read against rb status --json on the same record and machine so a faster or slower machine holds the same ratio. The three are read in turn, round
     by round, so other work on the machine weighs on each alike; the median of the rounds' ratios is held."""
     import shell_baselines
-    root, then = Path(getattr(scale_record, "root", scale_record)).resolve(), shell_baselines.for_this_machine()
+    root, then = Path(getattr(scale_record, "root", scale_record)).resolve(), shell_baselines.to_hold()
     as_the_user(monkeypatch)
     server = Open(root)
     rounds = []
@@ -1443,16 +1447,17 @@ def test_home_within_budget(scale_record, monkeypatch):
 TIME_MARGIN, SIZE_MARGIN = 1.25, 1.2
 
 
-def over_budget(rounds: list, then: dict) -> list:
+def over_budget(rounds: list, then) -> list:
     """For home and state_json, whether a round's size and the median of its time ratios against rb status hold their
-    budget, with what was read against what it may be."""
+    budget, with what was read against what it may be. `then` is the figures held, or several (shell_baselines.to_hold),
+    of which the most lenient."""
     import statistics
-    out = []
+    out, thens = [], then if isinstance(then, list) else [then]
     for k in ("home", "state_json"):
-        size = rounds[0][k][1]
-        out.append((k, size <= SIZE_MARGIN * then[k]["bytes_median"], (size, then[k]["bytes_median"])))
+        size, most = rounds[0][k][1], max(t[k]["bytes_median"] for t in thens)
+        out.append((k, size <= SIZE_MARGIN * most, (size, most)))
         ratio = statistics.median(r[k][0] / r["status"][0] for r in rounds)
-        cap = TIME_MARGIN * then[k]["seconds_median"] / then["status"]["seconds_median"]
+        cap = TIME_MARGIN * max(t[k]["seconds_median"] / t["status"]["seconds_median"] for t in thens)
         out.append((k, ratio <= cap, (round(ratio, 3), round(cap, 3))))
     return out
 
@@ -1467,6 +1472,24 @@ def test_home_budget_takes_a_loaded_machine_and_fails_a_real_slowdown():
         return all(ok for _, ok, _ in over_budget(rs, then))
     assert holds(rounds(1.070)) and holds(rounds(0.89 * 1.24))
     assert not holds(rounds(0.89 * 1.5)) and not holds(rounds(0.89, state=0.75)) and not holds(rounds(0.89, size=1201))
+
+
+def test_a_system_never_measured_holds_the_most_lenient_figures_and_fails_a_real_slowdown():
+    """Windows has no figures of its own: it holds the most lenient of the systems measured, which takes the ratio
+    GitHub's Windows runner read for /state.json at 0.8.5 (1.057, against a cap of 1.042 on macOS's figures alone) and
+    still fails /state.json or home read half as fast again as Linux reads them. Linux and macOS hold their own."""
+    import shell_baselines
+    hold = shell_baselines.to_hold("Windows")
+    linux = shell_baselines.BY_MACHINE["Linux x86_64, 16 cpus"]
+    assert hold == list(shell_baselines.BY_MACHINE.values()) and shell_baselines.to_hold("Linux") == [linux]
+    assert shell_baselines.to_hold("Darwin") == [shell_baselines.BASELINES]
+    ratio = {k: linux[k]["seconds_median"] / linux["status"]["seconds_median"] for k in ("home", "state_json")}
+    def rounds(home: float, state: float) -> list:
+        return [{"home": (home, linux["home"]["bytes_median"]), "state_json": (state, linux["state_json"]["bytes_median"]), "status": (1.0, 0)}] * 5
+    def holds(rs) -> bool:
+        return all(ok for _, ok, _ in over_budget(rs, hold))
+    assert holds(rounds(ratio["home"], 1.057)) and not all(ok for _, ok, _ in over_budget(rounds(ratio["home"], 1.057), shell_baselines.BASELINES))
+    assert not holds(rounds(ratio["home"], ratio["state_json"] * 1.5)) and not holds(rounds(ratio["home"] * 1.5, ratio["state_json"]))
 
 
 def test_rb_open_s_document_carries_its_places_on_the_shell(tmp_path, monkeypatch):
@@ -1669,7 +1692,7 @@ def grid_cells(doc: dict, eid: str = "e1") -> dict:
 def test_a_grid_of_one_column_says_its_runs_and_the_changes_interval(int8, docs):
     """INT8 against FP32 on three seeds, one column: each cell its runs, by id, and "3 seeds"; int8's change against
     fp32 with rb's t interval over the seeds' differences, the same as c1's own reading, and c1 as what reads it."""
-    want = int8.json(Writers.HUMAN, "show", "c1")["data"]["finding"]["comparison"]
+    want = int8.json(Writers.HUMAN, "show", "--long", "c1")["data"]["finding"]["comparison"]
     runs = {r["id"] for r in int8.json(Writers.HUMAN, "status")["data"]["runs"]}
     for tier in ("live", "owner"):
         t = experiment_of(docs[tier], "e1")["table"]
@@ -1719,7 +1742,7 @@ def test_a_grid_says_rbs_interval_where_the_arms_never_pair_and_no_second_one_be
     repeat and the table leaves it out, so the cell gives no interval of its own beside c4's reading. e4's two runs at
     each size are one unit: "2 runs as 1 unit"."""
     rec, docs = grid
-    c3 = rec.json(Writers.HUMAN, "show", "c3")["data"]["finding"]["comparison"]
+    c3 = rec.json(Writers.HUMAN, "show", "--long", "c3")["data"]["finding"]["comparison"]
     for tier in ("live", "owner"):
         i8 = grid_cells(docs[tier], "e2")[("int8", ())]
         assert (i8["paired"], i8["count_said"], i8["criteria"]) == (False, "3 runs", ["c3"]), i8
@@ -1761,7 +1784,7 @@ def test_a_cells_interval_is_the_rules_that_reads_it(tmp_path):
        "image", "--units", "50000", "--id", "a1")
     doc = dumped(rec.root, "page", tmp_path)[0]
     for e, c in (("e1", "c1"), ("e2", "c2")):
-        want = rec.json(you, "show", c)["data"]["finding"]["comparison"]
+        want = rec.json(you, "show", "--long", c)["data"]["finding"]["comparison"]
         cell = grid_cells(doc, e)[("int8", ())]
         assert cell["lo"] == pytest.approx(want["lo"]) and cell["hi"] == pytest.approx(want["hi"]) and cell["criteria"] == [c], (e, cell, want)
     cell = grid_cells(doc, "e3")[("int8", ())]
@@ -1816,7 +1839,7 @@ def test_the_demo_s_lines_read_plainly(int8_demo, tmp_path):
     which side of it, and its timing says its units the same way; what is still open in the record leads with its count."""
     import rbtest
     root = Path(getattr(int8_demo, "root", int8_demo))
-    status = subprocess.run([*rbtest.command(), "status"], cwd=root, env=rbtest.environment(), capture_output=True, text=True,
+    status = subprocess.run([*rbtest.command(), "status", "--full"], cwd=root, env=rbtest.environment(), capture_output=True, text=True,
                             stdin=subprocess.DEVNULL).stdout
     doc = contract.model_document(root, "live", tmp_path)
     assert re.search(r"c2 · investigating since \d{4}-\d\d-\d\d · note: ", status), status
@@ -2081,7 +2104,9 @@ def test_the_standing_card_says_why_by_the_queues_order(calls_docs):
     states = [doc["findings"][c]["state"] for c in q1["findings"]]
     missed = [c for c in q1["findings"] if doc["findings"][c]["state"] in ("misses", "not reproduced") and c != "c3"]
     n = len(q1["findings"])
-    assert [r["kind"] for r in card["reasons"]] == ["baseline", "not_met"], card
+    # the line says the two strongest; every reason stays, each naming its subjects, and `more` counts the rest (G3)
+    assert [r["kind"] for r in card["reasons"][:2]] == ["baseline", "not_met"], card
+    assert card["more"] == len(card["reasons"]) - 2 and all(r["subjects"] for r in card["reasons"]), card
     assert card["line"] == (f"No answer yet: the fp32 baseline doesn't match its cited number, and {len(missed)} of {n} rules "
                             f"{'is' if len(missed) == 1 else 'are'} not met."), card
     assert card["reasons"][1]["criteria"] == missed
@@ -2613,10 +2638,10 @@ def test_a_rule_s_timing_is_read_on_its_subject_s_runs(tmp_path, before):
     runs, said so with its baseline's runs coming first, and the trust box counts no rule written after its results;
     with one subject run before it, it reads as written after its results came in, as before."""
     rec = baseline_first_record(tmp_path / "int8", before)
-    f = rec.json(Writers.HUMAN, "show", "c1")["data"]["finding"]
+    f = rec.json(Writers.HUMAN, "show", "--long", "c1")["data"]["finding"]
     doc = contract.model_document(rec.root, "owner", tmp_path)
     parts = {p["kind"]: p for p in doc["home"]["integrity"]["parts"]}
-    status = rec.rb(Writers.HUMAN, "status")
+    status = rec.rb(Writers.HUMAN, "status", "--full")
     if before == 0:
         assert f["timing"] == "before", f["says"]
         assert f["says"]["timing"] == "declared before its runs (by production times; its baseline's runs came first)", f["says"]
@@ -2651,7 +2676,7 @@ def test_a_rule_before_every_run_reads_before_with_no_baseline_words(tmp_path):
     for seed, (fp32, int8) in enumerate([(75.69, 75.53), (75.71, 75.58), (75.66, 75.48)], 1):
         rb("run", "add", "e1", f"top1={fp32}", "--variant", "fp32", "--set", f"seed={seed}")
         rb("run", "add", "e1", f"top1={int8}", "--variant", "int8", "--set", f"seed={seed}")
-    f = rec.json(Writers.HUMAN, "show", "c1")["data"]["finding"]
+    f = rec.json(Writers.HUMAN, "show", "--long", "c1")["data"]["finding"]
     assert f["timing"] == "before" and f["says"]["timing"] == "declared before the evidence (by production times)", f["says"]
 
 
@@ -2663,7 +2688,7 @@ def test_an_analysis_or_a_retraction_reads_the_timing_on_the_subject_s_runs_too(
     runs = [r["id"] for r in rec.json(Writers.HUMAN, "status")["data"]["runs"]]
     rec.rb({**Writers.HUMAN, **at("10:00")}, "analysis", "add", "e1", "--compare", "int8/fp32:top1=-0.16[-0.22,-0.09]", "--method",
            "paired bootstrap over images", "--reads", ",".join(runs))
-    f = rec.json(Writers.HUMAN, "show", "c1")["data"]["finding"]
+    f = rec.json(Writers.HUMAN, "show", "--long", "c1")["data"]["finding"]
     assert f["timing"] == "before" and f["says"]["timing"].endswith("its baseline's runs came first)"), f["says"]
 
     rec = baseline_first_record(tmp_path / "all", 3)
@@ -2673,7 +2698,7 @@ def test_an_analysis_or_a_retraction_reads_the_timing_on_the_subject_s_runs_too(
     assert late["do"].endswith("   (run after the declaration)"), late
 
     rec = baseline_first_record(tmp_path / "one", 1)
-    f = rec.json(Writers.HUMAN, "show", "c1")["data"]["finding"]
+    f = rec.json(Writers.HUMAN, "show", "--long", "c1")["data"]["finding"]
     [early] = [o["run"] for o in f["observations"] if o["arm"] == "int8" and o["before_declared"]]
     said = rec.rb({**Writers.HUMAN, **at("10:01")}, "retract", early, "--why", "the wrong checkpoint")
     assert " · declared after the evidence existed" in said and " · declared before its runs" in said, said
@@ -2699,7 +2724,7 @@ def test_a_rule_whose_reference_is_no_baseline_says_the_runs_it_compares_against
        "--at-least", "-1", "--id", "c1")
     for seed, v in enumerate([75.69, 75.71, 75.66], 1):
         rb("run", "add", "e1", f"top1={v}", "--variant", "fp32", "--set", f"seed={seed}")
-    f = rec.json(Writers.HUMAN, "show", "c1")["data"]["finding"]
+    f = rec.json(Writers.HUMAN, "show", "--long", "c1")["data"]["finding"]
     assert f["says"]["timing"] == "declared before its runs (by production times; the runs it compares against came first)", f["says"]
 
 
@@ -2815,7 +2840,7 @@ def test_a_page_names_what_rb_minted_an_id_for_by_what_it_is(tmp_path):
     you = Writers.HUMAN
     note = rec.json(you, "note", "add", "the calibration set is 512 images", "-e", "e1")["data"]["object"]["id"]
     rec.rb(you, "retract", note, "--why", "written on the wrong experiment")
-    runs = json.loads(subprocess.run([*command(), "status", "--json"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout)["data"]["runs"]
+    runs = json.loads(subprocess.run([*command(), "status", "--full", "--json"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout)["data"]["runs"]
     first = next(r["id"] for r in runs if r.get("per_run", {}).get("seed") == 2 or "seed=2" in json.dumps(r))
     again = rec.json(you, "run", "add", "e1", "fp32.top1=75.71", "int8.top1=75.57", "--set", "seed=2", "--replaces", first, "--why",
                      "the first read calibrated on training images")["data"]["object"]["id"]
@@ -2824,7 +2849,7 @@ def test_a_page_names_what_rb_minted_an_id_for_by_what_it_is(tmp_path):
     # a baseline's run with no candidate's beside it, and a rule declared after the runs: its timing names that run
     lone = rec.json(you, "run", "add", "e1", "fp32.top1=75.62", "--set", "seed=9")["data"]["object"]["id"]
     rec.rb(you, "criterion", "add", "INT8 keeps top-1 within two points of FP32", "-e", "e1", "--metric", "change.top1", "--at-least", "-2", "--id", "c9")
-    status = json.loads(subprocess.run([*command(), "status", "--json"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout)
+    status = json.loads(subprocess.run([*command(), "status", "--full", "--json"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout)
     timing = next(f for f in status["data"]["findings"] if f["criterion"] == "c9")["says"]["timing"]
     assert lone in timing, ("rb status keeps the id", timing)
     # a reason someone gave keeps its words: an id in a path, in quotation marks or in a command stays as written
@@ -2877,7 +2902,7 @@ def test_a_design_change_says_a_rule_by_its_metrics_title(tmp_path):
     rec.rb(CLAUDE_CODE, "criterion", "add", "The ONNX export keeps 75.5 top-1", "-e", "e1", "--metric", "onnx_top1", "--at-least", "75.5", "--id", "c4")
     rec.rb(CLAUDE_CODE, "criterion", "add", "INT8 answers in 7 ms or less", "-e", "e1", "--metric", "change.top1", "--at-most", "1", "--id", "c5")
     rec.rb(CLAUDE_CODE, "criterion", "add", "INT8 keeps top-1 on seed 1", "-e", "e1", "--metric", "change.top1", "--at-least", "-1", "--where", "seed=1", "--id", "c6")
-    shown = subprocess.run([*command(), "show", "e1"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout
+    shown = subprocess.run([*command(), "show", "--long", "e1"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout
     assert "criterion c4 added: onnx_top1 ≥ 75.5 (primary)" in shown, shown
     (tmp_path / "dumps").mkdir()
     for tier, doc in both_tiers(rec.root, tmp_path / "dumps").items():
@@ -2906,7 +2931,7 @@ def test_a_line_names_each_run_once_and_a_proposed_call_as_proposed(tmp_path):
     when_met words as written, ids and all, as its text does; a call a session recorded reads as proposed, not made."""
     rec = int8_record(tmp_path / "int8")
     you = Writers.HUMAN
-    runs = json.loads(subprocess.run([*command(), "status", "--json"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout)["data"]["runs"]
+    runs = json.loads(subprocess.run([*command(), "status", "--full", "--json"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout)["data"]["runs"]
     first = next(r["id"] for r in runs if "seed=2" in json.dumps(r) or r.get("per_run", {}).get("seed") == 2)
     # a session replaces seed 2's run, with the same seed: two runs with one label, the retraction's reason the session's
     again = rec.json(CLAUDE_CODE, "run", "add", "e1", "fp32.top1=75.72", "int8.top1=75.57", "--set", "seed=2", "--replaces", first, "--why",
@@ -2948,7 +2973,7 @@ def test_an_untitled_analysis_is_an_analysis_and_each_run_is_named_as_its_lines_
     alone; runs.{id}.named (contract 1.9) is the run as every line names it, told apart from a run whose label reads the
     same."""
     rec = int8_record(tmp_path / "int8")
-    runs = json.loads(subprocess.run([*command(), "status", "--json"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout)["data"]["runs"]
+    runs = json.loads(subprocess.run([*command(), "status", "--full", "--json"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout)["data"]["runs"]
     two = next(r["id"] for r in runs if "seed=2" in json.dumps(r) or r.get("per_run", {}).get("seed") == 2)
     again = rec.json(CLAUDE_CODE, "run", "add", "e1", "fp32.top1=75.72", "int8.top1=75.57", "--set", "seed=2", "--replaces", two, "--why", "the first read calibrated on training images")["data"]["object"]["id"]
     aid = rec.json(Writers.HUMAN, "analysis", "add", "e1", "--compare", "int8/fp32:top1=-0.15[-0.31,0.01]", "--method", "paired bootstrap over images",
@@ -3012,7 +3037,7 @@ def test_the_int8_demo_counts_what_its_log_holds(int8_demo, tmp_path):
     journal watched is seen as it ran, and its past call from notes/2026-05-07.md is the
     one call recorded afterwards; every count is the rule applied to what the record holds, and the model's History
     types each run's line as its run."""
-    st = int8_demo.rb("status")
+    st = int8_demo.rb("status", "--full")
     w = st["witness"]
     late = [r["id"] for r in st["runs"] if afterwards_by_the_rule(r)]
     assert w["runs"]["total"] == len(st["runs"]) == 10 and w["runs"]["afterwards"] == len(late) == 2 and w["runs"]["before"] == 2
@@ -3049,7 +3074,7 @@ def test_rb_status_rb_context_and_rb_uis_head_say_the_record_line(int8_demo, int
     the record line's sentence from the witness facts, the day as rb's text gives days: the INT8 demo's two runs typed
     in May and its past call, each count with its noun. A record kept with rb from its first write says nothing there,
     and never "what came before it is Retrospective"."""
-    st = int8_demo.rb("status")
+    st = int8_demo.rb("status", "--full")
     w = st["witness"]
     assert (w["runs"]["afterwards"], w["calls"]["afterwards"], w["analyses"]["afterwards"], w["notes"]["afterwards"]) == (2, 1, 0, 0)
     line = f"Kept with rb since {w['began'][:10]}. 2 runs and 1 call were recorded afterwards, not as they happened."
@@ -3057,9 +3082,10 @@ def test_rb_status_rb_context_and_rb_uis_head_say_the_record_line(int8_demo, int
         r = subprocess.run([*command(), *argv], cwd=int8_demo.root, env=int8_demo.env, capture_output=True, encoding="utf-8",
                            stdin=subprocess.DEVNULL)
         return r.stdout.splitlines()
-    status, context = text("status"), text("context")
+    status, context = text("status", "--full"), text("context")
     assert status[1] == line, status[:3]
-    assert context.count(line) == 1 and context[2] == line, context[:4]
+    # rb context's first line sends a person to rb status and rb ui (UX5 2.5); the record's own lines follow it
+    assert context[0].startswith("To read this record yourself") and context.count(line) == 1 and context[3] == line, context[:5]
     assert not [x for x in status + context if "Retrospective" in x and "came before it" in x]
     assert {k: st["record_start"][k] for k in ("before", "runs")} == {"before": 2, "runs": 10}    # its data keeps its shape
     from rbtest import AGENT_VARS
@@ -3069,7 +3095,7 @@ def test_rb_status_rb_context_and_rb_uis_head_say_the_record_line(int8_demo, int
     for k in AGENT_VARS:
         monkeypatch.delenv(k, raising=False)
     assert home_view(int8_demo.root).began == line
-    kept = int8.rb(Writers.HUMAN, "status")
+    kept = int8.rb(Writers.HUMAN, "status", "--full")
     assert "Kept with rb since" not in kept and "Retrospective" not in kept
     assert "Kept with rb since" not in int8.rb(Writers.HUMAN, "context")
 
@@ -3077,7 +3103,7 @@ def test_rb_status_rb_context_and_rb_uis_head_say_the_record_line(int8_demo, int
 def test_a_past_call_from_a_file_is_recorded_afterwards_and_still_waits(int8_demo):
     """The demo's past call a session quoted from notes/2026-05-07.md reads as recorded afterwards, and still waits for
     the user's confirmation: knowing it was recorded afterwards confirms nothing."""
-    st = int8_demo.rb("status")
+    st = int8_demo.rb("status", "--full")
     [row] = [p for p in st["pending"] if p.get("past")]
     assert row["witness"] == {"seen": "afterwards", "basis": "past_call"}
     assert row["authority"]["state"] == "past_unconfirmed" and row["authority"]["pending"] is True
@@ -3115,7 +3141,7 @@ def test_what_an_analysis_rests_on_a_retraction_and_a_clones_notes_are_typed_by_
     bundle, clone = tmp_path / "bundle", tmp_path / "clone"
     rb(you, "export", "--with-record", "--out", str(bundle))
     rec.run(you, "clone", str(bundle), str(clone), cwd=tmp_path)
-    cloned = json.loads(subprocess.run([*command(), "status", "--json"], cwd=clone, env=rec.env, capture_output=True, encoding="utf-8").stdout)["data"]
+    cloned = json.loads(subprocess.run([*command(), "status", "--full", "--json"], cwd=clone, env=rec.env, capture_output=True, encoding="utf-8").stdout)["data"]
     assert cloned["witness"]["notes"] == {"total": 1, "afterwards": 1}
     assert st["witness"]["notes"] == {"total": 1, "afterwards": 0}
 
@@ -3170,7 +3196,7 @@ def test_a_log_line_says_its_op_in_words(tmp_path):
     for said in [line[17:] for line in text.splitlines()] + [r["sentence"] for r in doc["history"]["log"]]:
         assert not re.match(r"\w+_\w+ ", said) and "verif" not in said, said
     # a setting's own history says them the same way
-    shown = subprocess.run([*command(), "show", "e1/data.batch_size"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout
+    shown = subprocess.run([*command(), "show", "--long", "e1/data.batch_size"], cwd=rec.root, env=rec.env, capture_output=True, encoding="utf-8").stdout
     assert " spec set: " in shown and " spec check: " in shown and "spec_" not in shown, shown
     ops = {r["op"]: r["sentence"] for r in doc["history"]["log"]}
     assert ops["add_variant"].startswith("add variant ") and ops["spec_set"].startswith("spec set ") and ops["spec_verify"].startswith("spec check ")
@@ -3180,7 +3206,8 @@ def test_rb_status_and_rb_context_say_rules_and_needs_judgment_as_the_page_does(
     """One wording for rules and the queue (0.6.1): rb status's tally line leads with the page's "Rules: " and says its
     tally words exactly ("1 met · 1 not met · 1 not reproduced"), "none yet" and "none standing (N retracted)" with
     the same lead; the findings are under "Rules" (rb context's "## Rules", its own guidance under "## How to record");
-    the calls that wait are under "Needs judgment (N)" and "## Needs judgment". The JSON keeps its words (`human`)."""
+    the calls that wait are under "Needs judgment (N)" and "## Needs judgment". The JSON keeps its words (`human`).
+    UX5: plain rb status is the short dashboard now; the long form that says all this is rb status --full."""
     root = tmp_path / "int8"
     root.mkdir()
     rec = Writers(root)
@@ -3189,7 +3216,7 @@ def test_rb_status_and_rb_context_say_rules_and_needs_judgment_as_the_page_does(
     rec.git("config", "user.email", "ana@example.org")
     rec.git("config", "user.name", "ana")
     rb(you, "init", "INT8 ResNet-50", "--no-agents")
-    status = rb(you, "status").splitlines()
+    status = rb(you, "status", "--full").splitlines()
     assert "Rules: none yet" in status and not [x for x in status if x.startswith("Criteria")]
     rb(you, "question", "add", "Does INT8 cost top-1 on ImageNet?", "--id", "q1")
     rb(you, "experiment", "add", "INT8 vs FP32 on ImageNet", "--id", "int8", "-q", "q1", "--baseline", "fp32", "--candidate", "int8",
@@ -3205,12 +3232,13 @@ def test_rb_status_and_rb_context_say_rules_and_needs_judgment_as_the_page_does(
        "--tolerance", "0.05", "--source", "paper.md", "--quote", "INT8 top-1 75.4", "--locator", "Table 2", "--id", "c3")
     for seed, (fp32, int8) in enumerate([(76.1, 75.9), (76.0, 75.8), (76.2, 75.7)], 1):
         rb(you, "run", "add", "int8", f"fp32.top1={fp32}", f"int8.top1={int8}", "--set", f"seed={seed}")
-    status = rb(you, "status").splitlines()
+    status = rb(you, "status", "--full").splitlines()
     rb(you, "page", "--out", str(tmp_path / "page.html"))
     page = (tmp_path / "page.html").read_text(encoding="utf-8")
     import html as _html
     tallies = {_html.unescape(re.sub(r"<[^>]+>", "", m)) for m in re.findall(r'<p class="stt"><span class="k">Rules: </span>(.*?)</p>', page)}
-    assert tallies == {"1 met, on the estimate alone · 1 not met · 1 not reproduced"}, tallies
+    # closed form (owner, Nov 13 2026): the page says a rule holds or does not hold; rb status keeps its own words
+    assert tallies == {"1 holds, on the estimate alone · 1 does not hold · 1 not reproduced"}, tallies
     assert "Rules: 1 met, on the estimate alone · 1 not met · 1 not reproduced" in status
     assert "Needs judgment (2)" in status and "Rules" in status
     assert not [x for x in status if "Needs a human" in x or x.startswith("Criteria")]
@@ -3221,7 +3249,7 @@ def test_rb_status_and_rb_context_say_rules_and_needs_judgment_as_the_page_does(
     assert [i["who"] for i in json.loads(rb(you, "status", "--json"))["data"]["open"] if i["code"] == "undecided"] == ["human", "human"]
     for c in ("c1", "c2", "c3"):
         rb(you, "retract", c, "--why", "the wrong split")
-    assert "Rules: none standing (3 retracted)" in rb(you, "status").splitlines()
+    assert "Rules: none standing (3 retracted)" in rb(you, "status", "--full").splitlines()
 
 
 def format_two_rules_record(root: Path) -> Writers:

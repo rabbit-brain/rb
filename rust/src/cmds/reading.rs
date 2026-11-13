@@ -198,7 +198,9 @@ fn finding_block_without(f: &Value, limit: Option<usize>, said: &[String]) -> Ve
 pub fn settings_counts(e: &Value) -> String {
     let k = e.get("settings_count").cloned().unwrap_or(Value::empty_dict());
     let mut s = format!("settings {} verified · {} provisional · {} unknown", gs(&k, "verified"), gs(&k, "provisional"), gs(&k, "unknown"));
-    for (key, word) in [("conflict", "conflict"), ("stale", "stale"), ("inherited", "inherited"), ("per_run", "per-run")] {
+    // a setting whose call git took a write of out of the record reads undetermined (N2), counted under that word
+    // (MP-1111-1200's L1)
+    for (key, word) in [("undetermined", "undetermined"), ("conflict", "conflict"), ("stale", "stale"), ("inherited", "inherited"), ("per_run", "per-run")] {
         if truthy(&k, key) {
             s += &format!(" · {} {word}", gs(&k, key));
         }
@@ -445,8 +447,143 @@ pub fn cmd_status(ns: &Namespace, out: &mut Out) -> R {
     }
     let led = Ledger::open(None)?;
     let r = status_of(&led, ns, &fail_on, out);
+    // the dashboard (UX5 2.5): one screen, like git status; --full prints the long form, word for word as before
+    if r.is_ok() && !flag(ns, "full") {
+        dashboard_of(out, ns);
+    }
     out.shows_for(&led);
     r
+}
+
+/// rb files (UX5 1.4): the Files tab in a terminal. Cited, Changed and each folder with its marks; a folder's files;
+/// or one file, with what cites it and the lines the record cites from it. `data.files` holds every file, as the
+/// shell's document holds them on rb open.
+pub fn cmd_files(ns: &Namespace, out: &mut Out) -> R {
+    let led = Ledger::open(None)?;
+    let doc = crate::shell::model::build_on(&led, crate::shell::Surface::Open, None)?;
+    let files: Vec<Value> = doc.get("files").and_then(Value::as_list).cloned().unwrap_or_default();
+    let all = flag(ns, "all");
+    let want = s(ns, "path").map(|p| p.trim_start_matches("./").replace('\\', "/")).filter(|p| !p.is_empty() && p != ".");
+    let row = |f: &Value, whole: bool| {
+        let name = if whole { gs(f, "path") } else { gs(f, "name") };
+        format!("  {name:<44} {}", crate::files::marks_said(f, false)).trim_end().to_string()
+    };
+    let one = want.as_ref().and_then(|p| files.iter().find(|f| gs(f, "path") == *p));
+    if let Some(f) = one {
+        out.say(format!("{}  {}", gs(f, "path"), crate::files::marks_said(f, false)));
+        for m in items(f, "marks") {
+            out.say(format!("  {} {}", gs(m, "glyph"), gs(m, "said")));
+        }
+        let cites: Vec<(&String, &Value)> = doc.get("citations").and_then(Value::as_dict).map(|c| c.iter().filter(|(_, c)| gs(c, "path") == gs(f, "path")).collect()).unwrap_or_default();
+        for (key, c) in cites {
+            out.say("");
+            out.say(key.clone());
+            for l in items(c, "lines") {
+                let on = l.get("cited").and_then(Value::as_bool).unwrap_or(false);
+                out.say(format!("  {:>4}{} {}", gs(l, "n"), if on { " \u{25b8}" } else { "  " }, gs(l, "text")));
+            }
+        }
+        // the line each setting reads its value from (UX5 2.2): a setting's source is a citation too
+        for (address, cite, at, around) in crate::card::setting_lines(&led, &gs(f, "path"))? {
+            out.say("");
+            out.say(format!("{cite} ({address})"));
+            for (n, text) in around {
+                out.say(format!("  {n:>4}{} {text}", if n == at { " \u{25b8}" } else { "  " }));
+            }
+        }
+        let by = items(f, "cited_by");
+        if !by.is_empty() {
+            out.say("");
+            out.say("Cited by");
+            for b in by {
+                out.say(format!("  {} {}", gs(b, "kind"), gs(b, "id")));
+            }
+        }
+        out.data.insert("files".into(), Value::List(vec![f.clone()]));
+        return Ok(0);
+    }
+    let under: Vec<&Value> = match &want {
+        Some(p) => {
+            let p = if p.ends_with('/') { p.clone() } else { format!("{p}/") };
+            files.iter().filter(|f| gs(f, "path").starts_with(&p)).collect()
+        }
+        None => files.iter().collect(),
+    };
+    if want.is_some() && under.is_empty() {
+        return Err(RBError::msg("E_FILE_NOT_FOUND", format!("{} is no file or folder rb lists here.", want.unwrap_or_default())));
+    }
+    let owned: Vec<Value> = under.iter().map(|f| (*f).clone()).collect();
+    let (cited, changed) = crate::files::sections(&owned);
+    if want.is_none() {
+        if !cited.is_empty() {
+            out.say("Cited");
+            out.say_all(cited.iter().map(|f| row(f, true)));
+        }
+        if !changed.is_empty() {
+            out.say("");
+            out.say("Changed");
+            out.say_all(changed.iter().map(|f| row(f, true)));
+        }
+        out.say("");
+        out.say("Folders");
+    }
+    // each folder with the marks of its files summed; with --all or a folder named, its files under it
+    let mut folders: IndexMap<String, Vec<&Value>> = IndexMap::new();
+    for f in &owned {
+        folders.entry(gs(f, "folder")).or_default().push(f);
+    }
+    folders.sort_keys();
+    for (folder, fs) in &folders {
+        let mut sums: IndexMap<String, (String, i64, bool)> = IndexMap::new();
+        for f in fs {
+            for m in items(f, "marks") {
+                let e = sums.entry(gs(m, "key")).or_insert((gs(m, "glyph"), 0, false));
+                match m.get("n").and_then(Value::as_i64) {
+                    Some(n) => e.1 += n,
+                    None => e.2 = true,
+                }
+            }
+        }
+        let marks = sums.values().map(|(g, n, _)| if *n > 0 { format!("{g} {n}") } else { g.clone() }).collect::<Vec<_>>().join(" ");
+        let name = if folder.is_empty() { "./".to_string() } else { folder.clone() };
+        out.say(format!("  {:<44} {}", format!("{name} ({})", fs.len()), marks).trim_end().to_string());
+        if all || want.is_some() {
+            out.say_all(fs.iter().map(|f| format!("  {}", row(f, false))));
+        }
+    }
+    out.data.insert("files".into(), Value::List(owned));
+    Ok(0)
+}
+
+/// rb status's text as the dashboard draws it, in place of the long form: what it prints is what it tells a session.
+fn dashboard_of(out: &mut Out, ns: &Namespace) {
+    let Some(ov) = out.data.get("overview").cloned() else { return };
+    let empty = out.data.get("questions").map_or(true, |q| q.len() == 0) && out.data.get("experiments").map_or(true, |e| e.len() == 0);
+    let lines = std::env::var("LINES").ok().and_then(|l| l.trim().parse::<usize>().ok()).filter(|n| *n > 0).unwrap_or(24);
+    let text = crate::overview::Text { width: crate::argparse::terminal_width(), ascii: flag(ns, "ascii"), words: flag(ns, "words"), lines };
+    let gate = out.lines.iter().find(|l| l.starts_with("GATE FAILED")).cloned();
+    let start = out.lines.iter().position(|l| l.starts_with("Nothing recorded yet.")).map(|i| out.lines[i].clone());
+    out.lines = crate::overview::dashboard(&ov, text);
+    if empty {
+        if let Some(s) = start {
+            out.lines.insert(1, String::new());
+            out.lines.insert(2, s);
+        }
+    }
+    if let Some(g) = gate {
+        out.lines.push(String::new());
+        out.lines.push(g);
+    }
+    // a session is told the decisions the dashboard names, and nothing it does not print
+    let named: Vec<String> = ov
+        .get("decisions")
+        .and_then(Value::as_list)
+        .map(|d| d.iter().take(4).filter(|x| gs(x, "kind") == "decide").map(|x| crate::delta::state_key(&gs(x, "code"), &gs(x, "subject"))).collect())
+        .unwrap_or_default();
+    out.told = Some(named);
+    out.told_lines = None;
+    // one screen: the dashboard ends on its own last line; what to do next is in its Decisions and in --full
+    out.next_quiet = true;
 }
 
 fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) -> R {
@@ -755,6 +892,19 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
         out.say_all(more);
         st.insert("experiments".into(), Value::List(with_rerun));
     }
+    // the Overview's view model, which every surface draws (UX5 1.1)
+    // for one experiment, the story is the question it is filed under, read from the whole record (the scoped data
+    // holds no question)
+    let ov = match experiment {
+        Some(x) => {
+            let filed = led.load::<crate::record::Experiment>(x).ok().and_then(|e| e.questions.first().cloned());
+            crate::overview::of_question(led, &Value::Dict(led.status(None)?), filed.as_deref())?
+        }
+        None => crate::overview::of(led, &Value::Dict(st.clone()))?,
+    };
+    st.insert("overview".into(), ov);
+    // the files the record names, with their marks, as rb files --json gives them (UX5 2.6)
+    st.insert("files".into(), crate::files::of(led, None, false)?);
     let runs = items(&stv, "runs");
     if !runs.is_empty() {
         let tam = led.tampered()?;
@@ -820,8 +970,9 @@ fn status_of(led: &Ledger, ns: &Namespace, fail_on: &[String], out: &mut Out) ->
             let label = gs(r, "name") + &if truthy(r, "version") { format!(" {}", gs(r, "version")) } else { String::new() };
             let ident = av.get("identity").map(|i| gs(i, "text")).unwrap_or_default();
             out.say(
-                format!("  {:<12} {} · {label} · {} · {ident}", gs(r, "id"), gs(r, "type"), gs(&av, "state"))
-                    + &if truthy(&av, "how") { format!(" · how to get it again: {}", gs(&av, "how")) } else { String::new() }
+                format!("  {:<12} {} · {label} · {} · {ident}", gs(r, "id"), gs(r, "type"), gs(&av, "said"))
+                    + &recipe_of(r)
+                    + &copies_of(&av)
                     + &if truthy(r, "taken_out") { format!(" · {}", gs(r, "taken_out")) } else { String::new() },
             );
         }
@@ -1092,13 +1243,65 @@ fn show_note(led: &Ledger, id: &str, holder: &Obj, out: &mut Out) -> R {
 
 pub fn cmd_show(ns: &Namespace, out: &mut Out) -> R {
     let subject = s_or(ns, "id");
-    if (subject.ends_with(".yaml") || subject.ends_with(".yml") || subject.ends_with(".json")) && Path::new(&subject).is_file() {
+    if (subject.ends_with(".yaml") || subject.ends_with(".yml") || subject.ends_with(".json")) && Path::new(&subject).is_file() && record_file(&subject) {
         return show_file(&subject, out);
     }
     let led = Ledger::open(None)?;
-    let r = show_of(&led, subject, out);
+    let long = crate::cli::ns_bool(ns, "long");
+    // a file, its lines or key, a folder or a commit the record cites (UX5 2.2): its card, which has no long form
+    if led.kind_of(&subject)?.is_none() && led.note_holder(&subject)?.is_none() {
+        let (head, name) = crate::ledger::parse_address(&subject);
+        let setting = name.is_some() && led.kind_of(&head)? == Some("experiment");
+        if !setting {
+            if let Some(card) = crate::card::of(&led, &subject)? {
+                draw_card(&led, &card, ns, out);
+                out.shows_for(&led);
+                return Ok(0);
+            }
+        }
+    }
+    let start = out.lines.len();
+    let r = show_of(&led, subject.clone(), out);
+    // a record's card, as fields (UX5 2.1): in place of the long form, which --long prints; --json holds both
+    if matches!(r, Ok(0)) && out.data.get("taken_out").is_none() {
+        if let Some(card) = crate::card::of(&led, &subject)? {
+            if long || out.json_mode {
+                out.data.insert("card".into(), card.to_value(&led));
+            } else {
+                let lead: Vec<String> = out.data.get("taken_under").map(|v| vec![pyjson::py_str(v)]).unwrap_or_default();
+                out.lines.truncate(start);
+                out.say_all(lead);
+                draw_card(&led, &card, ns, out);
+            }
+        }
+    }
     out.shows_for(&led);
     r
+}
+
+/// Whether a file holds a record of rb's, read as `rb show <file>.yaml` reads one: under `.rb/`, or a file whose first
+/// line that says anything names `rb`. Any other config is a file the record may cite, shown as its card.
+fn record_file(path: &str) -> bool {
+    if crate::sys::slashed(Path::new(path)).split('/').any(|p| p == ".rb") {
+        return true;
+    }
+    let Ok(b) = std::fs::read(path) else { return true };
+    let text = String::from_utf8_lossy(&b);
+    let first = text.lines().map(str::trim).find(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with("---")).unwrap_or("");
+    // a mapping, or a list whose first item is one (`- rb: 1`, `[{"rb": 1}]`), names rb as its first key
+    let first = first.trim_start_matches(|c: char| c == '{' || c == '[' || c == '-' || c.is_whitespace());
+    ["rb:", "\"rb\"", "rb :", "'rb'"].iter().any(|k| first.starts_with(k)) || std::str::from_utf8(&b).is_err()
+}
+
+/// A card drawn as `rb show` prints it: fields wrapped to the terminal; `data.card` holds it whole.
+fn draw_card(led: &Ledger, card: &crate::card::Card, ns: &Namespace, out: &mut Out) {
+    let draw = crate::card::Draw::here(crate::cli::ns_bool(ns, "words"));
+    let esc = |t: &str| if crate::ledger::design::draws_escapes(t) && led.shows_escapes().unwrap_or(false) { crate::ledger::design::shown(t) } else { t.to_string() };
+    out.data.insert("card".into(), card.to_value(led));
+    if !out.json_mode {
+        out.say_all(crate::card::lines(card, &draw, &esc));
+        out.drawn = true;
+    }
 }
 
 fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
@@ -1378,7 +1581,7 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             out.say(
                 format!("Resource {}: {}", res.id, res.name)
                     + &if res.version.is_empty() { String::new() } else { format!(" {}", res.version) }
-                    + &format!(" ({}) · {}", res.r#type, gs(&avv, "state")),
+                    + &format!(" ({}) · {}", res.r#type, gs(&avv, "said")),
             );
             if !res.subset.is_empty() {
                 out.say(format!("  subset: {}", res.subset));
@@ -1394,11 +1597,20 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             let ident = if ids.is_empty() { avv.get("identity").map(|i| gs(i, "text")).unwrap_or_default() } else { ids.join(" · ") };
             out.say(format!("  identity: {ident}"));
             for loc in items(&avv, "locations") {
-                out.say(format!("  {}:{} · {}", gs(loc, "provider"), gs(loc, "ref"), gs(loc, "state")));
+                out.say(if gs(loc, "provider") == "local" {
+                    format!("  {}", crate::getit::copy_said(&gs(loc, "ref"), &gs(loc, "state")))
+                } else {
+                    format!("  {}:{}", gs(loc, "provider"), gs(loc, "ref"))
+                });
             }
-            if let Some(a) = &res.acquisition {
-                let parts: Vec<String> = [a.source.clone(), a.url.clone().unwrap_or_default(), a.recipe.clone().unwrap_or_default()].into_iter().filter(|x| !x.is_empty()).collect();
-                out.say(format!("  how to get it again: {}", parts.join(" · ")));
+            // a recipe is how to get it again; an address and what it comes from are said on its first line
+            if let Some(recipe) = res.acquisition.as_ref().and_then(|a| a.recipe.clone()).filter(|r| !r.trim().is_empty()) {
+                out.say(format!("  how to get it again: {recipe}"));
+            }
+            if truthy(&avv, "asks") {
+                let (line, cmd) = crate::getit::ask_words(res);
+                out.say(format!("  {line}"));
+                out.next.push(cmd);
             }
             if !res.note.is_empty() {
                 out.say(format!("  note: {}", res.note));
@@ -1426,7 +1638,7 @@ fn show_of(led: &Ledger, subject: String, out: &mut Out) -> R {
             for (r, u, word) in users.iter().take(12) {
                 out.say(
                     format!("  {word} by run {} ({}, {})", r.id, r.experiment, cut(&r.created_at, 10))
-                        + &u.availability.as_ref().filter(|x| !x.is_empty()).map(|x| format!(" · {x} then")).unwrap_or_default()
+                        + &u.availability.as_ref().filter(|x| !x.is_empty()).map(|x| crate::getit::then_said(x)).filter(|x| !x.is_empty()).map(|x| format!(" · {x}")).unwrap_or_default()
                         + &u.sha256.as_ref().filter(|x| !x.is_empty()).map(|x| format!(" · sha256 {}", cut(x, 12))).unwrap_or_default()
                         + &led.took_mark("run", &r.id)?.map(|m| format!(" · {m}")).unwrap_or_default(),
                 );
@@ -1886,8 +2098,8 @@ fn show_experiment(led: &Ledger, exp: &Experiment, out: &mut Out, data: &mut Dic
         None => (),
     }
     let (gate_words, gate_by) = led.gate_words()?.remove(&exp.id).unwrap_or_default();
-    let command = view::gate_command(&exp.id, &exp.if_holds, &exp.if_not, &gate_words, &design.waiting_command());
-    for (label, text) in view::gate_parts(&exp.if_holds, &exp.if_not, &gate_words, &design.writer(&gate_by, "gate"), &command, design.gate_first()) {
+    let command = view::gate_command(&exp.id, &exp.if_holds, &exp.if_not, &gate_words, &design.waiting_command(), !design.taken.is_empty());
+    for (label, text) in view::gate_parts(&exp.if_holds, &exp.if_not, &gate_words, &design.writer(&gate_by, "gate"), &command, design.gate_first(), &design.taken) {
         out.say(format!("  {label}: {text}"));
     }
     if !exp.variants.is_empty() {
@@ -2123,7 +2335,7 @@ pub fn on_estimate_said(alone: i64, n: &str) -> String {
 }
 
 fn tally_word(key: &str, n: &str) -> String {
-    crate::shell::strings::plain_word(&format!("{n} {}", crate::shell::strings::short_rule(key)))
+    crate::shell::strings::terminal_word(&format!("{n} {}", crate::shell::strings::short_rule(key)))
 }
 
 pub const CONTEXT_RULES: &[&str] = &[
@@ -2836,8 +3048,8 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
             l.push(format!("- {label}: {text}"));
         }
         let (gate_words, gate_by) = gate_said.get(&e.id).cloned().unwrap_or_default();
-        let command = view::gate_command(&e.id, &e.if_holds, &e.if_not, &gate_words, &design.waiting_command());
-        for (label, text) in view::gate_parts(&e.if_holds, &e.if_not, &gate_words, &design.writer(&gate_by, "gate"), &command, design.gate_first()) {
+        let command = view::gate_command(&e.id, &e.if_holds, &e.if_not, &gate_words, &design.waiting_command(), !design.taken.is_empty());
+        for (label, text) in view::gate_parts(&e.if_holds, &e.if_not, &gate_words, &design.writer(&gate_by, "gate"), &command, design.gate_first(), &design.taken) {
             l.push(format!("- {label}: {text}"));
         }
         l.push(
@@ -3059,8 +3271,9 @@ fn briefing(led: &Ledger, st: &Dict, found: Option<&crate::journal::FoundAll>, s
             l.push(
                 format!("- {} ({}): {}", gs(r, "id"), gs(r, "type"), gs(r, "name"))
                     + &if truthy(r, "version") { format!(" {}", gs(r, "version")) } else { String::new() }
-                    + &format!(" · {}", gs(&av, "state"))
-                    + &if truthy(&av, "how") { format!(" · how to get it again: {}", gs(&av, "how")) } else { String::new() }
+                    + &format!(" · {}", gs(&av, "said"))
+                    + &recipe_of(r)
+                    + &copies_of(&av)
                     + &if truthy(r, "taken_out") { format!(" · {}", gs(r, "taken_out")) } else { String::new() },
             );
         }
@@ -3163,6 +3376,9 @@ fn say_agent(led: &Ledger, model: Option<&str>, provider: Option<&str>, out: &mu
     Ok(())
 }
 
+/// rb context's first line (UX5 2.5): the briefing is in words for an agent; a person reads the same record drawn.
+pub const CONTEXT_FIRST_LINE: &str = "To read this record yourself: rb status in a terminal, or rb ui.";
+
 pub fn cmd_context(ns: &Namespace, out: &mut Out) -> R {
     let led = Ledger::open(None)?;
     let r = context_of(&led, ns, out);
@@ -3183,6 +3399,8 @@ fn context_of(led: &Ledger, ns: &Namespace, out: &mut Out) -> R {
     let scope = crate::journal::Scope::of(&led);
     let rerun = crate::reproduce::rerun(led)?;
     let md = briefing(&led, &st, found.as_ref(), &scope, !out.json_mode, rerun.as_ref())?;
+    // the briefing is the agent's, in words; its first line sends a person to the screens drawn for them (UX5 2.5)
+    out.say(CONTEXT_FIRST_LINE);
     out.say(md.trim_end_matches('\n').to_string());
     out.told = Some(told_keys(&Value::Dict(st.clone())));
     out.told_lines = Some(recent_lines(&led)?);
@@ -3255,4 +3473,19 @@ fn when_label(produced: &crate::value::Dict, from: &str) -> String {
         (_, "flag") => "as given".to_string(),
         (_, f) => f.to_string(),
     }
+}
+
+/// A resource's recipe, where it records one, as rb status and rb context say it after where to get it.
+fn recipe_of(r: &Value) -> String {
+    let recipe = r.get("acquisition").filter(|a| truthy(a, "recipe")).map(|a| gs(a, "recipe")).unwrap_or_default();
+    if recipe.trim().is_empty() {
+        String::new()
+    } else {
+        format!(" · how to get it again: {}", recipe.trim())
+    }
+}
+
+/// Its local copies that are not here, as the owner's own text says them.
+fn copies_of(av: &Value) -> String {
+    items(av, "copies").iter().filter(|c| gs(c, "state") != "here").map(|c| format!(" · {}", gs(c, "said"))).collect()
 }

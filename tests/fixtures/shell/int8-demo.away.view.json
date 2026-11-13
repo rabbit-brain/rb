@@ -1,5 +1,5 @@
 {
- "contract": "rb-shell-view/1.18",
+ "contract": "rb-shell-view/1.22",
  "surface": "open",
  "tier": "live",
  "rb_version": "0.6.0",
@@ -151,25 +151,42 @@
     "state": "open",
     "state_word": "Open",
     "line": "No answer yet: the fp32 baseline doesn't match its cited number, and 2 experiment designs wait for your confirmation.",
+    "more": 0,
     "reasons": [
      {
       "kind": "baseline",
       "text": "the fp32 baseline doesn't match its cited number",
       "criteria": [
        "c2"
+      ],
+      "subjects": [
+       {
+        "kind": "criterion",
+        "id": "c2"
+       }
       ]
      },
      {
       "kind": "design",
       "text": "2 experiment designs wait for your confirmation",
-      "criteria": []
+      "criteria": [],
+      "subjects": [
+       {
+        "kind": "design",
+        "id": "e1"
+       },
+       {
+        "kind": "design",
+        "id": "e2"
+       }
+      ]
      }
     ],
     "tallies": [
      {
       "state": "meets",
       "n": 3,
-      "label": "3 met",
+      "label": "3 hold",
       "criteria": [
        "c1",
        "c3",
@@ -341,6 +358,239 @@
     "rank": 5
    }
   ]
+ },
+ "overview": {
+  "project": "INT8 ResNet-50 on ImageNet",
+  "taken_out": "",
+  "question": {
+   "id": "q1",
+   "text": "Does INT8 post-training quantization keep ResNet-50 within 1 point of FP32 top-1 on ImageNet?",
+   "plain": null,
+   "plain_cite": null,
+   "state": "open",
+   "subs": 1
+  },
+  "strip": {
+   "groups": [
+    {
+     "state": "meets",
+     "mark": "■",
+     "label": "passed",
+     "n": 3,
+     "checks": [
+      {
+       "id": "c1",
+       "late": false,
+       "taken_out": false
+      },
+      {
+       "id": "c3",
+       "late": false,
+       "taken_out": false
+      },
+      {
+       "id": "c4",
+       "late": false,
+       "taken_out": false
+      }
+     ]
+    },
+    {
+     "state": "misses",
+     "mark": "▲",
+     "label": "failed",
+     "n": 2,
+     "checks": [
+      {
+       "id": "c2",
+       "late": true,
+       "taken_out": false
+      },
+      {
+       "id": "c6",
+       "late": true,
+       "taken_out": false
+      }
+     ]
+    }
+   ],
+   "said": "3 passed, 2 failed; 2 of 5 written after their results",
+   "text": "■■■ 3 passed  ▲▲ 2 failed"
+  },
+  "chart": [
+   {
+    "id": "c1",
+    "group": "int8 − fp32, top1",
+    "label": "int8 holds top1 within 1 point of fp32",
+    "est": -0.0029,
+    "lo": -0.0061,
+    "hi": 0.0003,
+    "n": 3,
+    "unit": "seed",
+    "threshold": -0.01,
+    "tol": 0.0,
+    "side": "ge",
+    "difference": true,
+    "state": "meets",
+    "late": false,
+    "taken_out": "",
+    "said": "top1: int8 vs fp32: -0.0029 [-0.0061, +0.0003] · paired difference, t interval, 3 seeds, 95% (rb); criterion met · unresolved",
+    "short": false,
+    "est_text": "−0.0029",
+    "range_text": "−0.0061…+0.0003",
+    "claim": false,
+    "measure_unit": "",
+    "result_text": "−0.0029",
+    "edge_text": "from −0.01"
+   },
+   {
+    "id": "c2",
+    "group": "fp32 top1",
+    "label": "fp32 top1 matches the published 76.13",
+    "est": 0.7597,
+    "lo": 0.7589,
+    "hi": 0.7605,
+    "n": 3,
+    "unit": "seed",
+    "threshold": 0.7613,
+    "tol": 0.0005,
+    "side": "eq",
+    "difference": false,
+    "state": "misses",
+    "late": true,
+    "taken_out": "",
+    "said": "fp32.top1: 0.7597 [0.7589, 0.7605] · mean, t interval, 3 seeds, 95% (rb); not reproduced · measured",
+    "short": false,
+    "est_text": "0.7597",
+    "range_text": "0.7589…0.7605",
+    "claim": false,
+    "measure_unit": "",
+    "result_text": "0.7597",
+    "edge_text": "0.7608 to 0.7618"
+   },
+   {
+    "id": "c6",
+    "group": "int8 latency_ratio",
+    "label": "int8 latency is at most 0.6 of fp32 on the T4",
+    "est": 0.64,
+    "lo": null,
+    "hi": null,
+    "n": 1,
+    "unit": "run",
+    "threshold": 0.6,
+    "tol": 0.0,
+    "side": "le",
+    "difference": false,
+    "state": "misses",
+    "late": true,
+    "taken_out": "",
+    "said": "latency_ratio: int8: 0.64 · 1 run (rb); criterion not met · point only",
+    "short": false,
+    "est_text": "0.64",
+    "range_text": "",
+    "claim": false,
+    "measure_unit": "",
+    "result_text": "0.64",
+    "edge_text": "up to 0.6"
+   }
+  ],
+  "rests": [
+   {
+    "key": "planned",
+    "runs": null,
+    "label": "planned first",
+    "ok": null,
+    "n": 3,
+    "of": 5,
+    "said": "3 of 5 checks were written before their results",
+    "opens": "q1",
+    "taken_out": "",
+    "text": "planned first 3 of 5"
+   },
+   {
+    "key": "reproduced",
+    "runs": null,
+    "label": "reproduced",
+    "ok": false,
+    "n": 0,
+    "of": 1,
+    "said": "0 of 1 cited numbers reproduced",
+    "opens": "q1",
+    "taken_out": "",
+    "text": "reproduced ✗ 0 of 1"
+   },
+   {
+    "key": "tries",
+    "label": "tries",
+    "ok": null,
+    "n": 1,
+    "of": null,
+    "runs": 8,
+    "said": "8 runs in 1 experiment",
+    "opens": "runs",
+    "taken_out": "",
+    "text": "tries 1 · 8 runs"
+   },
+   {
+    "key": "code",
+    "runs": null,
+    "label": "code kept",
+    "ok": true,
+    "n": 1,
+    "of": 1,
+    "said": "the code is kept whole for 1 of 1 experiments",
+    "opens": "e1",
+    "taken_out": "",
+    "text": "code kept ✓ 1 of 1"
+   }
+  ],
+  "decisions": [
+   {
+    "kind": "decide",
+    "chip": "decide",
+    "code": "undecided",
+    "subject": "c2",
+    "title": "fp32 top1 matches the published 76.13",
+    "mark": "▲",
+    "cmd": "",
+    "do": "rb decide c2 accept|reject|investigate --why \"...\"",
+    "said": "c2 is not reproduced and no call on it is recorded: fp32 top1 matches the published 76.13",
+    "taken_out": ""
+   },
+   {
+    "kind": "confirm",
+    "chip": "confirm",
+    "code": "call_proposed",
+    "subject": "c3",
+    "title": "the ONNX export holds onnx_top1",
+    "mark": "accept",
+    "cmd": "rb confirm dec7",
+    "do": "rb confirm dec7",
+    "said": "a accept call on c3 waits for your confirmation",
+    "taken_out": ""
+   },
+   {
+    "kind": "confirm",
+    "chip": "confirm",
+    "code": "design_pending",
+    "subject": "e1 · e2",
+    "title": "2 plans",
+    "mark": "",
+    "cmd": "rb confirm",
+    "do": "rb confirm",
+    "said": "the design of 2 experiments is not confirmed",
+    "taken_out": ""
+   }
+  ],
+  "made": 2,
+  "made_taken_out": 0,
+  "others": [],
+  "plain": null,
+  "counts": {
+   "questions": 2,
+   "checks": 6,
+   "runs": 9
+  }
  },
  "your_call": {
   "n": 4,
@@ -1005,6 +1255,17 @@
    ],
    "other_code": "",
    "timing": "before",
+   "when": {
+    "rule": "2026-10-12",
+    "results": "2026-10-14"
+   },
+   "chips": [
+    {
+     "kind": "undecided",
+     "text": "not decided"
+    }
+   ],
+   "mixes": [],
    "witness": {
     "total": 3,
     "afterwards": 0
@@ -1175,6 +1436,36 @@
    ],
    "other_code": "",
    "timing": "after_evidence",
+   "when": {
+    "rule": "2026-10-20",
+    "results": "2026-10-14"
+   },
+   "chips": [
+    {
+     "kind": "late",
+     "text": "written after its results"
+    },
+    {
+     "kind": "undecided",
+     "text": "not decided"
+    }
+   ],
+   "mixes": [
+    {
+     "setting": "checker",
+     "values": [
+      {
+       "value": "strict",
+       "runs": 3
+      },
+      {
+       "value": "loose",
+       "runs": 1
+      }
+     ],
+     "how": "arms_differ"
+    }
+   ],
    "witness": {
     "total": 3,
     "afterwards": 0
@@ -1342,6 +1633,17 @@
    ],
    "other_code": "",
    "timing": "before",
+   "when": {
+    "rule": "2026-10-12",
+    "results": "2026-10-14"
+   },
+   "chips": [
+    {
+     "kind": "undecided",
+     "text": "not decided"
+    }
+   ],
+   "mixes": [],
    "witness": {
     "total": 1,
     "afterwards": 0
@@ -1478,6 +1780,17 @@
    "observed_places": [],
    "other_code": "",
    "timing": "before",
+   "when": {
+    "rule": "2026-10-12",
+    "results": "2026-10-14"
+   },
+   "chips": [
+    {
+     "kind": "undecided",
+     "text": "not decided"
+    }
+   ],
+   "mixes": [],
    "witness": {
     "total": 3,
     "afterwards": 0
@@ -1717,6 +2030,17 @@
    ],
    "other_code": "",
    "timing": "before",
+   "when": {
+    "rule": "2026-10-12",
+    "results": "2026-10-14"
+   },
+   "chips": [
+    {
+     "kind": "undecided",
+     "text": "not decided"
+    }
+   ],
+   "mixes": [],
    "witness": {
     "total": 4,
     "afterwards": 0
@@ -1869,6 +2193,21 @@
    ],
    "other_code": "",
    "timing": "after_evidence",
+   "when": {
+    "rule": "2026-10-20",
+    "results": "2026-10-14"
+   },
+   "chips": [
+    {
+     "kind": "late",
+     "text": "written after its results"
+    },
+    {
+     "kind": "undecided",
+     "text": "not decided"
+    }
+   ],
+   "mixes": [],
    "witness": {
     "total": 1,
     "afterwards": 1
@@ -2351,7 +2690,8 @@
        "name": "batch_size",
        "value": "256",
        "source": "configs/eval.yaml:3",
-       "status": "verified"
+       "status": "verified",
+       "said": "configs/eval.yaml says the value"
       }
      ],
      "by_arm": {
@@ -2360,7 +2700,8 @@
         "name": "quant",
         "value": "int8",
         "source": "configs/int8.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/int8.yaml says the value"
        }
       ],
       "fp32": [
@@ -2368,7 +2709,8 @@
         "name": "quant",
         "value": "fp32",
         "source": "configs/fp32.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/fp32.yaml says the value"
        }
       ]
      },
@@ -2458,7 +2800,22 @@
      "refs": []
     }
    ],
-   "compares": "int8 against the fp32 baseline"
+   "compares": "int8 against the fp32 baseline",
+   "mixes": [
+    {
+     "setting": "checker",
+     "values": [
+      {
+       "value": "strict",
+       "runs": 6
+      },
+      {
+       "value": "loose",
+       "runs": 2
+      }
+     ]
+    }
+   ]
   },
   {
    "id": "e2",
@@ -2978,7 +3335,8 @@
      ]
     }
    ],
-   "compares": "int8 against the fp32 baseline"
+   "compares": "int8 against the fp32 baseline",
+   "mixes": []
   }
  ],
  "runs": {
@@ -3209,7 +3567,8 @@
        "name": "batch_size",
        "value": "256",
        "source": "configs/eval.yaml:3",
-       "status": "verified"
+       "status": "verified",
+       "said": "configs/eval.yaml says the value"
       }
      ],
      "by_arm": {
@@ -3218,7 +3577,8 @@
         "name": "quant",
         "value": "int8",
         "source": "configs/int8.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/int8.yaml says the value"
        }
       ],
       "fp32": [
@@ -3226,7 +3586,8 @@
         "name": "quant",
         "value": "fp32",
         "source": "configs/fp32.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/fp32.yaml says the value"
        }
       ]
      },
@@ -3393,7 +3754,8 @@
        "name": "batch_size",
        "value": "256",
        "source": "configs/eval.yaml:3",
-       "status": "verified"
+       "status": "verified",
+       "said": "configs/eval.yaml says the value"
       }
      ],
      "by_arm": {
@@ -3402,7 +3764,8 @@
         "name": "quant",
         "value": "int8",
         "source": "configs/int8.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/int8.yaml says the value"
        }
       ],
       "fp32": [
@@ -3410,7 +3773,8 @@
         "name": "quant",
         "value": "fp32",
         "source": "configs/fp32.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/fp32.yaml says the value"
        }
       ]
      },
@@ -3590,7 +3954,8 @@
        "name": "batch_size",
        "value": "256",
        "source": "configs/eval.yaml:3",
-       "status": "verified"
+       "status": "verified",
+       "said": "configs/eval.yaml says the value"
       }
      ],
      "by_arm": {
@@ -3599,7 +3964,8 @@
         "name": "quant",
         "value": "int8",
         "source": "configs/int8.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/int8.yaml says the value"
        }
       ],
       "fp32": [
@@ -3607,7 +3973,8 @@
         "name": "quant",
         "value": "fp32",
         "source": "configs/fp32.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/fp32.yaml says the value"
        }
       ]
      },
@@ -3776,7 +4143,8 @@
        "name": "batch_size",
        "value": "256",
        "source": "configs/eval.yaml:3",
-       "status": "verified"
+       "status": "verified",
+       "said": "configs/eval.yaml says the value"
       }
      ],
      "by_arm": {
@@ -3785,7 +4153,8 @@
         "name": "quant",
         "value": "int8",
         "source": "configs/int8.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/int8.yaml says the value"
        }
       ],
       "fp32": [
@@ -3793,7 +4162,8 @@
         "name": "quant",
         "value": "fp32",
         "source": "configs/fp32.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/fp32.yaml says the value"
        }
       ]
      },
@@ -3944,7 +4314,8 @@
        "name": "batch_size",
        "value": "256",
        "source": "configs/eval.yaml:3",
-       "status": "verified"
+       "status": "verified",
+       "said": "configs/eval.yaml says the value"
       }
      ],
      "by_arm": {
@@ -3953,7 +4324,8 @@
         "name": "quant",
         "value": "int8",
         "source": "configs/int8.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/int8.yaml says the value"
        }
       ],
       "fp32": [
@@ -3961,7 +4333,8 @@
         "name": "quant",
         "value": "fp32",
         "source": "configs/fp32.yaml:1",
-        "status": "verified"
+        "status": "verified",
+        "said": "configs/fp32.yaml says the value"
        }
       ]
      },
@@ -4582,6 +4955,23 @@
    "identity": "sha256 of the file list",
    "exact": true,
    "how": "python get_data.py --split val",
+   "said": "no download link",
+   "get": {
+    "kind": "none",
+    "href": "",
+    "text": "",
+    "public": true
+   },
+   "cite": [],
+   "asks": false,
+   "copies": [
+    {
+     "ref": "data/imagenet/val",
+     "state": "here",
+     "outside": false,
+     "said": "copy here: data/imagenet/val"
+    }
+   ],
    "acquisition": {
     "command": "python get_data.py --split val",
     "from": "scripts/README.md:5"
@@ -4659,6 +5049,23 @@
    "identity": "sha256 of the file list",
    "exact": true,
    "how": "python get_data.py --calib 512",
+   "said": "no download link",
+   "get": {
+    "kind": "none",
+    "href": "",
+    "text": "",
+    "public": true
+   },
+   "cite": [],
+   "asks": false,
+   "copies": [
+    {
+     "ref": "data/imagenet/calib512",
+     "state": "here",
+     "outside": false,
+     "said": "copy here: data/imagenet/calib512"
+    }
+   ],
    "acquisition": {
     "command": "python get_data.py --calib 512",
     "from": "scripts/README.md:6"
@@ -4714,6 +5121,23 @@
    "identity": "sha256 0e4b9a71c2d8",
    "exact": true,
    "how": "",
+   "said": "get it: https://example.org/resnet50_fp32.pt",
+   "get": {
+    "kind": "url",
+    "href": "https://example.org/resnet50_fp32.pt",
+    "text": "https://example.org/resnet50_fp32.pt",
+    "public": true
+   },
+   "cite": [],
+   "asks": false,
+   "copies": [
+    {
+     "ref": "models/resnet50_fp32.pt",
+     "state": "here",
+     "outside": false,
+     "said": "copy here: models/resnet50_fp32.pt"
+    }
+   ],
    "acquisition": null,
    "read_by": {
     "runs": [
@@ -4758,6 +5182,23 @@
    "identity": "sha256 a346fc2bfdfa",
    "exact": true,
    "how": "python quantize.py --seed 1 --calib 512",
+   "said": "no download link",
+   "get": {
+    "kind": "none",
+    "href": "",
+    "text": "",
+    "public": true
+   },
+   "cite": [],
+   "asks": false,
+   "copies": [
+    {
+     "ref": "models/int8_s1.pt",
+     "state": "here",
+     "outside": false,
+     "said": "copy here: models/int8_s1.pt"
+    }
+   ],
    "acquisition": {
     "command": "python quantize.py --seed 1 --calib 512",
     "from": "scripts/README.md:8"
@@ -6050,6 +6491,14 @@
    }
   ],
   "record_files": 42,
+  "chip": {
+   "ref": "exp-b",
+   "commit": "5d1e0a7c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e",
+   "not_committed": 1,
+   "files": [
+    ".rb/log.jsonl"
+   ]
+  },
   "not_committed_files": [
    {
     "path": ".rb/log.jsonl",
@@ -6497,5 +6946,128 @@
    "open_url": "vscode://file/home/ana/int8-resnet50/configs/fp32.yaml:1",
    "cited_by": []
   }
- }
+ },
+ "files": [
+  {
+   "path": "README.md",
+   "folder": "",
+   "name": "README.md",
+   "named": true,
+   "marks": [
+    {
+     "key": "cited",
+     "glyph": "❝",
+     "ascii": "\"",
+     "n": 1,
+     "said": "cited by the record"
+    }
+   ],
+   "cited_by": [
+    {
+     "kind": "criterion",
+     "id": "c2"
+    }
+   ],
+   "lines": [
+    14
+   ],
+   "changed_since": "",
+   "git": "committed"
+  },
+  {
+   "path": "configs/calib.yaml",
+   "folder": "configs/",
+   "name": "calib.yaml",
+   "named": false,
+   "marks": [
+    {
+     "key": "uncommitted",
+     "glyph": "±",
+     "ascii": "+",
+     "n": null,
+     "said": "not committed"
+    }
+   ],
+   "cited_by": [],
+   "lines": [],
+   "changed_since": "",
+   "git": "changed"
+  },
+  {
+   "path": "configs/train.yaml",
+   "folder": "configs/",
+   "name": "train.yaml",
+   "named": true,
+   "marks": [
+    {
+     "key": "setting",
+     "glyph": "⚙",
+     "ascii": "s",
+     "n": 3,
+     "said": "the source of a setting"
+    }
+   ],
+   "cited_by": [
+    {
+     "kind": "setting",
+     "id": "e1/optim.lr"
+    }
+   ],
+   "lines": [
+    3
+   ],
+   "changed_since": "",
+   "git": "committed"
+  },
+  {
+   "path": "notes.md",
+   "folder": "",
+   "name": "notes.md",
+   "named": true,
+   "marks": [
+    {
+     "key": "cited",
+     "glyph": "❝",
+     "ascii": "\"",
+     "n": 1,
+     "said": "cited by the record"
+    }
+   ],
+   "cited_by": [
+    {
+     "kind": "call",
+     "id": "dec4"
+    }
+   ],
+   "lines": [
+    3
+   ],
+   "changed_since": "",
+   "git": "committed"
+  },
+  {
+   "path": "results/seed1/metrics.json",
+   "folder": "results/seed1/",
+   "name": "metrics.json",
+   "named": true,
+   "marks": [
+    {
+     "key": "output",
+     "glyph": "▣",
+     "ascii": "o",
+     "n": null,
+     "said": "a run's output"
+    }
+   ],
+   "cited_by": [
+    {
+     "kind": "run",
+     "id": "runs1"
+    }
+   ],
+   "lines": [],
+   "changed_since": "",
+   "git": "committed"
+  }
+ ]
 }

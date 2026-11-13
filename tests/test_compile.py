@@ -108,7 +108,7 @@ def test_prose_grounds_against_the_record_and_the_rest_stays_unplaced(rb, capsys
     assert "777.77" not in grounded                                          # unknown numbers stay unplaced
     # The command wrote nothing: compile is a read.
     assert not env.data["proposals"]
-    code2, env2 = rb("status")
+    code2, env2 = rb("status", "--full")
     assert env2.data["counts"]["run_count"] == 1
 
 

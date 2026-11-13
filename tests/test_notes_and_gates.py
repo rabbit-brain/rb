@@ -16,6 +16,12 @@ import pytest
 import rabbit_brain
 from rbtest import AGENT_VARS, Mcp, command, environment
 
+
+def dd_of(html: str, label: str, inner: str):
+    """A record card's fact, `<dt>label</dt><dd>...inner...</dd>`. Closed form (owner, Nov 13 2026): the value is a
+    link that opens the record card it comes from, so the words may sit in its `<a>`."""
+    return re.search(r'<dt>' + re.escape(label) + r'</dt><dd>(?:<a href="#k-[^"]+">)?<span class="au">' + re.escape(inner) + r'</span>(?:</a>)?</dd>', html)
+
 AGENT = {"CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "sess-notes-3f1a"}
 GATE = "If INT8 still loses less than 0.01 top-1, I ship it next week."
 
@@ -29,7 +35,7 @@ def confirm(exp: str, if_holds: str = "", if_not: str = "", words: str = "") -> 
 def design_confirm(rec: "Rec", exp: str) -> str:
     """The command that confirms an experiment's design as rb lists it now, which a gate a session set waits with: its
     experiment and a short hash of the design; nothing where it does not wait."""
-    [e] = [e for e in rec.ok("status")["data"]["experiments"] if e["id"] == exp]
+    [e] = [e for e in rec.ok("status", "--full")["data"]["experiments"] if e["id"] == exp]
     return e["design"]["confirm"]
 
 
@@ -98,32 +104,34 @@ def test_a_note_shows_its_id_and_a_retracted_note_leaves_every_screen(rec, monke
     first = rec.ok("note", "add", "-e", "int8", "results.csv row 12 gives top1 0.755; read from line 21.", agent=AGENT)["data"]["object"]["id"]
     later = rec.ok("note", "add", "-e", "int8", "The calibration set is the first 1000 validation images.", agent=AGENT)["data"]["object"]["id"]
     on_project = rec.ok("note", "add", "Older precisions wait for backfill.", agent=AGENT)["data"]["object"]["id"]
-    assert f"note {later}: The calibration set" in rec.text("status")
-    shown = rec.text("show", "int8")
+    assert f"note {later}: The calibration set" in rec.text("status", "--full")
+    shown = rec.text("show", "--long", "int8")
     assert f"  note {first} (" in shown and f"  note {later} (" in shown
     context = rec.text("context")
     assert f"- note {first}: results.csv row 12" in context and f"- note {on_project}: Older precisions" in context
-    assert f"  note {on_project} (" in rec.text("status")
+    assert f"  note {on_project} (" in rec.text("status", "--full")
     # the page names a note by what it is on, never by its id, which stays the item's own (Look 7, FIX6)
-    assert f'<li class="note" data-id="{first}"><span class="nd2">note on int8:</span> <span class="au">results.csv row 12' in rec.html()
+    # as one line (owner, Nov 13 2026): rb's label, its opening clause, not confirmed; the whole a click away
+    assert (f'<li class="note nl" data-id="{first}"><details class="nfold" data-fold="note:{first}"><summary><span class="nd2">note on int8:</span> '
+            '<span class="nop">results.csv row 12 gives top1 0.755;</span><span class="fch fch-warn">not confirmed</span></summary>') in rec.html()
     # a plain note adds no key an older rb does not know
     assert "retracted" not in (rec.root / ".rb" / "experiments" / "int8" / "notes" / f"{first}.yaml").read_text(encoding="utf-8")
 
     said = rec.text("retract", first, "--why", "the row is 12, the line was mistyped")
     assert said.startswith(f"{first} (note) retracted: the row is 12, the line was mistyped.")
-    for where, text in {"status": rec.text("status"), "show": rec.text("show", "int8"), "context": rec.text("context"), "page": rec.page()}.items():
+    for where, text in {"status": rec.text("status", "--full"), "show": rec.text("show", "--long", "int8"), "context": rec.text("context"), "page": rec.page()}.items():
         assert "results.csv row 12" not in text, where
         assert "The calibration set" in text, where
     kept = (rec.root / ".rb" / "experiments" / "int8" / "notes" / f"{first}.yaml").read_text(encoding="utf-8")
     assert "results.csv row 12" in kept and "why: the row is 12, the line was mistyped" in kept
-    [row] = [n for n in rec.ok("status")["data"]["experiments"][0]["notes"] if n["id"] == first]
+    [row] = [n for n in rec.ok("status", "--full")["data"]["experiments"][0]["notes"] if n["id"] == first]
     assert row["retracted"]["why"] == "the row is 12, the line was mistyped"
     assert rec.ok("log")["data"]["entries"][-1]["op"] == "retract"
 
     # the SDK and MCP take a note back the same way
     at_the_users_terminal(rec, monkeypatch)
     rabbit_brain.open(rec.root).retract(later, why="said in the plan already")
-    assert "The calibration set" not in rec.text("show", "int8")
+    assert "The calibration set" not in rec.text("show", "--long", "int8")
     server = Mcp(root=rec.root, env={**rec.env, "RB_SESSION": "sess-notes-mcp"})
     try:
         server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "clientInfo": {"name": "notes-client"}}})
@@ -132,7 +140,7 @@ def test_a_note_shows_its_id_and_a_retracted_note_leaves_every_screen(rec, monke
         assert not answer["result"].get("isError"), answer
     finally:
         server.close()
-    assert "Older precisions" not in rec.text("status") and "Older precisions" not in rec.text("context")
+    assert "Older precisions" not in rec.text("status", "--full") and "Older precisions" not in rec.text("context")
     code = rec.run("retract", first, "--why", "again", "--json")
     assert code.returncode == 2 and "was already retracted" in json.loads(code.stdout)["errors"][0]["message"]
 
@@ -142,24 +150,25 @@ def test_a_gates_words_are_said_once_and_as_given_on_the_page(rec):
     session's first-person words stood on it with no mark of whose they are."""
     rec.ok("experiment", "gate", "int8", "--if-holds", GATE, "--words", GATE, agent=AGENT)
     said = f'if it holds: words (as given): "{GATE}"'
-    status = rec.text("status")
+    status = rec.text("status", "--full")
     assert said in status and status.count(GATE) == 1
     assert said in rec.text("context")
     page = rec.page()
     assert f'words (as given): "{GATE}"' in page and f"if it holds: {GATE}" not in page
     # words that differ from the gate's text still follow it, as before
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8", "--words", GATE, agent=AGENT)
-    assert f'if it holds: ship INT8 · words (as given): "{GATE}"' in rec.text("status")
+    assert f'if it holds: ship INT8 · words (as given): "{GATE}"' in rec.text("status", "--full")
     # the researcher's own gate: their words once in rb's text, and on a page neither tag nor quote. Words a session gave
     # the same read as given while the design waits: no line's time says whose they are now (review of the snapshot
     # rule, round 1); once the user confirms the design they are theirs
     rec.ok("experiment", "gate", "int8", "--if-holds", GATE, "--words", GATE)
-    assert f'if it holds: words (as given): "{GATE}" · not confirmed' in rec.text("status")
+    assert f'if it holds: words (as given): "{GATE}" · not confirmed' in rec.text("status", "--full")
     rec.ok(*design_confirm(rec, "int8").split()[1:])
-    assert f'if it holds: your words: "{GATE}"' in rec.text("status")
+    assert f'if it holds: your words: "{GATE}"' in rec.text("status", "--full")
     page, html = rec.page(), rec.html()
     # neither tag: "your words", nor the "words (as given)" a session's are said in (rb's "command (as given)" is no tag)
-    assert f'<dt>if it holds</dt><dd><span class="au">{GATE}</span></dd>' in html and "your words" not in page and "words (as given)" not in page
+    # closed form (owner, Nov 13 2026): the fact's words sit in a link to the experiment's record card
+    assert dd_of(html, "if it holds", GATE) and "your words" not in page and "words (as given)" not in page
 
 
 def test_a_session_takes_back_only_a_note_a_session_wrote(rec, monkeypatch):
@@ -185,9 +194,9 @@ def test_a_session_takes_back_only_a_note_a_session_wrote(rec, monkeypatch):
     finally:
         server.close()
     assert len(rec.ok("log")["data"]["entries"]) == lines
-    assert "The calibration set" in rec.text("show", "int8") and "Older precisions" in rec.text("status")
+    assert "The calibration set" in rec.text("show", "--long", "int8") and "Older precisions" in rec.text("status", "--full")
     rec.ok("retract", theirs, "--why", "the seed was fine", agent=AGENT)
-    assert "seed 2 looked odd" not in rec.text("show", "int8")
+    assert "seed 2 looked odd" not in rec.text("show", "--long", "int8")
 
 
 def test_a_gate_a_session_set_reads_as_not_confirmed_and_its_receipt_says_it_once(rec, monkeypatch):
@@ -204,7 +213,7 @@ def test_a_gate_a_session_set_reads_as_not_confirmed_and_its_receipt_says_it_onc
     r = rec.run("experiment", "gate", "int4", "--if-holds", "I ship INT4 next week", "--if-not", "I keep FP32", agent=AGENT)
     line = "if it holds: I ship INT4 next week · if not: I keep FP32 · not confirmed"
     assert r.stdout.startswith(f"int4 gates: {line}\n  design not confirmed · list it to confirm: rb confirm int4\n"), r.stdout
-    for where, text in {"status": rec.text("status"), "show": rec.text("show", "int4"), "context": rec.text("context")}.items():
+    for where, text in {"status": rec.text("status", "--full"), "show": rec.text("show", "--long", "int4"), "context": rec.text("context")}.items():
         assert "I keep FP32 · not confirmed" in text, where
     assert "I keep FP32 · not confirmed" in " ".join(rec.page().split())
     at_the_users_terminal(rec, monkeypatch)
@@ -217,7 +226,7 @@ def test_a_gate_a_session_set_reads_as_not_confirmed_and_its_receipt_says_it_onc
     assert "I keep FP32 · not confirmed" in json.dumps(json.loads(state), ensure_ascii=False)
     # the researcher's own gate says nothing of the kind
     rec.ok("experiment", "gate", "int4", "--if-holds", "ship INT4", "--if-not", "keep FP32")
-    status = rec.text("status")
+    status = rec.text("status", "--full")
     assert "if it holds: ship INT4 · if not: keep FP32" in status and "keep FP32 · not confirmed" not in status
 
 
@@ -228,13 +237,13 @@ def test_a_note_every_criterion_of_an_experiment_carries_is_said_once_for_it(rec
     rec.ok("criterion", "add", "INT8 reaches 0.75 top-1", "-e", "int8", "-q", "q1", "--metric", "top1", "--subject", "int8", "--at-least", "0.75",
            "--id", "c2")
     shared = "no run config was compared with the spec (record runs with --config)"
-    for where in ("status", "context", "show int8"):
+    for where in ("status --full", "context", "show --long int8"):
         lines = rec.text(*where.split()).splitlines()
         at = [i for i, line in enumerate(lines) if line.strip() == f"· {shared}"]
         head = [i for i, line in enumerate(lines) if line.strip() == "On every int8 criterion:"]
         first = min(i for i, line in enumerate(lines) if line.strip().startswith(("c1 ", "c2 ")))
         assert len(at) == 1 and len(head) == 1 and head[0] < at[0] < first, (where, at, head, first)
-    findings = rec.ok("status")["data"]["findings"]
+    findings = rec.ok("status", "--full")["data"]["findings"]
     assert all(shared in [c["text"] for c in f["caveats"]] for f in findings) and len(findings) == 2
 
 
@@ -251,18 +260,25 @@ def test_a_gate_a_session_set_is_the_users_on_one_rb_confirm(rec):
     rec.ok("decide", "c1", "accept", "--why", "INT8 holds on the first run", agent=AGENT)
     cmd = design_confirm(rec, "int8")
     gate = f'if it holds: words (as given): "{GATE}" · not confirmed'
-    for where in ("status", "context"):
-        text = rec.text(where)
+    for where in ("status --full", "context"):
+        text = rec.text(*where.split())
         assert gate in text and cmd not in text and "The design of 1 experiment is not confirmed: rb confirm lists it." in text, where
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     # its own view does not show every part the key names: it gives the command that lists it (recheck of group E)
     assert f"  design not confirmed · list it to confirm: rb confirm int8\n" in shown and f"  {gate}\n" in shown and cmd not in shown, shown
     # the page says it as status does: on its line, and, in the experiment's part, as the design's standing with the
     # command that lists it, once (round 8)
     page, html = rec.page(), rec.html()
-    assert f'<dt>if it holds</dt><dd><span class="au">words (as given): "{GATE}" · not confirmed</span></dd>' in html, html
-    assert cmd not in page and page.count("design not confirmed · list it to confirm: rb confirm int8") == 1, page
-    assert "The design of 1 experiment is not confirmed: rb confirm lists it." in page and "Gates set, not confirmed" not in page, page
+    # closed form (owner, Nov 13 2026): the fact's words sit in a link to the experiment's record card
+    assert dd_of(html, "if it holds", f'words (as given): "{GATE}" · not confirmed'), html
+    # in the experiment's part, a chip and a Confirm action that shows the keys in rb ui (owner, Nov 13 2026), never
+    # the command's prose
+    assert cmd not in page and page.count("design not confirmed · list it to confirm: rb confirm int8") == 0, page
+    # closed form (owner, Nov 13 2026): the chip is one plain line, and its action a prompt button for their
+    # agent (cpprompt) in place of the Confirm popover; the summary's line names no command
+    assert ('<div class="dstate"><a class="fch fch-warn" href="#k-int8" title="Design not confirmed">This experiment\'s design is not confirmed.</a>'
+            '<button type="button" class="ibtn ico cpprompt rbcmd" data-act="copy-text" data-text="In this repository, use Rabbit Brain to show me the design of "INT8 against FP32" that waits for my confirmation, part by part, and how I confirm it."') in html
+    assert "The design of 1 experiment is not confirmed." in page and "rb confirm lists it" not in page and "Gates set, not confirmed" not in page, page
     assert "Confirm all" not in page, page
     listed = rec.text("confirm")
     assert listed.index("Waiting for a confirmation (1):") < listed.index("Designs waiting for a confirmation (1):\n  int8: INT8 against FP32\n")
@@ -279,7 +295,7 @@ def test_a_gate_a_session_set_is_the_users_on_one_rb_confirm(rec):
     assert f"Confirming 1 design:\n  int8: INT8 against FP32\n" in out and f"    gate: {gate}\n" in out and f"confirm: {cmd}" not in out, out
     assert f'int8\'s design is confirmed.\n  gate: if it holds: your words: "{GATE}"' in out
     assert (rec.root / ".rb" / "experiments" / "int8" / "experiment.yaml").read_bytes() == before
-    for where in ("status", "context", "show int8"):
+    for where in ("status --full", "context", "show --long int8"):
         text = rec.text(*where.split())
         assert f'if it holds: your words: "{GATE}"' in text and "rb confirm int8" not in text and "design not confirmed" not in text, where
     assert rec.ok("confirm")["data"]["gates_pending"] == [] and rec.ok("confirm")["data"]["designs_pending"] == []
@@ -288,10 +304,10 @@ def test_a_gate_a_session_set_is_the_users_on_one_rb_confirm(rec):
     assert "design experiment int8 confirmed, with its gate" in rec.text("log")
     # a session's new gate waits again, with the design it changed
     rec.ok("experiment", "gate", "int8", "--if-not", "I keep FP32", agent=AGENT)
-    status = rec.text("status")
+    status = rec.text("status", "--full")
     assert "I keep FP32 · not confirmed" in status and "The design of 1 experiment is not confirmed: rb confirm lists it." in status, status
-    assert "design not confirmed · list it to confirm: rb confirm int8" in rec.text("show", "int8")
-    assert '  changed since you confirmed it: the gate, was "if it holds: ' in rec.text("show", "int8")
+    assert "design not confirmed · list it to confirm: rb confirm int8" in rec.text("show", "--long", "int8")
+    assert '  changed since you confirmed it: the gate, was "if it holds: ' in rec.text("show", "--long", "int8")
 
 
 @pytest.mark.xfail(strict=True, reason="4b gap (pins-4b.md), an old page pin that cannot pass on the shell; the fix ports it, owner R (views.rs): an experiment's notes are not drawn with their ids")
@@ -302,9 +318,9 @@ def test_a_note_is_named_by_its_id_in_its_receipt_its_log_line_rb_show_and_rb_op
     import urllib.request
     r = rec.run("note", "add", "-e", "int8", "The calibration set is the first 1000 validation images.", agent=AGENT)
     [nid] = re.findall(r"^Note (n[a-z0-9]+) on int8: The calibration set", r.stdout, re.M)
-    shown = rec.text("show", nid)
+    shown = rec.text("show", "--long", nid)
     assert shown.startswith(f"Note {nid} on int8 (") and "The calibration set is the first 1000 validation images. · not confirmed" in shown
-    assert rec.ok("show", nid)["data"]["object"]["id"] == nid
+    assert rec.ok("show", "--long", nid)["data"]["object"]["id"] == nid
     at_the_users_terminal(rec, monkeypatch)
     server = Open(rec.root)
     try:
@@ -317,7 +333,7 @@ def test_a_note_is_named_by_its_id_in_its_receipt_its_log_line_rb_show_and_rb_op
     log = rec.text("log")
     assert f"retract note {nid} on experiment int8: note: said in the plan already" in log and "retract experiment int8" not in log
     assert f"retract note {nid} on experiment int8: note: said in the plan already" in rec.text("context")
-    assert "retracted · note: said in the plan already · not confirmed" in rec.text("show", nid)
+    assert "retracted · note: said in the plan already · not confirmed" in rec.text("show", "--long", nid)
 
 
 def test_a_criterions_statement_that_is_the_words_given_is_said_once_as_given(rec):
@@ -329,14 +345,14 @@ def test_a_criterions_statement_that_is_the_words_given_is_said_once_as_given(re
                 "--at-least", "-0.01", "--id", "c2", "--words", S, agent=AGENT)
     said = f'words (as given): "{S}"'
     assert r.stdout.startswith(f"c2: {said}\n"), r.stdout
-    for where, text in {"status": rec.text("status"), "context": rec.text("context"), "show q1": rec.text("show", "q1"),
-                        "show c2": rec.text("show", "c2")}.items():
+    for where, text in {"status": rec.text("status", "--full"), "context": rec.text("context"), "show q1": rec.text("show", "--long", "q1"),
+                        "show c2": rec.text("show", "--long", "c2")}.items():
         assert said in text and text.count(S) == text.count(said), where
     page = " ".join(rec.page().split())
     assert said in page and page.count(S) == page.count(said)
     rec.ok("criterion", "add", "INT8 loses at most 0.02 top-1", "-e", "int8", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
            "--at-least", "-0.02", "--id", "c3", "--words", S, agent=AGENT)
-    assert f"Criterion c3 on int8 (primary, own): INT8 loses at most 0.02 top-1 · {said}" in rec.text("show", "c3")
+    assert f"Criterion c3 on int8 (primary, own): INT8 loses at most 0.02 top-1 · {said}" in rec.text("show", "--long", "c3")
 
 
 def test_an_adoption_makes_no_gate_or_note_the_users_that_they_did_not_write(rec):
@@ -349,7 +365,7 @@ def test_an_adoption_makes_no_gate_or_note_the_users_that_they_did_not_write(rec
     exp.write_text(exp.read_text(encoding="utf-8").replace("ship INT8 next week", "ship INT4 instead"), encoding="utf-8")
     rec.ok("doctor", "--adopt", "--why", "tidy", agent=AGENT)
     cmd = design_confirm(rec, "int8")
-    for where, waits in (("status", "The design of 1 experiment is not confirmed: rb confirm lists it."), ("show int8", "list it to confirm: rb confirm int8")):
+    for where, waits in (("status --full", "The design of 1 experiment is not confirmed: rb confirm lists it."), ("show --long int8", "list it to confirm: rb confirm int8")):
         text = rec.text(*where.split())
         assert "if it holds: ship INT4 instead · not confirmed" in text and waits in text and "ship it" not in text, where
     assert [g["experiment"] for g in rec.ok("confirm")["data"]["gates_pending"]] == ["int8"]
@@ -366,7 +382,7 @@ def test_an_adoption_makes_no_gate_or_note_the_users_that_they_did_not_write(rec
     assert refused.returncode != 0 and err["code"] == "E_ADOPT_AUTHORITY", err
     assert f"{nid}.text: another writer's words, changed outside rb" in err["problems"], err
     rec.ok("doctor", "--adopt", "--why", "a typo in my note")
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert "The calibration set is the first 5000 validation images." in shown
     assert "5000 validation images. · not confirmed" not in shown
 
@@ -403,7 +419,7 @@ def test_a_gate_is_confirmed_only_as_it_was_listed_and_counted_with_the_calls(re
     call = rec.ok("decide", "int8", "park", "--why", "later", agent=AGENT)["data"]["object"]["id"]
     # trial of group E: while a design waits, no line offers to confirm all, which would confirm a design no screen
     # listed; rb confirm lists it with the call, and its --all counts both (review of group 9)
-    status = rec.text("status")
+    status = rec.text("status", "--full")
     assert "The design of 1 experiment is not confirmed: rb confirm lists it.\n" in status and "Confirm all" not in status, status
     assert "Confirm all" not in rec.text("context") and "Confirm all" not in rec.page()
     assert f"rb confirm {call} {cmd.split()[-1]} confirms 1 call and 1 design as listed." in rec.text("confirm")
@@ -428,16 +444,16 @@ def test_a_sessions_reason_reads_as_its_note_on_rb_log_and_a_gate_confirmed_is_t
     user confirmed the gate the session was told only `gate experiment int8`. A session's reason on rb log and rb
     context reads as its note; the user's stays as given; the session is told the gate was confirmed."""
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8 next week", "--why", "docs/plan.md:6 gives the next step", agent=AGENT)
-    rec.ok("status", agent=AGENT)
+    rec.ok("status", "--full", agent=AGENT)
     log = rec.text("log")
     assert "gate experiment int8: note: docs/plan.md:6 gives the next step" in log, log
     assert "- " in rec.text("context") and "gate experiment int8: note: docs/plan.md:6 gives the next step" in rec.text("context")
     rec.ok("experiment", "gate", "int8", "--if-not", "keep FP32", "--why", "my own plan")
     assert "gate experiment int8: my own plan" in rec.text("log")
     rec.ok("experiment", "gate", "int8", "--if-not", "keep FP32 for now", agent=AGENT)
-    rec.ok("show", "int8", agent=AGENT)
+    rec.ok("show", "--long", "int8", agent=AGENT)
     rec.ok(*design_confirm(rec, "int8").split()[1:])
-    told = [t["text"] for t in rec.ok("show", "int8", agent=AGENT)["rb_delta"]]
+    told = [t["text"] for t in rec.ok("show", "--long", "int8", agent=AGENT)["rb_delta"]]
     assert "int8's design confirmed, with its gate: if it holds: ship INT8 next week · if not: keep FP32 for now" in told, told
 
 
@@ -448,12 +464,12 @@ def test_a_note_every_criterion_here_carries_is_said_once_on_the_questions_readi
     rec.ok("criterion", "add", "INT8 reaches 0.75 top-1", "-e", "int8", "-q", "q1", "--metric", "top1", "--subject", "int8", "--at-least", "0.75",
            "--id", "c2")
     shared = "no run config was compared with the spec (record runs with --config)"
-    for where in ("status", "show q1", "context"):
+    for where in ("status --full", "show q1", "context"):
         text = rec.text(*where.split())
         reading = re.split(r"\n(?:## )?Rules\n", text)[0] if where != "show q1" else text
         assert reading.count(shared) == 1, (where, reading)
         assert f"On every int8 criterion below: " in reading and reading.index("On every int8 criterion below: ") < reading.index("INT8 loses at most 0.01 top-1")
-    q = next(x for x in rec.ok("status")["data"]["questions"] if x["id"] == "q1")
+    q = next(x for x in rec.ok("status", "--full")["data"]["questions"] if x["id"] == "q1")
     assert sum(shared in line for line in q["inquiry"]["summary"]) == 2
 
 
@@ -465,27 +481,27 @@ def test_a_criterion_whose_shared_note_names_an_unverified_setting_never_reads_i
     rec.ok("criterion", "add", "INT8 reaches 0.75 top-1", "-e", "int8", "-q", "q1", "--metric", "top1", "--subject", "int8", "--at-least", "0.75",
            "--id", "c2")
     unchecked = "integrity: no run config was compared, as said above\n"
-    for where in ("context", "show int8"):
+    for where in ("context", "show --long int8"):
         text = rec.text(*where.split())
         assert "no run config was compared with the spec (record runs with --config)" in text and text.count(unchecked) == 2, (where, text)
         assert "integrity: ok" not in text, where
-    assert "integrity:" not in rec.text("status")
+    assert "integrity:" not in rec.text("status", "--full")
     rec.ok("spec", "set", "int8", "calibration", "imagenet-cal", "--no-verify")
-    for where in ("context", "status", "show int8"):
+    for where in ("context", "status --full", "show --long int8"):
         text = rec.text(*where.split())
         assert "On every int8 criterion:" in text and "calibration = imagenet-cal is provisional: no check of it is recorded" in text, where
         assert "integrity: ok" not in text, where
         assert text.count("integrity: settings it reads are not verified, as said above\n") == 2, (where, text)
     # one criterion alone: the note is its own, under it
     rec.ok("retract", "c2", "--why", "a level rule is not what the question asks")
-    shown = rec.text("show", "c1")
+    shown = rec.text("show", "--long", "c1")
     assert "integrity: settings it reads are not verified, as said below" in shown and "integrity: ok" not in shown, shown
     # the experiment's findings in --json keep integrity as it was: no problem, the note under caveats
-    finding = next(f for f in rec.ok("status")["data"]["findings"] if f["criterion"] == "c1")
+    finding = next(f for f in rec.ok("status", "--full")["data"]["findings"] if f["criterion"] == "c1")
     assert finding["says"]["integrity"] == "ok" and "provisional" in [c["code"] for c in finding["caveats"]]
     # a run read again under this spec, with no config: both
     rec.ok("run", "add", "int8", "fp32.top1=0.760", "int8.top1=0.754")
-    assert "integrity: settings it reads are not verified and no run config was compared, as said below\n" in rec.text("show", "c1")
+    assert "integrity: settings it reads are not verified and no run config was compared, as said below\n" in rec.text("show", "--long", "c1")
     # a setting verified and a run whose config was compared with it: ok
     (rec.root / "cfg").mkdir()
     (rec.root / "cfg" / "fp16.json").write_text('{"lr": 0.1}\n', encoding="utf-8")
@@ -494,7 +510,7 @@ def test_a_criterion_whose_shared_note_names_an_unverified_setting_never_reads_i
     rec.ok("criterion", "add", "FP16 loses at most 0.01 top-1", "-e", "fp16", "--metric", "top1", "--subject", "fp16", "--reference", "fp32",
            "--at-least", "-0.01", "--id", "c3")
     rec.ok("run", "add", "fp16", "fp32.top1=0.761", "fp16.top1=0.760", "--config", "cfg/fp16.json")
-    assert "          integrity: ok\n" in rec.text("show", "c3")
+    assert "          integrity: ok\n" in rec.text("show", "--long", "c3")
 
 
 def test_experiment_add_says_the_variants_it_made_and_a_varied_factor_left_the_same_is_said_at_once(rec, monkeypatch):
@@ -586,17 +602,18 @@ def test_a_sessions_why_reads_as_its_note_on_every_screen_and_the_users_as_given
     rec.ok("freeze", "cal", "-m", "docs/plan.md:5 locks the rule before the runs", agent=AGENT)
     rec.ok("experiment", "add", "INT8 per channel", "--id", "chan", "-q", "q1", "--baseline", "fp32", "--candidate", "int8", "-m", "my own reason")
     said = f"note: {WHY} · not confirmed"
-    show, context = rec.text("show", "cal"), rec.text("context")
+    show, context = rec.text("show", "--long", "cal"), rec.text("context")
     assert f"  {said}\n" in show and f"why: {WHY}" not in show, show
     assert "follows from int8: docs/plan.md:4 names it as the next step · not confirmed" in show
     assert " · note: docs/plan.md:5 locks the rule before the runs · not confirmed" in show
     assert f"- {said}\n" in context and f"why: {WHY}" not in context
     assert "- follows from int8: docs/plan.md:4 names it as the next step · not confirmed" in context
-    assert "  why: my own reason\n" in rec.text("show", "chan") and "- why: my own reason\n" in context
+    assert "  why: my own reason\n" in rec.text("show", "--long", "chan") and "- why: my own reason\n" in context
     page, html = rec.page(), rec.html()
     # the session's why is drawn as its note (rb's "note" over the words, then its mark), the user's own as their why
-    assert f'<dt>note</dt><dd><span class="au">{WHY} · not confirmed</span></dd>' in html
-    assert f'<dt>why</dt><dd><span class="au">{WHY}' not in html and '<dt>why</dt><dd><span class="au">my own reason</span></dd>' in html
+    # closed form (owner, Nov 13 2026): the fact's words sit in a link to the experiment's record card
+    assert dd_of(html, "note", f"{WHY} · not confirmed")
+    assert not re.search(r'<dt>why</dt><dd>(?:<a href="#k-[^"]+">)?<span class="au">' + re.escape(WHY), html) and dd_of(html, "why", "my own reason")
     at_the_users_terminal(rec, monkeypatch)
     # rb ui's and rb open's card, and rb open's experiment pane, which says what the brief says
     assert said in object_card("cal", rec.root).facts and "why: my own reason" in object_card("chan", rec.root).facts
@@ -605,7 +622,7 @@ def test_a_sessions_why_reads_as_its_note_on_every_screen_and_the_users_as_given
     assert 'at(x, "why_part")' in (Path(__file__).resolve().parents[1] / "rust" / "src" / "shell" / "views.rs").read_text(encoding="utf-8")
     # nothing on a screen names who wrote it, and --json keeps the why as written
     assert "claude" not in show.lower() and "agent" not in show
-    assert rec.ok("show", "cal")["data"]["object"]["why"] == WHY
+    assert rec.ok("show", "--long", "cal")["data"]["object"]["why"] == WHY
 
 
 def test_a_sessions_supersedes_retraction_link_and_relation_reasons_read_as_its_note(rec, monkeypatch):
@@ -633,8 +650,8 @@ def test_a_sessions_supersedes_retraction_link_and_relation_reasons_read_as_its_
                    "--hypothesis", "per channel loses less", "-m", "docs/plan.md:6 names per channel next", agent=AGENT).stdout
     assert "  hypothesis: per channel loses less (note: docs/plan.md:6 names per channel next · not confirmed)\n" in said, said
     sup, ret = f"superseded by an2 · note: {SUP} · not confirmed", f"retracted · note: {RET} · not confirmed"
-    status, context, page = rec.text("status"), rec.text("context"), rec.page()
-    show_c1, show_an2, show_c2 = rec.text("show", "c1"), rec.text("show", "an2"), rec.text("show", "c2")
+    status, context, page = rec.text("status", "--full"), rec.text("context"), rec.page()
+    show_c1, show_an2, show_c2 = rec.text("show", "--long", "c1"), rec.text("show", "--long", "an2"), rec.text("show", "--long", "c2")
     for where, text in {"show c1": show_c1, "status": status, "context": context, "page": page}.items():
         assert sup in text and f"superseded by an2: {SUP}" not in text, where
     assert f"  supersedes an1 · note: {SUP} · not confirmed\n" in show_an2
@@ -651,6 +668,6 @@ def test_a_sessions_supersedes_retraction_link_and_relation_reasons_read_as_its_
     assert any(f.endswith(f"supersedes an earlier one · note: {SUP} · not confirmed") for f in facts), facts
     # the user's own reasons read as given, and --json keeps every reason as written
     rec.ok("retract", "c3", "-m", "my own reason")
-    assert "retracted: my own reason" in rec.text("status")
-    assert rec.ok("show", "an2")["data"]["object"]["why"] == SUP
+    assert "retracted: my own reason" in rec.text("status", "--full")
+    assert rec.ok("show", "--long", "an2")["data"]["object"]["why"] == SUP
     assert "claude" not in (status + context + page).lower()

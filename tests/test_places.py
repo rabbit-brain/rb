@@ -213,10 +213,10 @@ def test_rb_remove_and_elsewhere_count_as_the_place_does(rec):
     Elsewhere and in rb remove's plan, in the same words."""
     c = by_branch(places(rec.root))["exp-c"]
     assert (c["uncommitted"], c["checkout"]["said"]) == (2, "2 record files not committed")
-    status = rec.rb("status")
+    status = rec.rb("status", "--full")
     [there] = [e for e in status["elsewhere"] if e.get("branch") == "exp-c"]
     assert there["uncommitted"] == 2
-    text = subprocess.run([*command(), "status"], cwd=rec.root, env=rec.env, capture_output=True, text=True).stdout
+    text = subprocess.run([*command(), "status", "--full"], cwd=rec.root, env=rec.env, capture_output=True, text=True).stdout
     assert f"  exp-c · {there['path']} at " in text and "1 run on e1 (int8 against fp32) · 2 record files not committed" in text, text
     plan = rec.rb("remove", "--dry-run", cwd=rec.tree["exp-c"])
     assert plan["uncommitted"] == 2

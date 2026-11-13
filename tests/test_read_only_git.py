@@ -114,9 +114,9 @@ def test_a_read_only_git_folder_keeps_the_journal_beside_the_record_and_moves_it
     aside = Path(".rb/journal")
     assert (aside / "journal.jsonl").is_file() and (aside / "state.json").is_file()
     assert "journal/" in Path(".rb/.gitignore").read_text(encoding="utf-8").splitlines()
-    status = rb.text("status")
+    status = rb.text("status", "--full")
     assert status.count(ASIDE) == 1 and ASIDE in rb.text("context")
-    assert rb("status")[1].data["scope"]["journal_aside"] is True
+    assert rb("status", "--full")[1].data["scope"]["journal_aside"] is True
     # what a watched command printed is kept, and reconcile reads it
     code, env = rb("journal", "run", "--", sys.executable, "eval.py", "3")
     assert code == 0, env.errors
@@ -125,9 +125,9 @@ def test_a_read_only_git_folder_keeps_the_journal_beside_the_record_and_moves_it
     seen = entries(rb)
     # the first look that can write git's folder moves the journal there, each entry once
     rb.lock(on=False)
-    code, env = rb("status")
+    code, env = rb("status", "--full")
     assert code == 0 and env.data["scope"]["journal_aside"] is False
-    assert not aside.exists() and ASIDE not in rb.text("status")
+    assert not aside.exists() and ASIDE not in rb.text("status", "--full")
     home = Path(".git/rb/journal/main/journal.jsonl")
     after = entries(rb)
     assert after[:len(seen)] == seen and [e for e in after if e["op"] == "run"] == ran
@@ -163,7 +163,7 @@ def test_a_move_stopped_halfway_leaves_no_entry_twice(project):
     """A look that appended what was kept aside and stopped before taking it away: the next one adds none of it again."""
     rb = project
     assert rb("init", "INT8 ResNet-50 on ImageNet", "--no-agents")[0] == 0
-    assert rb("status")[0] == 0
+    assert rb("status", "--full")[0] == 0
     rb.lock()
     assert rb("journal", "run", "--", sys.executable, "eval.py", "4")[0] == 0
     kept = lines(Path(".rb/journal/journal.jsonl"))
@@ -172,7 +172,7 @@ def test_a_move_stopped_halfway_leaves_no_entry_twice(project):
     with home.open("a", encoding="utf-8") as f:            # as far as that look got
         f.write("\n".join(kept[:2]) + "\n")
     seen = len(lines(home)) - 2 + len(kept)
-    assert rb("status")[0] == 0
+    assert rb("status", "--full")[0] == 0
     held = lines(home)
     assert len(held) == len(set(held)) and len(held) >= seen and all(line in held for line in kept)
 
@@ -194,7 +194,7 @@ def test_what_rb_init_installs_in_a_sandbox_is_listed_and_rb_remove_takes_it(pro
     assert ".claude/skills/rabbit-brain/SKILL.md: rb's skill for Claude Code, as rb wrote it" in will
     assert ".mcp.json: made by rb, and as rb wrote it" in will and "rb did not write it here" not in plan
     rb.lock(on=False)
-    assert rb("status")[0] == 0                              # a look that can write there moves the list
+    assert rb("status", "--full")[0] == 0                              # a look that can write there moves the list
     home = Path(".git/rb/owned.jsonl")
     moved = [json.loads(x) for x in lines(home)]
     assert not aside.exists() and [m["path"] for m in moved].count("../../.mcp.json") == 1
@@ -226,7 +226,7 @@ def test_a_linked_worktree_keeps_its_own_journal_beside_its_own_record(project, 
     assert rb("init", "INT8 ResNet-50 on ImageNet", "--no-agents")[0] == 0
     git("add", ".rb")
     git("commit", "-qm", "the record")
-    assert rb("status")[0] == 0
+    assert rb("status", "--full")[0] == 0
     wt = tmp_path_factory.mktemp("trees") / "calib"
     git("worktree", "add", "-q", "-b", "calib", str(wt))
     main_journal = lines(Path(".git/rb/journal/main/journal.jsonl"))
@@ -236,7 +236,7 @@ def test_a_linked_worktree_keeps_its_own_journal_beside_its_own_record(project, 
     assert [e["command"].split()[-1] for e in entries(rb, cwd=wt) if e["op"] == "run"] == ["5"]
     assert not any(e["op"] == "run" for e in entries(rb))     # the main checkout's journal is its own
     rb.lock(on=False)
-    assert rb("status", cwd=wt)[0] == 0
+    assert rb("status", "--full", cwd=wt)[0] == 0
     theirs = Path(".git/rb/journal/calib")
     assert not (wt / ".rb/journal").exists() and (theirs / "journal.jsonl").is_file()
     assert json.loads((theirs / "place.json").read_text(encoding="utf-8"))["path"] == str(wt.resolve()).replace("\\", "/")

@@ -51,7 +51,7 @@ def one_model_on_eval_sets(rb, values, *, rows):
 
 def test_no_repeat_form_is_offered_for_a_condition(rb):
     one_model_on_eval_sets(rb, ["imagenet", "imagenet-v2", "imagenet-r"], rows=[76.0, 76.5, 77.0])
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     assert "pooled over 3 valset values" in out
     assert "a rule with --where valset=<value> reads one" in out
     assert "population.repeat" not in out, out
@@ -59,7 +59,7 @@ def test_no_repeat_form_is_offered_for_a_condition(rb):
 
 def test_the_repeat_form_is_offered_for_a_counter_and_said_to_be_for_counters_only(rb):
     one_model_on_eval_sets(rb, ["0", "1", "2"], rows=[76.0, 76.5, 77.0])
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     note = [line for line in out.splitlines() if "pooled in one reading" in line][0]
     assert note.index("--where valset=<value> reads one") < note.index("population.repeat"), note
     assert "The repeat form is for a counter only (a seed, an epoch, a repeat's number), never a condition" in note
@@ -70,7 +70,7 @@ def test_no_repeat_form_is_offered_for_a_setting_at_whose_value_the_rule_misses(
     # the counter-like values hold a miss at one of them: folding them would take that miss away
     one_model_on_eval_sets(rb, ["0", "1", "2"], rows=[74.0, 76.5, 77.0])
     rb("criterion", "add", "INT8 keeps 75 on average", "-e", "e1", "--metric", "top1", "--at-least", "75", "--id", "c2")
-    code, out = rb("show", "c2", text=True)
+    code, out = rb("show", "--long", "c2", text=True)
     assert "valset=0" in out and "alone would not meet the rule" in out, out
     assert "population.repeat" not in out, out
 
@@ -84,7 +84,7 @@ def test_a_pairing_offers_the_repeat_form_for_its_counter_never_for_a_condition(
         for epoch in (0, 1):
             for v, x in (("fp32", 76.0), ("int8", 75.5)):
                 rb("run", "add", "e2", f"{v}.top1={x + epoch / 10}", "--set", f"batch={batch}", "--set", f"epoch={epoch}", "--produced-at", "2026-05-01")
-    f = rb("show", "c3").data["finding"]
+    f = rb("show", "--long", "c3").data["finding"]
     said = f["comparison"]["pairing"]["said"]
     assert "paired by batch and epoch" in said, said
     assert "where epoch only numbers repeats, rb spec set e2 population.repeat epoch --no-verify" in said, said
@@ -99,7 +99,7 @@ def test_a_pairing_by_conditions_alone_offers_no_repeat_form(rb):
     for valset in ("imagenet", "imagenet-v2", "imagenet-r"):
         for v, x in (("fp32", 76.0), ("int8", 75.5)):
             rb("run", "add", "e3", f"{v}.top1={x}", "--set", f"valset={valset}", "--produced-at", "2026-05-01")
-    pairing = rb("show", "c4").data["finding"]["comparison"]["pairing"]
+    pairing = rb("show", "--long", "c4").data["finding"]["comparison"]["pairing"]
     assert "paired by valset" in pairing["said"] and "population.repeat" not in pairing["said"], pairing["said"]
     assert pairing["command"] is None
 
@@ -110,7 +110,7 @@ def test_the_page_lists_every_problem_of_a_card(rb):
     rb("spec", "set", "e4", "fp32.calib", "512", "--no-verify")
     rb("criterion", "add", "INT8 loses at most 1 point", "-e", "e4", "--metric", "change.top1", "--at-least", "-1", "--id", "c5")
     rb("run", "add", "e4", "fp32.top1=76.0", "int8.top1=75.6", "--produced-at", "2026-05-01")
-    problems = [p["text"] for p in rb("show", "c5").data["finding"]["integrity"]]
+    problems = [p["text"] for p in rb("show", "--long", "c5").data["finding"]["integrity"]]
     assert len(problems) == 2, problems
     rb("page", "--out", "page.html")
     page = Path("page.html").read_text(encoding="utf-8")
@@ -135,7 +135,7 @@ def test_rb_status_keeps_the_note_its_integrity_line_points_to(rb):
         rb("run", "add", "e5", "--from", str(d / "metrics.json"), "--config", str(d / "config.yaml"), "--set", "seed=1", "--set", f"problems={n}", "--produced-at", "2026-05-01")
     # a run left out, so the notes are more than rb status shows
     rb("run", "add", "e5", "fp32.top1=70", "--set", "seed=9", "--set", "problems=250", "--produced-at", "2026-05-01")
-    code, out = rb("status", text=True)
+    code, out = rb("status", "--full", text=True)
     block = out[out.index("\n  c6      INT8 loses at most 1 point\n") + 1 :]
     block = "\n".join([block.splitlines()[0]] + [line for line in block.splitlines()[1:]][: next((i for i, line in enumerate(block.splitlines()[1:]) if not line.startswith("          ")), None)])
     assert "has a config that says the code had uncommitted changes when it ran, as said below" in block, block
@@ -186,7 +186,7 @@ def test_no_repeat_form_is_offered_where_it_would_read_away_a_miss(rb):
         rb("run", "add", "e8", f"fp32.top1={a}", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
         rb("run", "add", "e8", f"int8.top1={b}", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
     rb("run", "add", "e8", "int8.top1=500", "--set", "seed=4", "--produced-at", "2026-05-01")
-    f = rb("show", "c8").data["finding"]
+    f = rb("show", "--long", "c8").data["finding"]
     assert f["rule_outcome"] == "misses"
     assert f["comparison"]["pairing"]["command"] is None, f["comparison"]["pairing"]
     assert "population.repeat" not in f["comparison"]["pairing"]["said"]
@@ -201,7 +201,7 @@ def test_where_a_rule_misses_no_note_offers_a_command_that_counts_runs_otherwise
     rb("criterion", "add", "INT8 keeps 70 in every run", "-e", "e9", "--metric", "top1", "--each", "--at-least", "70", "--id", "c9")
     for (seed, epoch, x) in [(1, 0, 65), (2, 0, 80), (3, 0, 71), (1, 1, 90), (2, 1, 70), (3, 1, 75)]:
         rb("run", "add", "e9", f"top1={x}", "--set", f"seed={seed}", "--set", f"epoch={epoch}", "--produced-at", "2026-05-01")
-    f = rb("show", "c9").data["finding"]
+    f = rb("show", "--long", "c9").data["finding"]
     assert f["rule_outcome"] == "misses"
     texts = " ".join(c["text"] for c in f["caveats"])
     assert "population.unit" not in texts and "population.repeat" not in texts, texts

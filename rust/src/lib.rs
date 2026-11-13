@@ -44,12 +44,17 @@ pub mod elsewhere;
 pub mod places;
 pub mod checkout;
 pub mod view;
+pub mod overview;
+pub mod files;
+pub mod plainfile;
+pub mod card;
 pub mod graph;
 pub mod reproduce;
 pub mod capture;
 pub mod history;
 pub mod next_step;
 pub mod acquisition;
+pub mod getit;
 pub mod shell;
 pub mod skill;
 pub mod owned;
@@ -59,11 +64,22 @@ pub mod telemetry;
 pub mod usage;
 pub mod cmds;
 
-pub const VERSION: &str = "0.8.5";
+pub const VERSION: &str = "0.8.6";
 
 /// The version rb says it is: VERSION, or RB_TEST_VERSION when the tests pin it (as RB_TEST_NOW pins the clock and
-/// RB_TEST_SEED the ids), so what they expect outlives a release.
+/// RB_TEST_SEED the ids), so what they expect outlives a release. While they pin it, a file beside the program named
+/// for it with `.test-version` after (rb.test-version) pins this program alone: a test's upgrade puts a newer rb in place
+/// as a copy of the same program, where no wrapper script can run (Windows).
 pub fn version() -> &'static str {
     static PINNED: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    PINNED.get_or_init(|| std::env::var("RB_TEST_VERSION").ok().filter(|v| !v.is_empty()).unwrap_or_else(|| VERSION.to_string()))
+    PINNED.get_or_init(|| {
+        let pinned = std::env::var("RB_TEST_VERSION").ok().filter(|v| !v.is_empty());
+        let beside = || {
+            let exe = std::env::current_exe().ok()?;
+            let mut name = exe.file_name()?.to_os_string();
+            name.push(".test-version");
+            std::fs::read_to_string(exe.with_file_name(name)).ok().map(|t| t.trim().to_string()).filter(|v| !v.is_empty())
+        };
+        pinned.as_ref().and_then(|_| beside()).or(pinned).unwrap_or_else(|| VERSION.to_string())
+    })
 }

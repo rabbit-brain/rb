@@ -55,7 +55,7 @@ def page(rb) -> str:
 
 
 def finding(rb, cid):
-    return rb("show", cid).data["finding"]
+    return rb("show", "--long", cid).data["finding"]
 
 
 # ---------------------------------------------------------------- N1: a count
@@ -73,16 +73,17 @@ def test_a_count_names_both_numbers_and_misses_short_of_its_count(rb):
     assert f["rule_outcome"] == "misses", f
     assert f["says"]["rule"] == "criterion not met: 10 of 20 seeds at most 0.89; the rule asks for 19", f["says"]
     assert len(f["missed_units"]) == 10
-    code, out = rb("show", "cc", text=True)
+    code, out = rb("show", "--long", "cc", text=True)
     assert "10 of 20 seeds at most 0.89; the rule asks for 19" in out
-    code, out = rb("status", text=True)
+    code, out = rb("status", "--full", text=True)
     assert "10 of 20 seeds at most 0.89; the rule asks for 19" in out
     code, out = rb("context", text=True)
     assert "10 of 20 seeds at most 0.89" in out
     text = page(rb)
     assert "INT8: 10 of 20 seeds at most 0.89; the rule asks for 19" in text
-    assert "Not met: INT8: 10 of 20 seeds at most 0.89" in text
-    code, _ = rb("status", "--fail-on", "unmet", text=True)
+    # closed form (owner, Nov 13 2026): a page says a rule's state as "does not hold"
+    assert "Does not hold: INT8: 10 of 20 seeds at most 0.89" in text
+    code, _ = rb("status", "--full", "--fail-on", "unmet", text=True)
     assert code == 1
 
 
@@ -103,7 +104,7 @@ def test_a_count_with_too_few_units_is_undetermined_and_one_with_enough_is_met(r
     seeds(rb, [0.95, 0.889], start=3)
     f = finding(rb, "cc")
     assert f["rule_outcome"] == "meets" and f["says"]["rule"] == "recorded values meet criterion: 3 of 4 seeds at most 0.89; the rule asks for 3", f["says"]
-    code, out = rb("status", text=True)
+    code, out = rb("status", "--full", text=True)
     assert "Rules: 1 met" in out, out
 
 
@@ -121,9 +122,9 @@ def test_a_call_on_a_count_reads_as_made_on_an_earlier_reading_once_it_moves(rb)
     rb("criterion", "add", "2 of 3 seeds below 0.890", "-e", "e1", "--metric", "int8.val_loss", "--at-most", "0.890", "--count", "2", "--of", "3", "--id", "cc")
     seeds(rb, [0.88, 0.95, 0.885])
     rb("decide", "cc", "accept", "--why", "within budget")
-    assert not [i for i in rb("status").data["open"] if i["code"] == "decision_outdated"]
+    assert not [i for i in rb("status", "--full").data["open"] if i["code"] == "decision_outdated"]
     seeds(rb, [0.96], start=2)            # a second run of seed 2: its unit's mean moves
-    assert [i for i in rb("status").data["open"] if i["code"] == "decision_outdated" and i["subject"] == "cc"]
+    assert [i for i in rb("status", "--full").data["open"] if i["code"] == "decision_outdated" and i["subject"] == "cc"]
 
 
 def test_a_count_declared_before_its_runs_reads_so(rb):
@@ -165,7 +166,7 @@ def test_a_best_run_is_named_as_the_best_with_its_unit_and_never_as_a_mean(rb):
     assert f["rule_outcome"] == "misses" and f["says"]["rule"] == "criterion not met: best of 5 seeds, seed 3: 0.8893 > 0.889", f["says"]
     assert f["comparison"]["estimate"] == pytest.approx(0.8893) and f["comparison"]["lo"] is None
     assert "best unit seed 3" in f["says"]["comparison"] and "mean" not in f["says"]["comparison"], f["says"]["comparison"]
-    code, out = rb("show", "cb", text=True)
+    code, out = rb("show", "--long", "cb", text=True)
     assert "best of 5 seeds, seed 3: 0.8893 > 0.889" in out and "the best of 5 units' int8.val_loss ≤ 0.889" in out
     text = page(rb)
     assert "INT8: best of 5 seeds, seed 3: 0.8893 > 0.889" in text
@@ -192,7 +193,7 @@ def test_a_relative_change_reads_in_percent_with_its_interval_said(rb):
     assert f["comparison"]["method"] == "relative change of the means, paired, delta-method t interval" and f["comparison"]["lo"] is not None
     assert "%" in f["says"]["comparison"] and "nats" not in f["says"]["comparison"], f["says"]["comparison"]
     assert f["rule_outcome"] == "meets" and f["says"]["rule"].endswith("≤ 3%"), f["says"]
-    code, out = rb("show", "cr", text=True)
+    code, out = rb("show", "--long", "cr", text=True)
     assert "change.val_loss as a relative change ≤ 3%" in out and "delta-method t interval" in out
     text = page(rb)
     assert re.search(r"INT8 is 2\.\d+% higher than the FP32 baseline", text), re.findall(r"INT8 is [^,]{0,60}", text)
@@ -237,7 +238,7 @@ def test_a_cited_difference_of_means_is_read_as_one_and_is_comparable(rb):
     assert f["comparison"]["estimate"] == pytest.approx((0.98 + 0.99 + 1.01) / 3 - (0.96 + 0.97) / 2)
     assert f["comparison"]["method"].startswith("difference of means, as cited")
     assert f["rule_outcome"] == "meets" and f["says"]["headline"].startswith("reproduced"), f["says"]
-    code, out = rb("show", "cm", text=True)
+    code, out = rb("show", "--long", "cm", text=True)
     assert "change.val_loss as a difference of means = 0.0283 ± 0.00005" in out and "difference of means, as cited" in out
     assert ", a difference of means, as cited" in page(rb)
 
@@ -285,7 +286,7 @@ def test_mcp_declares_a_count(rb):
 ])
 def test_a_clone_keeps_each_rule_whole_and_in_format_2(rb, tmp_path, rule):
     rb("criterion", "add", "the rule", "-e", "e1", *rule, "--id", "c1")
-    said = rb("show", "c1").data["object"]
+    said = rb("show", "--long", "c1").data["object"]
     rb("export", "--with-record", "--out", "bundle")
     rb("clone", "bundle", str(tmp_path / "copy"))
     copied = rbyaml_load(tmp_path / "copy" / ".rb" / "experiments" / "e1" / "criteria" / "c1.yaml")
@@ -624,7 +625,7 @@ def test_a_met_count_reads_on_its_recorded_values_whatever_the_interval(rb):
     f = finding(rb, "cc")
     assert f["comparison"]["lo"] is not None and f["rule_outcome"] == "meets"
     assert f["says"]["headline"].startswith("recorded values meet criterion"), f["says"]
-    data = rb("status").data
+    data = rb("status", "--full").data
     assert data["tally_on_estimate"].get("meets") == 1, (data["tally"], data["tally_on_estimate"])
 
 
@@ -756,7 +757,8 @@ def test_a_count_across_design_cells_says_its_estimate_as_rb_show_does(rb):
     legends = [html.unescape(m) for m in re.findall(r'<p class="figleg figv">(.*?)</p>', raw)]
     for cid, est in (("cc", "0.9915"), ("c1", "+0.0245")):
         assert finding(rb, cid)["says"]["comparison"].split(": ")[1].startswith(est.lstrip("+") if cid == "cc" else est)
-        assert re.search(rf"What rb measured {re.escape(est)} nats", text), (cid, re.findall(r"What rb measured [^ ]+ nats", text))
+        # rb's number, drawn beside the rule's own ("Rule ≤ 1 nats rb 0.9915 nats") or alone where nothing is drawn
+        assert re.search(rf"What rb measured (?:(?:Rule|Claimed) [^ ]+ [^ ]+(?: nats)? rb )?{re.escape(est)} nats", text), (cid, re.findall(r"What rb measured .{0,40}? nats", text))
         assert any(x.endswith(f"estimate: {est}") for x in legends), (cid, legends)
 
 

@@ -55,7 +55,7 @@ def criterion(record, id="c1", metric="new.error", question="q1", when_met="Accu
 
 
 def inquiry(record, question="q1"):
-    return next(q["inquiry"] for q in record("status")["questions"] if q["id"] == question)
+    return next(q["inquiry"] for q in record("status", "--full")["questions"] if q["id"] == question)
 
 
 def rows(root):
@@ -69,7 +69,7 @@ def written(root):
 
 
 def outdated(record, question="q1"):
-    return any(item["code"] == "decision_outdated" and item["subject"] == question for item in record("status")["open"])
+    return any(item["code"] == "decision_outdated" and item["subject"] == question for item in record("status", "--full")["open"])
 
 
 def test_shared_experiment_has_different_evidence_for_each_inquiry(record):
@@ -151,7 +151,7 @@ def test_a_met_threshold_with_an_unresolved_interval_stays_qualified(record):
 def surfaces(record, capsys, question="q1"):
     """What rb show <question>, rb status and rb context print, each as text."""
     said = {}
-    for name, argv in (("show", ["show", question]), ("status", ["status"]), ("context", ["context"])):
+    for name, argv in (("show", ["show", question]), ("status", ["status", "--full"]), ("context", ["context"])):
         main(argv)
         said[name] = capsys.readouterr().out
     return said
@@ -193,14 +193,14 @@ def test_rbs_own_next_steps_link_a_new_criterion_to_the_question_it_bears_on(rec
     assert add.startswith('rb criterion add "<what it should show>" -e e2 -q q1 --metric new.error --at-most <x>')
     [add] = adds(offered("analysis", "add", "e3", "--compare", "new/old:error=0.1[0.05,0.15]", "--method", "bootstrap"), "e3")
     assert add == 'rb criterion add "<what it should show>" -e e3 -q <question> --metric error --subject new --reference old --better'
-    status = offered("status")
+    status = offered("status", "--full")
     assert adds(status, "e1") == ['rb criterion add "<what it should show>" -e e1 -q <question> --metric <name> --at-most <x>']   # q1 and q2
     # a number or a comparison no criterion reads is said unread, with no rule to declare (round 7)
     assert adds(status, "e2") == [] and adds(status, "e3") == []
     record("retract", "q2", "--why", "folded into q1")
-    assert adds(offered("status"), "e1") == ['rb criterion add "<what it should show>" -e e1 -q q1 --metric <name> --at-most <x>']
+    assert adds(offered("status", "--full"), "e1") == ['rb criterion add "<what it should show>" -e e1 -q q1 --metric <name> --at-most <x>']
     parser = cli_parser.build_parser()
-    for command in [*status, *offered("status")]:
+    for command in [*status, *offered("status", "--full")]:
         if command.startswith("rb criterion add "):
             parser.parse_args(shlex.split(command.replace("<question>", "q1").replace("<name>", "error").replace("<x>", "0.1"))[1:])
 
@@ -234,7 +234,7 @@ def test_once_links_are_in_use_each_unassigned_criterion_is_given_to_the_agent_w
     related), each criterion filed under a question and linked to none is an agent item for that question, with the
     filing that links it, and amends a frozen experiment; it fails no gate, and a filing clears it."""
     def unassigned():
-        return {(i["subject"], i["question"]): i for i in record("status")["open"] if i["code"] == "unassigned_criterion"}
+        return {(i["subject"], i["question"]): i for i in record("status", "--full")["open"] if i["code"] == "unassigned_criterion"}
 
     criterion(record, "c3", question=None, when_met=None)
     record("run", "add", "e1", "new.error=0.05")
@@ -245,7 +245,7 @@ def test_once_links_are_in_use_each_unassigned_criterion_is_given_to_the_agent_w
     assert set(items) == {("c3", "q1"), ("c3", "q2")}                    # e1 is filed under both
     assert items[("c3", "q1")]["who"] == "agent" and items[("c3", "q1")]["do"] == 'rb criterion file c3 q1 --why "<why it bears on this question>"'
     assert items[("c3", "q1")]["what"] == "c3 is filed under q1 through e1 and linked to no question, so q1's reading leaves it out: c3"
-    assert not record("status")["gate"]["integrity"] and not record("status")["gate"]["undecided"]
+    assert not record("status", "--full")["gate"]["integrity"] and not record("status", "--full")["gate"]["undecided"]
     record("freeze", "e1", "--why", "before more runs")
     assert {i["do"] for i in unassigned().values()} == {f'rb criterion file c3 {q} --why "<why it bears on this question>" --amend' for q in ("q1", "q2")}
     record("criterion", "file", "c3", "q1", "--why", "it bears on accuracy", "--amend")
@@ -258,7 +258,7 @@ def test_an_unassigned_criterion_waits_while_its_filing_would_be_refused_for_an_
     outside rb. rb status gives that edit's repair (edited_outside_rb) and not the filing until the edit is restored or
     adopted; the filing under a question no edit touches is still given."""
     def unassigned():
-        return sorted((i["subject"], i["question"]) for i in record("status")["open"] if i["code"] == "unassigned_criterion")
+        return sorted((i["subject"], i["question"]) for i in record("status", "--full")["open"] if i["code"] == "unassigned_criterion")
 
     criterion(record, "c3", question=None, when_met=None)
     record("experiment", "add", "Serving cost", "--id", "e2", "-q", "q2", "--baseline", "old", "--candidate", "new")
@@ -269,7 +269,7 @@ def test_an_unassigned_criterion_waits_while_its_filing_would_be_refused_for_an_
     doc.update({"text": "Does top-1 accuracy hold?"} if edited == "question" else {"title": "Shared measurements, edited"})
     path.write_text(rbyaml.dumps(doc), encoding="utf-8")
     subject = "q1" if edited == "question" else "e1"
-    assert [i["subject"] for i in record("status")["open"] if i["code"] == "edited_outside_rb"] == [subject]
+    assert [i["subject"] for i in record("status", "--full")["open"] if i["code"] == "edited_outside_rb"] == [subject]
     assert unassigned() == ([("c3", "q2")] if edited == "question" else [])
     record("criterion", "file", "c3", "q1", "--why", "it bears on accuracy", error="E_STATE_EDITED")
     record("doctor", "--restore")
@@ -312,7 +312,7 @@ def test_a_call_on_a_linked_criterion_is_said_beside_its_interpretation_which_st
     day = row["finding"]["review"]["at"][:10]
     assert f'decided: rejected {day}: the evaluation leaked test data' in row["summary"] and 'your words: "reject it, the eval leaked"' in row["summary"]
     [said] = [line for line in q["summary"] if words in line]
-    assert f"Interpretation active for c1 (estimate meets criterion; decided: rejected {day}: " in said
+    assert f"Note in force for c1 (estimate meets criterion; decided: rejected {day}: " in said
     assert "the evaluation leaked test data" in said and "Rule met" not in said
     for name, text in surfaces(record, capsys).items():
         assert said in text, name
@@ -331,8 +331,8 @@ def test_a_rule_is_said_as_its_finding_words_it_with_the_cells_that_meet_and_the
     interpretation keeps the documented activation rule (the cells' mean meets)."""
     criterion(record, metric="change.error")
     record("run", "add", "e1", "old.error=1", "new.error=1.05")
-    [said] = [line for line in inquiry(record)["summary"] if "Recorded interpretation" in line]
-    assert "Interpretation active for c1 (estimate meets criterion)." in said and "Rule met" not in said
+    [said] = [line for line in inquiry(record)["summary"] if line.startswith(("Note:", "Notes:"))]
+    assert "Note in force for c1 (estimate meets criterion)." in said and "Rule met" not in said
     assert "c1: units: 1 run" in said
     record("spec", "set", "e1", "width", "--design-factor")
     criterion(record, "c2", metric="change.error", question="q2", when_met="Cost stays flat at every width.")
@@ -341,8 +341,8 @@ def test_a_rule_is_said_as_its_finding_words_it_with_the_cells_that_meet_and_the
     q = inquiry(record, "q2")
     [row] = q["direct"]
     assert row["interpretation_active"] and row["finding"]["comparison"]["design"]["meets"] == 1
-    [said] = [line for line in q["summary"] if "Recorded interpretation" in line]
-    assert ("Interpretation active for c2 (estimate meets criterion; 1 of 2 design cells meet the threshold; "
+    [said] = [line for line in q["summary"] if line.startswith(("Note:", "Notes:"))]
+    assert ("Note in force for c2 (estimate meets criterion; 1 of 2 design cells meet the threshold; "
             "range -0.05 to +0.2).") in said
     assert any(text.startswith("units: 2 design cells · descriptive range -0.05 to +0.2;") for text in row["qualifications"])
 
@@ -356,7 +356,7 @@ def test_design_cells_that_all_meet_read_as_both_or_all_of_them(record):
     record("run", "add", "e1", "old.error=1", "new.error=0.95", "--set", "width=512")
     [row] = inquiry(record, "q2")["direct"]
     assert row["finding"]["comparison"]["design"]["meets"] == 2
-    [said] = [line for line in inquiry(record, "q2")["summary"] if "Recorded interpretation" in line]
+    [said] = [line for line in inquiry(record, "q2")["summary"] if line.startswith(("Note:", "Notes:"))]
     assert "; both design cells meet the threshold; " in said and "2 of 2" not in said, said
     assert " · both cells meet the threshold" in row["finding"]["says"]["units"], row["finding"]["says"]["units"]
 
@@ -372,8 +372,8 @@ def test_a_design_range_beside_an_interpretation_reads_as_its_finding_says_it(re
     q = inquiry(record, "q2")
     [row] = q["direct"]
     assert "estimate 12347.4 ≤ 12348" in row["finding"]["says"]["rule"]
-    [said] = [line for line in q["summary"] if "Recorded interpretation" in line]
-    assert ("Interpretation active for c1 (estimate meets criterion; 1 of 2 design cells meet the threshold; "
+    [said] = [line for line in q["summary"] if line.startswith(("Note:", "Notes:"))]
+    assert ("Note in force for c1 (estimate meets criterion; 1 of 2 design cells meet the threshold; "
             "range 12345.6 to 12349.1).") in said and "e+04" not in said
     assert "descriptive range 12345.6 to 12349.1;" in row["finding"]["says"]["units"]
 
@@ -515,7 +515,7 @@ def test_a_call_made_before_anything_was_filed_under_its_question_asks_again_onc
     record("criterion", "add", "the error holds on the other split", "-e", "e3", "--metric", "new.error", "--at-most", "0.1", "--id", "c5")
     record("run", "add", "e3", "new.error=0.05")
     assert record("show", decision["id"])["current"] is False
-    assert not outdated(record, "q3") and not record("status")["gate"]["undecided"]
+    assert not outdated(record, "q3") and not record("status", "--full")["gate"]["undecided"]
     record("criterion", "file", "c5", "q3", "--why", "say what c5 bears on")
     assert outdated(record, "q3")
 
@@ -548,7 +548,7 @@ def earlier(workdir, monkeypatch, capsys):
 
 
 def items(record, code):
-    return [item["subject"] for item in record("status")["open"] if item["code"] == code]
+    return [item["subject"] for item in record("status", "--full")["open"] if item["code"] == code]
 
 
 def test_an_earlier_builds_question_call_reads_as_it_was_made(earlier):
@@ -558,7 +558,7 @@ def test_an_earlier_builds_question_call_reads_as_it_was_made(earlier):
     assert earlier("doctor")["outcome"]["passed"]
     assert written(earlier.root) == {rel.removeprefix(".rb/"): text.encode("utf-8") for rel, text in earlier.fixture["files"].items()}
     earlier("run", "add", "e1", "base.val_loss=1.0", "wide.val_loss=1.05")
-    [moved] = [i for i in earlier("status")["open"] if i["code"] == "decision_outdated"]
+    [moved] = [i for i in earlier("status", "--full")["open"] if i["code"] == "decision_outdated"]
     assert moved["subject"] == "q1" and moved["what"].endswith("moved since: c1")
     assert items(earlier, "gate_missed") == ["g1"]
 
@@ -569,16 +569,16 @@ def test_a_new_question_call_in_an_earlier_record_keeps_its_shape_until_a_criter
     assert "inquiry_basis" not in (earlier.root / f".rb/decisions/{decision['id']}.yaml").read_text(encoding="utf-8")
     assert items(earlier, "decision_outdated") == [] and items(earlier, "gate_missed") == []
     earlier("criterion", "file", "c1", "q1", "--when-met", "Width lowers val_loss.", "--why", "say what c1 bears on")
-    [moved] = [i for i in earlier("status")["open"] if i["code"] == "decision_outdated"]
+    [moved] = [i for i in earlier("status", "--full")["open"] if i["code"] == "decision_outdated"]
     assert moved["subject"] == "q1" and moved["what"].endswith("moved since: c1")
 
 
 def test_a_question_link_alone_is_discoverable_without_an_experiment_filing(record):
     record("question", "add", "Another angle on the same measurements", "--id", "q3")
     criterion(record, question="q3")
-    status = record("status")
+    status = record("status", "--full")
     assert not any(item["code"] == "open_question" and item["subject"] == "q3" for item in status["open"])
-    scoped = record("status", "e1")
+    scoped = record("status", "--full", "e1")
     assert any(q["id"] == "q3" for q in scoped["questions"])
     brief = next(b for b in home().briefs if b.id == "q3")
     assert [r["criterion"] for r in brief.inquiry["direct"]] == ["c1"]
@@ -604,11 +604,11 @@ def test_moving_an_inquiry_keeps_its_links_and_logs_the_reason_and_words(record)
 def test_a_call_on_one_inquiry_does_not_settle_another_inquirys_missed_gate(record):
     criterion(record, question="q2", role="gate")
     record("run", "add", "e1", "new.error=0.2")
-    assert any(item["code"] == "gate_missed" for item in record("status")["open"])
+    assert any(item["code"] == "gate_missed" for item in record("status", "--full")["open"])
     record("decide", "q1", "park", "--why", "park the first inquiry only")
-    assert any(item["code"] == "gate_missed" for item in record("status")["open"])
+    assert any(item["code"] == "gate_missed" for item in record("status", "--full")["open"])
     record("decide", "q2", "park", "--why", "park the inquiry that owns this policy")
-    assert not any(item["code"] == "gate_missed" for item in record("status")["open"])
+    assert not any(item["code"] == "gate_missed" for item in record("status", "--full")["open"])
 
 
 def test_link_revisions_removal_and_refiling_keep_the_attributed_history(record, monkeypatch):
@@ -663,7 +663,7 @@ def test_a_retracted_linked_criterion_leaves_the_questions_evidence_and_a_retrac
     brief = next(b for b in home().briefs if b.id == "q1")
     assert [f.criterion_id for f in brief.inquiry_findings] == ["c2"]
     record("decide", "q1", "park", "--why", "wait for a clean measurement")
-    call = record("status")["decisions"][-1]
+    call = record("status", "--full")["decisions"][-1]
     assert list(call["inquiry_basis"]["criteria"]) == ["c2"]
 
 
@@ -682,7 +682,7 @@ def test_an_edited_or_missing_question_never_keeps_its_interpretation_active(rec
         assert row["integrity"] and not row["interpretation_active"]
     else:
         path.unlink()
-        status = record("status")
+        status = record("status", "--full")
         assert any(item["code"] == "edited_outside_rb" for item in status["open"])
         assert all(not row["interpretation_active"] for q in status["questions"] for row in q["inquiry"]["direct"])
     before = written(record.root)
@@ -712,14 +712,14 @@ def test_unavailable_question_fails_integrity_until_its_link_is_withdrawn(record
     record("freeze", "e1", "--why", "before measurement")
     record("run", "add", "e1", "new.error=0.05")
     before = record("show", "c1")["finding"]
-    record("status", "--fail-on", "integrity")
+    record("status", "--full", "--fail-on", "integrity")
     record("retract", "q1", "--why", "withdraw this inquiry")
-    status = record("status", "--fail-on", "integrity", exit_code=1)
+    status = record("status", "--full", "--fail-on", "integrity", exit_code=1)
     assert any(item["code"] == "question_link_unavailable" and item["subject"] == "c1" for item in status["open"])
     after = record("show", "c1")["finding"]
     assert (after["comparison"], after["rule_outcome"]) == (before["comparison"], before["rule_outcome"])
     record("criterion", "file", "c1", "q1", "--remove", "--amend", "--why", "withdraw the unavailable scope")
-    record("status", "--fail-on", "integrity")
+    record("status", "--full", "--fail-on", "integrity")
 
 
 def test_stale_question_link_mutes_only_the_inquiry_reading(record):
@@ -777,7 +777,7 @@ def test_a_filing_never_carries_an_interpretation_to_a_reworded_question_unless_
     record("criterion", "file", "c1", "q1", "--when-met", words, "--why", "the same reading holds for the new wording")
     link = next(l for l in record("show", "c1")["object"]["question_links"] if not l.get("retracted"))
     assert (link["when_met"], link["declared_by"], link["question_text"]) == (words, "agent:inquiry-writer", "Does accuracy hold on the deployed devices?")
-    assert not [i for i in record("status")["open"] if i["code"] == "question_link_outdated"]
+    assert not [i for i in record("status", "--full")["open"] if i["code"] == "question_link_outdated"]
 
 
 def test_on_a_frozen_experiment_the_restate_command_a_refusal_gives_carries_the_amendment(record, capsys):
@@ -810,13 +810,13 @@ def test_a_reworded_question_asks_for_words_only_where_its_link_has_them(record)
     doc["text"] = "Does accuracy hold on the deployed devices?"
     path.write_text(rbyaml.dumps(doc), encoding="utf-8")
     record("doctor", "--adopt", "--why", "the inquiry was reworded")
-    items = {i["subject"]: i for i in record("status")["open"] if i["code"] == "question_link_outdated"}
+    items = {i["subject"]: i for i in record("status", "--full")["open"] if i["code"] == "question_link_outdated"}
     assert items["c1"]["do"] == 'rb criterion file c1 q1 --why "<why this mapping fits the current question>"', items["c1"]
     assert "interpretation" not in items["c1"]["what"] and "met rule" not in items["c1"]["what"]
     assert '--when-met "<what a met rule means for this question now>"' in items["c2"]["do"]
     argv = shlex.split(items["c1"]["do"].replace('"<why this mapping fits the current question>"', '"it still bears on the inquiry"'))
     record(*argv[1:])
-    assert [i["subject"] for i in record("status")["open"] if i["code"] == "question_link_outdated"] == ["c2"]
+    assert [i["subject"] for i in record("status", "--full")["open"] if i["code"] == "question_link_outdated"] == ["c2"]
     link = next(l for l in record("show", "c1")["object"]["question_links"] if not l.get("retracted"))
     assert (link["when_met"], link["question_text"]) == ("", "Does accuracy hold on the deployed devices?")
 
@@ -899,7 +899,7 @@ def test_inquiry_reading_is_shared_by_status_show_context_cards_and_page(record,
     context = rabbit_brain.open().context()
     for line in q["summary"]:
         assert line in context
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     status_text = capsys.readouterr().out
     for line in q["summary"]:
         assert line in status_text

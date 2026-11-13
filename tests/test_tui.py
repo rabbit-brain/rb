@@ -63,6 +63,33 @@ async def until(pilot, ready, timeout: float = 15.0) -> None:
         await pilot.pause(0.1)
 
 
+def _waits(screen):
+    """The list c acts on: on the home's Overview, Decisions, which lists everything that waits for a confirmation (no TO
+    CONFIRM group on the home, at any size: UX5 R12)."""
+    return screen._confirm_list()
+
+
+def _listed_waits(screen) -> list:
+    """The rows of Decisions that wait for a confirmation (R12: no TO CONFIRM group on the home), its '+N more' opened:
+    every one that waits is listed there."""
+    if not hasattr(screen, "_confirm_list"):
+        return []
+    dl = screen.query_one("#decisions-list")
+    ids = [dl.get_option_at_index(i).id for i in range(dl.option_count)]
+    if "decisions-more" in ids:
+        screen._open_decisions()
+        ids = [dl.get_option_at_index(i).id for i in range(dl.option_count)]
+    return [i for i in ids if (i or "").startswith("p:")]
+
+
+def _to_waiting(screen, rid=None) -> None:
+    """Focus the list c acts on, its row of `rid` (else its first that waits) highlighted, as the user's arrows do."""
+    lst = _waits(screen)
+    lst.focus()
+    ids = [lst.get_option_at_index(i).id for i in range(lst.option_count)]
+    lst.highlighted = ids.index(f"p:{rid}") if rid else next(i for i, o in enumerate(ids) if (o or "").startswith("p:"))
+
+
 def _shown(screen) -> str:
     """Every line the screen draws, as plain text."""
     from textual.widgets import Static
@@ -77,9 +104,16 @@ def _colour_of(line, part: str) -> str:
     return next(str(s.style) for s in line.spans if s.start <= at < s.end)
 
 
+def _same_colour(style: str, colour: str) -> bool:
+    """Whether a drawn span's style string ('bold #e3b341', 'rgb(158,158,158)') holds `colour` ('grey62', '#e3b341')."""
+    from rich.color import Color
+    m = re.search(r"#[0-9a-fA-F]{6}|rgb\(\d+, ?\d+, ?\d+\)|grey\d+", style)
+    return m is not None and Color.parse(m.group(0)).get_truecolor() == Color.parse(colour).get_truecolor()
+
+
 def status_counts(capsys) -> tuple:
     """How many items rb status lists under Needs judgment and under Can be done now."""
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     text = capsys.readouterr().out
     return tuple(int(m.group(1)) if m else 0 for m in (re.search(rf"^{t} \((\d+)\)$", text, re.M) for t in ("Needs judgment", "Can be done now")))
 
@@ -113,29 +147,30 @@ def test_the_home_view_counts_only_what_the_user_can_clear(repo, monkeypatch, ca
 
 
 def test_the_head_says_where_the_record_began_in_one_quiet_line(repo):
-    """A run made before the record began: under the title, one dim line, the record line's sentence, says when rb
-    began keeping the record and what was recorded afterwards; with nothing recorded afterwards, there is no such line."""
-    from rabbit_brain.tui import DIM, RBApp
+    """A run made before the record began: the About strip under the title (row 1) leads with the amber chip that counts
+    what was recorded afterwards (TUI-PARITY A15, M12), never the record line's sentence; with nothing recorded
+    afterwards, there is no such chip."""
+    from rabbit_brain.tui import RBApp
 
     async def drawn():
         app = RBApp(Path.cwd())
         async with app.run_test(size=(120, 36)) as pilot:
             await pilot.pause(0.3)
-            began = app.screen.query_one("#began")
-            return began.display, str(began.content)
+            return app.screen.query_one("#about").render().plain
 
-    assert home().began is None and asyncio.run(drawn())[0] is False
+    assert home().began is None and "recorded afterwards" not in asyncio.run(drawn())
     assert repo("run", "add", "e1", "top1=0.75", "--produced-at", "2026-05-07T12:00:00Z")[0] == 0
     line = home().began
     assert line.startswith("Kept with rb since ") and line.endswith(". 1 run was recorded afterwards, not as it happened.")
-    assert asyncio.run(drawn()) == (True, f"[{DIM}]{line}[/{DIM}]")
+    about = asyncio.run(drawn())
+    assert re.match(r"\[recorded afterwards · 1 of \d+ runs?\]", about) and "Kept with rb" not in about, about
 
 
-def test_the_line_under_the_work_never_says_nothing_waits_while_a_call_does(repo, monkeypatch, capsys):
-    """A criterion that misses with nobody's decision on it is a call rb status lists for the user, so the line under
-    the work says a call waits on you, naming no command or section of rb's, drawn in the colour of what is yours to
-    do, never green; the rest of what rb status lists is still open in the record. Once the call is made, nothing waits
-    on you again. No line names a role."""
+def test_the_pinned_badge_counts_a_call_that_waits_and_no_line_says_it(repo, monkeypatch, capsys):
+    """A criterion that misses with nobody's decision on it is a call rb status lists for the user: the pinned Your call
+    counts it, in the colour of what is yours to do, as Decisions does, and no line under the work says it (R12: the
+    badge counts it); the rest of what rb status lists is still open in the record. Once the call is made, the badge
+    counts nothing. No line names a role."""
     from rabbit_brain.tui import ACCENT, RBApp
 
     monkeypatch.setenv("CLAUDECODE", "1")
@@ -151,15 +186,23 @@ def test_the_line_under_the_work_never_says_nothing_waits_while_a_call_does(repo
         app = RBApp(Path.cwd())
         async with app.run_test(size=(120, 36)) as pilot:
             await pilot.pause(0.3)
-            assert app.screen.query_one("#quiet").content == f"[{ACCENT}]1 call waits on you.[/{ACCENT}]"
-            assert app.screen.query_one("#tree-panel").border_subtitle == f"{agents} still open in the record"
+            # the badge counts what Decisions lists: the call on c2, and e1's design, which waits for a confirmation
+            n = len(app.screen.home.overview.decisions)
+            assert n == 2 and [x.kind for x in app.screen.home.overview.decisions] == ["decide", "confirm"]
+            # the pin and Your call's head count what it lists (TUI-PARITY M1): bold, its key beside it
+            pin = app.screen.query_one("#pin").render()
+            assert pin.plain == f"Your call {n}  y" and pin.spans and str(pin.spans[0].style) == "bold"
+            dl = app.screen.query_one("#decisions-list")
+            assert dl.get_option_at_index(0).prompt.plain.startswith(f"YOUR CALL {n}")
+            assert "waits on you" not in _shown(app.screen)
+            assert app.screen.query_one("#pin-also").render().plain == f"also open {agents}  a"
 
     asyncio.run(drive())
     assert repo("decide", "c2", "reject", "-m", "0.9 was never the bar")[0] == 0
     assert confirm_designs() == ["e1"]                       # the agent set it up: the user confirms its design
     humans, agents = status_counts(capsys)
     h = home()
-    assert humans == 0 and h.waiting == 0
+    assert humans == 0 and h.waiting == 0 and h.overview.decisions == []
     assert h.quiet == f"Nothing waits on you. 1 rule is met; {agents} thing{' is' if agents == 1 else 's are'} still open in the record."
 
 
@@ -193,7 +236,7 @@ def test_a_call_made_on_your_words_shows_them_whole_on_the_card(repo, monkeypatc
             tree.focus()
             tree.highlighted = ids.index("o:e1")
             await pilot.pause(0.2)
-            await pilot.press("enter")
+            await pilot.press("l")                      # the long form, one key away (UX lead, Nov 12 05:30, ruling 8)
             await until(pilot, lambda: isinstance(app.screen, ObjectScreen))
             assert isinstance(app.screen, ObjectScreen) and app.screen.subject == "e1"
             assert f"decision: accepted {d['at'][:10]} · note: the run holds · {said}" in _shown(app.screen)
@@ -216,19 +259,23 @@ def test_c_on_rb_ui_confirms_the_highlighted_call_that_waits(repo, monkeypatch):
     async def drive():
         app = RBApp(Path.cwd())
         async with app.run_test(size=(120, 40)) as pilot:
-            await until(pilot, lambda: bool(app.screen.query("#pending")) and app.screen.query_one("#pending").option_count == 2)
-            panel = app.screen.query_one("#pending-panel")
-            assert panel.display and panel.border_title == "TO CONFIRM (2)" and not app.screen.query_one("#calls-panel").display
+            await until(pilot, lambda: len(_listed_waits(app.screen)) == 2)
+            # they wait as rows of Decisions, never under YOUR CALL, and the TO CONFIRM group stays off the home
+            dl = app.screen.query_one("#decisions-list")
+            listed = [dl.get_option_at_index(i).id for i in range(dl.option_count)]
+            assert {f"p:{first}", f"p:{second}"} <= set(listed) and _waits(app.screen) is dl
+            assert not app.screen.query("#pending-panel") and not app.screen.query_one("#calls-panel").display
             # c while the user browses another list confirms nothing: it takes them to the group, and c there confirms
             app.screen.query_one("#tree-list").focus()
             await pilot.press("c")
-            await until(pilot, lambda: getattr(app.focused, "id", None) == "pending")
+            await until(pilot, lambda: app.focused is dl)
             await pilot.pause(0.5)
-            assert app.screen.query_one("#pending").option_count == 2 and len(state().status()["pending"]) == 2
-            app.screen.query_one("#pending").highlighted = 1
+            assert len(_listed_waits(app.screen)) == 2 and len(state().status()["pending"]) == 2
+            dl.highlighted = listed.index(f"p:{second}")
+            await pilot.pause(0.3)
             await pilot.press("c")
-            await until(pilot, lambda: app.screen.query_one("#pending").option_count == 1)
-            assert app.screen.query_one("#pending").option_count == 1
+            await until(pilot, lambda: len(_listed_waits(app.screen)) == 1)
+            assert len(_listed_waits(app.screen)) == 1
 
     asyncio.run(drive())
     st = state().status()
@@ -257,202 +304,24 @@ def test_rb_ui_draws_a_waiting_calls_hidden_characters_as_escapes_where_c_confir
     async def drive():
         app = RBApp(Path.cwd())
         async with app.run_test(size=(120, 40)) as pilot:
-            await until(pilot, lambda: bool(app.screen.query("#pending")) and app.screen.query_one("#pending").option_count == 2)
+            await until(pilot, lambda: len(_listed_waits(app.screen)) == 2)
             screen = app.screen
-            screen.query_one("#pending").focus()
+            _to_waiting(screen, made)
             card = lambda: _shown(screen.query_one("#side-card"))
             await until(pilot, lambda: "later" in card())
             assert TAGS[0] not in card() and f"later{ESCAPED}" in card(), card()
             await pilot.press("c")
-            await until(pilot, lambda: screen.query_one("#pending").option_count == 1)
+            await until(pilot, lambda: len(_listed_waits(screen)) == 1)
             screen.query_one("#tree-list").focus()
             await pilot.press("a")
-            await until(pilot, lambda: isinstance(app.screen, OpenItemsScreen))
+            await until(pilot, lambda: type(app.screen).__name__ == "AlsoPanel")
             listed = _shown(app.screen)
-            assert TAGS[0] not in listed and f"it scales{ESCAPED}" in listed, listed
+            # also open says each item as a mark, a subject and its state (TUI-PARITY M18): no hidden character there
+            assert TAGS[0] not in listed and "ALSO OPEN" in listed, listed
 
     asyncio.run(drive())
     [d] = [d for d in state().status()["decisions"] if d["authority"].get("confirms") == made]
     assert (d["by"], d["why"], d["authority"]["state"]) == ("human:t", "later" + TAGS, "confirmed")
-
-
-def test_c_on_rb_ui_confirms_a_gate_a_session_set(repo, monkeypatch):
-    """Review of group 9: rb ui's card said `confirm: rb confirm e1` for a gate a session set, but the group c acts on
-    held only calls, so the gate took the terminal. It waits there too, and c confirms it as it was listed. Review of
-    group 10: its card was titled a past call, and said confirming it makes a call. Group E: a gate a session set is
-    part of its experiment's design and waits with it, in one row titled a design, its card saying the design part by
-    part, the gate among them; c confirms the design as listed, with its gate."""
-    from rabbit_brain.tui import RBApp
-    monkeypatch.setenv("CLAUDECODE", "1")
-    assert repo("experiment", "gate", "e1", "--if-holds", "ship it next week")[0] == 0
-    monkeypatch.delenv("CLAUDECODE")
-    [row] = home().pending
-    assert (row.kind, row.text) == ("design", "e1's design: the experiment") and re.fullmatch(r"e1@[0-9a-f]{64}", row.id)
-    assert row.confirm == f"rb confirm {row.id}" and row.confirm == state().status()["gates_pending"][0]["confirm"]
-    assert "gate: if it holds: ship it next week · not confirmed" in row.lines and "why: not recorded" in row.lines
-
-    async def drive():
-        app = RBApp(Path.cwd())
-        async with app.run_test(size=(120, 40)) as pilot:
-            await until(pilot, lambda: bool(app.screen.query("#pending")) and app.screen.query_one("#pending").option_count == 1)
-            app.screen.query_one("#pending").focus()
-            await until(pilot, lambda: getattr(app.focused, "id", None) == "pending")
-            card = lambda: _shown(app.screen.query_one("#side-card"))
-            # the card is replaced as focus moves: wait until the design's is the only one, not only until its words show
-            titles = lambda: [str(w.render()) for w in app.screen.query_one("#side-card").query(".card-title")]
-            await until(pilot, lambda: "A design, not confirmed" in card() and titles() == ["A design, not confirmed"])
-            assert titles() == ["A design, not confirmed"]
-            assert f"the design is yours, as listed here, with its gate, through the same rb confirm anyone would type: {row.confirm}" in card()
-            assert "gate: if it holds: ship it next week · not confirmed" in card()
-            assert "past call" not in card() and "the call is made" not in card()
-            await pilot.press("c")
-            await until(pilot, lambda: not app.screen.query_one("#pending-panel").display)
-
-    asyncio.run(drive())
-    st = state().status()
-    assert st["gates_pending"] == [] and st["designs_pending"] == [] and home().pending == []
-    assert [e["design"]["standing"] for e in st["experiments"]] == ["confirmed"]
-
-
-def test_c_shows_the_design_it_would_confirm_before_it_confirms_it(repo, monkeypatch):
-    """Review of group E: c pressed while the user browsed the catalogue took them to the group of what waits, but the
-    card beside it still showed a question, and the next c confirmed a design they never saw. The first c now shows the
-    highlighted design part by part (beside the list, or full screen on a narrow terminal) and says the next c confirms
-    that design; only then does c confirm it."""
-    from rabbit_brain.tui import RBApp
-    monkeypatch.setenv("CLAUDECODE", "1")
-    assert repo("experiment", "gate", "e1", "--if-holds", "ship it next week")[0] == 0
-    monkeypatch.delenv("CLAUDECODE")
-    [row] = home().pending
-    said = []
-
-    async def drive(size):
-        app = RBApp(Path.cwd())
-        app.notify = lambda message, **kw: said.append(message)
-        async with app.run_test(size=size) as pilot:
-            await until(pilot, lambda: bool(app.screen.query("#pending")) and app.screen.query_one("#pending").option_count == 1)
-            app.screen.query_one("#tree-list").focus()
-            await pilot.pause(0.3)
-            await pilot.press("c")
-            await until(pilot, lambda: said == ["c again confirms the highlighted design."])
-            assert said == ["c again confirms the highlighted design."], said
-            card = lambda: _shown(app.screen.query_one("#side-card"))
-            await until(pilot, lambda: "A design, not confirmed" in card())
-            assert "A design, not confirmed" in card() and "gate: if it holds: ship it next week · not confirmed" in card() and row.confirm in card(), card()
-            assert state().status()["designs_pending"], "the first c confirms nothing"
-            assert getattr(app.focused, "id", None) == "pending"
-            await pilot.press("c")
-            await until(pilot, lambda: not state().status()["designs_pending"])
-
-    asyncio.run(drive((120, 40)))
-    assert [e["design"]["standing"] for e in state().status()["experiments"]] == ["confirmed"]
-
-
-def test_c_on_a_narrow_rb_ui_shows_the_design_full_screen_first(repo, monkeypatch):
-    """The same on a terminal too narrow for a card beside the list: the first c opens the design full screen."""
-    from rabbit_brain.tui import PendingScreen, RBApp
-    monkeypatch.setenv("CLAUDECODE", "1")
-    assert repo("experiment", "gate", "e1", "--if-holds", "ship it next week")[0] == 0
-    monkeypatch.delenv("CLAUDECODE")
-    said = []
-
-    async def drive():
-        app = RBApp(Path.cwd())
-        app.notify = lambda message, **kw: said.append(message)
-        async with app.run_test(size=(90, 40)) as pilot:
-            await until(pilot, lambda: bool(app.screen.query("#pending")) and app.screen.query_one("#pending").option_count == 1)
-            app.screen.query_one("#tree-list").focus()
-            await pilot.pause(0.3)
-            await pilot.press("c")
-            await until(pilot, lambda: isinstance(app.screen, PendingScreen))
-            assert isinstance(app.screen, PendingScreen) and "gate: if it holds: ship it next week · not confirmed" in _shown(app.screen)
-            # recheck of group E: a full screen has no list, so nothing on it is highlighted
-            assert "c confirms this one: the design is yours" in _shown(app.screen) and "highlighted" not in _shown(app.screen)
-            assert state().status()["designs_pending"], "the first c confirms nothing"
-            await pilot.press("escape")
-            await until(pilot, lambda: not isinstance(app.screen, PendingScreen) and getattr(app.focused, "id", None) == "pending")
-            assert getattr(app.focused, "id", None) == "pending"
-            await pilot.press("c")
-            await until(pilot, lambda: not state().status()["designs_pending"])
-
-    asyncio.run(drive())
-    assert said[:1] == ["c again confirms the highlighted design."]
-
-
-def test_c_twice_on_a_narrow_rb_ui_confirms_what_its_full_screen_card_shows(repo, monkeypatch):
-    """Recheck of group E: at 90x30 the first c opened the full-screen card of what waits, and the second c did
-    nothing there: only escape and then c confirmed it, a call too (group D's c, c confirmed a call). c on the card
-    confirms the one it shows; one a session changed while it was open is shown as it reads now, and the next c says
-    so before the c after it confirms it."""
-    from rabbit_brain.tui import HomeScreen, PendingScreen, RBApp
-    monkeypatch.setenv("CLAUDECODE", "1")
-    assert repo("decide", "e1", "park", "--why", "later")[0] == 0
-    monkeypatch.delenv("CLAUDECODE")
-    said = []
-    got = {}
-
-    def session_changes_it(text):
-        r = subprocess.run([*command(), "experiment", "gate", "e1", "--if-holds", text], env={**environment(), "CLAUDECODE": "1"},
-                           capture_output=True, stdin=subprocess.DEVNULL, encoding="utf-8")
-        assert r.returncode == 0, (r.stdout, r.stderr)
-
-    async def drive():
-        app = RBApp(Path.cwd())
-        app.notify = lambda message, **kw: said.append(message)
-        async with app.run_test(size=(90, 30)) as pilot:
-            await until(pilot, lambda: bool(app.screen.query("#pending")) and app.screen.query_one("#pending").option_count == 2)
-            home_screen = app.screen
-            assert isinstance(home_screen, HomeScreen) and not home_screen._wide
-            home_screen.query_one("#tree-list").focus()
-            await pilot.pause(0.3)
-            # the call first: c shows it full screen, c again confirms it
-            await pilot.press("c")
-            await until(pilot, lambda: isinstance(app.screen, PendingScreen))
-            await pilot.press("c")
-            await until(pilot, lambda: not state().status().get("pending") and not isinstance(app.screen, PendingScreen), timeout=30)
-            got["call"] = state().status().get("pending")
-            # then the design: a session changes it while its card is open
-            await until(pilot, lambda: home_screen.query_one("#pending").option_count == 1)
-            home_screen.query_one("#pending").focus()
-            await pilot.pause(0.3)
-            await pilot.press("c")
-            await until(pilot, lambda: isinstance(app.screen, PendingScreen) and app.screen.row.kind == "design")
-            first = app.screen.row.id
-            session_changes_it("ship it next week")
-            await until(pilot, lambda: isinstance(app.screen, PendingScreen) and app.screen.row.id != first and "ship it next week" in _shown(app.screen), timeout=30)
-            await pilot.press("c")
-            await until(pilot, lambda: bool(said) and said[-1].endswith("changed since it was shown: c again confirms it as it reads now."))
-            got["shown again"] = (said[-1], _confirmed_keys())
-            now = app.screen.row.id
-            await pilot.press("c")
-            await until(pilot, lambda: not state().status()["designs_pending"], timeout=30)
-            got["keys"] = (now, _confirmed_keys())
-
-    asyncio.run(drive())
-    assert got["call"] == [], got
-    assert got["shown again"] == ("e1's design changed since it was shown: c again confirms it as it reads now.", []), got["shown again"]
-    now, keys = got["keys"]
-    assert keys == [now.split("@")[1]], got["keys"]
-
-
-def test_a_designs_card_says_its_gate_only_where_it_has_one(repo, monkeypatch):
-    """Recheck of group E: the card of e1's design said c confirms it `with its gate`, and e1 has no gate."""
-    from rabbit_brain.tui import PendingScreen, RBApp
-    got = {}
-
-    async def drive():
-        app = RBApp(Path.cwd())
-        app.notify = lambda message, **kw: None
-        async with app.run_test(size=(90, 30)) as pilot:
-            await until(pilot, lambda: bool(app.screen.query("#pending")) and app.screen.query_one("#pending").option_count == 1)
-            app.screen.query_one("#tree-list").focus()
-            await pilot.pause(0.3)
-            await pilot.press("c")
-            await until(pilot, lambda: isinstance(app.screen, PendingScreen))
-            got["card"] = _shown(app.screen)
-
-    asyncio.run(drive())
-    assert "the design is yours, as listed here, through the same rb confirm" in got["card"] and "with its gate" not in got["card"], got["card"]
 
 
 def _confirmed_keys() -> list:
@@ -460,101 +329,6 @@ def _confirmed_keys() -> list:
     `detail.design` is the hash an earlier rb names the design by."""
     lines = [json.loads(l) for l in (Path.cwd() / ".rb" / "log.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
     return [k["full"] for l in lines if l.get("op") == "gate" and (l.get("detail") or {}).get("design") for k in l["detail"]["owned"].values()]
-
-
-@pytest.mark.parametrize("size", [(120, 40), (90, 40)], ids=["wide", "narrow"])
-def test_c_never_confirms_a_design_changed_after_it_was_shown(repo, monkeypatch, size):
-    """Trial of group E: the first c showed e1's design; a session changed it before the second c, rb ui refreshed the
-    row under the user (and, wide, put a question's card beside the list), and the second c confirmed the design as it
-    read after the change, which the user never saw. c confirms only the design as shown: a second c before the screen
-    has read the change runs rb confirm with the key shown, which rb refuses; once the screen has read it, what is in
-    view is the design as it reads now (the card beside the list, or the full-screen card, redrawn), and the next c
-    shows it again and says it changed; only the c after that confirms it."""
-    from rabbit_brain.tui import HomeScreen, PendingScreen, RBApp
-    monkeypatch.setenv("CLAUDECODE", "1")
-    assert repo("experiment", "gate", "e1", "--if-holds", "ship it next week")[0] == 0
-    monkeypatch.delenv("CLAUDECODE")
-    said = []
-    got = {}
-
-    def session_changes_it(text):
-        # its own process, as a session's write is: the screen holds this one's output
-        r = subprocess.run([*command(), "experiment", "gate", "e1", "--if-holds", text], env={**environment(), "CLAUDECODE": "1"},
-                           capture_output=True, stdin=subprocess.DEVNULL, encoding="utf-8")
-        assert r.returncode == 0, (r.stdout, r.stderr)
-        return home().pending[0].id
-
-    def waiting():
-        return [d["confirm"] for d in state().status()["designs_pending"]]
-
-    async def drive():
-        app = RBApp(Path.cwd())
-        app.notify = lambda message, **kw: said.append(message)
-        async with app.run_test(size=size) as pilot:
-            await until(pilot, lambda: bool(app.screen.query("#pending")) and app.screen.query_one("#pending").option_count == 1)
-            screen = app.screen
-            assert isinstance(screen, HomeScreen)
-            narrow = not screen._wide
-            card = (lambda: _shown(app.screen)) if narrow else (lambda: _shown(screen.query_one("#side-card")))
-
-            async def back():
-                if narrow:
-                    await pilot.press("escape")
-                    await until(pilot, lambda: not isinstance(app.screen, PendingScreen))
-
-            screen.query_one("#tree-list").focus()
-            await pilot.pause(0.3)
-            await pilot.press("c")
-            await until(pilot, lambda: "ship it next week" in card() and said)
-            got["first"] = (list(said), card())
-            # a session changes it before the screen reads the change: c confirms the key shown, and rb refuses it
-            stamp = screen._mtimes()
-            screen._mtimes = lambda: stamp
-            second = session_changes_it("ship it in two weeks")
-            await back()
-            await pilot.press("c")
-            await until(pilot, lambda: len(said) == 2, timeout=30)
-            got["refused"] = (said[-1], waiting(), _confirmed_keys())
-            # the screen reads it: c shows it as it reads now, and says it changed
-            del screen._mtimes
-            await until(pilot, lambda: bool(screen._pending) and screen._pending[0].id == second)
-            await pilot.pause(0.5)
-            got["beside after the write"] = card()
-            await pilot.press("c")
-            await until(pilot, lambda: len(said) == 3 and "ship it in two weeks" in card())
-            got["shown again"] = (said[-1], card(), waiting())
-            # a session changes it while it is in view: the card is redrawn as it reads now, and c shows it again; the
-            # redraw takes the earlier card away only after it mounts the new one, so it is read once the earlier one is gone
-            third = session_changes_it("ship it in three weeks")
-            await until(pilot, lambda: bool(screen._pending) and screen._pending[0].id == third and "ship it in three weeks" in card()
-                        and "ship it in two weeks" not in card())
-            got["redrawn"] = card()
-            await back()
-            await pilot.press("c")
-            await until(pilot, lambda: len(said) == 4 and "ship it in three weeks" in card())
-            got["shown a third time"] = (said[-1], waiting())
-            await back()
-            await pilot.press("c")
-            await until(pilot, lambda: not waiting(), timeout=30)
-            got["keys"] = (second, third, _confirmed_keys())
-
-    asyncio.run(drive())
-    said_first, shown = got["first"]
-    assert said_first == ["c again confirms the highlighted design."] and "ship it next week" in shown, got["first"]
-    said_then, still, keys = got["refused"]
-    assert said_then.strip().endswith(f"To confirm it as it reads now: {still[0]}") and keys == [], got["refused"]
-    if size[0] >= 100:       # beside the list stays the design the user had in view, never a question's card
-        assert "A design, not confirmed" in got["beside after the write"] and "ship it in two weeks" in got["beside after the write"], got
-    changed = "e1's design changed since it was shown: c again confirms it as it reads now."
-    said_again, shown, still = got["shown again"]
-    assert said_again == changed and "ship it in two weeks" in shown and "ship it next week" not in shown and still, got["shown again"]
-    assert "ship it in three weeks" in got["redrawn"] and "ship it in two weeks" not in got["redrawn"], got["redrawn"]
-    said_again, still = got["shown a third time"]
-    assert said_again == changed and still, got["shown a third time"]
-    second, third, keys = got["keys"]
-    assert keys == [third.split("@")[1]], (keys, second, third)
-    st = state().status()
-    assert [e["design"]["standing"] for e in st["experiments"]] == ["confirmed"] and st["experiments"][0]["if_holds"] == "ship it in three weeks"
 
 
 def test_an_investigation_reads_as_still_going_on_the_card(repo):
@@ -589,14 +363,14 @@ def test_a_shared_experiment_opens_from_both_question_rows_and_keeps_its_selecti
             assert occurrences[0] == "o:e1" and occurrences[1] != occurrences[0]
 
             def preview_is_experiment():
-                return [str(w.render()) for w in app.screen.query_one("#side-card").query(".card-title")] == ["the experiment"]
+                return [str(w.render()) for w in app.screen.query_one("#side-card").query(".ev-title")] == ["the experiment"]
 
             for row_id in occurrences:
                 tree.focus()
                 tree.highlighted = ids().index(row_id)
                 await until(pilot, preview_is_experiment)
                 assert preview_is_experiment()
-                await pilot.press("enter")
+                await pilot.press("l")
                 await until(pilot, lambda: isinstance(app.screen, ObjectScreen))
                 assert app.screen.subject == "e1" and app.screen.card.title == "the experiment"
                 await pilot.press("escape")
@@ -611,10 +385,14 @@ def test_a_shared_experiment_opens_from_both_question_rows_and_keeps_its_selecti
             assert tree.get_option_at_index(tree.highlighted).id == occurrences[1]
             await until(pilot, preview_is_experiment)
             assert preview_is_experiment()
-            # Mouse selection uses the same mapping as the keyboard's priority binding and the side preview.
-            assert await pilot.click("#tree-list", offset=(20, ids().index(occurrences[1])))
-            await until(pilot, lambda: isinstance(app.screen, ObjectScreen))
-            assert app.screen.subject == "e1" and app.screen.card.title == "the experiment"
+            # Mouse selection uses the same mapping as the keyboard's priority binding and the side preview: the card
+            # in the evidence pane, the focus on its first citation
+            from rabbit_brain.evidence import Cite
+            at = ids().index(occurrences[1])         # rows are two lines (the title, then its marks)
+            line = sum(tree.get_option_at_index(i).prompt.plain.count("\n") + 1 for i in range(at))
+            assert await pilot.click("#tree-list", offset=(10, line - tree.scroll_y))
+            await until(pilot, lambda: isinstance(app.focused, Cite))
+            assert app.screen.query_one("#side-card").trail == ["e1"] and preview_is_experiment()
 
     asyncio.run(drive())
 
@@ -622,35 +400,39 @@ def test_a_shared_experiment_opens_from_both_question_rows_and_keeps_its_selecti
 def test_a_rule_met_only_on_its_estimate_is_never_drawn_green(repo):
     """top1 of 0.76 alone meets at least 0.7 on its estimate, with no interval to read; with 0.62 and 0.95 beside 0.78
     and 0.8 it meets on its estimate, its interval across 0.7: the screen draws either without green wherever it is
-    counted, in the tree, the tally, the line that counts met rules when nothing waits on the user, and the experiment's
+    counted, in the tree, the question's strip (the home counts nothing record-wide: R21), and the experiment's
     criteria, as it draws a rule with a problem under it. Met across its whole interval (0.76, 0.78 and 0.8), with
     nothing under it, it is green."""
     from rabbit_brain.tui import DIM, GOOD, ObjectScreen, RBApp
     assert confirm_designs() == ["e1"]                       # the agent set it up: the user confirms its design
 
     def drawn(app) -> dict:
-        """Each tree row's count of met rules, whole, and the colour it is drawn in, the tally line and the quiet line's
-        markup. At 120 columns e1's row has no room for rb's whole words, so every row counts in short ones."""
+        """Each tree row's count of met rules, whole, and the colour it is drawn in, and the strip's passed squares with
+        their count, whole, and their colour. At 120 columns e1's row has no room for rb's whole words, so every row
+        counts in short ones."""
         tree = app.screen.query_one("#tree-list")
         rows = {}
         for i in range(tree.option_count):
             opt = tree.get_option_at_index(i)
             t = opt.prompt
-            rows.update({opt.id: str(sp.style) for sp in t.spans if str(t)[sp.start:sp.end] == "1 met"})
-        return {"tree": rows, "tally": app.screen.query_one("#tally").content, "quiet": app.screen.query_one("#quiet").content}
+            if opt.id in ("o:q1", "o:e1"):
+                rows[opt.id] = whole(t, "1 met")
+        head = app.screen.query_one("#story-head").render()
+        at = head.plain.index("■ 1 passed")
+        square = next(c for c in (GOOD, DIM) if _same_colour(next(str(sp.style) for sp in head.spans if sp.start <= at < sp.end), c))
+        return {"tree": rows, "strip": square, "record_lines": [w for w in ("#tally", "#quiet") if app.screen.query(w)]}
 
     async def drive(colour: str) -> None:
         app = RBApp(Path.cwd())
         async with app.run_test(size=(120, 36)) as pilot:
             await pilot.pause(0.3)
             d = drawn(app)
-            assert d["tree"] == {"o:q1": colour, "o:e1": colour} and _colour_of(d["tally"], "1 met") == colour
-            assert d["quiet"].startswith(f"[{colour}]Nothing waits on you. 1 rule is met;")
+            assert d["tree"] == {"o:q1": colour, "o:e1": colour} and d["strip"] == colour and d["record_lines"] == []
             tree = app.screen.query_one("#tree-list")
             tree.focus()
             tree.highlighted = [tree.get_option_at_index(i).id for i in range(tree.option_count)].index("o:e1")
             await pilot.pause(0.2)
-            await pilot.press("enter")
+            await pilot.press("l")                      # the long form, one key away
             await until(pilot, lambda: isinstance(app.screen, ObjectScreen))
             label = "rule met" if colour == GOOD else "estimate meets the rule"
             assert f"[{colour}]{label} · " in "\n".join(str(w.content) for w in app.screen.query(".bar-body"))
@@ -683,8 +465,7 @@ def _laid(app) -> bool:
     if not isinstance(app.screen, HomeScreen):
         return False
     tree = app.screen.query_one("#tree-list")
-    rows = [tree.get_option_at_index(i).prompt for i in range(tree.option_count)]
-    return bool(rows) and all(tree.size.width - 4 <= len(t.plain) < tree.size.width for t in rows)
+    return bool(tree.option_count) and tree.size.width > 0 and getattr(app.screen, "_laid_w", None) == tree.size.width
 
 
 async def catalogue(width: int) -> dict:
@@ -704,27 +485,33 @@ def short_words(part: str) -> str:
     return _short_count(part)
 
 
+def _mark_of(part: str) -> str:
+    """A count as the catalogue draws it (TUI-PARITY A7, section 5 item 3: list rows compress to marks and counts):
+    '2 criteria not met' is '▲ 2'."""
+    from rabbit_brain.tui import ROW_STATES
+    n, words = part.split(" ", 1)
+    mark = next(g for w, g in ROW_STATES if w in words)
+    return f"{mark} {n}"
+
+
 def _standing_at(line, part: str):
-    """Where `part` stands whole on a catalogue row: after a space, and before a separator, the '…' that ends a row
-    leaving something out, or the row's end."""
-    from rabbit_brain.tui import plain_word
-    found = re.search(rf"(?:^| )({re.escape(plain_word(part))})(?: ·| …|$)", line.plain)
+    """Where `part`'s mark and count stand whole on a catalogue row: after a space, and before another or the row's end."""
+    found = re.search(rf"(?:^|\s)({re.escape(_mark_of(part))})(?=\s|$)", line.plain)
     return found.start(1) if found else None
 
 
 def whole(line, part: str) -> str:
-    """The colour `part` is drawn in, once it stands whole on a catalogue row."""
+    """The colour `part`'s mark and count are drawn in, once they stand whole on a catalogue row."""
     at = _standing_at(line, part)
     assert at is not None, (part, line.plain)
     return next(str(s.style) for s in line.spans if s.start <= at < s.end)
 
 
 def test_each_count_on_a_row_is_whole_and_in_its_colour_at_120_columns(repo):
-    """At 120 columns every count on q1's and e1's rows stands whole in its colour: c1 met across its interval, then
-    c1 met beside c2 not met. With no room for rb's whole words on every row, every row counts in short ones; at 240
-    columns they are rb's own. What is not a count gives way first, the lock word and then the state word, with a '…'
-    where they were. Cut where there is no room at all, each count keeps its colour."""
-    from rabbit_brain.tui import BAD, GOOD, standing_text
+    """At 120 columns every count on q1's and e1's rows stands whole in its colour, as the strip draws it (■ 1 passed
+    ▲ 1 failed): c1 met across its interval, then c1 met beside c2 not met. No row says its counts in rb's rule words,
+    at any width: the strip's words stand beside its marks."""
+    from rabbit_brain.tui import BAD, GOOD
 
     for top1 in ("0.78", "0.8"):
         assert repo("run", "add", "e1", f"top1={top1}")[0] == 0
@@ -738,25 +525,17 @@ def test_each_count_on_a_row_is_whole_and_in_its_colour_at_120_columns(repo):
         "open · 1 criterion met · 1 criterion not met", "open · 1 criterion met · 1 criterion not met · not locked"]
     drawn = asyncio.run(catalogue(120))
     assert [(whole(drawn[oid], "1 met"), whole(drawn[oid], "1 not met")) for oid in ("o:q1", "o:e1")] == [(GOOD, BAD)] * 2
-    assert drawn["o:q1"].plain.endswith(" open · 1 met · 1 not met")
-    assert drawn["o:e1"].plain.endswith(" open · 1 met · 1 not met …")       # never as if it said all there is
+    flat = lambda t: " ".join(t.plain.split())
+    assert flat(drawn["o:q1"]).endswith("■ 1 ▲ 1") and flat(drawn["o:e1"]).endswith("■ 1 ▲ 1")      # compressed (A7)
     drawn = asyncio.run(catalogue(240))
-    assert ([(whole(drawn[oid], "1 criterion met"), whole(drawn[oid], "1 criterion not met")) for oid in ("o:q1", "o:e1")]
-            == [(GOOD, BAD)] * 2)
-    standing = "open · 1 criterion met · 1 criterion not met · not locked"
-    assert [standing_text(standing, short=True, room=room).plain for room in (37, 26, 19)] == [
-        "open · 1 met · 1 not met · not locked", "open · 1 met · 1 not met …", "1 met · 1 not met …"]
-    assert standing_text(standing, short=True, room=12, spare=7).plain == "1 met · 1 not met …"   # the title gives way
-    assert standing_text("planned · not locked", room=8, spare=12).plain == "planned…"    # never for what is not a count
-    cut = standing_text(standing, short=True, room=12)
-    assert cut.plain == "1 met · 1 n…" and (whole(cut, "1 met"), _colour_of(cut, "1 n…")) == (GOOD, BAD)
+    assert [(whole(drawn[oid], "1 criterion met"), whole(drawn[oid], "1 criterion not met")) for oid in ("o:q1", "o:e1")] == [(GOOD, BAD)] * 2
+    assert not [t.plain for t in drawn.values() if re.search(r"\b(met|not met|reproduced|not tested|open)\b", t.plain.split("  ")[-1])]
 
 
 def test_a_long_title_or_id_never_cuts_a_count_at_120_columns(repo):
-    """At 120 columns a long title or a long id never cuts a count: beside a 38-character question, an experiment with an
-    id rb made up and one with a 21-character id keep every count whole and in its colour. What is not a count gives way
-    first, the lock word and then the state word, and then the title. A row that leaves out any part of its standing
-    ends in '…', so no row reads as whole when it is not; every id stands whole."""
+    """At 120 columns a long title never cuts a count: beside a 38-character question, an experiment with an id rb made
+    up and one with a 21-character id keep every count whole and in its colour, and a title gives way between words,
+    ending in '…'."""
     from rabbit_brain.tui import BAD, GOOD
 
     assert repo("question", "add", "does the wider model keep its accuracy", "--id", "q3")[0] == 0
@@ -780,22 +559,30 @@ def test_a_long_title_or_id_never_cuts_a_count_at_120_columns(repo):
               for i in ("q3", made_up, long_id)}
     assert counts == {"q3": [GOOD, BAD], made_up: [GOOD, BAD], long_id: [GOOD]}
     for i, r in rows.items():
-        line = drawn[f"o:{i}"]
-        assert f" {i}  " in line.plain, line.plain
-        said = all(_standing_at(line, short_words(part)) is not None for part in r.standing.split(" · "))
-        assert said or line.plain.endswith("…"), line.plain
-    assert all(drawn[f"o:{i}"].plain.endswith(" …") for i in (made_up, long_id))
+        # the title is cut only between words, with '…' where it is (UX lead, Nov 12 05:30, ruling 9)
+        title = drawn[f"o:{i}"].plain.split("\n")[0].strip()
+        for kind in ("┃ ", f"▸ {i} "):                 # a question's ┃, an experiment's ▸ and id (A7)
+            title = title[len(kind):] if title.startswith(kind) else title
+        whole_words = title[:-1] if title.endswith("…") else title
+        assert r.label.startswith(whole_words) and (title == r.label or whole_words == "" or r.label[len(whole_words)] == " "), (title, r.label)
 
 
-def test_on_a_narrow_terminal_the_catalogue_takes_the_room_of_the_card_beside_it(repo):
-    """Below 96 columns no card is drawn beside the catalogue, so the catalogue takes its room: in an 80 by 24 terminal
-    it spans the screen, and so it stays across a resize. Each count on q1's and e1's rows stands whole in its colour."""
+def test_below_120_columns_t_brings_the_catalogue_over_the_story_with_its_counts_whole(repo):
+    """R22: below 120 columns the left pane is the header's tab row (Research t, Files f), the story has the screen, and
+    one key, t, brings the whole catalogue over it, each count on q1's and e1's rows whole in its colour, the key line
+    naming t; t again, or escape, gives the story back. At 120 columns the three panes stand side by side. So it stays
+    across a resize."""
     from rabbit_brain.tui import BAD, GOOD, RBApp
 
     assert repo("criterion", "add", "top5 holds", "-e", "e1", "--metric", "top5", "--at-least", "0.99", "--noise", "0.001",
                 "--id", "c2", "-q", "q1")[0] == 0
     for top1, top5 in (("0.78", "0.9"), ("0.8", "0.91"), ("0.79", "0.92")):
         assert repo("run", "add", "e1", f"top1={top1}", f"top5={top5}")[0] == 0
+
+    def counts(screen):
+        tree = screen.query_one("#tree-list")
+        rows = {tree.get_option_at_index(i).id: tree.get_option_at_index(i).prompt for i in range(tree.option_count)}
+        return [(whole(rows[oid], "1 met"), whole(rows[oid], "1 not met")) for oid in ("o:q1", "o:e1")]
 
     async def drive() -> list:
         app = RBApp(Path.cwd())
@@ -804,20 +591,34 @@ def test_on_a_narrow_terminal_the_catalogue_takes_the_room_of_the_card_beside_it
             for size in ((80, 24), (120, 36), (80, 24)):
                 await pilot.resize_terminal(*size)
                 screen = app.screen
-                await until(pilot, lambda: _laid(app) and screen.query_one("#side-card").display == (size[0] >= 96))
-                tree, panel, top = (screen.query_one(s) for s in ("#tree-list", "#tree-panel", "#top"))
-                rows = {tree.get_option_at_index(i).id: tree.get_option_at_index(i).prompt for i in range(tree.option_count)}
-                seen.append((size[0], panel.region.width == top.region.width,
-                             [(whole(rows[oid], "1 met"), whole(rows[oid], "1 not met")) for oid in ("o:q1", "o:e1")]))
+                wide = size[0] >= 120
+                await until(pilot, lambda: screen.query_one("#side-card").display == wide and screen.query_one("#tree-panel").display == wide)
+                panes = [screen.query_one(s).region.width > 0 for s in ("#tree-panel", "#middle", "#side-card")]
+                footer = screen.query_one("#footer").render().plain
+                row = str(screen.query_one("#tabrow").render())
+                if wide:
+                    seen.append((size[0], panes, screen.query_one("#tabrow").display))
+                    continue
+                await pilot.press("t")
+                await until(pilot, lambda: _laid(app) and screen.query_one("#tree-panel").region.width == screen.region.width - 2)
+                over = (screen.query_one("#tree-panel").display, screen.query_one("#middle").display)
+                got = counts(screen)
+                await pilot.press("escape")
+                await until(pilot, lambda: screen.query_one("#middle").display)
+                seen.append((size[0], panes, "Research  t" in row, footer.startswith("⏎ open"), over, got))
         return seen
 
-    assert asyncio.run(drive()) == [(80, True, [(GOOD, BAD)] * 2), (120, False, [(GOOD, BAD)] * 2), (80, True, [(GOOD, BAD)] * 2)]
+    assert asyncio.run(drive()) == [(80, [False, True, False], True, True, (True, False), [(GOOD, BAD)] * 2),
+                                    (120, [True, True, True], False),
+                                    (80, [False, True, False], True, True, (True, False), [(GOOD, BAD)] * 2)]
 
 
 def test_the_lines_over_the_catalogue_never_hide_what_they_leave_out(repo):
-    """The project's title and the count of its rules by their reading are one line each. The count says the page's
-    and rb status's words at 100 and at 160 columns, each whole, shown and in its colour. Where they do not fit, as at
-    60 columns, the line ends in '…', as a title too long for its line does."""
+    """The project's title is one line, ending in '…' where it does not fit. The count of the question's checks by
+    their reading is the Overview's strip (UX5 R2: it takes the place of the line of rule counts): rb status's and the
+    page's words, each group its squares, its count and its label, every group whole, shown, and each square in its
+    check's colour (a gate missed in the warning colour, a gate being policy). Where the strip does not fit on one line,
+    as at 60 columns, a group goes whole to the next line: nothing is cut, and nothing is left out."""
     from textual.geometry import Region
     from rabbit_brain.tui import BAD, DIM, GOOD, WARN, HomeScreen, RBApp
 
@@ -833,25 +634,44 @@ def test_the_lines_over_the_catalogue_never_hide_what_they_leave_out(repo):
     for top5, loss in (("0.9", "0.5"), ("0.91", "0.6"), ("0.92", "0.7")):
         assert repo("run", "add", "e1", f"top5={top5}", f"loss={loss}")[0] == 0
     assert dict(home().tally) == {"meets": 1, "misses": 1, "undetermined": 1, "untested": 1, "gate missed": 1}
+    groups = home()["overview"]["strip"]["groups"]
+    said = [f"{g['mark'] * len(g['checks'])} {len(g['checks'])} {g['label']}" for g in groups]
+    assert said == ["■ 1 passed", "▲▲ 2 failed", "◧ 1 can't tell yet", "□ 1 no results yet"]
+    order = [c["id"] for g in groups for c in g["checks"]]
+    roles = {f.criterion_id: f.role == "gate" for b in home().briefs for e in b.experiments for f in e.findings}
+    assert sum(roles[c] for c in order) == 1
 
     async def lines(width: int) -> tuple:
-        """The title's line and the criteria's line as the screen shows them, and what the criteria's line draws."""
+        """The title's line and the strip's lines as the screen shows them, and the colour of each square, by check."""
         app = RBApp(Path.cwd())
         async with app.run_test(size=(width, 36)) as pilot:
             await until(pilot, lambda: isinstance(app.screen, HomeScreen) and _laid(app))
-            head, tally = (app.screen.query_one(s) for s in ("#head", "#tally"))
-            shown = [w.render_lines(Region(0, 0, w.size.width, 1))[0].text.rstrip() for w in (head, tally)]
-            return *shown, tally.content
+            await pilot.pause(0.3)
+            head, story = (app.screen.query_one(s) for s in ("#head", "#story-head"))
+            # row 0: the title, then the git chip and its key (M12)
+            first = head.render_lines(Region(0, 0, head.size.width, 1))[0].text.rstrip().split("  [")[0].rstrip()
+            drawn = [line.text.rstrip() for line in story.render_lines(Region(0, 0, story.size.width, story.size.height))]
+            text = story.content
+            squares = [str(next(sp.style for sp in text.spans if sp.start <= i < sp.end)) for i, ch in enumerate(text.plain) if ch in "■▲◧□"]
+            return first, drawn, dict(zip(order, squares)), len(squares)
 
-    for width, said in ((100, ("1 met", "1 not met", "1 can't tell yet", "1 not tested", "1 gate missed")),
-                        (160, ("1 met", "1 not met", "1 can't tell yet", "1 not tested", "1 gate missed"))):
-        head, shown, drawn = asyncio.run(lines(width))
-        assert all(re.search(rf"(?:^| ){re.escape(part)}(?: ·|$)", shown) for part in said), (width, shown)
-        assert [whole(drawn, part) for part in said] == [GOOD, BAD, WARN, DIM, WARN]
-        assert head == title or (head.endswith("…") and title.startswith(head[:-1])), head
-    head, shown, _ = asyncio.run(lines(60))
-    assert shown.startswith("Rules: 1 met · 1 not met · ") and shown.endswith("…"), shown
-    assert title.startswith(head[:-1]) and head.endswith("…"), head
+    colours = {c: GOOD if s == "meets" else (WARN if roles[c] else BAD) if s == "misses" else WARN if s == "undetermined" else DIM
+               for g in groups for c, s in ((x["id"], g["state"]) for x in g["checks"])}
+    assert sorted(colours.values()) == sorted([GOOD, BAD, WARN, WARN, DIM])
+    for width in (100, 160, 60):
+        head, drawn, squares, n = asyncio.run(lines(width))
+        strip = [line for line in drawn if any(ch in line for ch in "■▲◧□")]
+        assert n == len(order) and squares == colours, (width, squares)
+        for part in said:                       # every group whole on one line, never cut
+            assert any(part in line for line in strip), (width, part, strip)
+        assert not any(line.endswith("…") for line in strip), (width, strip)
+        # one line where the story has the width (100 columns: the story has the screen; 160: groups one space apart
+        # where two would wrap), else a group whole on the next
+        assert len(strip) == 1 if width in (100, 160) else len(strip) == 2, (width, strip)
+        if width >= 100:
+            assert head == title or (head.endswith("…") and title.startswith(head[:-1])), head
+        else:
+            assert title.startswith(head[:-1]) and head.endswith("…"), head
 
 
 def test_the_criterion_card_says_the_words_it_was_declared_on_and_no_writer(repo, monkeypatch):
@@ -885,7 +705,7 @@ def test_the_experiment_card_counts_a_setting_as_this_read_finds_its_source(repo
     card = object_card("e1")
     assert "settings: 1 conflict · 1 stale" in card.facts
     assert card.blockers == ["optim.lr    its source now states another value", "optim.wd    its source no longer states it"]
-    _, env = repo("status")
+    _, env = repo("status", "--full")
     assert {("conflict", "e1/optim.lr"), ("stale", "e1/optim.wd")} <= {(o["code"], o["subject"]) for o in env.data["open"]}
     assert repo("spec", "verify", "e1")[0] == 1             # the conflict goes on record, and is counted as one still
     card = object_card("e1")
@@ -909,23 +729,26 @@ def test_the_experiment_card_crowds_out_no_reason_a_setting_is_in_trouble(repo):
 
 
 def test_a_long_title_of_what_rb_found_keeps_a_gap_before_its_hint(repo, capsys):
-    """What a watched command printed, named by a command too long for the column, still has a gap before the words
-    that say where it is, never running into them."""
+    """What a watched command printed, named by a command too long for the column, is a row of Files whose title gives
+    way with `…` and whose second line says what it becomes (TUI-PARITY M23)."""
     show = "import json; print(json.dumps({'metrics': {'top1': 0.81}}))  # the same evaluation, again"
     assert main(["journal", "run", "--json", "--", sys.executable, "-c", show]) == 0
     capsys.readouterr()
-    from textual.widgets import OptionList
     from rabbit_brain.tui import HomeScreen, RBApp
 
     async def drawn():
         app = RBApp(Path.cwd())
         async with app.run_test(size=(160, 44)) as pilot:
-            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and app.screen.query_one("#calls", OptionList).option_count)
-            calls = app.screen.query_one("#calls", OptionList)
-            return [str(calls.get_option_at_index(i).prompt) for i in range(calls.option_count)]
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and bool(app.screen._asks))
+            await pilot.press("f")
+            await pilot.pause(0.6)
+            fl = app.screen.query_one("#files-list")
+            return [fl.get_option_at_index(i).prompt.plain for i in range(fl.option_count) if (fl.get_option_at_index(i).id or "").startswith("found:")]
 
     [row] = asyncio.run(drawn())
-    assert len(row.split("` printed on e1")[0]) > 44 and "` printed on e1  in the repository, not in the record" in row, row
+    first, second = row.split("\n")
+    assert first.startswith(("…", "`")) or "printed" in first, row
+    assert second.strip() == "→ a run of e1", row
 
 
 def test_bare_rb_without_a_terminal_prints_help_as_before(repo, capsys):
@@ -1035,7 +858,9 @@ def test_rb_ui_ends_with_the_screens_code_when_it_fails(repo, monkeypatch):
 def test_q_closes_the_screen_as_its_footer_says(repo):
     """The footer names q as quit: on the home screen it closes rb, and on a card it only goes back."""
     from rabbit_brain.tui import HomeScreen, ObjectScreen, RBApp
-    assert confirm_designs() == ["e1"]                       # nothing waits: tab goes from the catalogue to the card
+    # the focus starts on the Overview's decisions (e1's design waits there); tab goes to its chart, and enter opens
+    # the check's card
+    assert confirm_designs() == ["e1"]
 
     async def drive(keys):
         """Press each key and wait for what it should bring: a screen by its class, the app's end ("closed"), or
@@ -1057,7 +882,7 @@ def test_q_closes_the_screen_as_its_footer_says(repo):
         return app.return_code, seen
 
     assert asyncio.run(drive([("q", "closed")]))[0] == 0
-    code, seen = asyncio.run(drive([("tab", None), ("enter", ObjectScreen), ("q", HomeScreen)]))
+    code, seen = asyncio.run(drive([("tab", None), ("l", ObjectScreen), ("q", HomeScreen)]))
     assert code is None and seen[1:] == [ObjectScreen.__name__, HomeScreen.__name__]
     assert asyncio.run(drive([("x", None)]))[0] is None
 
@@ -1085,34 +910,11 @@ def test_q_while_the_screen_still_draws_closes_it_with_no_traceback(repo):
     assert asyncio.run(closed_with_a_highlight_still_to_handle()) == 0
 
 
-def test_a_full_screen_card_closing_as_a_write_lands_draws_nothing(repo, monkeypatch):
-    """The same for the full-screen card of what waits on a narrow terminal: a write the poll sees as the screen
-    closes shows that card as it reads now, and drew it on a screen already closing."""
-    from rabbit_brain.tui import PendingScreen, RBApp
-    monkeypatch.setenv("CLAUDECODE", "1")
-    assert repo("experiment", "gate", "e1", "--if-holds", "ship it next week")[0] == 0
-    monkeypatch.delenv("CLAUDECODE")
-
-    async def closed_as_a_write_lands():
-        app = RBApp(Path.cwd())
-        async with app.run_test(size=(90, 40)) as pilot:
-            await until(pilot, lambda: bool(app.screen.query("#pending")) and app.screen.query_one("#pending").option_count == 1)
-            app.screen.query_one("#tree-list").focus()
-            await pilot.pause(0.3)
-            await pilot.press("c")
-            await until(pilot, lambda: isinstance(app.screen, PendingScreen))
-            card = app.screen
-            app.exit()
-            card.show(card.row)
-        return app.return_code
-
-    assert asyncio.run(closed_as_a_write_lands()) == 0
-
-
 def test_a_card_answers_to_the_mouse_too(repo):
-    """The terminal streams mouse events to the screen (Textual turns mouse reporting on), so the
-    card's chips must run exactly what the keys run: clicking y opens the same Reason modal."""
-    from rabbit_brain.tui import CardScreen, HomeScreen, RBApp, Reason
+    """What rb found is a row of Files (TUI-PARITY X2, M23): a click on the row opens its panel as enter does, and its
+    y asks for a note; escape goes back with nothing written."""
+    from rabbit_brain.tui import HomeScreen, RBApp
+    from rabbit_brain.tui_panels import FoundPanel
     Path("out").mkdir()
     Path("out/metrics.json").write_text('{"top1": 0.81}', encoding="utf-8")     # a run nobody recorded
     state().scan()
@@ -1121,21 +923,23 @@ def test_a_card_answers_to_the_mouse_too(repo):
     async def drive():
         app = RBApp(Path.cwd())
         async with app.run_test(size=(100, 30)) as pilot:
-            await pilot.pause(0.3)
-            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and getattr(app.focused, "id", None) == "calls")
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and bool(app.screen._asks))
+            s = app.screen
+            await pilot.press("f")
+            await until(pilot, lambda: any((s.query_one("#files-list").get_option_at_index(i).id or "").startswith("found:")
+                                           for i in range(s.query_one("#files-list").option_count)))
+            fl = s.query_one("#files-list")
+            at = next(i for i in range(fl.option_count) if (fl.get_option_at_index(i).id or "").startswith("found:"))
+            fl.focus()
+            fl.highlighted = at
             await pilot.press("enter")
-            await until(pilot, lambda: isinstance(app.screen, CardScreen))
-            assert isinstance(app.screen, CardScreen) and app.screen.card.kind == "record"
-            await pilot.click(".chip-yes")
-            await until(pilot, lambda: isinstance(app.screen, Reason))
-            assert isinstance(app.screen, Reason)
-            await pilot.press("escape")
+            await until(pilot, lambda: isinstance(app.screen, FoundPanel))
+            await pilot.press("y")
             await pilot.pause(0.2)
-            assert isinstance(app.screen, CardScreen)   # escape closed the modal alone, not the card
-            await pilot.click(".chip-no")
-            await until(pilot, lambda: isinstance(app.screen, Reason))
-            assert isinstance(app.screen, Reason)
+            assert app.screen.noting and "⏎ record" in str(app.screen.query_one("#panel-footer").render())
             await pilot.press("escape")
+            await pilot.pause(0.3)
+            assert isinstance(app.screen, HomeScreen)
 
     asyncio.run(drive())
     rec = state()
@@ -1143,13 +947,14 @@ def test_a_card_answers_to_the_mouse_too(repo):
 
 
 def test_the_tree_lists_resources_and_opens_one(repo, capsys):
-    """A resource is a row of the catalogue with where it stands now, and enter opens it like any other row."""
+    """A resource is a row of the catalogue with where a reader gets it, and enter opens its card like any other row's; l
+    its long form."""
     from rabbit_brain.tui import ObjectScreen, RBApp
     assert main(["resource", "add", "imagenet", "--type", "dataset", "--name", "ImageNet-1k", "--version", "validation",
                  "--at", "s3:s3://lab-bucket/imagenet", "--json"]) == 0
     capsys.readouterr()
     row = next(r for r in home().tree if r.kind == "resource")
-    assert (row.id, row.label, row.standing, row.depth) == ("imagenet", "ImageNet-1k validation", "remote", 0)
+    assert (row.id, row.label, row.standing, row.depth) == ("imagenet", "ImageNet-1k validation", "no download link", 0)
     writes = len(state().log(None))
 
     async def drive():
@@ -1162,10 +967,15 @@ def test_the_tree_lists_resources_and_opens_one(repo, capsys):
             tree.focus()
             tree.highlighted = ids.index("o:imagenet")
             await pilot.pause(0.2)
-            await pilot.press("enter")
-            await pilot.pause(0.3)
-            assert isinstance(app.screen, ObjectScreen) and app.screen.subject == "imagenet"
-            assert app.screen.card.title == "ImageNet-1k validation" and app.screen.card.lead == "dataset · remote"
+            said = tree.get_option_at_index(tree.highlighted).prompt.plain
+            # where a reader gets it, never "remote" or "present" (TUI-PARITY L2, L3): an s3 location has no download link
+            assert said.endswith("no download link") and "remote" not in said, said
+            await pilot.press("enter")                  # its card (TUI-PARITY M11): crumb Resources, its name, its chips
+            await until(pilot, lambda: bool(app.screen.query("#card-view")))
+            view = app.screen.query_one("#card-view")
+            assert view.data.kind == "resource" and view.data.subject == "imagenet" and view.data.crumb == "Resources"
+            said = view.render().plain
+            assert "┃ ImageNet-1k" in said and "[dataset]  [no download link]" in said and "remote" not in said, said
             await pilot.press("escape")
 
     asyncio.run(drive())
@@ -1177,7 +987,7 @@ def test_a_rule_met_on_evidence_with_a_problem_is_never_green(repo):
     and rb page as for the screen. When the source of a setting e2 reads comes to state another value, c2 still meets its rule, and the
     screen draws it dim wherever it draws it, as rb open does: counted on e2's row, on both questions it is explicitly
     linked to (q1a and q1), and as a pass bar on the card of what rb found and on e2's card, beside the catalogue and full
-    screen. What is sound stays green beside it: e1's rules, each met across the interval of three runs; the gate q1
+    screen, and on the Overview's strip and chart. What is sound stays green beside it: e1's rules, each met across the interval of three runs; the gate q1
     counts beside c2 draws neutral, met or not, a gate being policy (D4)."""
     from rabbit_brain.tui import DIM, GOOD, CardScreen, HomeScreen, ObjectScreen, RBApp
     Path("configs").mkdir()
@@ -1217,40 +1027,58 @@ def test_a_rule_met_on_evidence_with_a_problem_is_never_green(repo):
                 return pane
             return None
 
+        def overview(screen) -> dict:
+            """The colour of each check's square in the Overview's strip and on its chart row."""
+            out = {}
+            groups = screen.home["overview"]["strip"]["groups"]
+            text = screen.query_one("#story-head").content
+            squares = [i for i, ch in enumerate(text.plain) if ch in "■▲◧□"]
+            for c, i in zip([c["id"] for g in groups for c in g["checks"]], squares):
+                out[f"strip {c}"] = next(str(sp.style) for sp in reversed(text.spans) if sp.start <= i < sp.end)
+            chart = screen.query_one("#chart-list")
+            for k in range(chart.option_count):
+                o = chart.get_option_at_index(k)
+                if o.id and o.id.endswith(":chart"):
+                    i = max(o.prompt.plain.rfind(m) for m in "■▲◧□")
+                    out[f"chart {o.id.split(':')[1]}"] = next(str(sp.style) for sp in reversed(o.prompt.spans) if sp.start <= i < sp.end)
+            return out
+
         async with app.run_test(size=(240, 40)) as pilot:
-            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and getattr(app.focused, "id", None) == "calls")
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and app.screen.query_one("#tree-list").option_count)
+            await pilot.pause(0.5)
+            seen["overview"] = overview(app.screen)
             tree = app.screen.query_one("#tree-list")
             ids = [tree.get_option_at_index(i).id for i in range(tree.option_count)]
-            for row, parts in (("q1", ("2 criteria met", "1 gate met")), ("e1", ("1 criterion met", "1 gate met")), ("q1a", ("1 criterion met",)),
-                               ("e2", ("1 criterion met",))):
-                for part in parts:
-                    seen[f"{row}'s row, {part}"] = _colour_of(tree.get_option_at_index(ids.index(f"o:{row}")).prompt, part)
-            await pilot.press("enter")
-            await until(pilot, lambda: isinstance(app.screen, CardScreen))
-            seen["what rb found"] = bars(app.screen)
-            await pilot.press("escape")
+            # each row's met checks are one mark and count (ruling 9), green while one of them is a rule met with
+            # nothing under it, and a gate met never makes it so
+            for row, part in (("q1", "3 met"), ("e1", "2 met"), ("q1a", "1 met"), ("e2", "1 met")):
+                seen[f"{row}'s row, {part}"] = whole(tree.get_option_at_index(ids.index(f"o:{row}")).prompt, part)
+            # what rb found is a row of Files with its small panel (TUI-PARITY X2, M23): no card of bars to colour
             await until(pilot, lambda: isinstance(app.screen, HomeScreen))
             tree.focus()
             for e, title in (("e1", "the experiment"), ("e2", "the follow-up")):
                 tree.highlighted = ids.index(f"o:{e}")
-                await until(pilot, lambda: beside(title) is not None)
-                seen[f"{e} beside"] = bars(beside(title))
-            await pilot.press("enter")
-            await until(pilot, lambda: isinstance(app.screen, ObjectScreen))
-            seen["e2 full screen"] = bars(app.screen)
-            await pilot.press("escape")
+                await pilot.pause(0.2)
+                await pilot.press("l")                  # the long form, one key away
+                await until(pilot, lambda: isinstance(app.screen, ObjectScreen) and app.screen.query(".bar"))
+                seen[f"{e} beside"] = bars(app.screen)
+                await pilot.press("escape")
+                await until(pilot, lambda: isinstance(app.screen, HomeScreen))
+            seen["e2 full screen"] = seen["e2 beside"]
         return seen
 
     # a gate met draws neutral: a gate is policy, not a finding (D4)
-    green = {"q1's row, 2 criteria met": GOOD, "q1's row, 1 gate met": DIM, "e1's row, 1 criterion met": GOOD, "e1's row, 1 gate met": DIM,
-             "q1a's row, 1 criterion met": GOOD, "e2's row, 1 criterion met": GOOD, "what rb found": {"c2": GOOD},
-             "e1 beside": {"c1": GOOD, "g1": DIM}, "e2 beside": {"c2": GOOD}, "e2 full screen": {"c2": GOOD}}
+    green = {"q1's row, 3 met": GOOD, "e1's row, 2 met": GOOD, "q1a's row, 1 met": GOOD, "e2's row, 1 met": GOOD,
+             "e1 beside": {"c1": GOOD, "g1": DIM}, "e2 beside": {"c2": GOOD}, "e2 full screen": {"c2": GOOD},
+             # the Overview of q1, which c1, g1 and c2 are each linked to: its strip and its chart draw them alike
+             "overview": {f"{where} {c}": colour for where in ("strip", "chart") for c, colour in (("c1", GOOD), ("g1", DIM), ("c2", GOOD))}}
     assert asyncio.run(drawn()) == green
     Path("configs/train.yaml").write_text("optim:\n  lr: 0.002\n", encoding="utf-8")
     c2 = next(f for b in home().briefs for e in b.experiments for f in e.findings if f.criterion_id == "c2")
     assert c2.standing == "criterion met · measured" and not c2.good
-    assert asyncio.run(drawn()) == {**green, "q1's row, 2 criteria met": DIM, "q1a's row, 1 criterion met": DIM, "e2's row, 1 criterion met": DIM,
-                                    "what rb found": {"c2": DIM}, "e2 beside": {"c2": DIM}, "e2 full screen": {"c2": DIM}}
+    assert asyncio.run(drawn()) == {**green, "q1's row, 3 met": DIM, "q1a's row, 1 met": DIM, "e2's row, 1 met": DIM,
+                                    "e2 beside": {"c2": DIM}, "e2 full screen": {"c2": DIM},
+                                    "overview": {**green["overview"], "strip c2": DIM, "chart c2": DIM}}
 
 
 def test_questions_a_merge_put_each_under_the_other_count_as_rb_counts(repo):
@@ -1297,7 +1125,7 @@ def test_questions_a_merge_put_each_under_the_other_count_as_rb_counts(repo):
             await until(pilot, lambda: isinstance(app.screen, HomeScreen) and any(t.option_count for t in app.screen.query("#tree-list")))
             tree = app.screen.query_one("#tree-list")
             rows = [tree.get_option_at_index(i) for i in range(tree.option_count)]
-            return {o.id[2:]: _colour_of(o.prompt, "criterion met") for o in rows if o.id in ("o:q2", "o:q3", "o:e2", "o:e3")}
+            return {o.id[2:]: whole(o.prompt, "1 criterion met") for o in rows if o.id in ("o:q2", "o:q3", "o:e2", "o:e3")}
 
     assert asyncio.run(drawn()) == {"q2": GOOD, "q3": DIM, "e2": GOOD, "e3": DIM}
 
@@ -1330,12 +1158,20 @@ def _options(screen, list_id: str) -> list:
     return [(str(options.get_option_at_index(i).prompt), options.get_option_at_index(i).disabled) for i in range(options.option_count)]
 
 
+async def _open_places(pilot, app) -> None:
+    """w opens WHERE (TUI-PARITY M17); enter on its branch row lists the places and the versions of the record."""
+    from rabbit_brain.tui import PlacesScreen
+    await pilot.press("w")
+    await until(pilot, lambda: type(app.screen).__name__ == "WherePanel")
+    await pilot.press("home")
+    await pilot.press("enter")
+    await until(pilot, lambda: isinstance(app.screen, PlacesScreen))
+
+
 async def _choose(pilot, app, list_id: str, starts: str) -> None:
     """w, then enter on the row of `list_id` that starts with `starts`."""
     from textual.widgets import OptionList
-    from rabbit_brain.tui import PlacesScreen
-    await pilot.press("w")
-    await until(pilot, lambda: isinstance(app.screen, PlacesScreen))
+    await _open_places(pilot, app)
     options = app.screen.query_one(list_id, OptionList)
     options.focus()
     options.highlighted = next(i for i, (text, _) in enumerate(_options(app.screen, list_id)) if text.startswith(starts))
@@ -1359,8 +1195,7 @@ def test_w_lists_the_places_and_shows_another_place_only_to_read(placed):
             home = app.screen
             got["start line"] = str(home.query_one("#place").render())
             got["start keys"] = [home.check_action(a, ()) for a in ("yes", "no", "confirm")]
-            await pilot.press("w")
-            await until(pilot, lambda: isinstance(app.screen, PlacesScreen))
+            await _open_places(pilot, app)
             got["where"], got["versions"] = _options(app.screen, "#where"), _options(app.screen, "#versions")
             await pilot.press("escape")
             await until(pilot, lambda: app.screen is home)
@@ -1371,8 +1206,7 @@ def test_w_lists_the_places_and_shows_another_place_only_to_read(placed):
             got["there runs"] = {r.run_id for r in home.home.runs}
             got["there keys"] = [home.check_action(a, ()) for a in ("yes", "no", "confirm")]
             got["there pending"] = [(p.id, p.confirm) for p in home.home.pending]
-            got["subtitle"] = home.query_one("#pending-panel").border_subtitle
-            home.query_one("#pending").focus()
+            _to_waiting(home)
             await pilot.press("c")
             await pilot.press("c")
             await pilot.pause(1.0)
@@ -1397,8 +1231,8 @@ def test_w_lists_the_places_and_shows_another_place_only_to_read(placed):
     assert got["there line"].startswith(f"exp-c · {c_short} · read only · esc: back to main · its own record · ")
     assert rec.run_sibling in got["there runs"] and rec.run_sibling not in got["back runs"]
     assert got["there keys"] == [False, False, False] and got["back keys"] == [True, True, True]
-    assert got["there pending"] == [(rec.proposed, f"cd {c_path} && rb confirm {rec.proposed}")] and got["subtitle"] == ""
-    assert [d["id"] for d in rec.rb("status", cwd=rec.tree["exp-c"])["pending"]] == [rec.proposed]     # c confirmed nothing
+    assert got["there pending"] == [(rec.proposed, f"cd {c_path} && rb confirm {rec.proposed}")]
+    assert [d["id"] for d in rec.rb("status", "--full", cwd=rec.tree["exp-c"])["pending"]] == [rec.proposed]     # c confirmed nothing
     assert got["mark there"] == got["mark"]
 
 
@@ -1420,8 +1254,7 @@ def test_w_names_each_place_in_short_with_its_whole_path_in_the_detail(tmp_path,
         async with app.run_test(size=(150, 44)) as pilot:
             await until(pilot, lambda: isinstance(app.screen, HomeScreen) and app.screen.query_one("#tree-list").option_count)
             got["line"] = str(app.screen.query_one("#place").render())
-            await pilot.press("w")
-            await until(pilot, lambda: isinstance(app.screen, PlacesScreen))
+            await _open_places(pilot, app)
             got["where"] = [t for t, _ in _options(app.screen, "#where")]
             where = app.screen.query_one("#where", OptionList)
             where.highlighted = next(i for i, t in enumerate(got["where"]) if t.startswith("exp-c · "))
@@ -1513,8 +1346,7 @@ def test_w_in_a_single_checkout_names_its_place_as_it_always_has(repo, workdir, 
         async with app.run_test(size=(150, 44)) as pilot:
             await until(pilot, lambda: isinstance(app.screen, HomeScreen) and app.screen.query_one("#tree-list").option_count)
             got["line"] = str(app.screen.query_one("#place").render())
-            await pilot.press("w")
-            await until(pilot, lambda: isinstance(app.screen, PlacesScreen))
+            await _open_places(pilot, app)
             await pilot.pause(0.3)
             got["where"] = _options(app.screen, "#where")
             got["detail"] = str(app.screen.query_one("#where-detail").render())
@@ -1635,13 +1467,15 @@ def test_observed_says_a_move_of_head_in_words_and_activity_with_its_commit(tmp_
         app = RBApp(here)
         async with app.run_test(size=(120, 40)) as pilot:
             await until(pilot, lambda: isinstance(app.screen, HomeScreen) and app.screen.query_one("#tree-list").option_count)
-            got["title"] = app.screen.query_one("#live-panel").border_title
-            await pilot.press("a")
+            # OBSERVED is one focusable line (TUI-PARITY X10): its newest observation; enter opens the list
+            got["title"] = app.screen.query_one("#observed").render().plain
+            app.screen.query_one("#observed").focus()
+            await pilot.press("enter")
             await until(pilot, lambda: isinstance(app.screen, OpenItemsScreen))
             got["activity"] = app.screen.activity
 
     asyncio.run(drive())
-    assert got["title"] == "OBSERVED · UTC"
+    assert re.match(r"\d\d:\d\d  \S", got["title"]), got["title"]
     gits = [l for l in got["activity"] if "  git  " in l]
     assert len(gits) == 2 and re.fullmatch(rf"\d\d:\d\d UTC  git  new commit · at commit {head[:12]}", gits[-1]), got["activity"]
     assert all(re.match(r"\d\d:\d\d UTC  ", l) for l in got["activity"]), got["activity"]
@@ -1684,7 +1518,7 @@ def test_on_a_narrow_screen_enter_opens_a_waiting_call_with_the_command_that_con
             home = app.screen
             await _choose(pilot, app, "#where", "exp-c · ")
             await until(pilot, lambda: home.place is not None and app.screen is home)
-            home.query_one("#pending", OptionList).focus()
+            _to_waiting(home)
             await pilot.press("enter")
             await until(pilot, lambda: isinstance(app.screen, PendingScreen))
             got["opened"] = isinstance(app.screen, PendingScreen)
@@ -1765,7 +1599,7 @@ def test_a_past_version_s_waiting_call_shows_no_command(placed, monkeypatch):
                 await _choose(pilot, app, "#versions", head[:12])
                 await until(pilot, lambda: home.at is not None and app.screen is home)
                 got["rows"] = [(r.id, r.confirm) for r in home.home.pending]
-                home.query_one("#pending", OptionList).focus()
+                _to_waiting(home)
                 await pilot.press("enter")
                 await until(pilot, lambda: isinstance(app.screen, PendingScreen))
                 got["card"] = " ".join(str(w.render()) for w in app.screen.query("Static"))
@@ -1778,23 +1612,44 @@ def test_a_past_version_s_waiting_call_shows_no_command(placed, monkeypatch):
     _shutil.rmtree(folder)
 
 
+async def _record_first_found(app, pilot, note=None):
+    """What rb found is a row of Files (TUI-PARITY X2, M23): f, the found row, enter opens its panel, y asks for a note,
+    enter records it."""
+    from rabbit_brain.tui_panels import FoundPanel
+    s = app.screen
+    await pilot.press("f")
+    found = lambda: [i for i in range(s.query_one("#files-list").option_count) if (s.query_one("#files-list").get_option_at_index(i).id or "").startswith("found:")]
+    await until(pilot, lambda: bool(found()))
+    fl = s.query_one("#files-list")
+    fl.focus()
+    fl.highlighted = found()[0]
+    await pilot.pause(0.2)
+    await pilot.press("enter")
+    await until(pilot, lambda: isinstance(app.screen, FoundPanel))
+    await pilot.press("y")
+    await pilot.pause(0.2)
+    if note:
+        for ch in note:
+            await pilot.press(ch)
+    await pilot.press("enter")
+
+
 def _y_on_the_first_found(rec, app_here) -> dict:
     """y, then enter, on the first thing the screen started in `app_here` lists as found: the receipt of the run it
     recorded, with its metrics and files."""
     from rabbit_brain.tui import HomeScreen, RBApp, Reason
-    before = {r["id"] for r in rec.rb("status")["runs"]}
+    before = {r["id"] for r in rec.rb("status", "--full")["runs"]}
 
     async def drive():
         app = RBApp(rec.root, app_here)
         async with app.run_test(size=(120, 36)) as pilot:
-            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and getattr(app.focused, "id", None) == "calls")
-            await pilot.press("y")
-            await until(pilot, lambda: isinstance(app.screen, Reason))
-            await pilot.press("enter")
-            await until(pilot, lambda: len(rec.rb("status")["runs"]) > len(before), timeout=60)
+            # y and n act on what rb found in its own panel only (TUI-PARITY X2, M23), a row of Files
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and bool(app.screen._asks))
+            await _record_first_found(app, pilot)
+            await until(pilot, lambda: len(rec.rb("status", "--full")["runs"]) > len(before), timeout=60)
 
     asyncio.run(drive())
-    [made] = [r for r in rec.rb("status")["runs"] if r["id"] not in before]
+    [made] = [r for r in rec.rb("status", "--full")["runs"] if r["id"] not in before]
     return rec.rb("show", made["id"])["object"]
 
 
@@ -1828,19 +1683,18 @@ def test_y_on_what_a_command_printed_in_a_nested_worktree_records_that_worktree_
     printed = 'import json; print(json.dumps({"metrics": {"fp32.top1": 0.75, "int8.top1": 0.749}}))'
     ran = subprocess.run([*command(), "journal", "run", "--", sys.executable, "-c", printed], cwd=b, env=rec.env, capture_output=True, text=True)
     assert ran.returncode == 0, ran.stderr                                   # a run nobody recorded, printed there
-    before = {r["id"] for r in rec.rb("status")["runs"]}
+    before = {r["id"] for r in rec.rb("status", "--full")["runs"]}
 
     async def drive():
         app = RBApp(rec.root)
         async with app.run_test(size=(120, 36)) as pilot:
-            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and getattr(app.focused, "id", None) == "calls")
-            await pilot.press("y")
-            await until(pilot, lambda: isinstance(app.screen, Reason))
-            await pilot.press("enter")
-            await until(pilot, lambda: len(rec.rb("status")["runs"]) > len(before), timeout=60)
+            # y and n act on what rb found in its own panel only (TUI-PARITY X2, M23), a row of Files
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and bool(app.screen._asks))
+            await _record_first_found(app, pilot)
+            await until(pilot, lambda: len(rec.rb("status", "--full")["runs"]) > len(before), timeout=60)
 
     asyncio.run(drive())
-    [made] = [r for r in rec.rb("status")["runs"] if r["id"] not in before]
+    [made] = [r for r in rec.rb("status", "--full")["runs"] if r["id"] not in before]
     attached = rec.rb("show", made["id"])["object"]["receipt"]["attached"]
     assert attached["worktree"] == {"path": b.as_posix()} and attached["branch"] == "exp-b" and attached["dirty"] is True
 
@@ -1931,7 +1785,7 @@ def test_rb_ui_says_rules_as_the_page_and_rb_status_do(repo, capsys, tmp_path):
         assert repo("criterion", "add", c[0], "-e", "e1", *c[1:], "-q", "q1")[0] == 0
     for top5, loss in (("0.9", "0.5"), ("0.91", "0.4"), ("0.92", "0.45")):
         assert repo("run", "add", "e1", "top1=0.79", f"top5={top5}", f"loss={loss}")[0] == 0
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     [status] = [x for x in capsys.readouterr().out.splitlines() if x.startswith("Rules: ")]
     assert main(["page", "--out", str(tmp_path / "page.html")]) == 0
     capsys.readouterr()
@@ -1939,13 +1793,17 @@ def test_rb_ui_says_rules_as_the_page_and_rb_status_do(repo, capsys, tmp_path):
     [tally] = {_html.unescape(re.sub(r"<[^>]+>", "", m)) for m in re.findall(r'<p class="stt">(.*?)</p>', page)}
     h = home()
     shown = tally_text(h.tally, h.get("muted", ())).plain
-    assert shown == status == tally == "Rules: 1 met · 1 not met · 1 can't tell yet · 1 gate missed", (shown, status, tally)
+    assert shown == status == "Rules: 1 met · 1 not met · 1 can't tell yet · 1 gate missed", (shown, status)
+    # closed form (owner, Nov 13 2026): the page says the same tally as holds, does not hold and not settled
+    assert tally == "Rules: 1 holds · 1 does not hold · 1 not settled · 1 gate missed", tally
     rows = {r.id: r.standing for r in h.tree}
     assert rows["e1"].startswith("open · 1 criterion met · 1 criterion not met")       # rb's own words, in the model
     assert said_standing(rows["e1"]).startswith("open · 1 rule met · 1 rule not met · 1 can't tell yet")
     assert plain_word("2 criteria met") == "2 rules met" and plain_word("estimate meets criterion") == "estimate meets the rule"
     drawn = asyncio.run(catalogue(240))
-    assert "1 rule met · 1 rule not met" in drawn["o:e1"].plain and "criteri" not in drawn["o:e1"].plain, drawn["o:e1"].plain
+    # the catalogue's row counts as the strip does, its marks with the strip's words (ruling 9; Nov 12 20:35 +08)
+    flat = " ".join(drawn["o:e1"].plain.split())
+    assert flat.endswith("■ 1 ▲ 2 ◧ 1") and "criteri" not in flat, drawn["o:e1"].plain      # compressed (A7)
     assert object_card("e1").bars_label == "Its rules:"
 
     async def card(subject: str) -> str:
@@ -2003,7 +1861,10 @@ def test_a_click_on_the_place_line_opens_where_as_w_does_and_its_lines_scroll(re
         async with app.run_test(size=(80, 24)) as pilot:
             await until(pilot, lambda: isinstance(app.screen, HomeScreen) and app.screen.query_one("#tree-list").option_count)
             got["line"] = str(app.screen.query_one("#place").render())
-            await pilot.click("#place")
+            await pilot.click("#head")           # the git chip's row opens WHERE, as w does (M12)
+            await until(pilot, lambda: type(app.screen).__name__ == "WherePanel")
+            await pilot.press("home")
+            await pilot.press("enter")
             await until(pilot, lambda: isinstance(app.screen, PlacesScreen))
             await pilot.pause(0.3)
             got["highlighted"] = app.screen.query_one("#where").highlighted
@@ -2042,3 +1903,416 @@ def test_the_places_op_without_detail_asks_git_for_no_tree(repo, workdir, monkey
     assert log.exists() and "ls-tree" not in log.read_text(encoding="utf-8")
     places_view(workdir, None, detail=True)
     assert "ls-tree" in log.read_text(encoding="utf-8")
+
+
+def test_other_questions_are_rows_under_decisions_and_enter_makes_one_the_story(repo):
+    """R21: under Decisions, one row per other top-level question, its words and its strip as rb status gives them;
+    Enter makes it the story, and escape gives the story back to rb's own pick. The home counts nothing record-wide."""
+    from rabbit_brain.tui import RBApp
+    assert repo("experiment", "add", "the scale experiment", "--id", "e2", "--hypothesis", "it scales", "--question", "q2")[0] == 0
+    assert repo("criterion", "add", "top1 holds at scale", "-e", "e2", "--metric", "top1", "--at-least", "0.9", "--id", "c2", "-q", "q2")[0] == 0
+    assert repo("run", "add", "e2", "top1=0.6")[0] == 0
+    ov = home().overview
+    assert ov["question"]["id"] == "q1" and [o["id"] for o in ov["others"]] == ["q2"]
+
+    async def drive(size):
+        got = {}
+        app = RBApp(Path.cwd())
+        async with app.run_test(size=size) as pilot:
+            await until(pilot, lambda: app.screen.query("#others-list") and app.screen.query_one("#others-list").option_count == 2)
+            home = app.screen
+            ol = home.query_one("#others-list")
+            got["rows"] = [ol.get_option_at_index(i).id for i in range(ol.option_count)]
+            got["row"] = ol.get_option_at_index(1).prompt.plain
+            got["record_lines"] = [w for w in ("#tally", "#quiet", "#pending-panel") if home.query(w)]
+            ol.focus()
+            ol.highlighted = 1
+            await pilot.pause(0.2)
+            await pilot.press("enter")
+            await until(pilot, lambda: "does it scale" in home.query_one("#story-head").render().plain)
+            got["story"] = home.query_one("#story-head").render().plain
+            got["others now"] = [ol.get_option_at_index(i).id for i in range(ol.option_count)]
+            await pilot.press("escape")
+            await until(pilot, lambda: "does it work" in home.query_one("#story-head").render().plain)
+            got["back"] = home.query_one("#story-head").render().plain
+        return got
+
+    for size in ((120, 40), (80, 24)):
+        got = asyncio.run(drive(size))
+        assert got["rows"] == ["others-head", "q:q2"] and got["record_lines"] == [], got
+        assert got["row"].splitlines()[0] == "┃ does it scale" and "[Open]  ▲ 1 failed" in got["row"], got["row"]
+        assert got["story"].startswith("┃ does it scale") and "▲ 1 failed" in got["story"], got["story"]
+        assert got["others now"] == ["others-head", "q:q1"]
+        assert got["back"].startswith("┃ does it work")
+
+
+def test_the_key_is_rows_of_a_key_and_a_label_never_a_sentence(repo):
+    """? on the home: one row per key with a label of three words or fewer; no sentence, and only the keys: what a
+    mark or a word means is shown beside it on the screen (no glossary, show instead: Nov 12 20:35 +08)."""
+    from rabbit_brain import tui
+    from rabbit_brain.tui import RBApp
+    from rabbit_brain.tui_panels import KeyPanel as KeyScreen
+    from rabbit_brain.tui_parts import KEYS
+
+    async def drive():
+        app = RBApp(Path.cwd())
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause(0.3)
+            await pilot.press("question_mark")
+            await until(pilot, lambda: isinstance(app.screen, KeyScreen))
+            text = str(app.screen.query_one("#keys").render())
+            await pilot.press("escape")
+            await until(pilot, lambda: not isinstance(app.screen, KeyScreen))
+            return text
+
+    text = asyncio.run(drive())
+    rows = [line.strip() for line in text.splitlines() if line.strip()]
+    # M15: its head with rb's version, then one row per key, its label three words at most
+    assert rows[0].startswith("KEYS") and rows[0].endswith(f"rb {tui.__dict__.get('__version__') or __import__('rabbit_brain').__version__}")
+    assert len(rows) == 1 + len(KEYS), rows
+    for line in rows[1:]:
+        key, label = line.split("  ", 1)
+        assert 1 <= len(label.split()) <= 3 and not label.rstrip().endswith((".", ":")), line
+    keys = dict(KEYS)
+    assert {k: keys[k] for k in ("tab ⇧tab", "⏎", "esc", "f", "W", "?")} == {
+        "tab ⇧tab": "next, previous", "⏎": "open", "esc": "back", "f": "Files", "W": "figure's words", "?": "keys"}
+    # no mark, and no list of what one means
+    assert not set("■▲◧□‾●○░┆✓✗❝⚙▣△±⊘∅") & set(text) and "MARKS" not in text, text
+    assert not hasattr(tui, "GLYPHS") and not hasattr(tui, "CHART_KEY")
+
+
+def test_every_check_under_a_top_level_question_counts_in_one_strip_as_rb_status_counts(scale_record, tmp_path, monkeypatch):
+    """R21 on the scale record: the home's strips, the story's and each of Other questions', count every check linked to
+    a question in exactly one strip, its top-level question's (a sub-question's checks with it), and say the counts rb
+    status gives."""
+    import subprocess as sp
+    from rabbit_brain.tui import RBApp
+    from rbtest import AGENT_VARS
+    root = tmp_path / "scale"
+    shutil.copytree(scale_record.root, root, symlinks=True)
+    for k, v in scale_record.env.items():
+        monkeypatch.setenv(k, v)
+    for k in AGENT_VARS:
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.chdir(root)
+    st = json.loads(sp.run([*command(), "status", "--json"], capture_output=True, encoding="utf-8", check=True).stdout)["data"]
+    ov = st["overview"]
+    qs = {q["id"]: q for q in st["questions"] if not q.get("retracted")}
+
+    def top(q):
+        while qs[q].get("parent"):
+            q = qs[q]["parent"]
+        return q
+
+    linked: dict = {}
+    for q in qs.values():
+        for x in (q.get("inquiry") or {}).get("direct", []):
+            linked.setdefault(x["criterion"], set()).add(top(q["id"]))
+    strips = {ov["question"]["id"]: ov["strip"], **{o["id"]: o["strip"] for o in ov["others"]}}
+    counted: dict = {}
+    for qid, s in strips.items():
+        for g in s["groups"]:
+            for c in g["checks"]:
+                counted.setdefault(c["id"], []).append(qid)
+    assert any(qs[q].get("parent") for q in qs), "the scale record has sub-questions"
+    assert {c: sorted(v) for c, v in counted.items()} == {c: sorted(v) for c, v in linked.items()}
+    assert all(len(v) == 1 for v in counted.values())
+    said = lambda s: [f"{g['n']} {g['label']}" for g in s["groups"]]
+
+    async def drive():
+        app = RBApp(root)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await until(pilot, lambda: app.screen.query("#others-list") and app.screen.query_one("#others-list").option_count > 1)
+            home = app.screen
+            ol = home.query_one("#others-list")
+            rows = {ol.get_option_at_index(i).id[2:]: ol.get_option_at_index(i).prompt.plain for i in range(1, ol.option_count)}
+            return home.query_one("#story-head").render().plain, rows
+
+    story, rows = asyncio.run(drive())
+    counts = re.compile(r"(\d+ (?:passed|failed|can't tell yet|no results yet))")
+    assert counts.findall(story) == said(ov["strip"])
+    assert {q: counts.findall(t) for q, t in rows.items()} == {o["id"]: said(o["strip"]) for o in ov["others"]}
+
+
+def test_your_call_and_y_open_one_list_whose_first_rows_are_the_homes(repo, monkeypatch):
+    """The pinned Your call and its key open one list (UX lead, Nov 12 07:15 +08): the Decisions rows, confirmations
+    included, each with its note (a call a session proposed: "park e1 · note: waiting on data"). The badge is
+    len(overview.decisions), and the home's Decisions rows are that list's first three rows, then "+n more"."""
+    from rabbit_brain.tui import ACCENT, RBApp
+    for k, bar in enumerate(("0.8", "0.85", "0.9")):
+        assert repo("criterion", "add", f"top1 reaches {bar}", "-e", "e1", "--metric", "top1", "--at-least", bar, "--id", f"m{k}")[0] == 0
+    monkeypatch.setenv("CLAUDECODE", "1")
+    assert repo("decide", "e1", "park", "--why", "waiting on data")[0] == 0
+    monkeypatch.delenv("CLAUDECODE")
+    n = len(home().overview.decisions)
+    assert n >= 5, home().overview.decisions                  # three calls, the proposed park, e1's design
+
+    def rows(dl) -> list:
+        return [(dl.get_option_at_index(i).id, dl.get_option_at_index(i).prompt.plain) for i in range(dl.option_count)]
+
+    async def drive(size, how):
+        app = RBApp(Path.cwd())
+        async with app.run_test(size=size) as pilot:
+            await until(pilot, lambda: app.screen.query("#decisions-list") and app.screen.query_one("#decisions-list").option_count)
+            s = app.screen
+            dl = s.query_one("#decisions-list")
+            got = {"home": rows(dl), "pin": s.query_one("#pin").render(), "head": s.query_one("#story-decisions-head").render().plain}
+            if how == "y":
+                s.query_one("#chart-list").focus()
+                await pilot.press("y")
+            else:
+                await s.query_one("#pin").on_click()
+            await until(pilot, lambda: "decisions-more" not in [i for i, _ in rows(dl)])
+            got["list"] = rows(dl)
+            await until(pilot, lambda: getattr(app.focused, "id", None) == "decisions-list", timeout=3)
+            got["focus"] = getattr(app.focused, "id", None)
+            await pilot.press("escape")
+            await until(pilot, lambda: "decisions-more" in [i for i, _ in rows(dl)])
+            got["back"] = rows(dl)
+        return got
+
+    for size, how in (((120, 40), "y"), ((80, 24), "pin"), ((160, 48), "y")):
+        got = asyncio.run(drive(size, how))
+        listed = [r for r in got["list"] if not r[0].startswith("decisions-more")]
+        # one row per design (TUI-PARITY section 5 item 10): the pin counts Your call's rows, bold, its key beside it
+        n_rows = len(app_rows := [r for r in listed if r[0].startswith(("o:", "p:", "decision-"))])
+        assert got["pin"].plain == f"Your call {n_rows}  y" and str(got["pin"].spans[0].style) == "bold", (got["pin"].plain, app_rows)
+        assert got["home"][0][1].lstrip().startswith(f"YOUR CALL {n_rows}")
+        # the home's rows: the list's first three, then "+n more"
+        ids = lambda rs: [i for i, _ in rs]          # `▌` marks the focused row, wherever it is
+        assert ids(got["home"][:-1]) == ids(listed[:len(got["home"]) - 1]) and got["home"][-1][0] == "decisions-more", got
+        # three rows, fewer at 80x24 where the story's first chart row needs the room (MP-1112-1030 S4)
+        # the head, then three rows, fewer at 80x24 where the story's first chart row needs the room (MP-1112-1030 S4)
+        shown = len(got["home"]) - 2
+        assert shown == 3 if size[1] >= 30 else 1 <= shown <= 3, got["home"]
+        assert got["home"][-1][1].strip() == f"+{n_rows - shown} more", got["home"]
+        assert got["focus"] == "decisions-list" and ids(got["back"]) == ids(got["home"])
+        # every waiting row is on the list, one line each, its state in a word (TUI-PARITY F3.3): no tag, no note
+        assert not any("[decide]" in text or "[confirm]" in text or "\n" in text for _, text in listed), listed
+        assert sum(" to confirm " in text for _, text in listed) == 1 and sum(text[1:].startswith("design ") for _, text in listed) == 1, listed
+
+
+def test_the_strip_puts_two_spaces_between_its_groups_and_one_only_where_two_would_wrap():
+    """The strip's groups two spaces apart, and one only where two would wrap and one fits (UX lead, Nov 12 07:15 +08)."""
+    from rabbit_brain.tui import strip_lines
+    groups = [{"mark": "■", "state": "meets", "label": "passed", "checks": ["a"] * 4},
+              {"mark": "▲", "state": "misses", "label": "failed", "checks": ["b"]},
+              {"mark": "◧", "state": "undetermined", "label": "can't tell yet", "checks": ["c"] * 4}]
+    lead = "Open · "
+    two = "[Open]  ■■■■ 4 passed  ▲ 1 failed  ◧◧◧◧ 4 can't tell yet"      # the state an amber chip (A7)
+    assert [t.plain for t in strip_lines(lead, groups, 80)] == [two]
+    # one column short of two spaces: the last joint takes one, and the strip stays on its line
+    assert [t.plain for t in strip_lines(lead, groups, len(two) - 1)] == ["[Open]  ■■■■ 4 passed  ▲ 1 failed ◧◧◧◧ 4 can't tell yet"]
+    # short of one space too: the group goes whole to the next line, under the first
+    assert [t.plain for t in strip_lines(lead, groups, len(two) - 2)] == ["[Open]  ■■■■ 4 passed  ▲ 1 failed", "        ◧◧◧◧ 4 can't tell yet"]
+
+
+def test_the_rests_on_marks_read_n_of_m_never_a_slash(repo):
+    """What it rests on reads `0 of 1` on rb ui's home, as on every surface, never `0/1` (UX lead, Nov 12 07:15 +08)."""
+    from rabbit_brain.tui import RBApp
+
+    async def drive():
+        app = RBApp(Path.cwd())
+        async with app.run_test(size=(80, 24)) as pilot:
+            await until(pilot, lambda: app.screen.query("#story-rests") and app.screen.query_one("#story-rests").render().plain.strip())
+            return app.screen.query_one("#story-rests").render().plain
+
+    text = asyncio.run(drive())
+    assert re.search(r"\d+ of \d+", text) and not re.search(r"\d+/\d+", text), text
+
+
+# ------------------------------------------------------------ c on a design: its listing first (TUI-PARITY A11, M21)
+
+
+async def _listing(pilot, app):
+    from rabbit_brain.tui_panels import ConfirmListing
+    await until(pilot, lambda: isinstance(app.screen, ConfirmListing))
+    return app.screen
+
+
+def _listing_text(screen) -> str:
+    from rabbit_brain.tui_panels import listing_lines
+    return "\n".join(t.plain for t in listing_lines(screen.listing, 400))
+
+
+async def _to_end(pilot) -> None:
+    for _ in range(80):
+        await pilot.press("j")
+    await pilot.pause(0.4)
+
+
+@pytest.mark.parametrize("size", [(120, 40), (90, 40)], ids=["wide", "narrow"])
+def test_c_on_rb_ui_confirms_a_gate_a_session_set(repo, monkeypatch, size):
+    """A gate a session set is part of its experiment's design and waits with it, in one row titled a design. The first
+    c shows the design full screen, its gate among its parts; c confirms only once its last line has been on screen,
+    and then the design as listed, with its gate."""
+    from rabbit_brain.tui import RBApp
+    monkeypatch.setenv("CLAUDECODE", "1")
+    assert repo("experiment", "gate", "e1", "--if-holds", "ship it next week")[0] == 0
+    monkeypatch.delenv("CLAUDECODE")
+    [row] = home().pending
+    assert (row.kind, row.text) == ("design", "e1's design: the experiment") and re.fullmatch(r"e1@[0-9a-f]{64}", row.id)
+    got = {}
+
+    async def drive():
+        app = RBApp(Path.cwd())
+        app.notify = lambda message, **kw: None
+        async with app.run_test(size=size) as pilot:
+            await until(pilot, lambda: len(_listed_waits(app.screen)) == 1)
+            app.screen.query_one("#tree-list").focus()
+            await pilot.pause(0.3)
+            await pilot.press("c")
+            listing = await _listing(pilot, app)
+            got["text"] = _listing_text(listing)
+            got["key"] = listing.listing["confirm"]
+            await pilot.pause(0.4)
+            got["fits"] = listing.seen_end              # a listing that fits the screen has shown its last line
+            await pilot.press("c")                      # its last line not seen yet: nothing
+            await pilot.pause(0.5)
+            got["early"] = state().status()["designs_pending"]
+            await _to_end(pilot)
+            await pilot.press("c")
+            await until(pilot, lambda: not state().status()["designs_pending"], timeout=30)
+
+    asyncio.run(drive())
+    assert "ship it next week" in got["text"] and "gate" in got["text"], got["text"]
+    assert got["key"] == row.confirm and (got["early"] or got["fits"]), got
+    st = state().status()
+    assert st["gates_pending"] == [] and [e["design"]["standing"] for e in st["experiments"]] == ["confirmed"]
+
+
+def test_a_designs_listing_says_its_gate_only_where_it_has_one(repo, monkeypatch):
+    """A design with no gate lists no gate row."""
+    from rabbit_brain.tui import RBApp
+    got = {}
+
+    async def drive():
+        app = RBApp(Path.cwd())
+        app.notify = lambda message, **kw: None
+        async with app.run_test(size=(90, 30)) as pilot:
+            await until(pilot, lambda: len(_listed_waits(app.screen)) == 1)
+            app.screen.query_one("#tree-list").focus()
+            await pilot.pause(0.3)
+            await pilot.press("c")
+            got["text"] = _listing_text(await _listing(pilot, app))
+
+    asyncio.run(drive())
+    assert "CHECKS" in got["text"] and not re.search(r"^\s+gate\s", got["text"], re.M), got["text"]
+
+
+def test_a_listing_closing_as_a_write_lands_draws_nothing(repo, monkeypatch):
+    """A listing that looks again as the app exits draws nothing and raises nothing."""
+    from rabbit_brain.tui import RBApp
+    monkeypatch.setenv("CLAUDECODE", "1")
+    assert repo("experiment", "gate", "e1", "--if-holds", "ship it next week")[0] == 0
+    monkeypatch.delenv("CLAUDECODE")
+
+    async def closed_as_a_write_lands():
+        app = RBApp(Path.cwd())
+        async with app.run_test(size=(90, 40)) as pilot:
+            await until(pilot, lambda: len(_listed_waits(app.screen)) == 1)
+            app.screen.query_one("#tree-list").focus()
+            await pilot.pause(0.3)
+            await pilot.press("c")
+            listing = await _listing(pilot, app)
+            app.exit()
+            try:
+                listing.look_again()
+            except Exception:  # noqa: BLE001 - a closing screen may refuse a redraw; it must not crash the app
+                pass
+        return app.return_code
+
+    assert asyncio.run(closed_as_a_write_lands()) == 0
+
+
+@pytest.mark.parametrize("size", [(120, 40), (90, 40)], ids=["wide", "narrow"])
+def test_c_never_confirms_a_design_changed_after_it_was_shown(repo, monkeypatch, size):
+    """The first c showed e1's design; a session changes it. A c before the screen has read the change runs rb confirm
+    with the key shown, which rb refuses; once the listing has read it, it is drawn again as it reads now and disarmed
+    until its last line has been on screen again; only then does c confirm it, as it now reads."""
+    from rabbit_brain.tui import RBApp
+    monkeypatch.setenv("CLAUDECODE", "1")
+    assert repo("experiment", "gate", "e1", "--if-holds", "ship it next week")[0] == 0
+    monkeypatch.delenv("CLAUDECODE")
+    got = {}
+
+    def session_changes_it(text):
+        r = subprocess.run([*command(), "experiment", "gate", "e1", "--if-holds", text], env={**environment(), "CLAUDECODE": "1"},
+                           capture_output=True, stdin=subprocess.DEVNULL, encoding="utf-8")
+        assert r.returncode == 0, (r.stdout, r.stderr)
+
+    async def drive():
+        app = RBApp(Path.cwd())
+        app.notify = lambda message, **kw: None
+        async with app.run_test(size=size) as pilot:
+            await until(pilot, lambda: len(_listed_waits(app.screen)) == 1)
+            app.screen.query_one("#tree-list").focus()
+            await pilot.pause(0.3)
+            await pilot.press("c")
+            listing = await _listing(pilot, app)
+            shown = listing.listing["confirm"]
+            await _to_end(pilot)
+            reload, listing.reload = listing.reload, None          # the screen has not read the change yet
+            session_changes_it("ship it the week after")
+            await pilot.press("c")
+            await pilot.pause(3.0)
+            got["refused"] = [d["confirm"] for d in state().status()["designs_pending"]]
+            # rb refused the key shown: the design still waits, with its new key
+            await pilot.press("c")
+            listing = await _listing(pilot, app)
+            await pilot.pause(0.4)
+            got["again"] = (_listing_text(listing), listing.seen_end, listing.listing["confirm"] != shown)
+            await pilot.press("c")
+            await pilot.pause(0.5)
+            got["early"] = state().status()["designs_pending"]
+            await _to_end(pilot)
+            await pilot.press("c")
+            await until(pilot, lambda: not state().status()["designs_pending"], timeout=30)
+            del reload
+
+    asyncio.run(drive())
+    assert got["refused"] and (got["early"] or got["again"][1]), got
+    text, seen, moved = got["again"]
+    assert "ship it the week after" in text and moved, got["again"]
+    st = state().status()
+    assert [e["design"]["standing"] for e in st["experiments"]] == ["confirmed"]
+
+
+def test_y_n_only_in_the_found_prompt(repo):
+    """A17, X2, M23: with a found row of Files focused, `y` opens Your call; `⏎` opens the found file's panel, which shows
+    `<file> → a run of <experiment>` and no sentence, and only there do `y` and `n` act."""
+    from rabbit_brain.tui import HomeScreen, RBApp
+    from rabbit_brain.tui_panels import FoundPanel
+    Path("out").mkdir()
+    Path("out/metrics.json").write_text('{"top1": 0.81}', encoding="utf-8")     # a run nobody recorded
+    state().scan()
+    got = {}
+
+    async def drive():
+        app = RBApp(Path.cwd())
+        async with app.run_test(size=(80, 24)) as pilot:
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and bool(app.screen._asks))
+            s = app.screen
+            await pilot.press("f")
+            await pilot.pause(0.6)
+            fl = s.query_one("#files-list")
+            at = [i for i in range(fl.option_count) if (fl.get_option_at_index(i).id or "").startswith("found:")]
+            fl.focus()
+            fl.highlighted = at[0]
+            await pilot.pause(0.3)
+            got["footer"] = str(s.query_one("#footer").render())
+            await pilot.press("y")
+            await pilot.pause(0.4)
+            got["y"] = (type(app.screen).__name__, bool(getattr(s, "_decisions_open", False)))
+            fl.focus()
+            fl.highlighted = at[0]
+            await pilot.press("enter")
+            await until(pilot, lambda: isinstance(app.screen, FoundPanel))
+            got["panel"] = _shown(app.screen)
+            await pilot.press("escape")
+
+    asyncio.run(drive())
+    assert got["footer"].strip() == "⏎ record or leave out  esc back  ? keys  q quit", got["footer"]
+    assert got["y"][0] != "FoundPanel", got["y"]
+    assert "metrics.json → a run of e1" in got["panel"] and "y record it  n leave out  esc back" in got["panel"], got["panel"]
+    assert "through the same rb run add" not in got["panel"]

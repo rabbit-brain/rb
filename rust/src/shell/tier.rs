@@ -61,6 +61,8 @@ pub enum Row {
     DownloadAddress,
     /// hosts a run says it ran on (gpu and the like)
     Hosts,
+    /// a resource's local copies, their paths and whether each is on this machine, and rb's ask for a download link
+    LocalCopies,
     /// the place shown, its label, the places and versions listed, the scope bar
     Places,
     /// what waits elsewhere, in another place of the clone
@@ -119,6 +121,7 @@ pub const TABLE: &[(Row, &str, Shown, Shown)] = &[
     (Row::YouLine, "the \"you\" line", Shown::No, Shown::No),
     (Row::DownloadAddress, "resource download address", Shown::Yes, Shown::WithUrl),
     (Row::Hosts, "hosts (gpu and the like)", Shown::Yes, Shown::Yes),
+    (Row::LocalCopies, "a resource's local copies and paths, and the ask for a download link", Shown::Yes, Shown::No),
     (Row::Places, "place label, places, versions, scope bar", Shown::Yes, Shown::No),
     (Row::Elsewhere, "Elsewhere", Shown::Yes, Shown::No),
     (Row::RecordedIn, "recorded in, observed in another place", Shown::Yes, Shown::No),
@@ -161,7 +164,7 @@ mod tests {
             Row::Readings, Row::AuthorText, Row::YourWords, Row::Commands, Row::CitedSources, Row::Repository, Row::Versions, Row::ResultFiles,
             Row::Writer, Row::Session, Row::Branch, Row::Platform, Row::YouLine, Row::DownloadAddress, Row::Hosts, Row::Places, Row::Elsewhere,
             Row::RecordedIn, Row::OtherCode, Row::Pending, Row::DesignStanding, Row::ScopeLines, Row::Found, Row::CdCommands, Row::Digest,
-            Row::Checkout, Row::YourCheckout, Row::CheckoutEvidence, Row::PageEvidence,
+            Row::Checkout, Row::YourCheckout, Row::CheckoutEvidence, Row::PageEvidence, Row::LocalCopies,
         ];
         for r in rows {
             assert_eq!(TABLE.iter().filter(|(x, ..)| *x == r).count(), 1, "{r:?}");

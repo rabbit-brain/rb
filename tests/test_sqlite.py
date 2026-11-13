@@ -107,7 +107,7 @@ def test_one_row_is_a_run_that_names_its_database_table_row_and_columns(rbj, cap
     assert stored["receipt"]["row"] == {"store": "sqlite", "path": "results.db", "sha256": sha256(db), "table": "evals",
                                         "where": {"precision": "int8", "seed": 2}, "rowid": 3,
                                         "columns": {"acc1": "acc1", "val_loss": "val_loss"}}
-    code, out, _ = said(capsys, "show", run["id"])
+    code, out, _ = said(capsys, "show", "--long", run["id"])
     assert code == 0 and "  read from results.db, table evals, rowid 3 (precision=int8, seed=2)" in out.splitlines()
     # read again, after the database has grown: the same row is the same run, and nothing is written
     con = sqlite3.connect(db)
@@ -154,7 +154,7 @@ def test_a_row_read_again_with_other_values_is_refused_for_one_row_is_one_run(rb
     code, env = rbj(*read, "run_name=r3", "--replaces", first, "--why", "read before its training finished")
     assert code == 0
     second = env.data["object"]["id"]
-    finding = rbj("show", "c1")[1].data["finding"]
+    finding = rbj("show", "--long", "c1")[1].data["finding"]
     assert finding["comparison"]["estimate"] == 0.757 and [o["run"] for o in finding["observations"]] == [second]
     update(db, "update evals set finished_at = '2026-05-02 09:30:00' where run_name = 'r3'")
     before = record_files()
@@ -180,7 +180,7 @@ def test_a_row_or_file_read_again_under_a_newer_spec_replaces_its_run(rbj):
     first = {w: rbj(*read, w)[1].data["object"] for w in ("run_name=r3", "run_name=r4")}
     from_file = rbj("run", "add", "int8", "--variant", "int8", "--from", "metrics.json", "--set", "seed=9")[1].data["object"]
     assert rbj("spec", "set", "int8", "calib", "512", "--no-verify")[0] == 0
-    finding = rbj("show", "c1")[1].data["finding"]
+    finding = rbj("show", "--long", "c1")[1].data["finding"]
     assert {o["reason"] for o in finding["observations"]} == {"under an earlier spec: calib unknown -> 512"}
     code, env = rbj(*read, "run_name=r3")
     assert code == 0 and env.data["duplicate_of"] == first["run_name=r3"]["id"]
@@ -191,7 +191,7 @@ def test_a_row_or_file_read_again_under_a_newer_spec_replaces_its_run(rbj):
     assert again["id"] != first["run_name=r3"]["id"] and again["metrics"] == first["run_name=r3"]["metrics"]
     keep = ("store", "path", "sha256", "table", "where", "rowid", "columns", "per_run")
     assert {k: again["receipt"]["row"].get(k) for k in keep} == {k: first["run_name=r3"]["receipt"]["row"].get(k) for k in keep}
-    old = rbj("show", first["run_name=r3"]["id"])[1].data["object"]
+    old = rbj("show", "--long", first["run_name=r3"]["id"])[1].data["object"]
     assert old["retracted"]["why"] == f"replaced by {again['id']}: read again under the spec with calib"
     # the SDK reads the other row again, and MCP the file
     exp = rb.open().experiment("int8")
@@ -207,7 +207,7 @@ def test_a_row_or_file_read_again_under_a_newer_spec_replaces_its_run(rbj):
         server.close()
     assert not answer["isError"], answer
     assert answer["structuredContent"]["data"]["object"]["id"] != from_file["id"]
-    finding = rbj("show", "c1")[1].data["finding"]
+    finding = rbj("show", "--long", "c1")[1].data["finding"]
     assert sorted(o["run"] for o in finding["observations"] if o["counted"]) == sorted([again["id"], sdk.id, answer["structuredContent"]["data"]["object"]["id"]])
 
 
@@ -229,7 +229,7 @@ def test_after_a_spec_change_rb_points_at_replaces_never_at_again(rbj, capsys):
     assert f"--replaces {first}" in err and "under an earlier spec" in err
     code, env = rbj(*read)
     assert env.data["duplicate_of"] == first and any(f"--replaces {first}" in w for w in env.data["warnings"])
-    [item] = [i for i in rbj("status")[1].data["open"] if i["code"] == "untested" and i["subject"] == "c1"]
+    [item] = [i for i in rbj("status", "--full")[1].data["open"] if i["code"] == "untested" and i["subject"] == "c1"]
     assert f"1 run was recorded under an earlier spec ({first})" in item["what"] and "--replaces <run>" in item["what"]
     with pytest.warns(rb.RBWarning, match=f"--replaces {first}"):
         assert rb.open().experiment("int8").record_from("results.db", table="evals", where={"run_name": "r3"},
@@ -253,13 +253,13 @@ def test_one_row_read_as_a_run_in_two_experiments_is_said_at_the_write_and_by_st
     code, out, err = said(capsys, "run", "add", "int8b", "--from", "results.db", "--table", "evals", "--where", "run_name=r3", "--set", "seed=@seed")
     second = out.split()[0]
     assert code == 0 and f"results.db, table evals, rowid 3 is also recorded as {first} in int8: one row is one run, and it counts in both int8 and int8b" in err
-    [item] = [i for i in rbj("status")[1].data["open"] if i["code"] == "row_in_several_experiments"]
+    [item] = [i for i in rbj("status", "--full")[1].data["open"] if i["code"] == "row_in_several_experiments"]
     assert (item["who"], item["subject"], item["runs"], item["experiments"], item["do"]) == ("agent", second, [first, second], ["int8", "int8b"], "")
     assert item["what"] == f"{first} in int8, {second} in int8b were read from one row (results.db, table evals, rowid 3): one row is one run, and it counts in int8 and int8b"
-    code, out, _ = said(capsys, "status")
+    code, out, _ = said(capsys, "status", "--full")
     assert f"  - {item['what']}" in out
     assert rbj("retract", second, "--why", "read in the wrong experiment")[0] == 0
-    assert not [i for i in rbj("status")[1].data["open"] if i["code"] == "row_in_several_experiments"]
+    assert not [i for i in rbj("status", "--full")[1].data["open"] if i["code"] == "row_in_several_experiments"]
 
 
 def test_no_row_or_several_are_refused_with_how_many_and_nothing_is_written(rbj):
@@ -313,7 +313,7 @@ def test_a_value_that_holds_a_comma_is_one_value(rbj, capsys):
     assert record_files() == before
     code, env = rbj("run", "add", "int8", *row, "--where", 'overrides="lr=0.1,bs=32"', "--set", "seed=1")
     assert code == 0 and (env.data["object"]["receipt"]["row"]["rowid"], env.data["object"]["receipt"]["row"]["where"]) == (2, {"overrides": "lr=0.1,bs=32"})
-    code, out, _ = said(capsys, "show", env.data["object"]["id"])
+    code, out, _ = said(capsys, "show", "--long", env.data["object"]["id"])
     assert '  read from results.db, table runs, rowid 2 (overrides="lr=0.1,bs=32")' in out.splitlines()
     # two pairs, each its own --where, the spaces around '=' dropped
     code, env = rbj("run", "add", "int8", *row, "--where", "overrides = lr=0.1", "--where", "bs = 32", "--set", "seed=2")
@@ -339,7 +339,7 @@ def test_a_quoted_value_is_said_in_its_own_letters(rbj, capsys):
     assert code == 2 and env.errors[0].fix.startswith("Quote a value that holds a comma, --where 'overrides=\"précision=int8,lot=32\"'")
     code, env = rbj("run", "add", "int8", "--from", "results.db", "--table", "runs", "--where", 'overrides="précision=int8,lot=32"', "--set", "seed=1")
     assert code == 0, env.errors
-    code, out, _ = said(capsys, "show", env.data["object"]["id"])
+    code, out, _ = said(capsys, "show", "--long", env.data["object"]["id"])
     assert '  read from results.db, table runs, rowid 1 (overrides="précision=int8,lot=32")' in out.splitlines()
 
 
@@ -349,7 +349,7 @@ def test_a_column_named_by_an_alias_is_read_as_its_metric(rbj):
     code, env = rbj("run", "add", "int8", "--variant", "int8", "--from", "results.db", "--table", "evals", "--where", "run_name=r3", "--set", "seed=2")
     assert code == 0 and env.data["object"]["metrics"] == {"int8.acc1": 0.757, "int8.val_loss": 1.04}
     assert env.data["object"]["receipt"]["row"]["columns"] == {"int8.acc1": "acc1", "int8.val_loss": "val_loss"}
-    [observation] = rbj("show", "c1")[1].data["finding"]["observations"]
+    [observation] = rbj("show", "--long", "c1")[1].data["finding"]["observations"]
     assert observation["value"] == 0.757 and observation["counted"] and observation["basis"] == "file"
 
 
@@ -375,7 +375,7 @@ def test_per_run_values_and_the_produced_time_come_from_the_rows_columns(rbj, ca
     code, out, err = said(capsys, "run", "add", "int8", *where, "--set", "seed=@seed", "--produced-at", "@finished_at")
     assert code == 0, err
     assert "  Produced: 2026-05-02 09:30:00 (reported, column finished_at)" in out.splitlines()
-    run = rbj("show", out.split()[0])[1].data["object"]
+    run = rbj("show", "--long", out.split()[0])[1].data["object"]
     assert run["per_run"] == {"seed": 2} and run["produced_at"] == "2026-05-02T09:30:00.000+00:00" and run["produced_basis"] == "reported"
     assert (run["receipt"]["row"]["per_run"], run["receipt"]["row"]["produced_at"]) == ({"seed": "seed"}, "finished_at")
     before = record_files()
@@ -402,13 +402,13 @@ def test_a_row_is_dated_by_its_own_time_never_by_its_databases(rbj, capsys):
     code, out, err = said(capsys, "run", "add", "int8", *where, "run_name=r3")
     assert code == 0, err
     assert "  Produced: when is unknown; a database's times are not its row's. --produced-at @<column> reads a time the row holds." in out.splitlines()
-    run = rbj("show", out.split()[0])[1].data["object"]
+    run = rbj("show", "--long", out.split()[0])[1].data["object"]
     assert (run["produced_at"], run["produced_basis"]) == (None, "unknown")
-    assert rbj("show", "c1")[1].data["finding"]["timing"] == "unknown"
+    assert rbj("show", "--long", "c1")[1].data["finding"]["timing"] == "unknown"
     # the row's own time: it was made before the criterion was declared
     code, env = rbj("run", "add", "int8", *where, "run_name=r4", "--produced-at", "@finished_at")
     assert code == 0 and (env.data["object"]["produced_at"], env.data["object"]["produced_basis"]) == ("2026-05-03T08:15:00.000+00:00", "reported")
-    assert rbj("show", "c1")[1].data["finding"]["timing"] == "after_evidence"
+    assert rbj("show", "--long", "c1")[1].data["finding"]["timing"] == "after_evidence"
     run = rb.open().experiment("int8").record_from("results.db", table="evals", where={"run_name": "r5"}, variant="int8", per_run={"seed": "@seed"})
     assert (run.produced_at, run.produced_basis) == (None, "unknown")
 
@@ -451,9 +451,9 @@ def test_a_seed_a_column_holds_as_2_0_is_the_unit_seed_2(rbj, capsys):
     assert rbj("run", "add", "int8", "int8.acc1=0.75", "--set", "seed=2")[0] == 0
     code, out, err = said(capsys, "run", "add", "int8", "--variant", "int8", "--from", "results.db", "--table", "sweep", "--where", "name=a", "--set", "seed=@seed")
     assert code == 0 and "the two are one unit" in err
-    run = rbj("show", out.split()[0])[1].data["object"]
+    run = rbj("show", "--long", out.split()[0])[1].data["object"]
     assert run["per_run"] == {"seed": 2.0} and isinstance(run["per_run"]["seed"], float)
-    finding = rbj("show", "c1")[1].data["finding"]
+    finding = rbj("show", "--long", "c1")[1].data["finding"]
     assert (finding["units"]["n"], finding["units"]["runs"]) == (1, 2) and {o["unit"] for o in finding["observations"]} == {"seed=2"}
     assert finding["comparison"]["estimate"] == pytest.approx(0.755)
     [row] = [r for r in rbj("compare", "int8")[1].data["rows"] if r["variant"] == "int8"]
@@ -469,12 +469,12 @@ def test_rb_show_says_the_column_each_value_of_a_row_came_from(rbj, capsys):
     read = ["run", "add", "int8", "--from", "results.db", "--table", "sweep", "--set", "seed=@run_seed", "--where"]
     code, env = rbj(*read, "name=a", "--produced-at", "@ended")
     assert code == 0
-    code, out, _ = said(capsys, "show", env.data["object"]["id"])
+    code, out, _ = said(capsys, "show", "--long", env.data["object"]["id"])
     lines = out.splitlines()
     assert "  per-run: seed=11 (column run_seed)" in lines
     assert lines[1].startswith("  produced 2026-05-01 10:00 UTC (as reported, column ended) · recorded "), lines[1]
     code, env = rbj(*read, "name=b")
-    code, out, _ = said(capsys, "show", env.data["object"]["id"])
+    code, out, _ = said(capsys, "show", "--long", env.data["object"]["id"])
     assert out.splitlines()[1].startswith("  produced: when is unknown · recorded ")
 
 
@@ -778,7 +778,7 @@ def test_a_setting_is_verified_from_one_column_of_one_row_of_a_database(rbj, cap
     assert rbj("spec", "set", "int8", "width", "512", "--source", "results.db#configs[config_id=c2].width")[0] == 0
     update(db, "update configs set width = 256 where config_id = 'c2'")
     assert rbj("spec", "verify", "int8", "width")[0] == 1
-    st = rbj("status")[1].data
+    st = rbj("status", "--full")[1].data
     assert [i["code"] for i in st["open"] if i["subject"] == "int8/width"] == ["conflict"]
 
 
@@ -808,7 +808,7 @@ def test_a_per_run_value_is_read_from_the_row_another_table_links_to_the_runs_ro
     run = env.data["object"]
     assert run["per_run"] == {"seed": 1} and run["produced_at"] == "2026-05-01T11:00:00.000+00:00"
     assert run["receipt"]["row"]["per_run"] == {"seed": "configs[config_id=c2].seed"} and run["receipt"]["row"]["produced_at"] == "configs[config_id=c2].finished_at"
-    code, out, _ = said(capsys, "show", run["id"])
+    code, out, _ = said(capsys, "show", "--long", run["id"])
     assert "  per-run: seed=1 (column configs[config_id=c2].seed)" in out.splitlines()
     code, env = rbj("run", "add", "int8", "--variant", "int8", "--from", "results.db", "--table", "results", "--where", "result_id=3",
                     "--set", "seed=@configs[config_id].seed")
@@ -921,8 +921,8 @@ def test_an_rb_from_before_reads_a_record_that_never_read_a_database(rbj):
 
     unsettled = {"state_newer", "edited_outside_rb", "merged_outside_rb"}
     assert not [i for i in older("status")["open"] if i["code"] in unsettled]
-    assert older("show", "c1")["finding"]["integrity"] == []
-    assert older("show", read)["object"]["files"][0]["path"] == "metrics.json" and older("show", typed)["object"]["metrics"] == {"int8.acc1": 0.74}
+    assert older("show", "--long", "c1")["finding"]["integrity"] == []
+    assert older("show", "--long", read)["object"]["files"][0]["path"] == "metrics.json" and older("show", "--long", typed)["object"]["metrics"] == {"int8.acc1": 0.74}
     assert not older("doctor").get("problems")
     older("note", "add", "an older rb's note", "-e", "int8")
     code, env = rbj("doctor")
@@ -945,7 +945,7 @@ def test_a_run_read_from_a_row_is_said_to_be_a_row(rbj, capsys):
     code, env = rbj("run", "add", "int8", "--from", "results.db", "--table", "evals", "--where", "precision=int8,seed=2", "--set", "seed=2")
     assert code == 0, env.errors
     rid = env.data["object"]["id"]
-    code, shown, _ = said(capsys, "show", rid)
+    code, shown, _ = said(capsys, "show", "--long", rid)
     assert shown.startswith(f"Run {rid} on int8 (row)"), shown
     assert env.data["object"]["basis"] == "file"                              # the record keeps what it kept
 

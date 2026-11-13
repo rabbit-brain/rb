@@ -209,7 +209,13 @@ pub fn top_bar(doc: &Value) -> String {
     };
     // the words, while the place is shown as it is now: dim where every record file is committed, in ink otherwise
     let words = match text(doc, "checkout.said") {
-        said if !said.is_empty() && live => format!(" <span class=\"gs\" data-state=\"{}\">\u{b7} {}</span>", esc(text(doc, "checkout.state")), esc(said)),
+        // the chips say committed and not committed; every other state (ignored by git, no commit yet, not in git, git
+        // not found, rb could not read git) stays in words on the bar
+        said if !said.is_empty() && live => {
+            let state = text(doc, "checkout.state");
+            let sr = if matches!(state, "committed" | "not_committed") { " sr" } else { "" };
+            format!(" <span class=\"gs{sr}\" data-state=\"{}\">\u{b7} {}</span>", esc(state), esc(said))
+        }
         _ => String::new(),
     };
     let items: String = places
@@ -246,7 +252,9 @@ pub fn top_bar(doc: &Value) -> String {
         })
         .collect();
     let mut h = format!(
-        "<details class=\"pick\" data-pick=\"where\" data-fold=\"where\"><summary title=\"{}\"><span class=\"dim\">Where</span> <span class=\"lab\">{}</span>{words}</summary><ul class=\"picks\">{items}</ul></details>",
+        // the Where and Version pickers are the header's git chip (owner, Nov 13 2026): the branch, then the commit, each
+        // opening its list; their names said to a screen reader
+        "<details class=\"pick\" data-pick=\"where\" data-fold=\"where\"><summary title=\"{}\"><span class=\"sr\">Where </span><i class=\"ic ic-branch\"></i><span class=\"lab\">{}</span>{words}</summary><ul class=\"picks\">{items}</ul></details>",
         // the tooltip says the whole path, which the list says too
         esc(text(place, "path")),
         esc(&name)
@@ -276,13 +284,29 @@ pub fn top_bar(doc: &Value) -> String {
             .collect();
         // a past version is named on its button by its day; its commit is in the list
         let now_is = if live { "now".to_string() } else { esc(&version_day(text(place, "version.at"), versions)) };
+        // live, the chip says the commit the checkout is at; a past version, its day
+        let shown = match (live, short_head(doc)) {
+            (true, Some(sha)) => format!("<span class=\"sr\">{now_is} </span><span class=\"lab mono\">{}</span>", esc(&sha)),
+            _ => format!("<span class=\"lab\">{now_is}</span>"),
+        };
         h.push_str(&format!(
-            "<details class=\"pick\" data-pick=\"version\" data-fold=\"version\"><summary><span class=\"dim\">Version</span> <span class=\"lab\">{now_is}</span></summary><ul class=\"picks\">{now}{past}</ul></details>"
+            "<details class=\"pick\" data-pick=\"version\" data-fold=\"version\"><summary><span class=\"sr\">Version </span>{shown}</summary><ul class=\"picks\">{now}{past}</ul></details>"
         ));
+    } else if let Some(sha) = short_head(doc).filter(|_| live) {
+        h.push_str(&format!("<span class=\"gsha mono\">{}</span>", esc(&sha)));
+    }
+    if live {
+        h.push_str(&super::views::git_chips_at(doc, false, "where"));
     }
     // the live module swaps its children in with the rest of the page, so it is there while it holds nothing; the
     // script says in it what a refused choice said
     format!("<span class=\"where\" id=\"where\" data-swap>{h}<span class=\"failed\" role=\"status\" aria-live=\"polite\"></span></span>")
+}
+
+/// HEAD's commit in short (7 hex), as the header's chip says it; none with no commit.
+fn short_head(doc: &Value) -> Option<String> {
+    let c = text(doc, "checkout.commit");
+    (!c.is_empty()).then(|| c.chars().take(7).collect())
 }
 
 /// Where you are, in words, away from the live start place, with the way back; at the live start place the bar is
@@ -477,7 +501,7 @@ mod tests {
         // a 1.15 document (no evidence): the fold, as before
         let face = |t: &str| t[..t.find("<ul class=\"picks\">").unwrap()].to_string();
         let t = top_bar(&alone(&checkout_of(&c)));
-        assert!(t.contains("<details class=\"pick\" data-pick=\"where\" data-fold=\"where\"><summary title=\"/srv/ana/int8-resnet50\"><span class=\"dim\">Where</span> <span class=\"lab\">main</span> <span class=\"gs\" data-state=\"committed\">· all record files committed</span></summary>"), "{t}");
+        assert!(t.contains("<details class=\"pick\" data-pick=\"where\" data-fold=\"where\"><summary title=\"/srv/ana/int8-resnet50\"><span class=\"sr\">Where </span><i class=\"ic ic-branch\"></i><span class=\"lab\">main</span> <span class=\"gs sr\" data-state=\"committed\">· all record files committed</span></summary>"), "{t}");
         // the list: the place shown, its path as text, then its commit with Copy, which copies all 40 hex
         assert!(t.contains("aria-current=\"true\" aria-describedby=\"where-here\"><span class=\"nw\">main</span></a><div class=\"fls\" id=\"where-here\"><p class=\"fl pth\" id=\"where-path\">/srv/ana/int8-resnet50</p><p class=\"fl\">at commit 9fa4f89a1b2c</p>"), "{t}");
         assert!(t.contains(&format!("<span class=\"sha\" id=\"where-sha\" hidden>{sha}</span><button type=\"button\" class=\"cp\" data-act=\"copy\" data-from=\"where-sha\"")), "{t}");
@@ -486,10 +510,10 @@ mod tests {
         // the other states: the words as rb made them, the name its checkout's
         c.state = State::NotCommitted;
         c.record_files_not_committed = 2;
-        assert!(face(&top_bar(&alone(&checkout_of(&c)))).contains("<span class=\"lab\">main</span> <span class=\"gs\" data-state=\"not_committed\">· 2 record files not committed</span>"));
+        assert!(face(&top_bar(&alone(&checkout_of(&c)))).contains("<span class=\"lab\">main</span> <span class=\"gs sr\" data-state=\"not_committed\">· 2 record files not committed</span>"));
         c.branch = None;
         c.on_branch = false;
-        assert!(face(&top_bar(&alone(&checkout_of(&c)))).contains("<span class=\"lab\">no branch</span> <span class=\"gs\" data-state=\"not_committed\">"));
+        assert!(face(&top_bar(&alone(&checkout_of(&c)))).contains("<span class=\"lab\">no branch</span> <span class=\"gs sr\" data-state=\"not_committed\">"));
         c.state = State::Ignored;
         c.record_files_ignored = 12;
         c.ignored_by = Some(".gitignore:4:.rb/".into());
@@ -519,9 +543,9 @@ mod tests {
         let top = top_bar(&live);
         assert!(top.starts_with("<span class=\"where\" id=\"where\" data-swap>"), "{top}");
         // the button names the place by its checkout's name, then its words; the whole path is its tooltip
-        assert!(top.contains("<summary title=\"/home/ana/int8-resnet50\"><span class=\"dim\">Where</span> <span class=\"lab\">main</span> <span class=\"gs\" data-state=\"not_committed\">· 2 record files not committed</span></summary>"), "{top}");
+        assert!(top.contains("<summary title=\"/home/ana/int8-resnet50\"><span class=\"sr\">Where </span><i class=\"ic ic-branch\"></i><span class=\"lab\">main</span> <span class=\"gs sr\" data-state=\"not_committed\">· 2 record files not committed</span></summary>"), "{top}");
         assert!(!top.contains("class=\"pl\""), "the place line is retired: {top}");
-        assert!(top.contains("<summary><span class=\"dim\">Version</span> <span class=\"lab\">now</span></summary>"), "{top}");
+        assert!(top.contains("<summary><span class=\"sr\">Version </span><span class=\"sr\">now </span><span class=\"lab mono\">3f2a9c1</span></summary>"), "{top}");
         // the list: the place shown first, the evidence one step down (PARITY 4), the commit with Copy, the command in a
         // box with its own Copy, what record files are
         assert!(top.contains("<li class=\"here\"><a href=\"#overview\" data-place=\"\" data-at=\"\" aria-current=\"true\" aria-describedby=\"where-found\"><span class=\"nw\">main</span> · <span class=\"nw\">~/</span><wbr><span class=\"nw\">int8-resnet50</span></a><div class=\"fls\" id=\"where-here\"><p class=\"fl\" id=\"where-found\">rb checked the record with git <time datetime=\"2026-10-19T09:41:07.000+00:00\" title=\"2026-10-19 09:41 UTC\" data-checked>just now</time>: 2 of its 41 record files are new, changed or deleted since commit 3f2a9c1e8d0b.</p>"), "{top}");
@@ -566,7 +590,7 @@ mod tests {
         assert!(bar.contains("data-place=\"\" data-at=\"\"") && !bar.contains(" data-at=\"3"), "{bar}");
         let top = top_bar(&away);
         // its button names it by its branch, with its own words; its commit one step down
-        assert!(top.contains("<span class=\"lab\">exp-b</span> <span class=\"gs\" data-state=\"not_committed\">· 1 record file not committed</span></summary>"), "{top}");
+        assert!(top.contains("<span class=\"lab\">exp-b</span> <span class=\"gs sr\" data-state=\"not_committed\">· 1 record file not committed</span></summary>"), "{top}");
         assert!(top.contains("aria-current=\"true\" aria-describedby=\"where-found\"") && top.contains("since commit 5d1e0a7c4b3a.</p>"), "{top}");
         assert!(top.contains("git -C /home/ana/int8-resnet50/.worktrees/b status"), "its own folder: {top}");
         assert!(top.contains("<a href=\"#overview&amp;place=exp-b\" data-place=\"exp-b\" data-at=\"\" aria-current=\"true\""), "{top}");
@@ -593,8 +617,8 @@ mod tests {
         assert_eq!(title_away(&past), "main · ~/int8-resnet50 as of 2026-10-13 · ");
         let top = top_bar(&past);
         // no words on Where, and no commit on the face: the Version button says the day
-        assert!(top.contains("<span class=\"lab\">main</span></summary>") && !top.contains("class=\"gs\""), "{top}");
-        assert!(top.contains("<summary><span class=\"dim\">Version</span> <span class=\"lab\">2026-10-13</span></summary>"), "{top}");
+        assert!(top.contains("<span class=\"lab\">main</span></summary>") && !top.contains("class=\"gs"), "{top}");
+        assert!(top.contains("<summary><span class=\"sr\">Version </span><span class=\"lab\">2026-10-13</span></summary>"), "{top}");
         assert!(top.contains("data-at=\"3f2a9c1\" aria-current=\"true\""), "{top}");
         assert_eq!(elsewhere(&past), "");
         // two versions listed on one day: the button and the scope bar add the minute

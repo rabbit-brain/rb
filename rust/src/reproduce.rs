@@ -879,9 +879,11 @@ impl<'a> Recipes<'a> {
                 _ => "missing",
             };
             let label = format!("{}{}", res.name, if res.version.is_empty() { String::new() } else { format!(" {}", res.version) });
-            let how = av.get_str("how").unwrap_or("");
-            let mut detail = format!("{label}: {avs}{}", if how.is_empty() { String::new() } else { format!(" ({how})") });
-            let mut word = avs.clone();
+            // where a reader gets it, never the word for where its bytes stood on the machine that recorded it
+            let said = crate::view::said_of(&Value::Dict(av.clone()));
+            let recipe = res.acquisition.as_ref().and_then(|a| a.recipe.as_deref()).filter(|r| !r.trim().is_empty()).map(crate::getit::typed).unwrap_or_default();
+            let mut detail = format!("{label}: {said}{}", if recipe.is_empty() { String::new() } else { format!(" ({recipe})") });
+            let mut word = said.clone();
             let mut also: Vec<String> = Vec::new();
             if let Some(rt) = &res.retracted {
                 state = "missing";
@@ -1197,7 +1199,7 @@ impl<'a> Recipes<'a> {
                 (None, Some(r)) if r.retracted.is_some() => Step { what: words.clone(), label: said(&rid, ": retracted"), refs, ..Default::default() },
                 (None, Some(r)) => {
                     // words saying where it comes from, on both tiers; its address is the resource's own (resources{}.url)
-                    let how = r.acquisition.as_ref().map(|a| a.source.trim().to_string()).filter(|s| !s.is_empty());
+                    let how = r.acquisition.as_ref().map(|a| crate::getit::typed(a.source.trim())).filter(|s| !s.is_empty());
                     Step { what: words.clone(), label: said(&rid, &format!(": no recipe recorded{}", how.map(|h| format!(" · {h}")).unwrap_or_default())), refs, ..Default::default() }
                 }
                 (None, None) => Step { what: words.clone(), label: said(&rid, ": no such resource record"), refs, ..Default::default() },
@@ -1304,11 +1306,36 @@ impl<'a> Recipes<'a> {
         st
     }
 
+    /// rb's words for a setting's status (owner, Nov 13 2026: "what is provisional? no hover over?"), which the page says
+    /// on hover and on keyboard focus: what its source states, and at which commit, for one rb checked; why rb could not
+    /// confirm it for one it did not; what unknown and inherited mean for this one.
+    fn status_said(&self, s: &Setting, status: &str, value: &Value) -> String {
+        let path = s.source.as_ref().and_then(|x| x.path.clone()).unwrap_or_default();
+        let commit = s.source.as_ref().and_then(|x| x.commit.clone().or_else(|| x.resolved.as_ref().and_then(|r| r.commit.clone()))).unwrap_or_default();
+        let at = if commit.is_empty() { String::new() } else { format!(", at commit {}", crate::checkout::short(&commit).chars().take(7).collect::<String>()) };
+        let kind = s.source.as_ref().map(|x| x.kind.as_str()).unwrap_or("");
+        match status {
+            "verified" if !path.is_empty() => format!("{path} says {}{at}", crate::ledger::show(value)),
+            "verified" => format!("its source says {}", crate::ledger::show(value)),
+            // status_read reads a verified setting as provisional only where its file postdates a run that reads it
+            "provisional" if s.status == "verified" => {
+                format!("{path} has no commit from before a run that reads it, so rb cannot confirm it was set beforehand")
+            }
+            "provisional" if matches!(kind, "url" | "note") => "a link or a note: rb cannot read it to check the value".to_string(),
+            "provisional" if s.source.is_none() => "given with no source, so rb has nothing to compare it with".to_string(),
+            "provisional" if !s.failed.as_deref().unwrap_or("").is_empty() => format!("rb could not confirm it: {}", s.failed.as_deref().unwrap_or("")),
+            "provisional" => "not checked against its source".to_string(),
+            "inherited" => "brought by rb clone from the record it was cloned from; not checked here".to_string(),
+            "unknown" => "nobody has found its value yet".to_string(),
+            _ => String::new(),
+        }
+    }
+
     /// The settings a run is given, shared and by arm, each with its source and standing, and those whose value is
     /// unknown: the experiment's as it declares them, or for one run the values it was recorded with.
     fn settings(&self, exp: &Experiment, one: Option<&Run>) -> Res<(Value, Vec<String>)> {
-        let mut shared: Vec<(String, String, String, String)> = Vec::new();
-        let mut by_arm: IndexMap<String, Vec<(String, String, String, String)>> = IndexMap::new();
+        let mut shared: Vec<(String, String, String, String, String)> = Vec::new();
+        let mut by_arm: IndexMap<String, Vec<(String, String, String, String, String)>> = IndexMap::new();
         let mut unknown: Vec<String> = Vec::new();
         let mut put = |name: &str, value: &Value, s: Option<&Setting>| {
             if name.starts_with("population.") {
@@ -1318,12 +1345,16 @@ impl<'a> Recipes<'a> {
                 unknown.push(name.to_string());
                 return;
             }
-            let (source, status) = match s {
-                Some(s) if crate::ledger::same_value(&s.value, value) => (s.source.as_ref().map(cite).unwrap_or_default(), self.status(exp, name, s)),
-                _ => (String::new(), String::new()),
+            let (source, status, said) = match s {
+                Some(s) if crate::ledger::same_value(&s.value, value) => {
+                    let status = self.status(exp, name, s);
+                    let said = self.status_said(s, &status, value);
+                    (s.source.as_ref().map(cite).unwrap_or_default(), status, said)
+                }
+                _ => (String::new(), String::new(), String::new()),
             };
             let (arm, bare) = exp.split(name);
-            let row = (bare.to_string(), crate::ledger::show(value), source, status);
+            let row = (bare.to_string(), crate::ledger::show(value), source, status, said);
             match arm {
                 Some(v) => by_arm.entry(v.name.clone()).or_default().push(row),
                 None => shared.push(row),
@@ -1344,8 +1375,8 @@ impl<'a> Recipes<'a> {
             }
         }
         let verified = shared.iter().chain(by_arm.values().flatten()).filter(|r| r.3 == "verified").count();
-        let row = |r: &(String, String, String, String)| crate::obj! {"name" => r.0.clone(), "value" => r.1.clone(), "source" => r.2.clone(), "status" => r.3.clone()};
-        let kv = |rs: &[(String, String, String, String)]| rs.iter().map(|r| format!("{}={}", r.0, r.1)).collect::<Vec<_>>().join(" ");
+        let row = |r: &(String, String, String, String, String)| crate::obj! {"name" => r.0.clone(), "value" => r.1.clone(), "source" => r.2.clone(), "status" => r.3.clone(), "said" => r.4.clone()};
+        let kv = |rs: &[(String, String, String, String, String)]| rs.iter().map(|r| format!("{}={}", r.0, r.1)).collect::<Vec<_>>().join(" ");
         let mut lines: Vec<String> = Vec::new();
         if !shared.is_empty() || !by_arm.is_empty() || !unknown.is_empty() {
             lines.push(format!("# settings: {}", one_line(&kv(&shared))).trim_end().to_string());
@@ -1681,7 +1712,7 @@ pub fn rerun(led: &Ledger) -> Res<Option<Value>> {
         if let Some(a) = &res.acquisition {
             how.extend(a.url.iter().filter(|u| !u.trim().is_empty()).map(|u| u.trim().to_string()));
             if !a.source.trim().is_empty() {
-                how.push(a.source.trim().to_string());
+                how.push(crate::getit::typed(a.source.trim()));
             }
         }
         how.dedup();
@@ -2300,7 +2331,8 @@ mod tests {
             let script = text(&v, "script");
             let at = script.lines().position(|l| l == format!("# {said}")).unwrap_or_else(|| panic!("{script}"));
             assert!(script.lines().nth(at + 1).map_or(true, |l| l.is_empty() || l.starts_with('#')), "nothing to run follows it: {script}");
-            assert!(!pyjson::dumps(&v).contains("https://"), "a recipe holds no address of a resource");
+            // a recipe holds no address of a resource: a public one is said only as where a reader gets it (getit.rs)
+            assert!(!pyjson::dumps(&v).replace("get it: https://", "").contains("https://"), "a recipe holds no address of a resource");
             // the inputs that have one are commands, with where each was taken from
             let val = list(&v, "steps").iter().find(|s| text(s, "label") == "evaluation data · imagenet-val").expect("the evaluation data");
             assert_eq!((text(val, "command"), text(val, "from"), get(val, "runnable").truthy()), ("python get_data.py --split val", "scripts/README.md:5", true));
@@ -2588,11 +2620,11 @@ mod tests {
         let row = |rows: &[(String, String)], label: &str| rows.iter().find(|(l, _)| l == label).map(|(_, t)| t.clone()).unwrap_or_default();
         let (s1, local) = (rows("seed1"), rows("local"));
         assert_eq!(row(&s1, "files"), "ok · the only file the runs named is here unchanged");
-        assert!(row(&local, "training data").starts_with("ok · calib-local: present"), "{local:?}");
+        assert!(row(&local, "training data").starts_with("ok · calib-local: no download link"), "{local:?}");
         std::fs::remove_file(rec.root.join("results/seed1.json")).unwrap();
         std::fs::remove_file(rec.root.join("data/calib.txt")).unwrap();
         assert_eq!(row(&rows("seed1"), "files"), "missing · no file the runs named is here unchanged; not here: results/seed1.json");
-        assert!(row(&rows("local"), "training data").starts_with("missing · calib-local: lost"), "{:?}", rows("local"));
+        assert!(row(&rows("local"), "training data").starts_with("missing · calib-local: no download link"), "{:?}", rows("local"));
     }
 
     #[test]

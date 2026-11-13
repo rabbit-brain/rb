@@ -173,7 +173,7 @@ def test_status_and_reconcile_carry_the_found_count(repo, capsys):
     Path("out").mkdir()
     Path("out/one.json").write_text('{"top1": 0.9}', encoding="utf-8")
     state().scan()
-    code, env = repo("status")
+    code, env = repo("status", "--full")
     assert code == 0 and env.data["found_unrecorded"] == 1
     code, env = repo("reconcile")
     assert code == 0
@@ -188,18 +188,18 @@ def test_status_says_nothing_is_open_only_while_rb_found_no_run_either(repo, cap
     for top1 in ("0.8", "0.81", "0.82"):
         assert repo("run", "add", "e1", f"top1={top1}")[0] == 0
     assert state().status()["open"] == []
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     assert "Nothing open." in capsys.readouterr().out
     Path("out").mkdir()
     Path("out/one.json").write_text('{"top1": 0.83}', encoding="utf-8")
     state().scan()
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     out = capsys.readouterr().out
     assert "Found in the repository, not in the record (1)" in out and "Nothing open." not in out
     assert repo("run", "add", "e1", "--from", "out/one.json")[0] == 0
     Path("out/two.json").write_text('{"loss": 0.3}', encoding="utf-8")
     state().scan()
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     out = capsys.readouterr().out
     assert "Found in the repository, not in the record (1)" in out and "Nothing open." in out
     waiting = home().quiet      # the agent set it up
@@ -218,7 +218,7 @@ def test_status_says_the_rb_run_add_only_of_the_runs_rb_found(repo, capsys):
     says the same of what the journal found."""
     def found_line() -> str:
         state().scan()
-        assert main(["status"]) == 0
+        assert main(["status", "--full"]) == 0
         return next(line for line in capsys.readouterr().out.splitlines() if line.startswith("Found in the repository"))
 
     def compiled_line() -> str:
@@ -263,7 +263,25 @@ def on_home(app, found: int) -> bool:
     from rabbit_brain.tui import HomeScreen
 
     s = app.screen
-    return isinstance(s, HomeScreen) and len(s.home.found) == found and (found == 0 or getattr(app.focused, "id", None) == "calls")
+    if not (isinstance(s, HomeScreen) and len(s.home.found) == found):
+        return False
+    return True
+
+
+async def _open_found(app, pilot):
+    """What rb found is a row of Files (TUI-PARITY X2, M23): f, its row, enter opens its small panel."""
+    from rabbit_brain.tui_panels import FoundPanel
+    s = app.screen
+    if s.query_one("#files-list").display is False or s._tab != "files":
+        await pilot.press("f")
+    rows = lambda: [i for i in range(s.query_one("#files-list").option_count) if (s.query_one("#files-list").get_option_at_index(i).id or "").startswith("found:")]
+    await until(pilot, lambda: bool(rows()))
+    fl = s.query_one("#files-list")
+    fl.focus()
+    fl.highlighted = rows()[0]
+    await pilot.pause(0.2)
+    await pilot.press("enter")
+    await until(pilot, lambda: isinstance(app.screen, FoundPanel))
 
 
 def test_the_screen_records_a_forgotten_run_as_the_user_and_hides_scratch(repo):
@@ -282,16 +300,9 @@ def test_the_screen_records_a_forgotten_run_as_the_user_and_hides_scratch(repo):
         async with app.run_test(size=(110, 32)) as pilot:
             await pilot.pause(0.3)
             await until(pilot, lambda: on_home(app, found=1))
-            await pilot.press("enter")
-            await pilot.pause(0.3)
-            await until(pilot, lambda: isinstance(app.screen, CardScreen))
-            assert isinstance(app.screen, CardScreen)
-            assert app.screen.card.kind == "record"
-            assert any("sha" in f for f in app.screen.card.facts)
+            await _open_found(app, pilot)
             await pilot.press("y")
-            await pilot.pause(0.2)
-            await until(pilot, lambda: isinstance(app.screen, Reason))
-            assert isinstance(app.screen, Reason)
+            await pilot.pause(0.3)
             for ch in "saw the run myself":
                 await pilot.press(ch if ch != " " else "space")
             await pilot.press("enter")
@@ -307,14 +318,8 @@ def test_the_screen_records_a_forgotten_run_as_the_user_and_hides_scratch(repo):
             await pilot.press("r")
             await pilot.pause(0.5)
             await until(pilot, lambda: on_home(app, found=1))
-            await pilot.press("enter")
-            await pilot.pause(0.3)
-            await until(pilot, lambda: isinstance(app.screen, CardScreen))
-            assert isinstance(app.screen, CardScreen) and app.screen.card.kind == "record"
+            await _open_found(app, pilot)
             await pilot.press("n")
-            await pilot.pause(0.2)
-            await until(pilot, lambda: isinstance(app.screen, Reason))
-            await pilot.press("enter")
             await pilot.pause(0.5)
             await until(pilot, lambda: on_home(app, found=0))
 
@@ -332,6 +337,7 @@ def test_the_screen_records_a_forgotten_run_as_the_user_and_hides_scratch(repo):
 
 
 def test_y_at_home_records_without_opening_the_card(repo):
+    """y and n act on what rb found in its own prompt only (TUI-PARITY X2, M23): enter on its row opens it, y records."""
     from rabbit_brain.tui import RBApp, Reason
 
     Path("out").mkdir()
@@ -343,10 +349,9 @@ def test_y_at_home_records_without_opening_the_card(repo):
         async with app.run_test(size=(118, 34)) as pilot:
             await pilot.pause(0.4)
             await until(pilot, lambda: on_home(app, found=1))
-            await pilot.press("y")                               # act on the highlighted row from home
-            await pilot.pause(0.2)
-            await until(pilot, lambda: isinstance(app.screen, Reason))
-            assert isinstance(app.screen, Reason)
+            await _open_found(app, pilot)
+            await pilot.press("y")
+            await pilot.pause(0.3)
             await pilot.press("enter")                           # no note
             await pilot.pause(1.5)
             await until(pilot, lambda: on_home(app, found=0))
@@ -521,7 +526,7 @@ def test_a_record_below_the_top_runs_a_nested_worktree_s_command_in_its_folder(t
         assert "lr = 0.25" in out
     listed = {Path(line[len("worktree "):]).resolve(): line[len("worktree "):] for line in git("worktree", "list", "--porcelain").splitlines()
               if line.startswith("worktree ")}
-    assert main(["status"]) in (0, 1)
+    assert main(["status", "--full"]) in (0, 1)
     assert (f"This worktree (x · {listed[wt]}) has no record of its own: rb writes to the record in main · {listed[repo]}/sub, "
             "and each run keeps this worktree's code.") in capsys.readouterr().out
     assert main(["status", "--json"]) in (0, 1)

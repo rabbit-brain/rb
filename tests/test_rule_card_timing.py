@@ -18,6 +18,12 @@ from rbtest import AGENT_VARS, Open, as_the_user, command, environment
 pytestmark = pytest.mark.skipif(shutil.which("git") is None or sys.platform == "win32", reason="needs git and a POSIX shell")
 GIT = shutil.which("git")
 
+# a rule written before or after its results is placed against them in time (no glossary, show instead, Nov 12 20:35 +08)
+DAY = r"\d{1,2} [A-Z][a-z]{2}"
+PLACED = {
+    "before": re.compile(rf"Rule {DAY} \u2500\u2500\u25b6 results {DAY}\."),
+    "after_evidence": re.compile(rf"Results {DAY} \u2500\u2500\u25b6 rule {DAY}\."),
+}
 SAID = {
     "before": "Written before its results.",
     "after_evidence": "Written after its results came in.",
@@ -106,7 +112,7 @@ def test_the_rule_card_says_when_its_rule_was_written_by_its_timing_code(home, k
         server.close()
     for where, page in (("the page", p.read_text(encoding="utf-8")), ("rb open", live)):
         said = text_of(page)
-        assert SAID[kind] in said, (kind, where)
+        assert PLACED[kind].search(said) if kind in PLACED else SAID[kind] in said, (kind, where)
         for other, words in SAID.items():
             if other != kind and other != "untested":
                 assert words not in said, (kind, where, words)

@@ -79,7 +79,7 @@ def test_an_unknown_kind_is_a_newer_rb_not_a_crash(repo, capsys):
     assert not any(i["code"] == "edited_outside_rb" for i in items)
     for gate in ("stale", "unestablished"):
         assert rbj(capsys, "status", "--fail-on", gate)[0] == 1
-    code, env = rbj(capsys, "show", "c1")
+    code, env = rbj(capsys, "show", "--long", "c1")
     assert any(c["code"] == "state_newer" and c["problem"] for c in env.data["finding"]["integrity"])
     code, env = rbj(capsys, "doctor")
     assert any(c["check"] == "state_newer" for c in env.data["checks"])
@@ -88,7 +88,7 @@ def test_an_unknown_kind_is_a_newer_rb_not_a_crash(repo, capsys):
 def test_an_unknown_via_on_a_record_reads_as_newer_not_corrupt(repo, capsys):
     seed(capsys)
     edit_criterion(repo, lambda c1: c1.update(via="tui"))
-    code, env = rbj(capsys, "show", "c1")
+    code, env = rbj(capsys, "show", "--long", "c1")
     assert code != 0 and env.errors[0].code == "E_STATE_NEWER"
     assert "newer rb" in env.errors[0].message
 
@@ -98,7 +98,7 @@ def test_an_unknown_field_on_a_record_reads_as_newer_not_corrupt(repo, capsys, w
     """A newer rb may add a field to a record's file, or to a part of one (a variant of the experiment c1 reads)."""
     seed(capsys)
     edit_file(repo, where, lambda doc: doc.update(directive="dv1"))
-    code, env = rbj(capsys, "show", "c1")
+    code, env = rbj(capsys, "show", "--long", "c1")
     assert code != 0 and env.errors[0].code == "E_STATE_NEWER"
 
 
@@ -114,7 +114,7 @@ def test_an_unknown_field_written_by_hand_names_the_edit_and_the_restore(repo, c
     seed(capsys)
     before = (repo / where).read_bytes()
     edit_file(repo, where, lambda doc: doc.update(directive="dv1"))
-    for argv in (["status"], ["context"], ["show", "c1"]):
+    for argv in (["status"], ["context"], ["show", "--long", "c1"]):
         code, env = rbj(capsys, *argv)
         assert code == 2 and env.errors[0].code == "E_STATE_NEWER", argv
         assert env.errors[0].message == where.as_posix() + NEWER_OR_EDITED, (argv, env.errors[0].message)
@@ -132,7 +132,7 @@ def test_an_unknown_field_written_by_hand_names_the_edit_and_the_restore(repo, c
 def test_an_unknown_field_a_newer_rb_logged_says_only_to_upgrade(repo, capsys):
     seed(capsys)
     logged_as_a_newer_rb(repo, CRITERION, "criterion", "c1", lambda c1: c1.update(directive="dv1"))
-    code, env = rbj(capsys, "show", "c1")
+    code, env = rbj(capsys, "show", "--long", "c1")
     assert code == 2 and env.errors[0].code == "E_STATE_NEWER"
     assert env.errors[0].message.endswith("it was written by a newer rb.") and "by hand" not in env.errors[0].message
     assert "rb doctor --restore" not in env.errors[0].fix and "upgrade" in env.errors[0].fix
@@ -172,7 +172,7 @@ def test_a_relation_of_a_kind_or_orientation_this_rb_does_not_know_is_a_newer_pa
     [newer] = [i for i in items if i["code"] == "state_newer"]
     assert "a newer rb" in newer["what"] and "upgrade" in newer["do"] and all(env.data["gate"].values())
     assert not [i for i in items if i["code"] in ("edited_outside_rb", "finding_relation_invalid")]
-    code, env = rbj(capsys, "show", "c2")
+    code, env = rbj(capsys, "show", "--long", "c2")
     assert code == 0 and any(c["code"] == "state_newer" for c in env.data["finding"]["integrity"])
     code, env = rbj(capsys, "doctor")
     assert any(c["check"] == "state_newer" for c in env.data["checks"]) and not any(c["check"] == "corrupt" for c in env.data["checks"])
@@ -229,7 +229,7 @@ def test_garbage_is_still_corrupt_not_newer(repo, capsys):
         del c1["created_by"]
         c1["extra_field"] = 1
     edit_criterion(repo, garble)
-    code, env = rbj(capsys, "show", "c1")
+    code, env = rbj(capsys, "show", "--long", "c1")
     assert code != 0 and env.errors[0].code == "E_STATE_CORRUPT"
 
 
@@ -239,7 +239,7 @@ def test_a_bumped_format_number_asks_for_an_upgrade(repo, capsys):
     doc = rbyaml.loads(p.read_text(encoding="utf-8"))
     doc["rb"] = 3
     p.write_text(rbyaml.dumps(doc), encoding="utf-8")
-    for argv in (["status"], ["show", "c1"], ["freeze", "e1", "-m", "lock"]):
+    for argv in (["status"], ["show", "--long", "c1"], ["freeze", "e1", "-m", "lock"]):
         code, env = rbj(capsys, *argv)
         assert code != 0 and env.errors[0].code == "E_STATE_NEWER", argv
         assert "newer rb" in env.errors[0].message
@@ -256,7 +256,7 @@ def test_a_record_file_in_a_newer_format_asks_for_an_upgrade_and_never_reads_as_
              "op": "add", "kind": "criterion", "id": "c1", "path": CRITERION.as_posix(), "sha256": rbyaml.content_sha(c1)}
     with (repo / ".rb" / "log.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
-    code, env = rbj(capsys, "show", "c1")
+    code, env = rbj(capsys, "show", "--long", "c1")
     assert code != 0 and env.errors[0].code == "E_STATE_NEWER" and "newer rb" in env.errors[0].message
     code, env = rbj(capsys, "status")
     items = env.data["open"]
@@ -333,12 +333,12 @@ def test_a_call_resting_on_a_criterion_only_a_newer_rb_reads_is_still_read_and_s
     assert code == 0 and env.ok, env.errors
     assert [i["code"] for i in env.data["open"] if i["code"] in ("state_newer", "decision_outdated", "gate_missed")] == ["state_newer"]
     assert all(env.data["gate"].values())
-    code, env = rbj(capsys, "show", "q1")
+    code, env = rbj(capsys, "show", "--long", "q1")
     assert code == 0 and env.ok, env.errors
     assert env.data["decisions"][-1]["current"] is True
-    code, env = rbj(capsys, "show", decision)
+    code, env = rbj(capsys, "show", "--long", decision)
     assert code == 0 and env.ok and env.data["current"] is True, env.errors
-    assert main(["show", decision]) == 0
+    assert main(["show", "--long", decision]) == 0
     [line] = [x for x in capsys.readouterr().out.splitlines() if x.startswith(f"  {'settles the missed gate' if rested_on == 'g20' else 'made on'} {rested_on}: ")]
     assert line.endswith("  · only a newer rb reads it now")
 
@@ -547,7 +547,7 @@ def test_a_question_call_keeps_no_part_an_older_rb_does_not_know(repo, capsys):
     for s in (1, 2, 3):   # each arm in runs of its own, so the reading pairs them by seed
         assert rbj(capsys, "run", "add", "e1", f"acc=0.7{s}", "--variant", "base", "--set", f"seed={s}")[0] == 0
         assert rbj(capsys, "run", "add", "e1", f"acc=0.8{s}", "--variant", "cand", "--set", f"seed={s}")[0] == 0
-    code, env = rbj(capsys, "show", "c1")
+    code, env = rbj(capsys, "show", "--long", "c1")
     assert code == 0 and env.data["finding"]["comparison"]["pairing"], env.data["finding"]["comparison"]
     code, env = rbj(capsys, "decide", "q1", "accept", "--why", "fine")
     assert code == 0, env.errors
@@ -555,3 +555,29 @@ def test_a_question_call_keeps_no_part_an_older_rb_does_not_know(repo, capsys):
     assert "pairing" not in d.read_text(encoding="utf-8")
     code, env = rbj(capsys, "status")
     assert not [i for i in env.data["open"] if i["code"] in ("state_newer", "decision_outdated")]
+
+
+@pytest.mark.skipif(not os.environ.get("RB_OLD_BIN"), reason="RB_OLD_BIN names an rb from before a bundle named its branch")
+def test_an_older_rb_clones_a_bundle_that_names_its_branch_and_record_files(repo, capsys, tmp_path_factory):
+    """A bundle's repo carries `branch` and `record_uncommitted` (the hub's git chips, Nov 13 2026), additive: an older
+    rb verifies it, clones it with its code and reads the clone with no problem."""
+    Path("train.py").write_text("lr = 0.1\n", encoding="utf-8")
+    seed(capsys)
+    subprocess.run(["git", "add", "-A"], check=True)
+    subprocess.run(["git", "commit", "-qm", "code and record"], check=True)
+    assert rbj(capsys, "note", "add", "the held-out set is not in the pretraining data")[0] == 0
+    subprocess.run(["git", "remote", "add", "origin", "https://github.com/ana/int8-resnet50.git"], check=True)
+    tmp_path = tmp_path_factory.mktemp("away")              # outside the project, as a reader's machine is
+    assert rbj(capsys, "export", "--with-record", "--out", str(tmp_path / "b"))[0] == 0
+    man = json.loads((tmp_path / "b" / "manifest.json").read_text(encoding="utf-8"))
+    assert man["repo"]["branch"] and len(man["repo"]["record_uncommitted"]) == 2
+    old = os.environ["RB_OLD_BIN"]
+    r = subprocess.run([old, "clone", str(tmp_path / "b"), str(tmp_path / "c"), "--code", str(Path.cwd()), "--json"], capture_output=True, text=True,
+                       env=dict(os.environ), cwd=tmp_path)
+    got = json.loads(r.stdout)
+    assert r.returncode == 0 and got["ok"], r.stdout + r.stderr
+    r = subprocess.run([old, "status", "--json"], capture_output=True, text=True, env=dict(os.environ), cwd=tmp_path / "c")
+    st = json.loads(r.stdout)
+    assert st["ok"] and not any(p.get("code") == "state_newer" for p in st["data"].get("problems", [])), r.stdout[:2000]
+    r = subprocess.run([old, "doctor", "--json"], capture_output=True, text=True, env=dict(os.environ), cwd=tmp_path / "c")
+    assert r.returncode == 0, r.stdout[:2000]

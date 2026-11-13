@@ -2399,25 +2399,33 @@ pub fn cmd_resource_add(ns: &Namespace, out: &mut Out) -> R {
         res.name,
         if res.version.is_empty() { String::new() } else { format!(" {}", res.version) },
         res.r#type,
-        get_s(&av, "state"),
+        get_s(&av, "said"),
         res.sha256.as_ref().filter(|x| !x.is_empty()).map(|x| format!(" · sha256 {}", trunc(x, 12))).unwrap_or_default()
     ));
-    for loc in av.get("locations").and_then(|v| v.as_list()).cloned().unwrap_or_default() {
-        out.say(format!("  {}:{} · {}", loc.get_str("provider").unwrap_or(""), loc.get_str("ref").unwrap_or(""), loc.get_str("state").unwrap_or("")));
-    }
-    let state = get_s(&av, "state");
-    if state == "reconstructible" || state == "lost" {
-        let how = get_s(&av, "how");
-        out.say(format!(
-            "  No copy is recorded anywhere; {}",
-            if how.is_empty() { "record where it comes from with --source, --url or --recipe".to_string() } else { format!("how to get it again: {how}") }
-        ));
-    }
+    resource_places(out, &av);
+    asks_for_a_link(out, &led, &res, &av);
     actor_line(out, &led)?;
     out.data.insert("object".into(), obj("resource", res.dump(false)));
     out.data.insert("availability".into(), Value::Dict(av));
-    out.next = vec![format!("rb run add <experiment> ... --input {}", res.id)];
+    out.next.push(format!("rb run add <experiment> ... --input {}", res.id));
     Ok(0)
+}
+
+/// Each place a resource is recorded at, once: an address as recorded, a local copy with whether it is here.
+fn resource_places(out: &mut Out, av: &Dict) {
+    for loc in av.get("locations").and_then(|v| v.as_list()).cloned().unwrap_or_default() {
+        let (p, r) = (loc.get_str("provider").unwrap_or(""), loc.get_str("ref").unwrap_or(""));
+        out.say(if p == "local" { format!("  {}", crate::getit::copy_said(r, loc.get_str("state").unwrap_or(""))) } else { format!("  {p}:{r}") });
+    }
+}
+
+/// rb asks for a fetchable source where a dataset, checkpoint or model has none it can see: a warning, never a refusal.
+fn asks_for_a_link(out: &mut Out, led: &Ledger, res: &crate::record::Resource, av: &Dict) {
+    if av.get("asks").map_or(false, Value::truthy) {
+        let (line, cmd) = crate::getit::ask_words(res);
+        out.warn_of(led, &format!("{line} {cmd}"));
+        out.next.push(cmd);
+    }
 }
 
 pub fn cmd_resource_locate(ns: &Namespace, out: &mut Out) -> R {
@@ -2425,7 +2433,9 @@ pub fn cmd_resource_locate(ns: &Namespace, out: &mut Out) -> R {
     let provider = s_or(ns, "provider");
     let res = led.locate_resource(&s_or(ns, "id"), &provider, &s_or(ns, "ref"), &s_or(ns, "note"))?;
     let av = led.availability(&res);
-    out.say(format!("{} is at {provider}:{} · {} now", res.id, res.locations.last().map(|l| l.r#ref.clone()).unwrap_or_default(), get_s(&av, "state")));
+    out.say(format!("{} is recorded at {provider}:{} · {}", res.id, s_or(ns, "ref"), get_s(&av, "said")));
+    resource_places(out, &av);
+    asks_for_a_link(out, &led, &res, &av);
     actor_line(out, &led)?;
     out.data.insert("object".into(), obj("resource", res.dump(false)));
     out.data.insert("availability".into(), Value::Dict(av));
@@ -3012,7 +3022,7 @@ pub fn cmd_decide(ns: &Namespace, out: &mut Out) -> R {
 /// it confirms, then confirms it.
 /// What a design's confirmation leaves as it was: the notes on the experiment that read as not confirmed, which are
 /// not part of its design, and how the user says one in their own name. None when there are none.
-fn notes_left(e: &Experiment) -> Option<String> {
+pub(crate) fn notes_left(e: &Experiment) -> Option<String> {
     let ids: Vec<String> = e.notes.iter().filter(|n| n.retracted.is_none() && !crate::view::not_confirmed(&n.by).is_empty()).map(|n| n.id.clone().unwrap_or_default()).collect();
     if ids.is_empty() {
         return None;

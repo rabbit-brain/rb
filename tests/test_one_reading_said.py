@@ -131,7 +131,9 @@ def test_the_page_names_every_metric_as_declared_and_its_runs_in_rb_s_digits(rb)
     assert "49.690000000000005" not in raw and "49.69" in text, re.findall(r"49\.69\d*", raw)
     assert "M acc" not in text and "Acc," not in text and " Acc " not in text, re.findall(r".{20}\b[AM] ?acc.{20}", text)
     assert "<dt>m.acc, INT8</dt><dd>0.51</dd>" in raw and "<dt>acc, INT8</dt><dd>49.69</dd>" in raw, raw[raw.find(f"run-{rid}:results"):][:400]
-    assert "<th>m.acc</th>" in raw and "<th>acc</th>" in raw
+    # closed form (owner, Nov 13 2026): a table's head opens what it heads (the runs, or the rules), so it may be a link
+    for name in ("m.acc", "acc"):
+        assert re.search(rf'<th>(?:<a href="#[^"]+">)?{re.escape(name)}(?:</a>)?</th>', raw), name
 
 
 def test_the_page_s_experiment_rows_count_rules_met_on_the_estimate_alone(rb):
@@ -142,14 +144,15 @@ def test_the_page_s_experiment_rows_count_rules_met_on_the_estimate_alone(rb):
     raw = Path("page.html").read_text(encoding="utf-8")
     rows = raw[raw.find('id="experiments"'):]
     row = html.unescape(re.sub(r"<[^>]+>", "", rows[:rows.find("</li>")]))
-    assert "Rules: 1 rule met, on the estimate alone" in row, row
+    # closed form (owner, Nov 13 2026): a page says a rule's state as "holds"
+    assert "Rules: 1 rule holds, on the estimate alone" in row, row
 
 
 def test_a_rule_s_tolerance_reads_in_digits_on_the_terminal_and_the_page(rb):
     rb("experiment", "add", "INT8 alone", "--id", "e1", "--purpose", "a level", "--baseline", "int8")
     rb("criterion", "add", "INT8 matches the stated 0.999349", "-e", "e1", "--metric", "top1", "--equals", "0.999349", "--tolerance", "0.0000005", "--id", "c1")
     rb("run", "add", "e1", "top1=0.9993492", "--produced-at", "2026-05-01")
-    code, out = rb("status", text=True)
+    code, out = rb("status", "--full", text=True)
     assert "± 0.0000005" in out and "5e-07" not in out, out
     text = page_text(rb)
     assert "5e-07" not in text and "± 0.0000005" in text

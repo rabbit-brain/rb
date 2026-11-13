@@ -132,12 +132,12 @@ def record(capsys, *pairs, exp="e1") -> str:
 
 
 def finding(capsys, criterion="c1") -> dict:
-    return ok(capsys, "show", criterion).data["finding"]
+    return ok(capsys, "show", "--long", criterion).data["finding"]
 
 
 def caveats(capsys, subject, exp="e1") -> list:
     """The experiment's caveats about one subject (e1/lr), as (code, problem)."""
-    return [(c["code"], c["problem"]) for c in ok(capsys, "show", exp).data["caveats"] if c["subject"] == subject]
+    return [(c["code"], c["problem"]) for c in ok(capsys, "show", "--long", exp).data["caveats"] if c["subject"] == subject]
 
 
 def problems(f: dict) -> list:
@@ -156,7 +156,7 @@ def counted(f: dict) -> list:
 
 
 def setting(capsys, address) -> dict:
-    return ok(capsys, "show", address).data["object"]
+    return ok(capsys, "show", "--long", address).data["object"]
 
 
 def spec_set(capsys, exp, name, value, *extra):
@@ -457,7 +457,7 @@ def test_a_quote_states_only_the_words_and_numbers_it_holds_whole(human, capsys)
          "source": {"kind": "file", "path": "paper.txt", "quote": "batch size of 3", "term": "batch size",
                     "resolved": {"at": "2026-09-01T10:00:00.000+00:00", "sha256": sha, "line": 1, "text": "We use a batch size of 32 per GPU."}},
          "set_by": "human:t", "set_at": "2026-09-01T10:00:00.000+00:00", "via": "cli"}))
-    [then] = [c for c in ok(capsys, "show", "e1").data["caveats"] if c["subject"] == "e1/batch_then"]
+    [then] = [c for c in ok(capsys, "show", "--long", "e1").data["caveats"] if c["subject"] == "e1/batch_then"]
     assert (then["code"], then["problem"], then["text"]) == ("stale", True, 'batch_then: paper.txt "batch size of 3" is unchanged since an earlier rb '
                                                              "verified it, and this rb reads the quote otherwise: the quote is in paper.txt only as "
                                                              "part of a longer word or number; paper.txt:1 reads: We use a batch size of 32 per GPU.")
@@ -585,7 +585,7 @@ def test_a_check_that_finds_something_else_replaces_the_conflict_kept_before(hum
     assert code == 1 and row["conflict"] is False and row["reason"].startswith("train.py:1 does not name 'lr'; it reads: batch = 4.")
     s = setting(capsys, "e1/lr")
     assert s["conflict"] is None and s["failed"] == row["reason"] and caveats(capsys, "e1/lr") == [("provisional", False)]
-    assert main(["show", "e1/lr"]) == 0 and "CONFLICT" not in capsys.readouterr().out
+    assert main(["show", "--long", "e1/lr"]) == 0 and "CONFLICT" not in capsys.readouterr().out
     Path("train.py").write_text("lr = 0.2\n", encoding="utf-8")
     assert ok(capsys, "spec", "verify", "e1", "lr").data["results"][0]["after"] == "verified"
     assert setting(capsys, "e1/lr")["status"] == "verified" and caveats(capsys, "e1/lr") == []
@@ -625,9 +625,9 @@ def test_a_setting_s_history_shows_every_check_of_it(human, capsys):
     assert spec_set(capsys, "e1", "wd", "0.0", "--source", "cfg.yaml#wd") == (0, "verified")
     Path("cfg.yaml").write_text("lr: 0.2\nwd: 0.0\n", encoding="utf-8")
     assert rbj(capsys, "spec", "verify", "e1")[0] == 0
-    history = ok(capsys, "show", "e1/lr").data["history"]
+    history = ok(capsys, "show", "--long", "e1/lr").data["history"]
     assert [h["op"] for h in history] == ["spec_set", "spec_verify", "spec_verify"]
-    assert main(["show", "e1/lr"]) == 0
+    assert main(["show", "--long", "e1/lr"]) == 0
     shown = [line.strip().split(" ", 1)[1] for line in capsys.readouterr().out.splitlines() if line.startswith("    20")]
     assert shown == ["spec set: setting lr: new, 0.2", "spec check: provisional", "spec check: verified"]
     assert main(["log", "e1/lr"]) == 0
@@ -745,8 +745,8 @@ def test_a_conflict_names_its_source_and_both_values_once(human, capsys, path, s
         if kept:
             code, env = rbj(capsys, "spec", "verify", "e1", "lr")
             assert code == 1 and env.data["results"][0]["reason"] == said
-            assert ok(capsys, "show", "e1/lr").data["object"]["conflict"]["text"] == said
-        [c] = [c for c in ok(capsys, "show", "e1").data["caveats"] if c["subject"] == "e1/lr"]
+            assert ok(capsys, "show", "--long", "e1/lr").data["object"]["conflict"]["text"] == said
+        [c] = [c for c in ok(capsys, "show", "--long", "e1").data["caveats"] if c["subject"] == "e1/lr"]
         assert (c["code"], c["text"]) == ("conflict", f"lr: {said}")
         [item] = [i for i in ok(capsys, "status").data["open"] if i["subject"] == "e1/lr"]
         assert (item["code"], item["what"]) == ("conflict", f"e1/lr: {said}")
@@ -799,7 +799,7 @@ def test_a_hand_made_resolution_of_a_commit_pinned_source_does_not_pass_the_rech
     lr["value"] = 0.2
     lr["source"]["resolved"].update(text="lr: 0.2", read=0.2)                 # the hash of the file's bytes stays as it was
     p.write_text(rbyaml.dumps(doc), encoding="utf-8")
-    [caveat] = [c for c in ok(capsys, "show", "e1").data["caveats"] if c["subject"] == "e1/lr"]
+    [caveat] = [c for c in ok(capsys, "show", "--long", "e1").data["caveats"] if c["subject"] == "e1/lr"]
     assert caveat["code"] in ("stale", "conflict") and caveat["problem"] is True
     assert "does not state 0.2" in caveat["text"] and "was not made by rb" in caveat["text"]
     # and what rb read is not anyone's to rewrite: the file is not taken into the record as it stands
@@ -852,14 +852,14 @@ def test_what_an_earlier_rb_read_in_bytes_unchanged_since_stands(human, capsys):
     as_an_earlier_rb_wrote_it(human, f".rb/experiments/e1/analyses/{a}.yaml", "analyze", lambda doc: doc["comparisons"][0]["source"]["resolved"].update(
         sha256=sha("EVAL.md"), text="<!-- Acc@1 76.130 Acc@5 92.862 -->"))
     assert rbj(capsys, "status", "--fail-on", "stale")[0] == 0 and rbj(capsys, "status", "--fail-on", "integrity")[0] == 0
-    notes_ = {c["subject"]: c for c in ok(capsys, "show", "e1").data["caveats"]}
+    notes_ = {c["subject"]: c for c in ok(capsys, "show", "--long", "e1").data["caveats"]}
     for subject, line in (("e1/lr", "NOTES.md:3"), ("e1/env.torch", "requirements.txt:1")):
         assert (notes_[subject]["code"], notes_[subject]["problem"]) == ("source_changed", False)
         assert f"{line} is unchanged since an earlier rb verified it, and this rb reads comments otherwise: " in notes_[subject]["text"]
     assert problems(finding(capsys)) == []
 
     as_an_earlier_rb_wrote_it(human, exp, "spec", lambda doc: doc["settings"].append(verified("batch", 64, "NOTES.md", 1, "batch 64")))
-    [forged] = [c for c in ok(capsys, "show", "e1").data["caveats"] if c["subject"] == "e1/batch"]
+    [forged] = [c for c in ok(capsys, "show", "--long", "e1").data["caveats"] if c["subject"] == "e1/batch"]
     assert forged["problem"] and "the record of what was read was not made by rb" in forged["text"]
     with Path("EVAL.md").open("a", encoding="utf-8") as f:
         f.write("done\n")
@@ -880,7 +880,7 @@ def test_a_difference_declared_with_varies_is_not_a_confound(human, capsys):
     start(capsys, "--baseline", "fp32", "--candidate", "int8", "--varies", "precision")
     ok(capsys, "spec", "set", "e1", "fp32.precision", "fp32")
     ok(capsys, "spec", "set", "e1", "int8.precision", "int8")
-    assert not [c for c in ok(capsys, "show", "e1").data["caveats"] if c["code"].startswith("confound")]
+    assert not [c for c in ok(capsys, "show", "--long", "e1").data["caveats"] if c["code"].startswith("confound")]
 
 
 def test_a_confound_a_human_accepts_no_longer_blocks(human, capsys):
@@ -945,7 +945,7 @@ def test_a_humans_amendment_is_kept_with_the_hashes_before_and_after(human, caps
     ok(capsys, "spec", "set", "e1", "lr", "0.1")
     frozen = ok(capsys, "freeze", "e1", "-m", "locked").data["object"]["frozen"]
     ok(capsys, "spec", "set", "e1", "lr", "0.2", "--amend", "-m", "the spec had a typo")
-    shown = ok(capsys, "show", "e1").data
+    shown = ok(capsys, "show", "--long", "e1").data
     [am] = shown["object"]["amendments"]
     assert (am["by"], am["why"], am["before"], am["after"]) == ("human:t", "the spec had a typo", frozen["sha256"], shown["freeze_sha256"])
     assert "0.1 -> 0.2" in am["change"] and shown["spec_drift"] is None
@@ -970,7 +970,7 @@ def test_a_frozen_spec_edited_by_hand_is_drift_and_blocks(human, capsys):
     doc = rbyaml.loads(p.read_text(encoding="utf-8"))
     doc["settings"][0]["value"] = 0.5
     p.write_text(rbyaml.dumps(doc), encoding="utf-8")
-    assert ok(capsys, "show", "e1").data["spec_drift"]
+    assert ok(capsys, "show", "--long", "e1").data["spec_drift"]
     assert ("drift", "e1") in problems(finding(capsys))
     assert rbj(capsys, "status", "--fail-on", "stale")[0] == 1
 
@@ -980,7 +980,7 @@ def test_a_criterions_rule_edited_after_the_freeze_is_drift(human, capsys):
     ok(capsys, "criterion", "add", "s", "-e", "e1", "--metric", "top1", "--at-least", "0.7", "--id", "c1")
     ok(capsys, "freeze", "e1", "-m", "locked")
     edit_criterion(human, "c1", target=0.5)
-    assert ok(capsys, "show", "e1").data["spec_drift"]
+    assert ok(capsys, "show", "--long", "e1").data["spec_drift"]
 
 
 # ---------------------------------------------------------------- which runs count, and the timing
@@ -1351,8 +1351,8 @@ def test_a_population_setting_is_never_compared_with_a_run_config(human, capsys)
     [o] = finding(capsys)["observations"]
     assert o["counted"], o["reason"]
     assert ok(capsys, "compare", "e1").data["run_count"] == 1
-    assert ok(capsys, "show", run["id"]).data["config"]["mismatches"] == []
-    assert main(["show", run["id"]]) == 0 and "1 differ" not in capsys.readouterr().out
+    assert ok(capsys, "show", "--long", run["id"]).data["config"]["mismatches"] == []
+    assert main(["show", "--long", run["id"]]) == 0 and "1 differ" not in capsys.readouterr().out
     for name in ("env.gpu", "population.photo"):
         assert ok(capsys, "spec", "set", "e1", name, "--per-run").data["object"]["per_run"]
     assert main(["spec", "set", "e1", "env.gpu", "--per-run"]) == 0 and "--set env.gpu=<value>" in capsys.readouterr().out
@@ -1606,8 +1606,8 @@ def test_what_a_call_was_made_on_is_signed_only_when_it_compares_two_arms(human,
     said = capsys.readouterr().out
     assert "  made on c1: 20.63 [20.01, 21.26], n 3 (rb): measured, estimate meets criterion" in said
     assert "  made on c2: -0.06 [-0.1257, +0.005724], n 3 (rb): unresolved, estimate meets criterion" in said
-    assert main(["show", "c1"]) == 0 and ": p01.step_ms 20.4 (typed) · unit " in capsys.readouterr().out
-    assert main(["show", "c2"]) == 0 and ": difference -0.04 (typed) · unit " in capsys.readouterr().out
+    assert main(["show", "--long", "c1"]) == 0 and ": p01.step_ms 20.4 (typed) · unit " in capsys.readouterr().out
+    assert main(["show", "--long", "c2"]) == 0 and ": difference -0.04 (typed) · unit " in capsys.readouterr().out
     ok(capsys, "decide", "c1", "accept", "-m", "fast enough")
     record(capsys, "none.val_loss=1.30", "p01.val_loss=1.25", "p01.step_ms=20.5")
     assert finding(capsys)["says"]["review"].endswith("made on an earlier reading (20.63 [20.01, 21.26], n 3 (rb): measured, estimate meets criterion)")
@@ -1624,7 +1624,7 @@ def test_a_run_s_difference_keeps_its_sign_after_it_stops_counting(human, capsys
     ok(capsys, "spec", "set", "e1", "lr", "0.1", "--no-verify")              # the run is now under an earlier spec
     for c, shown, carded in (("c1", "change.m +0.3", "+0.3"), ("c2", "b.m 1.3", "1.3")):
         assert finding(capsys, c)["comparison"] is None
-        assert main(["show", c]) == 0 and f"  {run}: {shown} (typed) · unit {run} · not counted: " in capsys.readouterr().out
+        assert main(["show", "--long", c]) == 0 and f"  {run}: {shown} (typed) · unit {run} · not counted: " in capsys.readouterr().out
         assert any(f.startswith(f"{run}: {carded} · unit {run} · not counted: ") for f in object_card(c).facts)
 
 
@@ -1703,7 +1703,8 @@ def test_a_rule_beside_a_reading_says_its_numbers_as_declared(human, capsys):
         card = raw.split(f'id="c-{cid}"', 1)[1].split('<div class="card', 1)[0]
         # rb's own rule and its reading are the card's Source details rows, in those digits (DESIGN-PASS-1 P8)
         assert f'<dt>rule</dt><dd><span class="mono">{rule}</span></dd><dt>rb reads</dt><dd>{said}</dd>' in card, card
-        assert f'<dt>margin</dt><dd><a href="#c-{cid}:reading">{margin}</a></dd>' in card, card
+        # closed form (owner, Nov 13 2026): the margin's row says in plain words what it is
+        assert f'<dt>distance from the rule\'s number</dt><dd><a href="#c-{cid}:reading">{margin}</a></dd>' in card, card
     # and c3's reading, with its interval, on its own card
     assert "change.m: +0 [-0.6572, +0.6572]" in raw.split('id="c-c3"', 1)[1].split('<div class="card', 1)[0]
 
@@ -1723,7 +1724,7 @@ def test_a_rule_says_its_own_numbers_as_declared_and_every_reading_beside_it_as_
     ok(capsys, "freeze", "e1", "-m", "lock")
     ok(capsys, "criterion", "add", "s", "-e", "e1", "--metric", "c.r2", "--equals", "3846.6", "--tolerance", "0.05", "--id", "c3",
        "--amend", "--why", "add")
-    assert ok(capsys, "show", "e1").data["object"]["amendments"][-1]["change"] == "new criterion c3: c.r2 = 3846.6 ± 0.05"
+    assert ok(capsys, "show", "--long", "e1").data["object"]["amendments"][-1]["change"] == "new criterion c3: c.r2 = 3846.6 ± 0.05"
     assert [e["detail"]["rule"] for e in ok(capsys, "log", "-n", "50").data["entries"] if e["op"] == "add" and e["kind"] == "criterion"][0] == "ppl ≤ 1234.5678"
     for seed, x in ((11, "0.071948908507"), (12, "0.08"), (13, "0.088051091493")):
         record(capsys, f"change.mm={x}", "--set", f"seed={seed}")
@@ -1870,7 +1871,7 @@ def test_an_each_rule_says_its_threshold_as_declared_and_each_value_on_its_own_s
     f = finding(capsys)
     assert (f["rule"], f["says"]["rule"]) == ("each unit's ppl ≤ 1234.5678", "criterion not met: 1 of 2 units is above 1234.5678 (seed=2)")
     for c, said in (("c1", "ppl 1234.5679 (typed) · unit seed=2"), ("c2", "step_ms 21.0000004 (typed) · unit seed=2")):
-        assert main(["show", c]) == 0 and said in capsys.readouterr().out
+        assert main(["show", "--long", c]) == 0 and said in capsys.readouterr().out
 
 
 def test_an_each_rule_on_arms_that_never_share_a_unit_says_so(human, capsys):
@@ -1954,7 +1955,7 @@ def test_a_retracted_run_stops_counting_and_stays_on_record(human, capsys):
     assert env.data["rested_on"] == ["criterion c1 counts it"]
     f = finding(capsys)
     assert (f["rule_outcome"], f["n"], f["observations"]) == ("untested", 0, [])
-    shown = ok(capsys, "show", run).data["object"]
+    shown = ok(capsys, "show", "--long", run).data["object"]
     assert shown["retracted"]["why"] == "the eval set leaked" and shown["retracted"]["by"] == "human:t"
     assert (human / ".rb" / "experiments" / "e1" / "runs" / f"{run}.yaml").is_file()
 
@@ -2065,7 +2066,7 @@ def test_an_unparseable_record_is_state_corrupt(two_findings, capsys, where):
     runs = two_findings / ".rb" / "experiments" / "e1" / "runs"
     p = criterion_file(two_findings) if where == "criteria" else next(runs.glob("*.yaml"))
     p.write_text("{not yaml", encoding="utf-8")
-    for argv in (["status"], ["show", "c1"], ["context"]):
+    for argv in (["status"], ["show", "--long", "c1"], ["context"]):
         code, env = rbj(capsys, *argv)
         assert code == 2 and env.errors[0].code == "E_STATE_CORRUPT", argv
 

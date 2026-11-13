@@ -234,17 +234,6 @@
    "example": "live"
   },
   {
-   "selector": "[data-hint]",
-   "what": "a hint",
-   "group": "R1",
-   "on": [
-    "page",
-    "open"
-   ],
-   "made_by": "markup",
-   "example": "live"
-  },
-  {
    "selector": "[data-keys]",
    "what": "the keys help",
    "group": "R1",

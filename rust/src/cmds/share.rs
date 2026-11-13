@@ -111,11 +111,8 @@ pub fn cmd_export(ns: &Namespace, out: &mut Out) -> R {
         let parts: Vec<String> = left
             .iter()
             .map(|r| {
-                let (state, here, how) = (get_s(&dict_of(r), "state"), get_s(&dict_of(r), "here"), get_s(&dict_of(r), "how"));
-                format!("{} (", get_s(&dict_of(r), "id"))
-                    + &if here == state { state.clone() } else { format!("{here} here; in the bundle {state}") }
-                    + &if how.is_empty() { String::new() } else { format!(", {how}") }
-                    + ")"
+                // where a reader of the bundle gets it, never the word for where its bytes stood here
+                format!("{} ({})", get_s(&dict_of(r), "id"), get_s(&dict_of(r), "said"))
             })
             .collect();
         out.say(format!("Not in this bundle, so a reader cannot rerun with them from it alone: {}.", parts.join("; ")));
@@ -202,7 +199,7 @@ pub fn cmd_clone(ns: &Namespace, out: &mut Out) -> R {
 }
 
 pub fn cmd_login(ns: &Namespace, out: &mut Out) -> R {
-    crate::hub::cmd_login(s(ns, "hub"), out)
+    crate::hub::cmd_login(s(ns, "hub"), flag(ns, "wait"), out)
 }
 
 pub fn cmd_logout(ns: &Namespace, out: &mut Out) -> R {

@@ -59,13 +59,13 @@ def test_question_call_tracks_related_experiments_repository_without_direct_ques
     call = record("decide", "q1", "continue", "--why", "Review the two stages together")["object"]
     assert set(call["inquiry_basis"]["criteria"]) == {"c1"}
     assert "e2#repository" in call["inquiry_basis"]["repository"]
-    assert not any(p["code"] == "decision_outdated" and p["subject"] == "q1" for p in record("status")["open"])
+    assert not any(p["code"] == "decision_outdated" and p["subject"] == "q1" for p in record("status", "--full")["open"])
     if changed == "report":
         report.write_text("# Training 2\n\n## Results\nThe saved comparison needs a source correction.\n", encoding="utf-8")
         record("reconcile", "--apply")
     else:
         audit.write_text('{"passed": false}', encoding="utf-8")
-    assert any(p["code"] == "decision_outdated" and p["subject"] == "q1" for p in record("status")["open"])
+    assert any(p["code"] == "decision_outdated" and p["subject"] == "q1" for p in record("status", "--full")["open"])
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="rb clone starts a git repository")

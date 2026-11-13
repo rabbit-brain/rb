@@ -45,17 +45,17 @@ def two_arms(rb):
 
 def test_a_paired_reading_says_what_it_pairs_by_beside_its_unpaired_reading(rb):
     two_arms(rb)
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     assert "paired difference, t interval, 3 seeds" in out
     assert "paired by seed: each seed's int8 run against the same seed's fp32 run" in out
     assert "unpaired, the same runs read" in out and "unpaired difference, Welch interval, 6 runs" in out
     assert "rb spec set int8 population.repeat seed --no-verify reads each run as its own unit" in out
-    pairing = rb("show", "c1").data["finding"]["comparison"]["pairing"]
+    pairing = rb("show", "--long", "c1").data["finding"]["comparison"]["pairing"]
     assert pairing["by"] == ["seed"] and pairing["declared_unit"] is False
     assert pairing["unpaired"]["method"] == "unpaired difference, Welch interval" and pairing["command"] == "rb spec set int8 population.repeat seed --no-verify"
     # the researcher says the seeds link nothing: each run is its own unit, and no run reads as under an earlier spec
     rb("spec", "set", "int8", "population.repeat", "seed", "--no-verify")
-    f = rb("show", "c1").data["finding"]
+    f = rb("show", "--long", "c1").data["finding"]
     assert f["comparison"]["method"] == "unpaired difference, Welch interval" and f["comparison"]["n"] == 6
     assert "pairing" not in f["comparison"] or not f["comparison"]["pairing"]
     assert all(o["counted"] for o in f["observations"])
@@ -66,7 +66,7 @@ def test_arms_in_one_run_say_nothing_more(rb):
     rb("criterion", "add", "INT8 loses at most 1 point", "-e", "int8", "--metric", "change.top1", "--at-least", "-1", "--id", "c1")
     for a, b in [(76.1, 75.6), (75.2, 75.1), (76.4, 75.2)]:
         rb("run", "add", "int8", f"fp32.top1={a}", f"int8.top1={b}", "--produced-at", "2026-05-01")
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     assert "paired difference" in out and "paired by" not in out
 
 
@@ -86,11 +86,11 @@ def photos(rb, rule):
 
 def test_no_pooling_over_what_the_unit_is_made_of_nor_a_declared_repeat(rb):
     photos(rb, ["--at-least", "70"])
-    code, out = rb("show", "c2", text=True)
+    code, out = rb("show", "--long", "c2", text=True)
     assert "hold camera" not in out and "pooled over 2 camera" not in out
     assert "hold seed 1 and 2, pooled in one reading" in out and "rb spec set ph population.repeat seed --no-verify says so" in out
     rb("spec", "set", "ph", "population.repeat", "seed", "--no-verify")
-    code, out = rb("show", "c2", text=True)
+    code, out = rb("show", "--long", "c2", text=True)
     assert "pooled" not in out
 
 
@@ -102,7 +102,7 @@ def test_a_value_misses_alone_only_where_it_holds_a_reading_of_its_own(rb):
     rb("criterion", "add", "INT8 averages 75", "-e", "tk", "--metric", "top1", "--subject", "int8", "--equals", "75", "--tolerance", "0.5", "--id", "c3")
     for i, x in enumerate((74.0, 75.0, 76.0)):
         rb("run", "add", "tk", f"int8.top1={x}", "--set", f"run=r{i}", "--set", f"epoch={i}", "--produced-at", "2026-05-01")
-    f = rb("show", "c3").data["finding"]
+    f = rb("show", "--long", "c3").data["finding"]
     assert f["rule_outcome"] == "meets"
     assert "not reproduced at" not in f["says"]["headline"] and "not met at" not in f["says"]["headline"]
     assert not [c for c in f["caveats"] if c["code"] == "pooled_misses"]
@@ -119,12 +119,12 @@ def test_a_repeat_index_is_a_case_within_what_still_pairs_the_runs(rb):
         for epoch in (0, 1):
             for v, x in (("fp32", 76.0), ("int8", 75.0 + epoch / 10)):
                 rb("run", "add", "cam", f"{v}.top1={x}", "--set", f"camera={camera}", "--set", f"epoch={epoch}", "--produced-at", "2026-05-01")
-    code, out = rb("show", "c4", text=True)
+    code, out = rb("show", "--long", "c4", text=True)
     # of what pairs them, only the epoch could be a counter: the camera, a name, is a condition and never offered
     assert "paired by camera and epoch" in out and "where epoch only numbers repeats, rb spec set cam population.repeat epoch --no-verify" in out, out
     assert "population.repeat camera" not in out and "<that setting>" not in out
     rb("spec", "set", "cam", "population.repeat", "epoch", "--no-verify")
-    f = rb("show", "c4").data["finding"]
+    f = rb("show", "--long", "c4").data["finding"]
     assert f["comparison"]["method"] == "paired difference, t interval" and f["comparison"]["n"] == 3
     assert f["comparison"]["pairing"]["by"] == ["camera"]
 
@@ -138,10 +138,10 @@ def test_the_unpaired_reading_counts_each_arms_units_and_a_vowel_takes_an(rb):
         for epoch in (0, 1):
             for v, x in (("fp32", 76.0), ("int8", 75.0 + epoch / 10)):
                 rb("run", "add", "ang", f"{v}.top1={x}", "--set", f"angle={angle}", "--set", f"epoch={epoch}", "--produced-at", "2026-05-01")
-    code, out = rb("show", "c5", text=True)
+    code, out = rb("show", "--long", "c5", text=True)
     assert "if runs sharing an angle are not independent" in out or "if runs sharing an epoch are not independent" in out, out
     rb("spec", "set", "ang", "population.repeat", "epoch", "--no-verify")
-    code, out = rb("show", "c5", text=True)
+    code, out = rb("show", "--long", "c5", text=True)
     # paired by angle now; its unpaired reading says the same, estimate and interval, so it is left out (round 4)
     assert "paired by angle: each angle's int8 run against the same angle's fp32 run" in out and "unpaired, " not in out, out
 
@@ -156,10 +156,10 @@ def test_the_offered_repeat_keeps_the_repeats_already_declared(rb):
         for epoch in (0, 1):
             for v, x in (("fp32", 76.0), ("int8", 75.0 + epoch / 10)):
                 rb("run", "add", "cam", f"{v}.top1={x}", "--set", f"seed={seed}", "--set", f"epoch={epoch}", "--produced-at", "2026-05-01")
-    command = rb("show", "c6").data["finding"]["comparison"]["pairing"]["command"]
+    command = rb("show", "--long", "c6").data["finding"]["comparison"]["pairing"]["command"]
     assert command == "rb spec set cam population.repeat epoch,seed --no-verify"
     rb(*command.split()[1:])
-    f = rb("show", "c6").data["finding"]
+    f = rb("show", "--long", "c6").data["finding"]
     assert f["comparison"]["method"].startswith("unpaired difference")
 
 
@@ -173,7 +173,7 @@ def test_the_unpaired_reading_reads_the_runs_the_paired_one_leaves_out_too(rb):
         rb("run", "add", "int8", f"fp32.top1={x}", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
     for seed in (1, 2):
         rb("run", "add", "int8", "int8.top1=76.0", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
-    unpaired = rb("show", "c1").data["finding"]["comparison"]["pairing"]["unpaired"]
+    unpaired = rb("show", "--long", "c1").data["finding"]["comparison"]["pairing"]["unpaired"]
     assert unpaired["n"] == 5 and abs(unpaired["estimate"] - (76.0 - (76.0 + 76.0 + 90.0) / 3)) < 1e-9, unpaired
 
 
@@ -183,34 +183,34 @@ def test_the_unpaired_reading_reads_runs_that_give_both_arms_as_each_arms_number
     two_arms(rb)
     for seed, (a, b) in ((8, (76.8, 75.0)), (9, (75.0, 75.9))):
         rb("run", "add", "int8", f"fp32.top1={a}", f"int8.top1={b}", "--set", f"seed={seed}", "--produced-at", "2026-05-08")
-    f = rb("show", "c1").data["finding"]
+    f = rb("show", "--long", "c1").data["finding"]
     assert f["comparison"]["n"] == 5, f["comparison"]
     unpaired = f["comparison"]["pairing"]["unpaired"]
     fp32 = [76.1, 75.2, 76.4, 76.8, 75.0]
     int8 = [75.6, 75.1, 75.2, 75.0, 75.9]
     assert unpaired["n"] == 10 and abs(unpaired["estimate"] - (sum(int8) / 5 - sum(fp32) / 5)) < 1e-9, unpaired
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     assert "unpaired, the same runs read" in out and "unpaired difference, Welch interval, 10 " in out, out
 
 
 def test_no_unpaired_figure_where_a_run_gives_only_the_difference(rb):
     two_arms(rb)
     rb("run", "add", "int8", "change.top1=-0.4", "--set", "seed=8", "--produced-at", "2026-05-08")
-    comparison = rb("show", "c1").data["finding"]["comparison"]
+    comparison = rb("show", "--long", "c1").data["finding"]["comparison"]
     assert comparison["pairing"]["unpaired"] is None, comparison["pairing"]
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     assert "paired by seed" in out and "unpaired" not in out, out
 
 
 def test_a_setting_a_rule_selects_on_is_never_offered_as_a_repeat(rb):
     two_arms(rb)
     rb("criterion", "add", "INT8 holds at seed 1", "-e", "int8", "--metric", "change.top1", "--at-least", "-1", "--where", "seed=1", "--id", "c2")
-    comparison = rb("show", "c2").data["finding"]["comparison"]
+    comparison = rb("show", "--long", "c2").data["finding"]["comparison"]
     assert comparison["pairing"]["command"] is None, comparison["pairing"]
-    code, out = rb("show", "c2", text=True)
+    code, out = rb("show", "--long", "c2", text=True)
     assert "paired by seed" in out and "population.repeat" not in out, out
     # the rule that selects nothing still gets the offer
-    assert rb("show", "c1").data["finding"]["comparison"]["pairing"]["command"] == "rb spec set int8 population.repeat seed --no-verify"
+    assert rb("show", "--long", "c1").data["finding"]["comparison"]["pairing"]["command"] == "rb spec set int8 population.repeat seed --no-verify"
 
 
 def test_rb_compare_gives_no_row_of_its_own_to_a_declared_repeat(rb):
@@ -234,5 +234,5 @@ def test_an_unpaired_figure_over_runs_of_both_arms_counts_units_not_runs(rb):
     two_arms(rb)
     for seed, (a, b) in ((8, (76.8, 75.0)), (9, (75.0, 75.9))):
         rb("run", "add", "int8", f"fp32.top1={a}", f"int8.top1={b}", "--set", f"seed={seed}", "--produced-at", "2026-05-08")
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     assert "Welch interval, 10 units" in out and "10 runs" not in out, out

@@ -41,9 +41,9 @@ def test_a_flat_number_on_an_experiment_of_one_variant_is_that_variants(rb):
     env = rb("run", "add", "solo", "top1=75.6", "--produced-at", "2026-05-01")
     assert not [w for w in env.data.get("warnings", []) if "toward nothing" in w]
     assert env.data["object"]["metrics"] == {"int8.top1": 75.6}
-    st = rb("status").data
+    st = rb("status", "--full").data
     assert not [o for o in st["open"] if o["code"] == "unread_metric"]
-    f = rb("show", "c1").data["finding"]
+    f = rb("show", "--long", "c1").data["finding"]
     assert f["rule_outcome"] == "meets" and [o["counted"] for o in f["observations"]] == [True]
 
 
@@ -53,9 +53,9 @@ def test_a_rule_that_names_no_arm_reads_the_one_variants_number_and_says_so(rb):
     env = rb("run", "add", "solo", "top1=75.6", "--produced-at", "2026-05-01")
     assert env.data["object"]["metrics"] == {"int8.top1": 75.6}
     assert not [w for w in env.data.get("warnings", []) if "toward nothing" in w], env.data.get("warnings")
-    st = rb("status").data
+    st = rb("status", "--full").data
     assert not [o for o in st["open"] if o["code"] == "unread_metric"], [o["what"] for o in st["open"] if o["code"] == "unread_metric"]
-    f = rb("show", "c1").data["finding"]
+    f = rb("show", "--long", "c1").data["finding"]
     assert f["rule_outcome"] == "meets" and [o["counted"] for o in f["observations"]] == [True]
     # a number of another name still counts toward nothing, and the line names the rule's name once
     env = rb("run", "add", "solo", "latency_ms=4.1", "--produced-at", "2026-05-02")
@@ -69,7 +69,7 @@ def test_rb_show_names_an_arms_number_as_the_rule_does(rb):
     rb("criterion", "add", "INT8 loses at most a point", "-e", "e1", "--metric", "change.eval.top1", "--at-least", "-1", "--id", "c1")
     rb("run", "add", "e1", "fp32.eval.top1=76.1", "int8.eval.top1=75.6", "--produced-at", "2026-05-01")
     rb("run", "add", "e1", "eval.top1=76.0", "--variant", "fp32", "--produced-at", "2026-05-02")
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     assert "fp32.eval.top1 76" in out, out
     assert "fp32.top1" not in out, out
 
@@ -78,7 +78,7 @@ def test_rb_show_lists_a_run_no_rule_counts_with_why(rb):
     rb("experiment", "add", "INT8 alone", "--id", "solo", "--purpose", "a level", "--baseline", "int8")
     rb("criterion", "add", "INT8 holds 75", "-e", "solo", "--metric", "top1", "--subject", "int8", "--at-least", "75", "--id", "c1")
     rid = rb("run", "add", "solo", "latency_ms=4.1", "--produced-at", "2026-05-01").data["object"]["id"]
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     assert f"{rid} is on solo and counts toward no rule: it reports int8.latency_ms, and this rule reads int8.top1" in out, out
 
 
@@ -126,7 +126,7 @@ def test_a_run_no_rule_counts_says_what_a_rule_with_no_arm_reads(rb):
     rb("criterion", "add", "top1 holds 75", "-e", "solo", "--metric", "top1", "--at-least", "75", "--id", "c7")
     rb("run", "add", "solo", "top1=75.6", "--produced-at", "2026-05-01")
     rid = rb("run", "add", "solo", "loss=0.3", "--produced-at", "2026-05-01").data["object"]["id"]
-    code, out = rb("show", "c7", text=True)
+    code, out = rb("show", "--long", "c7", text=True)
     assert "meets criterion" in out and f"{rid} is on solo and counts toward no rule: it reports int8.loss, and this rule reads top1" in out, out
 
 
@@ -158,7 +158,7 @@ def test_on_one_variant_the_advice_names_the_number_as_the_rule_does(rb):
     for exp, crit in (("named", "c1"), ("bare", "c3")):
         rb("run", "add", exp, "top1=75.6", "--produced-at", "2026-05-02")
         rb("run", "add", exp, "int8.top1=75.8", "--produced-at", "2026-05-03")
-        assert [o["counted"] for o in rb("show", crit).data["finding"]["observations"]] == [True, True]
+        assert [o["counted"] for o in rb("show", "--long", crit).data["finding"]["observations"]] == [True, True]
 
 
 def test_with_the_baseline_retracted_the_advice_names_the_candidate_as_the_rule_does(rb):

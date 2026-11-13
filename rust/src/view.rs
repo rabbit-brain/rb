@@ -103,7 +103,12 @@ pub fn note_said(text: &str, words: &str, by: &str) -> String {
 
 /// The gate line with the words given when it was set, said as `gate_parts` says them.
 pub fn gate_said(if_holds: &str, if_not: &str, words: &str, by: &str, confirm: &str) -> String {
-    gate_parts(if_holds, if_not, words, by, confirm, false).into_iter().map(|(k, t)| format!("{k}: {t}")).collect::<Vec<_>>().join(" · ")
+    gate_said_taken(if_holds, if_not, words, by, confirm, "")
+}
+
+/// `gate_said`, for a gate whose design's confirmation git took out: `taken` says so after its mark.
+pub fn gate_said_taken(if_holds: &str, if_not: &str, words: &str, by: &str, confirm: &str, taken: &str) -> String {
+    gate_parts(if_holds, if_not, words, by, confirm, false, taken).into_iter().map(|(k, t)| format!("{k}: {t}")).collect::<Vec<_>>().join(" · ")
 }
 
 /// The gate as labelled lines ("if it holds", "if not"), with the words given when it was set: in place of a part
@@ -113,7 +118,9 @@ pub fn gate_said(if_holds: &str, if_not: &str, words: &str, by: &str, confirm: &
 /// with), as a call that waits does, a page included; `by` is who set it. A view that says its design's standing line
 /// gives no command here: an experiment waits in one place on a screen.
 /// On two lines, `first` puts that mark on the first branch, where only it is one a session wrote (`Design::gate_first`).
-pub fn gate_parts(if_holds: &str, if_not: &str, words: &str, by: &str, confirm: &str, first: bool) -> Vec<(&'static str, String)> {
+/// Where git took its design's confirmation out of the record (`taken`, `Design::taken`), the mark says so in place
+/// of a command, which rb confirm refuses until it is put back (MP-1111-0952's F3).
+pub fn gate_parts(if_holds: &str, if_not: &str, words: &str, by: &str, confirm: &str, first: bool, taken: &str) -> Vec<(&'static str, String)> {
     let mut parts: Vec<(&'static str, String)> =
         [("if it holds", if_holds), ("if not", if_not)].into_iter().filter(|(_, t)| !t.is_empty()).map(|(k, t)| (k, t.to_string())).collect();
     let said = match reader() {
@@ -130,7 +137,9 @@ pub fn gate_parts(if_holds: &str, if_not: &str, words: &str, by: &str, confirm: 
     let at = if first { parts.first_mut() } else { parts.last_mut() };
     if let Some(part) = at {
         part.1.push_str(not_confirmed(by));
-        if !not_confirmed(by).is_empty() && !confirm.is_empty() {
+        if !not_confirmed(by).is_empty() && !taken.is_empty() {
+            part.1.push_str(&format!(": {taken}"));
+        } else if !not_confirmed(by).is_empty() && !confirm.is_empty() {
             part.1.push_str(&format!(" · confirm: {confirm}"));
         }
     }
@@ -191,8 +200,9 @@ pub fn summary_lines(inquiry: &Value) -> Vec<String> {
 
 /// The command a gate line gives beside a session's gate: none while its design waits with it (the design's own line,
 /// and the one line for the designs that wait, say how), else the gate's own (`gate_confirm`).
-pub fn gate_command(experiment: &str, if_holds: &str, if_not: &str, words: &str, design_confirm: &str) -> String {
-    if design_confirm.is_empty() { gate_confirm(experiment, if_holds, if_not, words) } else { String::new() }
+pub fn gate_command(experiment: &str, if_holds: &str, if_not: &str, words: &str, design_confirm: &str, taken: bool) -> String {
+    // a design whose confirmation git took out offers no command: rb confirm refuses it until rb doctor --restore
+    if design_confirm.is_empty() && !taken { gate_confirm(experiment, if_holds, if_not, words) } else { String::new() }
 }
 
 /// The command that confirms a gate as it reads now: the experiment's id and a short hash of the gate and its words,
@@ -396,10 +406,23 @@ pub fn named_file(led: &Ledger, path: &str, run: Option<&Run>) -> String {
 
 /// A resource's location as a screen says it, `provider:ref · state`: a local file inside a nested worktree named, on a
 /// page, by its path inside it, and on the user's screens too where `short` asks (as `page_path` names it).
-fn location_said(loc: &Value, short: bool) -> String {
+/// Where a reader gets a resource, as this reader is told it: a page gives no address with a token in it.
+pub fn said_of(av: &Value) -> String {
+    get_or(av, if reader() == Reader::Page { "said_public" } else { "said" }, "")
+}
+
+/// A place a resource's bytes are recorded at, as the reader is told it: an address by itself; a local copy, with whether
+/// it is here, on rb's text and the user's own screens alone, since a page anyone may be sent names no local path.
+fn location_said(loc: &Value, short: bool) -> Option<String> {
     let (provider, r#ref) = (get_or(loc, "provider", ""), get_or(loc, "ref", ""));
-    let shown = if provider != "local" || (reader() == Reader::Screen && !short) { r#ref } else { page_path(&r#ref, None) };
-    format!("{provider}:{shown} · {}", get_or(loc, "state", ""))
+    if reader() == Reader::Page && (provider == "local" || crate::getit::private_place(&provider, &r#ref)) {
+        return None;
+    }
+    if provider != "local" {
+        return Some(format!("{provider}:{}", r#ref));
+    }
+    let shown = if reader() == Reader::Screen && !short { r#ref } else { page_path(&r#ref, None) };
+    Some(crate::getit::copy_said(&shown, &get_or(loc, "state", "")))
 }
 
 /// rb's own words that name a recorded file (`path`, and `path:line`), as a page and the user's screens say them: the
@@ -1217,6 +1240,7 @@ pub struct ExperimentBrief {
     pub design_lines: Vec<String>,
     /// the command that confirms its design while it waits, else nothing
     pub design_confirm: String,
+    pub design_taken: String,
     /// whether its gate's mark goes on its first branch, the only one a session wrote (`Design::gate_first`)
     pub gate_first: bool,
     /// what a design a session wrote any of does not record ("hypothesis or purpose", "why")
@@ -1263,7 +1287,12 @@ fn call_value(i: &Value, words: &IndexMap<String, String>) -> Value {
         "investigating" => "Review the investigation",
         _ => "Review this result",
     };
-    crate::obj! {"subject" => subject.clone(), "label" => label, "title" => words.get(&subject).cloned().unwrap_or(subject), "text" => get_or(i, "what", ""), "command" => get_or(i, "do", "")}
+    let mut v = crate::obj! {"subject" => subject.clone(), "label" => label, "title" => words.get(&subject).cloned().unwrap_or(subject), "text" => get_or(i, "what", ""), "command" => get_or(i, "do", "")};
+    // what git took out that it rests on, only while something is (MP-1111-0952's F2)
+    if let (Some(t), Value::Dict(d)) = (get_truthy(i, "taken_out"), &mut v) {
+        d.insert("taken_out".into(), Value::Str(t));
+    }
+    v
 }
 
 /// What a screen calls each criterion, experiment and question by: its statement, title or text.
@@ -1331,6 +1360,12 @@ fn waiting_calls(led: &Ledger, st: &Value, briefs: &[QuestionBrief], loose: &[St
         let mut reason = crate::ledger::views::call_reason(&code, &text, on_criteria.first().map(|(c, f)| (c, f)));
         if code == "gate_missed" && on_criteria.len() > 1 {
             reason.detail = on_criteria.iter().map(|(c, f)| format!("{}: {}", c.id, f.says.get("comparison").cloned().unwrap_or_default())).collect::<Vec<_>>().join("; ");
+        }
+        // what git took out that the call rests on, as rb status's item says it: the line for the call says it too
+        // (MP-1111-0952's F2: a missed gate whose settling call, or its confirmation, git took out)
+        let taken = get_or(i, "taken_out", "");
+        if !taken.is_empty() {
+            reason.also = if reason.also.is_empty() { taken } else { format!("{} \u{b7} {taken}", reason.also) };
         }
         let last = led.decisions_on(&on)?.pop().map(|d| d.action);
         let kind = led.kind_of(&on)?.unwrap_or("");
@@ -1426,7 +1461,7 @@ pub fn filed_at(briefs: &[QuestionBrief], subject: &str) -> String {
 /// with its subject, code, rb's words, its criteria and, for a late item, how many of each criterion's units came
 /// before it was declared; and work linked to no question apart (`unfiled`): its criteria (`loose_criteria`), the
 /// calls on it, and its open items.
-fn open_groups(st: &Value, loose: &[String], calls: &[Value]) -> (Vec<Value>, Value) {
+fn open_groups(led: &Ledger, st: &Value, loose: &[String], calls: &[Value]) -> (Vec<Value>, Value) {
     let findings: IndexMap<String, &Value> = list_of(st, "findings").iter().map(|f| (get_or(f, "criterion", ""), f)).collect();
     let variants: IndexMap<String, Vec<String>> = list_of(st, "experiments")
         .iter()
@@ -1437,7 +1472,7 @@ fn open_groups(st: &Value, loose: &[String], calls: &[Value]) -> (Vec<Value>, Va
     let mut unfiled_items = Vec::new();
     for i in list_of(st, "open").iter().filter(|i| get_or(i, "who", "") != "human") {
         let code = get_or(i, "code", "");
-        for v in plain_open_items(i, &findings, &variants) {
+        for v in plain_open_items(Some(led), i, &findings, &variants) {
             let criteria: Vec<String> = list_of(&v, "criteria").iter().map(py_str).collect();
             if !criteria.is_empty() && criteria.iter().all(|c| loose.contains(c)) {
                 unfiled_items.push(v);
@@ -1465,8 +1500,29 @@ fn open_groups(st: &Value, loose: &[String], calls: &[Value]) -> (Vec<Value>, Va
 /// subject (the id a screen shows as a trailing chip and links) apart, never the sentence's first word; a criterion's
 /// item one per criterion, by its statement. rb's own sentence stays in rb status
 /// and on the thing's own view.
-fn plain_open_items(i: &Value, findings: &IndexMap<String, &Value>, variants: &IndexMap<String, Vec<String>>) -> Vec<Value> {
+fn plain_open_items(led: Option<&Ledger>, i: &Value, findings: &IndexMap<String, &Value>, variants: &IndexMap<String, Vec<String>>) -> Vec<Value> {
     let (code, subject, what) = (get_or(i, "code", ""), get_or(i, "subject", ""), get_or(i, "what", ""));
+    // what git took out that the item may rest on, as rb status's item says it (MP-1111-0952's F1): each plain item
+    // keeps it (`taken_out`) and says it after its sentence
+    let taken = get_or(i, "taken_out", "");
+    let mut items = plain_items(led, i, &code, &subject, &what, &taken, findings, variants);
+    if !taken.is_empty() {
+        for v in items.iter_mut() {
+            if let Value::Dict(d) = v {
+                let what = d.get("what").map(py_str).unwrap_or_default();
+                if !what.contains(&taken) {
+                    d.insert("what".into(), Value::Str(format!("{what} \u{b7} {taken}")));
+                }
+                d.insert("taken_out".into(), Value::Str(taken.clone()));
+            }
+        }
+    }
+    items
+}
+
+#[allow(clippy::too_many_arguments)]
+fn plain_items(led: Option<&Ledger>, i: &Value, code: &str, subject: &str, what: &str, taken: &str, findings: &IndexMap<String, &Value>, variants: &IndexMap<String, Vec<String>>) -> Vec<Value> {
+    let (code, subject, what) = (code.to_string(), subject.to_string(), what.to_string());
     let mut criteria: Vec<String> = list_of(i, "criteria").iter().map(py_str).collect();
     if criteria.is_empty() {
         criteria = subject.split(", ").filter(|c| findings.contains_key(*c)).map(str::to_string).collect();
@@ -1527,6 +1583,13 @@ fn plain_open_items(i: &Value, findings: &IndexMap<String, &Value>, variants: &I
             .collect();
     }
     match code.as_str() {
+        // a setting whose own call git took a write of out of the record (a reject, a vouch) reads undetermined, as its
+        // own view does (N2), never as a value no source was checked for
+        "provisional" if !taken.is_empty() && led.map_or(false, |l| l.took_direct(&subject).unwrap_or(false)) => {
+            // the take-out is said after it, in rb status's words (a stash's too), once
+            let (exp, name) = subject.split_once('/').unwrap_or(("", subject.as_str()));
+            vec![item(&subject, format!("{} in {exp}: {}", setting_words(name, variants.get(exp)), crate::ledger::UNDETERMINED_STATE), String::new(), Vec::new())]
+        }
         "provisional" => {
             let (exp, name) = subject.split_once('/').unwrap_or(("", subject.as_str()));
             let value = what.split_once(&format!("{name} = ")).and_then(|(_, t)| t.split_once(" is provisional")).map(|(v, _)| v.to_string()).unwrap_or_default();
@@ -2241,6 +2304,7 @@ pub fn briefs(led: &Ledger, st: &Dict) -> Res<Vec<QuestionBrief>> {
             design_standing: design.state.to_string(),
             design_lines: design.lines(),
             design_confirm: design.waiting_command(),
+            design_taken: design.taken.clone(),
             gate_first: design.gate_first(),
             not_recorded: design.not_recorded.iter().map(|s| s.to_string()).collect(),
         })
@@ -2460,6 +2524,14 @@ pub struct ResourceRow {
     pub used_by: i64,
     pub identity: String,
     pub exact: bool,
+    /// where a reader gets it, in words (`get it: <address>`, `no download link`), with its chips
+    pub said: String,
+    /// {kind, href, text}: getit::get
+    pub get: Value,
+    /// a citation or licence it comes from, as chips
+    pub cite: Vec<String>,
+    /// whether rb asks for a fetchable source for it
+    pub asks: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -2524,6 +2596,12 @@ pub struct Home {
     /// the record's line (WITNESS), when anything was recorded afterwards: when rb began keeping the record and what was
     /// recorded afterwards, in one quiet line
     pub began: Option<String>,
+    /// the header's facts as rb ui draws them (TUI-PARITY Q1, Q2, A15): the git chip, the uncommitted chip, the
+    /// recorded-afterwards chip, when rb last looked, the record's first day and rb's version, each as a chip's words
+    pub head: Value,
+    /// what rb ui draws from the record as rows and prompts, each in rb's words (TUI-PARITY section 6): Your call's rows
+    /// one per design, its chips and the decisions made; also open's rows; Continue this research; each Next step
+    pub ui: Value,
     pub briefs: Vec<QuestionBrief>,
     pub runs: Vec<RunRow>,
     pub resources: Vec<ResourceRow>,
@@ -2541,6 +2619,8 @@ pub struct Home {
     pub weakened: Weakened,
     /// When the record was last written, to the minute in UTC; "" for a record no write has made yet.
     pub last_write: String,
+    /// The Overview's view model (UX5 1.1), as rb status --json gives it.
+    pub overview: Value,
 }
 
 /// One call that waits for a confirmation, as the user's screens list it.
@@ -2740,7 +2820,7 @@ fn tree(st: &Value) -> Vec<TreeRow> {
     for r in list_of(st, "resources") {
         let av = r.get("availability").filter(|a| a.truthy()).cloned().unwrap_or(Value::empty_dict());
         let ident = av.get("identity").filter(|i| i.truthy()).map(|i| get_or(i, "level", "")).unwrap_or_default();
-        let standing = get_or(&av, "state", "") + if ident == "name" { " · name only" } else { "" };
+        let standing = said_of(&av) + if ident == "name" { " · name only" } else { "" };
         let id = get_or(r, "id", "");
         let label = get_or(r, "name", &id) + &get_truthy(r, "version").map(|v| format!(" {v}")).unwrap_or_default();
         rows.push(TreeRow { kind: "resource".into(), id, label, standing, depth: 0, muted: Vec::new() });
@@ -2971,10 +3051,16 @@ fn quiet_line(calls: usize, found: usize, recorded: bool, met: i64, open: usize,
 /// The home view. The since line shows on the user's screen alone, so only it asks for one: `since_from` is Some(how
 /// many lines they had seen by their last look, as `mark_seen` counts them, or None to read their marker).
 pub fn home(led: &Ledger, since_from: Option<Option<i64>>) -> Res<Home> {
-    with_screen_trees(led, || home_in(led, since_from))
+    home_story(led, since_from, None)
 }
 
-fn home_in(led: &Ledger, since_from: Option<Option<i64>>) -> Res<Home> {
+/// The home with `story` (a top-level question's id) as the Overview's story in place of the one rb picks: rb ui's
+/// Other questions, where Enter makes one the story (R21). An id that names no top-level question leaves rb's pick.
+pub fn home_story(led: &Ledger, since_from: Option<Option<i64>>, story: Option<&str>) -> Res<Home> {
+    with_screen_trees(led, || home_in(led, since_from, story))
+}
+
+fn home_in(led: &Ledger, since_from: Option<Option<i64>>, story: Option<&str>) -> Res<Home> {
     led.locked(|| {
         let st = Value::Dict(led.status(None)?);
         let proj = st.get("project").cloned().unwrap_or(Value::empty_dict());
@@ -3056,7 +3142,7 @@ fn home_in(led: &Ledger, since_from: Option<Option<i64>>) -> Res<Home> {
         let calls = waiting_calls(led, &st, &qbriefs, &loose)?;
         // the calls waiting on you, one per subject, as Your call counts them
         let waiting = calls.len();
-        let (open_groups, unfiled) = open_groups(&st, &loose, &calls);
+        let (open_groups, unfiled) = open_groups(led, &st, &loose, &calls);
         // the things still open as the screens list them (DESIGN-PASS-1 target 2): every line that counts them says the
         // same number as the list does
         let open_things = open_groups.iter().map(|g| g.get("n").and_then(Value::as_i64).unwrap_or(0) as usize).sum::<usize>() + list_of(&unfiled, "open_items").len();
@@ -3077,8 +3163,11 @@ fn home_in(led: &Ledger, since_from: Option<Option<i64>>) -> Res<Home> {
         let (made, weakened) = record_made_with(led, &st)?;
         let last_write = last_write(led)?;
         Ok(Home {
+            overview: crate::overview::of_question(led, &st, story)?,
             title: get_or(&proj, "title", ""),
             began: led.record_line()?,
+            head: head_facts(led, &st, scope.as_ref())?,
+            ui: ui_facts(&st, &get_or(&proj, "title", "")),
             project_id: get_or(&proj, "id", ""),
             you: format!("you: {} · {source}", human_name(&get_or(&a, "id", ""))),
             since: since_line,
@@ -3122,6 +3211,294 @@ fn home_in(led: &Ledger, since_from: Option<Option<i64>>) -> Res<Home> {
 /// What a record holds, counted as rb status counts it: its questions, experiments, criteria, runs that stand and those
 /// taken back, analyses and resources; the calls waiting on you (D2's count, one per subject); and its writes, the
 /// log's lines but those that only say what a session runs on.
+/// The header's facts (TUI-PARITY Q1, Q2, A15), each the words of one chip, so a screen composes none: `git` (the
+/// checkout's name and its commit in 7 hex, "main · c07560f"), `commit` (the whole hash, for a copy), `not_committed`
+/// and `dirty` ("± 11 not committed", only while record files are; "⊘ 12 ignored by git" where git ignores them),
+/// `afterwards` ("recorded afterwards · 9 of 9 runs · 1 of 1 decision", only while anything was), `as_of` ("as of
+/// 14:29 UTC", when rb last looked), `since` ("since 23 Oct 2026", the record's first day) and `version` ("rb 0.8.5").
+/// "as of 14:29 UTC": when rb last looked, as the header's chip says it; empty before its first look.
+pub fn as_of(scope: &crate::journal::Scope) -> String {
+    scope.looked_at.as_deref().filter(|at| at.len() >= 16).map(|at| format!("as of {} UTC", &at[11..16])).unwrap_or_default()
+}
+
+pub fn head_facts(led: &Ledger, st: &Value, scope: Option<&crate::journal::Scope>) -> Res<Value> {
+    let repo = st.get("repository").cloned().unwrap_or(Value::empty_dict());
+    let state = get_or(&repo, "state", "");
+    let commit = get_or(&repo, "commit", "");
+    let name = match (repo.get("branch").and_then(Value::as_str), state.as_str()) {
+        (Some(b), _) if !b.is_empty() => b.to_string(),
+        (_, "not_in_git" | "git_not_found" | "unreadable") => String::new(),
+        _ => "no branch".to_string(),
+    };
+    let git = match state.as_str() {
+        "not_in_git" | "git_not_found" | "unreadable" => get_or(&repo, "said", ""),
+        "no_commit" => format!("{name} · no commit yet"),
+        _ => format!("{name} · {}", commit.chars().take(7).collect::<String>()),
+    };
+    let n = |k: &str| repo.get(k).and_then(Value::as_i64).unwrap_or(0);
+    let dirty = match state.as_str() {
+        "ignored" => format!("⊘ {} ignored by git", n("record_files_ignored")),
+        _ if n("record_files_not_committed") > 0 => format!("± {} not committed", n("record_files_not_committed")),
+        _ => String::new(),
+    };
+    let w = led.witness()?;
+    let count = |k: &str, f: &str| w.get(k).and_then(|c| c.get(f)).and_then(Value::as_i64).unwrap_or(0);
+    let nouns = [("runs", "run", "runs"), ("analyses", "analysis", "analyses"), ("calls", "decision", "decisions"), ("notes", "note", "notes")];
+    let parts: Vec<String> = nouns
+        .iter()
+        .filter(|(k, ..)| count(k, "afterwards") > 0)
+        .map(|(k, one, many)| format!("{} of {} {}", count(k, "afterwards"), count(k, "total"), if count(k, "total") == 1 { one } else { many }))
+        .collect();
+    let afterwards = if parts.is_empty() { String::new() } else { format!("recorded afterwards · {}", parts.join(" · ")) };
+    let as_of = scope.map(as_of).unwrap_or_default();
+    let began = get_or(&w, "began", "");
+    let first = crate::card::day(&began, false);
+    Ok(crate::obj! {
+        "git" => git, "commit" => commit, "not_committed" => n("record_files_not_committed"), "dirty" => dirty,
+        "afterwards" => afterwards, "as_of" => as_of, "since" => if first.is_empty() { String::new() } else { format!("since {first}") },
+        "version" => format!("rb {}", crate::version())
+    })
+}
+
+/// The words of a Your call row's state, as the web's still-open list says them (F, Nov 13 2026): a design, a call to
+/// confirm, else its check's state ("not met", "not reproduced", "gate missed", "can't tell yet", "no results yet").
+pub fn call_word(kind: &str, code: &str, finding: Option<&Value>) -> &'static str {
+    match (kind, finding) {
+        ("design", _) => "design",
+        ("confirm", _) => "to confirm",
+        (_, Some(f)) => {
+            let gate = get_or(f, "role", "") == "gate";
+            let cited = get_or(f, "origin", "") == "cited";
+            match get_or(f, "rule_outcome", "").as_str() {
+                "misses" if gate => "gate missed",
+                "misses" if cited => "not reproduced",
+                "misses" => "not met",
+                "undetermined" => "can't tell yet",
+                "untested" => "no results yet",
+                _ if cited => "reproduced",
+                _ => "met",
+            }
+        }
+        _ if code == "gate_missed" => "gate missed",
+        _ => "to decide",
+    }
+}
+
+/// The prompt that asks an agent to plan a test for a question nothing tests yet (the web's Next step, F's words).
+pub const PLAN_PROMPT_HEAD: &str = "In this repository, use Rabbit Brain to plan a test for the question ";
+pub const PLAN_PROMPT_TAIL: &str = ": propose the rule a result must meet and the runs to make, record them with rb, and don't run anything until I confirm.";
+/// The prompt that asks an agent to run an experiment with no run (F's words).
+pub const RUN_PROMPT_HEAD: &str = "Run ";
+pub const RUN_PROMPT_TAIL: &str = " with rb journal run, as its design says, and record each run.";
+
+/// Continue this research (H's hub card, Nov 13 2026): the prompt that hands the record to an agent, naming the first
+/// open question.
+pub fn continue_prompt(title: &str, question: Option<&str>) -> String {
+    let open = match question {
+        Some(q) => format!("still open: {q}"),
+        None => "still open in the record.".to_string(),
+    };
+    format!("Continue the research in \"{title}\" with Rabbit Brain. In its repository, run rb context first, then work on what is {open} Record every run with rb. Don't decide anything for me: list what needs my decision.")
+}
+
+/// What rb ui draws as rows and prompts (TUI-PARITY section 6), from rb status's data:
+/// - `your_call`: `rows` (one per decision, call to confirm and design: `kind` decide, confirm or design, `subject`,
+///   `mark`, `word`, `claim`, `title`), `chips` (`kind`, `said`: "3 decisions", "1 design to confirm"), `decided`
+///   ("decided 1", the calls made, else "") and `count`;
+/// - `also_open`: one row per item that needs no decision: `mark`, `kind` (question, experiment or "" ), `subject`,
+///   `state`, `opens`;
+/// - `continue`: the Continue this research prompt, "" at a past version; `next_steps`: a Next step prompt by question, experiment or resource
+///   id, none at a past version.
+pub fn ui_facts(st: &Value, title: &str) -> Value {
+    let s = |v: &Value, k: &str| get_or(v, k, "");
+    let findings: Dict = list_of(st, "findings").iter().map(|f| (s(f, "criterion"), f.clone())).collect();
+    let mut titles: Dict = Dict::new();
+    for e in list_of(st, "experiments") {
+        titles.insert(s(e, "id"), Value::str(s(e, "title")));
+    }
+    for q in list_of(st, "questions") {
+        titles.insert(s(q, "id"), Value::str(s(q, "text")));
+    }
+    for f in findings.values() {
+        titles.insert(s(f, "criterion"), Value::str(s(f, "statement")));
+    }
+    let title_of = |id: &str| titles.get(id).map(crate::pyjson::py_str).unwrap_or_else(|| id.to_string());
+    let human = |o: &&Value| s(o, "who") == "human";
+    let mut rows: Vec<Value> = Vec::new();
+    for o in list_of(st, "open").iter().filter(human) {
+        let subject = s(o, "subject");
+        let f = findings.get(&subject);
+        let state = f.map(|f| s(f, "rule_outcome")).unwrap_or_default();
+        rows.push(crate::obj! {"kind" => "decide", "code" => s(o, "code"), "subject" => subject.clone(), "mark" => if f.is_some() { crate::overview::mark_of(&state) } else { "" },
+            "word" => call_word("decide", &s(o, "code"), f), "claim" => f.map_or(false, |f| s(f, "origin") == "cited"), "title" => title_of(&subject)});
+    }
+    for p in list_of(st, "pending") {
+        let subject = s(p, "subject");
+        let id = if s(p, "id").is_empty() { s(p, "decision") } else { s(p, "id") };
+        rows.push(crate::obj! {"kind" => "confirm", "code" => if p.get("past").map_or(false, Value::truthy) { "past_call_unconfirmed" } else { "call_proposed" },
+            "subject" => subject.clone(), "id" => id, "mark" => "", "word" => call_word("confirm", "", None), "claim" => false, "title" => title_of(&subject)});
+    }
+    for d in list_of(st, "designs_pending") {
+        let exp = s(d, "experiment");
+        rows.push(crate::obj! {"kind" => "design", "code" => "design_pending", "subject" => exp.clone(), "confirm" => s(d, "confirm"), "mark" => "",
+            "word" => call_word("design", "", None), "claim" => false, "title" => if s(d, "title").is_empty() { title_of(&exp) } else { s(d, "title") }});
+    }
+    let n_of = |k: &str| rows.iter().filter(|r| s(r, "kind") == k).count();
+    let plural = |n: usize, one: &str, many: &str| format!("{n} {}", if n == 1 { one } else { many });
+    let chips: Vec<Value> = [
+        ("decide", plural(n_of("decide"), "decision", "decisions")),
+        ("confirm", plural(n_of("confirm"), "call to confirm", "calls to confirm")),
+        ("design", plural(n_of("design"), "design to confirm", "designs to confirm")),
+    ]
+    .into_iter()
+    .filter(|(k, _)| n_of(k) > 0)
+    .map(|(k, said)| crate::obj! {"kind" => k, "said" => said})
+    .collect();
+    let made = list_of(st, "decisions")
+        .iter()
+        .filter(|d| s(d, "taken_out").is_empty() && !d.get("retracted").map_or(false, Value::truthy))
+        .filter(|d| d.get("authority").map(|a| matches!(s(a, "state").as_str(), "direct" | "confirmed")).unwrap_or(false))
+        .count();
+    // also open: what needs no decision, each as a mark, a subject and its state
+    let runs: Dict = list_of(st, "runs").iter().map(|r| (s(r, "id"), r.clone())).collect();
+    let run_label = |id: &str| -> String {
+        let Some(r) = runs.get(id) else { return id.to_string() };
+        let mut parts: Vec<String> = Vec::new();
+        let variant = s(r, "variant");
+        let variant = if variant.is_empty() {
+            r.get("results").and_then(Value::as_dict).and_then(|m| m.keys().find_map(|k| k.split_once('.').map(|(v, _)| v.to_string()))).unwrap_or_default()
+        } else {
+            variant
+        };
+        if !variant.is_empty() {
+            parts.push(variant);
+        }
+        if let Some(Value::Dict(pr)) = r.get("per_run") {
+            if let Some(seed) = pr.get("seed") {
+                parts.push(format!("seed {}", crate::pyjson::py_str(seed)));
+            }
+        }
+        if parts.is_empty() { id.to_string() } else { parts.join(" · ") }
+    };
+    // several checks named in one item read as their count
+    let checks = |subject: &str| if subject.contains(", ") { plural(subject.split(", ").count(), "check", "checks") } else { format!("{subject} {}", title_of(subject)) };
+    let mut also: Vec<Value> = Vec::new();
+    for o in list_of(st, "open").iter().filter(|o| !human(o)) {
+        let code = s(o, "code");
+        let subject = s(o, "subject");
+        let n = |k: &str| o.get(k).and_then(Value::as_list).map_or(0, |l| l.len());
+        let (mark, kind, said, state) = match code.as_str() {
+            "late" => ("‾", "experiment", format!("{subject} {}", title_of(&subject)), plural(n("criteria").max(1), "check written after its results", "checks written after their results")),
+            "open_question" => ("□", "question", format!("{subject} {}", title_of(&subject)), "not tested yet".to_string()),
+            "unindexed_folder" => ("▣", "", plural(subject.split(", ").filter(|x| !x.is_empty()).count(), "result folder", "result folders"), "no experiment reads it".to_string()),
+            "command_later" => ("?", "", run_label(&subject), "command given later".to_string()),
+            "planned" => ("□", "experiment", format!("{subject} {}", title_of(&subject)), "no results yet".to_string()),
+            "provisional" | "unknown" | "unknown_optional" => ("?", "", subject.clone(), "not checked".to_string()),
+            "reindex" => ("△", "", subject.clone(), "changed since read".to_string()),
+            "untested" => ("□", "", checks(&subject), "no results yet".to_string()),
+            "no_interval" | "too_few_units" | "direction_unknown" => ("◧", "", checks(&subject), "can't tell yet".to_string()),
+            _ => ("◧", "", subject.clone(), code.replace('_', " ")),
+        };
+        let state = if code == "unindexed_folder" && n("folders") != 1 && subject.contains(", ") { "no experiment reads them".to_string() } else { state };
+        also.push(crate::obj! {"mark" => mark, "kind" => kind, "subject" => said, "state" => state, "code" => code, "opens" => subject});
+    }
+    // Continue this research names the first open question, in the record's order (its top-level questions first)
+    let qs = list_of(st, "questions");
+    let open_q = qs
+        .iter()
+        .filter(|q| s(q, "state") == "open")
+        .min_by_key(|q| q.get("parent").map_or(false, |p| !p.is_null()))
+        .map(|q| s(q, "text"));
+    // a Next step for each question nothing is filed under, and each experiment with no run
+    let mut next = Dict::new();
+    for o in list_of(st, "open").iter().filter(|o| s(o, "code") == "open_question") {
+        let q = s(o, "subject");
+        next.insert(q.clone(), Value::str(format!("{PLAN_PROMPT_HEAD}\"{}\"{PLAN_PROMPT_TAIL}", title_of(&q))));
+    }
+    for e in list_of(st, "experiments") {
+        let id = s(e, "id");
+        let has_runs = list_of(st, "runs").iter().any(|r| s(r, "experiment") == id);
+        if !has_runs && e.get("retracted").map_or(true, |r| !r.truthy()) {
+            let t = s(e, "title");
+            let named = if t.is_empty() { id.clone() } else { format!("\"{t}\"") };
+            next.insert(id, Value::str(format!("{RUN_PROMPT_HEAD}{named}{RUN_PROMPT_TAIL}")));
+        }
+    }
+    let resources = resource_facts(st, &mut next);
+    let past = at_past_version();
+    if past {
+        // a past version is read only and asks nothing (guarantee 38): no Next step and no Continue prompt to paste, as
+        // the web draws none there; rb ui draws only what this gives
+        next.clear();
+    }
+    crate::obj! {
+        "your_call" => crate::obj! {"rows" => Value::List(rows.clone()), "chips" => Value::List(chips), "count" => rows.len(),
+            "decided" => if made > 0 { format!("decided {made}") } else { String::new() }},
+        "also_open" => Value::List(also),
+        "continue" => if past { String::new() } else { continue_prompt(title, open_q.as_deref()) },
+        "next_steps" => Value::Dict(next),
+        "resources" => Value::List(resources),
+        // each check state's mark and word, as rb status's strip says them (TUI-PARITY G5): rb ui holds none of its own
+        "states" => Value::List(crate::overview::STATES.iter().map(|(state, mark, word)| crate::obj! {"state" => *state, "mark" => *mark, "word" => *word}).collect())
+    }
+}
+
+/// Where a reader gets each resource (TUI-PARITY L2, L3, L5, L6, L8, Q3), from its recorded locations until L's model
+/// lands: its Get it (`label`, `address`) from a Hugging Face id, a web address or a git https remote; the owner-only
+/// missing state of a location that is gone here (a repository path, or another machine's); its locations once each; the
+/// runs that read it and the checks those runs' experiments hold; and, with no Get it, a Next step that asks for one.
+fn resource_facts(st: &Value, next: &mut Dict) -> Vec<Value> {
+    let s = |v: &Value, k: &str| get_or(v, k, "");
+    let host = |url: &str| url.split("://").nth(1).unwrap_or(url).split('/').next().unwrap_or("").trim_start_matches("www.").to_string();
+    let mut out = Vec::new();
+    for r in list_of(st, "resources").iter().filter(|r| r.get("retracted").map_or(true, |x| !x.truthy())) {
+        let id = s(r, "id");
+        let av = r.get("availability").cloned().unwrap_or(Value::empty_dict());
+        let mut seen: Vec<(String, String)> = Vec::new();
+        let mut states: Vec<String> = Vec::new();
+        for l in list_of(&av, "locations") {
+            let key = (s(l, "provider"), s(l, "ref"));
+            if !seen.contains(&key) {
+                seen.push(key);
+                states.push(s(l, "state"));
+            }
+        }
+        let get_it = seen.iter().find_map(|(p, r)| match p.as_str() {
+            "hf" => Some(("Hugging Face".to_string(), format!("https://huggingface.co/{r}"))),
+            "url" if r.starts_with("https://") || r.starts_with("http://") => Some((host(r), r.clone())),
+            "git" if r.starts_with("https://") => Some((host(r), r.clone())),
+            _ => None,
+        });
+        let missing = seen.iter().zip(&states).find(|(_, st)| st.as_str() == "gone").map(|((_, r), _)| {
+            if r.starts_with('/') || r.contains(":\\") { "∅ only on the machine that recorded it".to_string() } else { format!("∅ not in this clone · {r}") }
+        });
+        let in_repo = seen.iter().zip(&states).any(|((p, r), st)| p == "local" && !r.starts_with('/') && st.as_str() == "present");
+        let runs: Vec<String> = list_of(st, "runs")
+            .iter()
+            .filter(|run| list_of(run, "inputs").iter().chain(list_of(run, "outputs").iter()).any(|u| s(u, "resource") == id))
+            .map(|run| s(run, "experiment_id"))
+            .collect();
+        let checks = list_of(st, "findings").iter().filter(|f| runs.contains(&s(f, "experiment"))).count();
+        let name = if s(r, "name").is_empty() { id.clone() } else { s(r, "name") };
+        if get_it.is_none() {
+            next.insert(id.clone(), Value::str(format!("Record where {name} can be downloaded (its URL or Hugging Face id) with rb.")));
+        }
+        let state = match (&get_it, in_repo) {
+            (Some((label, _)), _) => format!("↗ {label}"),
+            (None, true) => "in the repo".to_string(),
+            (None, false) => "no download link".to_string(),
+        };
+        out.push(crate::obj! {
+            "id" => id, "name" => name, "type" => s(r, "type"), "state" => state,
+            "get_it" => get_it.map_or(Value::Null, |(label, address)| crate::obj! {"label" => label, "address" => address}),
+            "missing" => missing.unwrap_or_default(),
+            "locations" => Value::list_of_str(seen.iter().map(|(p, r)| if p == "local" { r.clone() } else { format!("{p}:{r}") })),
+            "runs" => runs.len(), "checks" => checks
+        });
+    }
+    out
+}
+
 pub fn record_counts(led: &Ledger, st: &Value, calls: usize) -> Res<Value> {
     let n = |k: &str| st.get("counts").and_then(|c| c.get(k)).and_then(Value::as_i64).unwrap_or(0);
     let runs = led.all::<Run>()?;
@@ -3485,8 +3862,15 @@ pub fn resource_rows(led: &Ledger) -> Res<Vec<ResourceRow>> {
             name: res.name.clone() + &if res.version.is_empty() { String::new() } else { format!(" {}", res.version) },
             r#type: res.r#type.clone(),
             availability: get_or(&av, "state", ""),
-            where_: list_of(&av, "locations").iter().map(|l| location_said(l, false)).collect(),
-            where_short: list_of(&av, "locations").iter().map(|l| location_said(l, true)).collect(),
+            where_: list_of(&av, "locations").iter().filter_map(|l| location_said(l, false)).collect(),
+            where_short: list_of(&av, "locations").iter().filter_map(|l| location_said(l, true)).collect(),
+            said: said_of(&av),
+            get: match av.get("get") {
+                Some(Value::Dict(g)) if reader() == Reader::Page => Value::Dict(crate::getit::for_a_page(g)),
+                g => g.cloned().unwrap_or(Value::Null),
+            },
+            cite: list_of(&av, "cite").iter().map(|c| crate::pyjson::py_str(c)).collect(),
+            asks: av.get("asks").map_or(false, Value::truthy),
             how: get_truthy(&av, "how").unwrap_or_default(),
             used_by: runs.iter().filter(|r| r.inputs.iter().chain(r.outputs.iter()).any(|u| u.resource == res.id)).count() as i64,
             identity: get_or(&ident, "text", ""),
@@ -3563,7 +3947,7 @@ pub fn run_parts(run: &Run, rc: &Value) -> Vec<RunPart> {
             let (res, role, avail, sha) = (get_or(u, "resource", ""), get_or(u, "role", ""), get_or(u, "availability", ""), get_or(u, "sha256", ""));
             let text = res.clone()
                 + &if role.is_empty() { String::new() } else { format!(" ({role})") }
-                + &if avail.is_empty() { String::new() } else { format!(" · {avail} when recorded") }
+                + &if avail.is_empty() || reader() == Reader::Page || crate::getit::then_said(&avail).is_empty() { String::new() } else { format!(" · {}", crate::getit::then_said(&avail)) }
                 + &if sha.is_empty() { String::new() } else { format!(" · sha256 {}", cut(&sha, 12)) };
             out.push(RunPart { field: if key == "inputs" { "inputs" } else { "outputs" }, label: word.into(), text, refs: vec![res], blocker: false });
         }
@@ -3689,7 +4073,8 @@ pub fn settings_of(led: &Ledger, exp: &Experiment) -> Res<(String, Vec<(String, 
     }
     let mut items: Vec<(String, i64)> = tally.into_iter().collect();
     items.sort();
-    Ok(("settings: ".to_string() + &items.iter().map(|(k, n)| format!("{n} {}", crate::assess::rule_label(k, *n))).collect::<Vec<_>>().join(" · "), problems))
+    // a setting's status as it is named, never a rule's word ("1 undetermined", never "1 criterion undetermined")
+    Ok(("settings: ".to_string() + &items.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(" · "), problems))
 }
 
 /// An experiment's relations as its card says them, one line each: "reproduces: exp_01... (cloned from <address>)",
@@ -3800,8 +4185,8 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
                 None => (),
             }
             let words = get_or(&e, "gate_words", "");
-            let command = gate_command(&exp.id, &exp.if_holds, &exp.if_not, &words, &design.waiting_command());
-            for (label, text) in gate_parts(&exp.if_holds, &exp.if_not, &words, &design.writer(&get_or(&e, "gate_by", ""), "gate"), &command, design.gate_first()) {
+            let command = gate_command(&exp.id, &exp.if_holds, &exp.if_not, &words, &design.waiting_command(), !design.taken.is_empty());
+            for (label, text) in gate_parts(&exp.if_holds, &exp.if_not, &words, &design.writer(&get_or(&e, "gate_by", ""), "gate"), &command, design.gate_first(), &design.taken) {
                 c.facts.push(format!("{label}: {text}"));
             }
             if !exp.folder.is_empty() {
@@ -3977,25 +4362,26 @@ fn object_card_in(led: &Ledger, subject: &str) -> Res<Option<Card>> {
             let res: Resource = led.load(subject)?;
             let av = Value::Dict(led.availability(&res));
             c.title = res.name.clone() + &if res.version.is_empty() { String::new() } else { format!(" {}", res.version) };
-            c.lead = format!("{} · {}", res.r#type, get_or(&av, "state", ""));
+            c.lead = format!("{} · {}", res.r#type, said_of(&av));
             c.who_line = format!("resource · {}", av.get("identity").map(|i| get_or(i, "text", "")).unwrap_or_default());
             if !res.subset.is_empty() {
-                c.facts.push(format!("subset: {}", res.subset));
+                c.facts.push(format!("subset: {}", crate::getit::typed(&res.subset)));
             }
             // on the user's screens a local file inside a linked worktree is said in short, and kept whole once, after
             let mut whole: Vec<String> = Vec::new();
             for loc in list_of(&av, "locations") {
-                let said = location_said(loc, true);
-                if reader() == Reader::Screen && said != location_said(loc, false) {
+                let Some(said) = location_said(loc, true) else { continue };
+                if reader() == Reader::Screen && Some(&said) != location_said(loc, false).as_ref() {
                     whole.push(get_or(loc, "ref", ""));
                 }
-                c.facts.push(said.replacen(':', ": ", 1));
+                c.facts.push(if get_or(loc, "provider", "") == "local" { said } else { said.replacen(':', ": ", 1) });
             }
             if !whole.is_empty() {
                 c.facts.push(format!("{}: {}", if whole.len() == 1 { "path as recorded" } else { "paths as recorded" }, whole.join(", ")));
             }
-            if let Some(how) = get_truthy(&av, "how") {
-                c.facts.push(format!("how to get it again: {how}"));
+            // a recipe is how to get it again; an address and a citation are said on its lead
+            if let Some(how) = res.acquisition.as_ref().and_then(|a| a.recipe.as_deref()).filter(|r| !r.trim().is_empty()) {
+                c.facts.push(format!("how to get it again: {}", crate::getit::typed(how)));
             }
             let users: Vec<Run> = led.standing_runs()?.iter().filter(|r| r.inputs.iter().chain(r.outputs.iter()).any(|u| u.resource == res.id)).cloned().collect();
             for r in users.iter().take(6) {
@@ -4120,7 +4506,7 @@ impl ExperimentBrief {
     /// that waits with its design ends `· not confirmed` and gives no command: the design's own line says how it is
     /// confirmed, so it waits in one place on a screen; one that waits apart gives its own.
     pub fn gate_said(&self) -> String {
-        gate_said(&self.if_holds, &self.if_not, &self.gate_words, &self.gate_by, &gate_command(&self.id, &self.if_holds, &self.if_not, &self.gate_words, &self.design_confirm))
+        gate_said_taken(&self.if_holds, &self.if_not, &self.gate_words, &self.gate_by, &gate_command(&self.id, &self.if_holds, &self.if_not, &self.gate_words, &self.design_confirm, !self.design_taken.is_empty()), &self.design_taken)
     }
 
     fn gate_line_empty(&self) -> bool {
@@ -4136,7 +4522,7 @@ impl ExperimentBrief {
             "why_part" => why_part(&self.why, &self.why_by).map_or(Value::Null, |(k, t)| Value::list_of_str([k.to_string(), t])),
             "gate_words_said" => if self.gate_line_empty() { String::new() } else { your_words(&self.gate_words, &self.gate_by) },
             "gate_parts" => Value::List(
-                gate_parts(&self.if_holds, &self.if_not, &self.gate_words, &self.gate_by, &gate_command(&self.id, &self.if_holds, &self.if_not, &self.gate_words, &self.design_confirm), self.gate_first)
+                gate_parts(&self.if_holds, &self.if_not, &self.gate_words, &self.gate_by, &gate_command(&self.id, &self.if_holds, &self.if_not, &self.gate_words, &self.design_confirm, !self.design_taken.is_empty()), self.gate_first, &self.design_taken)
                     .into_iter()
                     .map(|(k, t)| Value::list_of_str([k.to_string(), t]))
                     .collect()
@@ -4203,12 +4589,12 @@ impl Home {
                 "muted" => strs(&t.muted)
             }).collect()),
             "quiet" => opt_s(&self.quiet), "waiting" => self.waiting, "calls" => Value::List(self.calls.clone()),
-            "counts" => self.counts.clone(), "made" => self.made.clone(), "last_write" => self.last_write.clone(),
+            "counts" => self.counts.clone(), "made" => self.made.clone(), "last_write" => self.last_write.clone(), "overview" => self.overview.clone(),
             "open_items" => Value::List(self.open_items.clone()), "unfiled" => self.unfiled.clone(),
             "tally" => Value::List(self.tally.iter().map(|(k, n)| crate::list![k.clone(), *n]).collect()),
             "tally_on_estimate" => Value::Dict(self.tally_alone.clone()),
             "muted" => strs(&self.muted),
-            "live" => strs(&self.live), "weak_identity" => opt_s(&self.weak_identity), "began" => opt_s(&self.began),
+            "live" => strs(&self.live), "weak_identity" => opt_s(&self.weak_identity), "began" => opt_s(&self.began), "head" => self.head.clone(), "ui" => self.ui.clone(),
             "briefs" => Value::List(self.briefs.iter().map(|b| b.to_value()).collect()),
             "runs" => Value::List(self.runs.iter().map(|r| crate::obj! {
                 "when" => r.when.clone(), "experiment" => r.experiment.clone(), "results" => r.results.clone(), "by" => r.by.clone(), "note" => r.note.clone(),
@@ -4218,7 +4604,8 @@ impl Home {
             }).collect()),
             "resources" => Value::List(self.resources.iter().map(|r| crate::obj! {
                 "resource_id" => r.resource_id.clone(), "name" => r.name.clone(), "type" => r.r#type.clone(), "availability" => r.availability.clone(),
-                "where" => strs(&r.where_), "where_short" => strs(&r.where_short), "how" => r.how.clone(), "used_by" => r.used_by, "identity" => r.identity.clone(), "exact" => r.exact
+                "where" => strs(&r.where_), "where_short" => strs(&r.where_short), "how" => r.how.clone(), "used_by" => r.used_by, "identity" => r.identity.clone(), "exact" => r.exact,
+                "said" => r.said.clone(), "get" => r.get.clone(), "cite" => strs(&r.cite), "asks" => r.asks
             }).collect()),
             "notes" => strs(&self.notes),
             "pending" => Value::List(self.pending.iter().map(|p| {
@@ -4334,6 +4721,29 @@ mod tests {
         }
     }
 
+    /// A past version asks nothing (guarantee 38): rb ui's bridge gives no Next step there, for a question, an experiment
+    /// or a resource, as the web draws none; live, each has its own.
+    #[test]
+    fn next_steps_none_at_a_past_version() {
+        use crate::obj;
+        use crate::value::Value;
+        let st = obj! {
+            "open" => Value::List(vec![obj! {"code" => "open_question", "subject" => "q-int8"}]),
+            "questions" => Value::List(vec![obj! {"id" => "q-int8", "state" => "open", "text" => "Does INT8 cost accuracy?"}]),
+            "experiments" => Value::List(vec![obj! {"id" => "int8", "title" => "INT8 vs FP32"}]),
+            "resources" => Value::List(vec![obj! {"id" => "imagenet-val", "name" => "ImageNet-1k validation"}])
+        };
+        let keys = |v: &Value| v.get("next_steps").and_then(Value::as_dict).map(|d| d.keys().cloned().collect::<Vec<_>>()).unwrap_or_default();
+        let live = super::ui_facts(&st, "INT8 ResNet-50");
+        assert_eq!(keys(&live).len(), 3, "{:?}", keys(&live));
+        let past = super::as_past_version(true, || super::ui_facts(&st, "INT8 ResNet-50"));
+        assert!(keys(&past).is_empty(), "{:?}", keys(&past));
+        assert_eq!(past.get("continue").and_then(Value::as_str), Some(""));
+        assert!(live.get("continue").and_then(Value::as_str).map_or(false, |c| c.starts_with("Continue the research")));
+        // the resource itself stays, with its state words
+        assert_eq!(past.get("resources").and_then(Value::as_list).map(Vec::len), Some(1));
+    }
+
     /// DESIGN-PASS-1 target 2: rb status's open items as the screens list them: one plain sentence per rule, by its
     /// statement; a setting by its variant and key, its value and its note; folders and runs counted in the sentence;
     /// no sentence led by its id, and rb's other sentences in the screens' rule words.
@@ -4345,7 +4755,7 @@ mod tests {
         let (a, b) = (f("Per-channel INT8 at 128 calibration images is no more than 1 point below FP32", 1), f("Per-channel INT8 at 512 calibration images is no more than 1 point below FP32", 2));
         let findings: IndexMap<String, &Value> = [("c-pc-128".to_string(), &a), ("c-pc-512".to_string(), &b)].into_iter().collect();
         let variants: IndexMap<String, Vec<String>> = [("e-ptq".to_string(), vec!["fp32".to_string(), "int8".to_string()])].into_iter().collect();
-        let said = |i: Value| super::plain_open_items(&i, &findings, &variants).iter().map(|v| (get_or(v, "subject", ""), get_or(v, "what", ""))).collect::<Vec<_>>();
+        let said = |i: Value| super::plain_open_items(None, &i, &findings, &variants).iter().map(|v| (get_or(v, "subject", ""), get_or(v, "what", ""))).collect::<Vec<_>>();
         let pair = |s: &str, w: &str| (s.to_string(), w.to_string());
         assert_eq!(
             said(obj! {"code" => "no_interval", "subject" => "c-pc-128, c-pc-512", "what" => "c-pc-128, c-pc-512: criterion undetermined: a noninferior rule reads the interval: 1 unit: rb gives an interval from 3"}),

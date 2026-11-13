@@ -29,6 +29,15 @@ AGENT = {"CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "sess-design-7c2e"}
 HYPOTHESIS = "INT8 keeps ResNet-50 top-1 within 0.5 points of FP32 on ImageNet"
 # int8's own views do not show every part its key names: they give the command that lists its design to confirm
 LISTING = "design not confirmed · list it to confirm: rb confirm int8"
+# closed form (owner, Nov 13 2026): a page says a waiting design in one plain line, with a prompt button for the
+# person's agent in place of the command that lists it, and the designs that wait in a line with no command
+PAGE_DESIGN_LINE = "This experiment's design is not confirmed."
+DESIGN_PROMPT = 'In this repository, use Rabbit Brain to show me the design of "{}" that waits for my confirmation, part by part, and how I confirm it.'
+ALL_PROMPT = "In this repository, use Rabbit Brain to show me every decision that waits for my confirmation, and how I confirm them."
+
+
+def page_designs_line(n: int) -> str:
+    return f"The design of {n} experiment{'' if n == 1 else 's'} is not confirmed."
 
 
 class Rec:
@@ -73,13 +82,13 @@ class Rec:
         return html_mod.unescape(re.sub(r"<[^>]+>", "\n", out.read_text(encoding="utf-8")))
 
     def design(self, exp: str) -> dict:
-        [e] = [e for e in self.ok("status")["data"]["experiments"] if e["id"] == exp]
+        [e] = [e for e in self.ok("status", "--full")["data"]["experiments"] if e["id"] == exp]
         return e["design"]
 
     def readings(self) -> str:
         """Every finding and criterion reading as --json gives them: what no confirmation may change."""
-        st = self.ok("status")["data"]
-        shown = {f["criterion"]: self.ok("show", f["criterion"])["data"]["finding"] for f in st["findings"]}
+        st = self.ok("status", "--full")["data"]
+        shown = {f["criterion"]: self.ok("show", "--long", f["criterion"])["data"]["finding"] for f in st["findings"]}
         return json.dumps({"findings": st["findings"], "shown": shown, "tally": st["tally"]}, sort_keys=True, ensure_ascii=False)
 
     def state(self, monkeypatch) -> dict:
@@ -135,13 +144,13 @@ def test_a_design_stated_in_the_users_own_terminal_carries_no_mark(rec, monkeypa
     rec.ok("freeze", "int8", "-m", "before the runs")
     rec.ok("run", "add", "int8", "fp32.top1=0.761", "int8.top1=0.758")
     rec.ok("experiment", "add", "Batch size probe", "--id", "bsz")
-    for argv in (("status",), ("context",), ("show", "int8"), ("show", "bsz"), ("confirm",), ("log",)):
+    for argv in (("status", "--full"), ("context",), ("show", "--long", "int8"), ("show", "--long", "bsz"), ("confirm",), ("log",)):
         text = rec.text(*argv)
         assert not [m for m in MARKS if m in text], (argv, text)
     assert rec.text("confirm") == "Nothing waits for a confirmation.\n"
     page = rec.page()
     assert not [m for m in PAGE_MARKS if m in page]
-    st = rec.ok("status")["data"]
+    st = rec.ok("status", "--full")["data"]
     assert st["designs_pending"] == [] and st["counts"]["design_pending_count"] == 0
     for e in st["experiments"]:
         d = e["design"]
@@ -172,14 +181,16 @@ def test_a_design_a_session_rebuilt_from_configs_says_its_standing_once_and_what
     assert (d["standing"], d["pending"], d["not_recorded"], d["changes"]) == ("not_confirmed", True, ["why"], []) and re.fullmatch(r"rb confirm int8@[0-9a-f]{64}", cmd)
     assert {"key": "source:optim.lr", "part": "setting optim.lr's source", "value": "configs/train.yaml#optim.lr"} in d["parts"]
     line = "The design of 1 experiment is not confirmed: rb confirm lists it."
-    status, context = rec.text("status"), rec.text("context")
+    status, context = rec.text("status", "--full"), rec.text("context")
     assert status.count(line) == 1 and context.count(line) == 1 and "design not confirmed" not in status + context
-    shown = rec.text("show", "int8").splitlines()
+    shown = rec.text("show", "--long", "int8").splitlines()
     assert shown[1] == f"  {LISTING}" and "  why: not recorded" in shown and not [x for x in shown if cmd in x], shown
     assert "hypothesis or purpose: not recorded" not in "\n".join(shown)
     assert any(x.strip().startswith("optim.lr") and x.endswith("configs/train.yaml#optim.lr") for x in shown), shown
     page = rec.page()
-    assert page.count(LISTING) == 1 and "why: not recorded" in page and page.count(line) == 1
+    # the page's own part says it as a chip with its Confirm action (owner, Nov 13 2026), never the command's prose
+    # closed form (owner, Nov 13 2026): the chip is the plain line, and the summary's line names no command
+    assert page.count(LISTING) == 0 and page.count(PAGE_DESIGN_LINE) == 1 and "why: not recorded" in page and page.count(page_designs_line(1)) == 1 and line not in page
     listed = rec.text("confirm", "int8")
     assert listed.startswith("Design waiting for a confirmation (1):\n  int8: INT8 vs FP32\n") and f"    confirm: {cmd}\n" in listed
     for part in ("why: not recorded", "setting optim.lr: 0.001 from configs/train.yaml#optim.lr", "criterion acc-tol (primary): change.top1 ≥ -0.005 · for q-acc"):
@@ -205,7 +216,7 @@ def test_a_design_a_session_ran_on_another_config_is_confirmed_once_and_reopened
            "--id", "acc-tol", agent=True)
     run = rec.ok("run", "add", "int8", "fp32.top1=0.761", "int8.top1=0.758", "--config", "out/seed1/config.yaml", agent=True)["data"]["object"]["id"]
     rec.ok("run", "add", "int8", "fp32.top1=0.760", "int8.top1=0.757", agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     first = rec.design("int8")["confirm"]
     assert f"  {LISTING}\n" in shown and f"{run} not counted: ran with optim.lr 0.01 (the spec says 0.001)" in shown, shown
     assert "  note: docs/plan.md:3 names INT8 · not confirmed\n" in shown and "if not: keep FP32 · not confirmed" in shown
@@ -218,10 +229,10 @@ def test_a_design_a_session_ran_on_another_config_is_confirmed_once_and_reopened
     d = rec.design("int8")
     assert (d["standing"], d["pending"], d["confirm"], d["changes"]) == ("confirmed", False, "", []) and d["confirmed"]["by"] == "human:ana"
     assert rec.readings() == readings
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert not [m for m in ("design not confirmed", "· not confirmed", "rb confirm") if m in shown], shown
     assert "  note: docs/plan.md:3 names INT8\n" in shown and "  why: docs/plan.md:3" not in shown      # still the session's note
-    assert "The design of" not in rec.text("status") and "design experiment int8 confirmed, with its gate" in rec.text("log")
+    assert "The design of" not in rec.text("status", "--full") and "design experiment int8 confirmed, with its gate" in rec.text("log")
     # a session changes a criterion's rule (an edit it adopts) and a setting's value: both reopen it, with was and now
     crit = rec.root / ".rb" / "experiments" / "int8" / "criteria" / "acc-tol.yaml"
     crit.write_text(crit.read_text(encoding="utf-8").replace("target: -0.005", "target: -0.003"), encoding="utf-8", newline="")
@@ -234,13 +245,14 @@ def test_a_design_a_session_ran_on_another_config_is_confirmed_once_and_reopened
     assert d["standing"] == "changed" and sorted((c["part"], c["change"], c["was"], c["now"]) for c in d["changes"]) == [
         ("criterion acc-tol's rule", "changed", "change.top1 ≥ -0.005", "change.top1 ≥ -0.003"), ("setting optim.lr", "changed", "0.001", "0.002")]
     second = d["confirm"]
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert f"  {LISTING}\n" in shown and all(f"  {c}\n" in shown for c in changes), shown
     page = rec.page()
     # a page anyone may be sent says them naming no reader
     assert all(c.replace("since you confirmed it", "since it was confirmed") in page for c in changes)
-    assert page.count("The design of 1 experiment is not confirmed: rb confirm lists it.") == 1
-    assert rec.text("status").count("The design of 1 experiment is not confirmed: rb confirm lists it.") == 1
+    # closed form (owner, Nov 13 2026): the page's line names no command
+    assert page.count(page_designs_line(1)) == 1 and "rb confirm lists it" not in page
+    assert rec.text("status", "--full").count("The design of 1 experiment is not confirmed: rb confirm lists it.") == 1
     lines = brief(rec.state(monkeypatch), "int8")["design"]["lines"]
     assert lines[0] == LISTING and sorted(lines[1:]) == sorted(changes)
     # the user's own change of the gate while the design waits makes no design theirs: it is said with the rest, against
@@ -262,9 +274,9 @@ def test_a_design_a_session_ran_on_another_config_is_confirmed_once_and_reopened
     rec.ok("criterion", "add", "INT8 keeps 0.75 top-1", "-e", "int8", "--metric", "int8.top1", "--at-least", "0.75", "--id", "c9", agent=True)
     assert [(c["part"], c["change"], c["now"]) for c in rec.design("int8")["changes"]] == [
         ("criterion c9's rule", "added", "int8.top1 ≥ 0.75"), ("criterion c9's role", "added", "primary")]
-    assert "  changed since you confirmed it: criterion c9 added: int8.top1 ≥ 0.75 (primary)\n" in rec.text("show", "int8")
+    assert "  changed since you confirmed it: criterion c9 added: int8.top1 ≥ 0.75 (primary)\n" in rec.text("show", "--long", "int8")
     rec.ok("retract", "c9", "--why", "a duplicate of acc-tol", agent=True)
-    assert rec.design("int8")["standing"] == "confirmed" and "design not confirmed" not in rec.text("show", "int8")
+    assert rec.design("int8")["standing"] == "confirmed" and "design not confirmed" not in rec.text("show", "--long", "int8")
 
 
 def test_eleven_experiments_a_session_imported_wait_in_one_line(rec):
@@ -274,22 +286,23 @@ def test_eleven_experiments_a_session_imported_wait_in_one_line(rec):
     for n in range(11):
         rec.ok("experiment", "add", f"Calibration size {n}", "--id", f"cal{n}", "-q", "q-acc", "--purpose", f"top-1 at calibration size {n}", agent=True)
     line = "The design of 11 experiments is not confirmed: rb confirm lists them."
-    status, context, page = rec.text("status"), rec.text("context"), rec.page()
+    status, context, page = rec.text("status", "--full"), rec.text("context"), rec.page()
     for where, text in (("status", status), ("context", context)):
         assert text.count(line) == 1 and "design not confirmed" not in text, where
         # one line, and no second one counting them again for rb confirm --all (review of group E)
         assert "Confirm all" not in text, (where, text)
     assert "Confirm all" not in page
     # a page's summary says the line once; each experiment's own part of it says its standing once
-    assert page.count(line) == 1 and page.count("design not confirmed · list it to confirm: rb confirm cal") == 11
-    assert rec.ok("status")["data"]["counts"]["design_pending_count"] == 11
+    # closed form (owner, Nov 13 2026): the summary's line names no command, and each part says the plain line
+    assert page.count(page_designs_line(11)) == 1 and line not in page and page.count(PAGE_DESIGN_LINE) == 11 and "list it to confirm" not in page
+    assert rec.ok("status", "--full")["data"]["counts"]["design_pending_count"] == 11
     listed = rec.text("confirm")
     assert listed.startswith("Designs waiting for a confirmation (11):\n") and listed.count("    why: not recorded\n") == 11
     every = " ".join(rec.design(f'cal{n}')['confirm'].split()[-1] for n in range(11))
     assert listed.rstrip("\n").endswith(f"rb confirm <experiment>@<hash> confirms one; rb confirm {every} confirms these 11 as listed.")
     out = rec.text("confirm", "--all")
     assert out.startswith("Confirming 11 designs:\n") and out.count("'s design is confirmed.") == 11
-    assert "The design of" not in rec.text("status") and rec.ok("status")["data"]["designs_pending"] == []
+    assert "The design of" not in rec.text("status", "--full") and rec.ok("status", "--full")["data"]["designs_pending"] == []
 
 
 def test_once_the_user_confirms_a_design_a_sessions_reasons_on_it_read_as_its_notes_and_its_gate_as_theirs(rec):
@@ -302,7 +315,7 @@ def test_once_the_user_confirms_a_design_a_sessions_reasons_on_it_read_as_its_no
     rec.ok("spec", "set", "int8", "fp32.precision", "--source", "configs/fp32.yaml#precision", agent=True)
     rec.ok("freeze", "int8", "-m", "docs/plan.md:5 locks the rule", agent=True)
     rec.ok("spec", "set", "int8", "int8.precision", "--source", "configs/int8.yaml#precision", "--amend", "--why", "docs/plan.md:6 adds it", agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     for said in ("  note: docs/plan.md:3 names INT8 · not confirmed\n", " · note: docs/plan.md:5 locks the rule · not confirmed",
                  " · note: docs/plan.md:6 adds it · not confirmed", 'words (as given): "I ship INT8 if it holds" · not confirmed'):
         assert said in shown, (said, shown)
@@ -312,18 +325,18 @@ def test_once_the_user_confirms_a_design_a_sessions_reasons_on_it_read_as_its_no
     assert re.search(r"\n    frozen \d{4}-\d\d-\d\dT[^\s]+ · note: docs/plan\.md:5 locks the rule · not confirmed\n", listed), listed
     assert re.search(r"\n    amended \d{4}-\d\d-\d\d: setting int8\.precision: new, int8 · note: docs/plan\.md:6 adds it · not confirmed\n", listed), listed
     rec.ok(*rec.design("int8")["confirm"].split()[1:])
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert "not confirmed" not in shown and "rb confirm" not in shown, shown
     for said in ("  note: docs/plan.md:3 names INT8\n", " · note: docs/plan.md:5 locks the rule", " · note: docs/plan.md:6 adds it",
                  'if it holds: ship INT8 · your words: "I ship INT8 if it holds"'):
         assert said in shown, (said, shown)
     assert "  why: docs/plan.md:3" not in shown and "because: docs/plan.md:6" not in shown
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8 next week", "--words", "I ship INT8 if it holds", agent=True)
-    assert [c["part"] for c in rec.design("int8")["changes"]] == ["the gate"] and len(rec.ok("status")["data"]["gates_pending"]) == 1
+    assert [c["part"] for c in rec.design("int8")["changes"]] == ["the gate"] and len(rec.ok("status", "--full")["data"]["gates_pending"]) == 1
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8", "--words", "I ship INT8 if it holds", agent=True)
-    st = rec.ok("status")["data"]
+    st = rec.ok("status", "--full")["data"]
     assert [e["design"]["standing"] for e in st["experiments"]] == ["confirmed"] and st["gates_pending"] == [] and st["designs_pending"] == []
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert "not confirmed" not in shown and 'if it holds: ship INT8 · your words: "I ship INT8 if it holds"' in shown, shown
     assert rec.text("confirm") == "Nothing waits for a confirmation.\n"
 
@@ -397,7 +410,7 @@ def test_an_adoption_by_the_user_makes_no_part_theirs_that_it_left_as_it_was(rec
     rec.ok("doctor", "--adopt", "--why", "fix the title")
     d = rec.design("lat")
     assert (d["standing"], d["confirm"]) == ("not_confirmed", waiting), d
-    assert "design not confirmed · list it to confirm: rb confirm lat" in rec.text("show", "lat") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
+    assert "design not confirmed · list it to confirm: rb confirm lat" in rec.text("show", "--long", "lat") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
     rec.ok("experiment", "add", "INT8 vs FP32", "--id", "int8", "-q", "q-acc", "--baseline", "fp32", "--candidate", "int8")
     rec.ok("criterion", "add", "INT8 loses at most 0.5 top-1", "-e", "int8", "-q", "q-acc", "--metric", "change.top1", "--at-least", "-0.005",
            "--id", "acc-tol", agent=True)
@@ -414,7 +427,7 @@ def test_an_adoption_by_the_user_makes_no_part_theirs_that_it_left_as_it_was(rec
     rec.ok("doctor", "--adopt", "--why", "my own number")
     assert rec.design("bsz")["standing"] == "not_confirmed" and rec.design("lat")["standing"] == "not_confirmed"
     rec.ok(*rec.design("bsz")["confirm"].split()[1:])
-    assert rec.design("bsz")["standing"] == "confirmed" and "design not confirmed" not in rec.text("show", "bsz")
+    assert rec.design("bsz")["standing"] == "confirmed" and "design not confirmed" not in rec.text("show", "--long", "bsz")
 
 
 def test_the_users_own_writes_after_a_confirmation_never_read_as_a_sessions_change(rec):
@@ -429,7 +442,7 @@ def test_the_users_own_writes_after_a_confirmation_never_read_as_a_sessions_chan
     edit(rec, "experiments/int8/experiment.yaml", "why: docs/plan.md:3 names INT8", "why: docs/plan.md:4 names INT8")
     rec.ok("doctor", "--adopt", "--why", "the plan moved", agent=True)
     assert changes(rec) == [("why", "changed", "docs/plan.md:3 names INT8", "docs/plan.md:4 names INT8")]
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert '  changed since you confirmed it: why, was "docs/plan.md:3 names INT8", now "docs/plan.md:4 names INT8"\n' in shown, shown
     assert "changed since you confirmed it: gate" not in shown and "if not: keep FP32 for now\n" in shown
     confirm(rec)
@@ -439,7 +452,7 @@ def test_the_users_own_writes_after_a_confirmation_never_read_as_a_sessions_chan
     assert rec.design("int8")["standing"] == "confirmed"
     edit(rec, "experiments/int8/experiment.yaml", "title: INT8 vs FP32", "title: INT8 against FP32")
     rec.ok("doctor", "--adopt", "--why", "tidy the title", agent=True)
-    assert rec.design("int8")["standing"] == "confirmed" and "changed since" not in rec.text("show", "int8")
+    assert rec.design("int8")["standing"] == "confirmed" and "changed since" not in rec.text("show", "--long", "int8")
     # a session's new value is read against the user's: it was 0.002, and its source the user took away stays theirs
     rec.ok("spec", "set", "int8", "optim.lr", "0.004", agent=True)
     assert changes(rec) == [("setting optim.lr", "changed", "0.002", "0.004")]
@@ -486,10 +499,10 @@ def test_a_session_taking_back_a_part_the_user_added_after_confirming_reopens_it
     assert rec.design("int8")["standing"] == "confirmed"
     rec.ok(*take_back, agent=True)
     assert rec.design("int8")["standing"] == "changed"
-    assert f"  changed since you confirmed it: {line}\n" in rec.text("show", "int8"), rec.text("show", "int8")
+    assert f"  changed since you confirmed it: {line}\n" in rec.text("show", "--long", "int8"), rec.text("show", "--long", "int8")
     # the user sets the gate back as they confirmed it: the design is exactly the one they confirmed
     rec.ok("experiment", "gate", "int8", "--if-not", "keep FP32")
-    assert rec.design("int8")["standing"] == "confirmed" and "design not confirmed" not in rec.text("show", "int8")
+    assert rec.design("int8")["standing"] == "confirmed" and "design not confirmed" not in rec.text("show", "--long", "int8")
 
 
 def test_a_sessions_amendment_design_factor_or_cited_value_after_confirming_reopens_it(rec):
@@ -501,7 +514,7 @@ def test_a_sessions_amendment_design_factor_or_cited_value_after_confirming_reop
     rec.ok("freeze", "int8", "-m", "before the runs", agent=True)
     confirm(rec)
     rec.ok("spec", "set", "int8", "seed", "--design-factor", "--amend", "-m", "seeds are fixed cells", agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     for line in ("setting seed, was per run, now per run (a fixed design factor)", "amended: setting seed: now a fixed design factor · note: seeds are fixed cells"):
         assert f"  changed since you confirmed it: {line}\n" in shown, (line, shown)
     assert "setting seed: per run (a fixed design factor)" in rec.text("confirm", "int8")
@@ -523,7 +536,7 @@ def test_a_freeze_or_an_amendment_since_the_confirmation_says_its_reason_on_its_
     rec.ok("freeze", "int8", "-m", "locks the plan", agent=True)
     rec.write("configs/train.yaml", "optim:\n  lr: 0.003\n  wd: 0.0001\ndata:\n  batch_size: 256\n")
     rec.ok("spec", "set", "int8", "optim.lr", "--source", "configs/train.yaml#optim.lr", "--amend", "--why", "the warmup was too short", agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     lines = [l.strip() for l in shown.splitlines() if l.strip().startswith("changed since you confirmed it:")]
     assert len(lines) == 2 and re.fullmatch(r"changed since you confirmed it: frozen \d{4}-\d\d-\d\d · note: locks the plan", lines[0]), lines
     assert lines[1] == ("changed since you confirmed it: amended: setting optim.lr: 0.001 -> 0.003; source configs/other.yaml#optim.lr -> "
@@ -549,7 +562,7 @@ def test_a_sessions_change_merged_in_after_the_confirmation_reopens_it(rec):
     git("merge", "-q", "--no-edit", "side")
     d = rec.design("int8")
     assert d["standing"] == "changed" and ("setting optim.lr", "changed", "0.001", "0.002") in changes(rec), d
-    assert "  changed since you confirmed it: setting optim.lr, was 0.001, now 0.002\n" in rec.text("show", "int8")
+    assert "  changed since you confirmed it: setting optim.lr, was 0.001, now 0.002\n" in rec.text("show", "--long", "int8")
 
 
 def test_an_interpretation_the_user_confirmed_with_its_design_reads_as_confirmed(rec, monkeypatch):
@@ -560,15 +573,15 @@ def test_an_interpretation_the_user_confirmed_with_its_design_reads_as_confirmed
     rec.ok("question", "add", "Is INT8 fast enough?", "--id", "q-lat")
     rec.ok("criterion", "file", "acc-tol", "q-lat", "--when-met", "INT8 is fast enough", "--why", "docs/plan.md:7 ties them", agent=True)
     unconfirmed = "declared when met, not confirmed: 'INT8 stays within the accuracy budget'"
-    assert all(unconfirmed in rec.text(*w) for w in (("status",), ("context",), ("show", "q-acc")))
+    assert all(unconfirmed in rec.text(*w) for w in (("status", "--full"), ("context",), ("show", "--long", "q-acc")))
     readings = rec.readings()
     confirm(rec)
     assert rec.readings() == readings
-    for where in (("status",), ("context",), ("show", "q-acc"), ("show", "q-lat")):
+    for where in (("status", "--full"), ("context",), ("show", "--long", "q-acc"), ("show", "--long", "q-lat")):
         text = rec.text(*where)
         assert "when met, not confirmed" not in text, (where, text)
-    assert "declared when met: 'INT8 stays within the accuracy budget'" in rec.text("show", "q-acc")
-    assert "declared when met: 'INT8 is fast enough'; note: docs/plan.md:7 ties them." in rec.text("show", "q-lat")
+    assert "declared when met: 'INT8 stays within the accuracy budget'" in rec.text("show", "--long", "q-acc")
+    assert "declared when met: 'INT8 is fast enough'; note: docs/plan.md:7 ties them." in rec.text("show", "--long", "q-lat")
     page = rec.page().replace("\n", "")
     assert not re.search(r"(Recorded|Conditional) interpretation( · its criterion: [^·]*)? · not confirmed", page), page
     state = rec.state(monkeypatch)
@@ -592,26 +605,26 @@ def test_an_interpretation_confirmed_with_a_design_waits_again_once_a_session_ch
     confirm(rec)
     said = "declared when met: 'INT8 stays within the accuracy budget'"
     unconfirmed = "declared when met, not confirmed: 'INT8 stays within the accuracy budget'"
-    assert said in rec.text("status") and unconfirmed not in rec.text("status")
-    assert "if not: keep FP32\n" in rec.text("show", "int8")
+    assert said in rec.text("status", "--full") and unconfirmed not in rec.text("status", "--full")
+    assert "if not: keep FP32\n" in rec.text("show", "--long", "int8")
     # a session loosens the rule: the runs now meet it, and the interpretation is active on a rule nobody confirmed
     edit(rec, "experiments/int8/criteria/acc-tol.yaml", "target: -0.001", "target: -0.005")
     rec.ok("doctor", "--adopt", "--why", "docs/plan.md:4 says 0.5", agent=True)
     assert changes(rec) == [("criterion acc-tol's rule", "changed", "change.top1 ≥ -0.001", "change.top1 ≥ -0.005")]
-    for where in (("status",), ("context",), ("show", "q-acc")):
+    for where in (("status", "--full"), ("context",), ("show", "--long", "q-acc")):
         text = rec.text(*where)
         assert unconfirmed in text and said not in text, (where, text)
     page = rec.page()
     # the shell says the interpretation as a note not confirmed, in its own line (plain words pass 3)
     assert unconfirmed in page.replace("\n", "") or "A note, not confirmed: " in page, page
-    [row] = [r for q in rec.ok("status")["data"]["questions"] for r in q["inquiry"]["direct"] if r.get("interpretation")]
+    [row] = [r for q in rec.ok("status", "--full")["data"]["questions"] for r in q["inquiry"]["direct"] if r.get("interpretation")]
     assert row["interpretation_confirmed"] is False and row["interpretation_active"] is True, row
     groups = [g for b in rec.state(monkeypatch)["home"]["briefs"] for g in (b.get("overview") or {}).get("interpretations", [])]
     assert groups and not any(g["confirmed"] for g in groups), groups
     # the gate the user confirmed is theirs still: nobody changed it
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert "if not: keep FP32\n" in shown and "keep FP32 · not confirmed" not in shown, shown
-    st = rec.ok("status")["data"]
+    st = rec.ok("status", "--full")["data"]
     assert st["gates_pending"] == [] and [e["gate_by"] for e in st["experiments"]] == ["human:ana"], st["gates_pending"]
     # a session's change to a setting reopens them too; confirming the design as it reads now makes them the user's,
     # and no confirmation moves a reading
@@ -619,15 +632,15 @@ def test_an_interpretation_confirmed_with_a_design_waits_again_once_a_session_ch
     rec.ok(*rec.design("int8")["confirm"].split()[1:])
     assert rec.readings() == readings
     rec.ok("spec", "set", "int8", "optim.lr", "0.002", agent=True)
-    assert unconfirmed in rec.text("status") and "if not: keep FP32\n" in rec.text("show", "int8")
+    assert unconfirmed in rec.text("status", "--full") and "if not: keep FP32\n" in rec.text("show", "--long", "int8")
     readings = rec.readings()
     rec.ok(*rec.design("int8")["confirm"].split()[1:])
     assert rec.readings() == readings
-    assert said in rec.text("status") and "if not: keep FP32\n" in rec.text("show", "int8")
+    assert said in rec.text("status", "--full") and "if not: keep FP32\n" in rec.text("show", "--long", "int8")
     # the user's own change of the rule leaves them confirmed
     edit(rec, "experiments/int8/criteria/acc-tol.yaml", "target: -0.005", "target: -0.004")
     rec.ok("doctor", "--adopt", "--why", "my own margin")
-    assert rec.design("int8")["standing"] == "confirmed" and said in rec.text("status") and "if not: keep FP32\n" in rec.text("show", "int8")
+    assert rec.design("int8")["standing"] == "confirmed" and said in rec.text("status", "--full") and "if not: keep FP32\n" in rec.text("show", "--long", "int8")
 
 
 def test_a_waiting_designs_command_is_said_once_on_each_screen(rec, monkeypatch, tmp_path):
@@ -639,18 +652,21 @@ def test_a_waiting_designs_command_is_said_once_on_each_screen(rec, monkeypatch,
     session_design(rec)
     cmd = rec.design("int8")["confirm"]
     line = "The design of 1 experiment is not confirmed: rb confirm lists it."
-    for argv in (("status",), ("context",)):
+    for argv in (("status", "--full"), ("context",)):
         text = rec.text(*argv)
         assert cmd not in text and text.count(line) == 1 and "keep FP32 · not confirmed" in text, (argv, text)
     # recheck of group E, round 3: none of these views shows every part the key names, so each gives the command that
     # lists the design, which ends with the one that confirms it as listed
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert cmd not in shown and shown.count(LISTING) == 1 and "if not: keep FP32 · not confirmed\n" in shown, shown
     page = rec.page()
-    assert cmd not in page and page.count(LISTING) == 1 and page.count(line) == 1 and "keep FP32 · not confirmed" in page, page
+    # closed form (owner, Nov 13 2026): the page says the design's standing once as a plain line with its prompt
+    # button, and the designs that wait in one line with no command
+    assert cmd not in page and page.count(LISTING) == 0 and "list it to confirm" not in page and page.count(PAGE_DESIGN_LINE) == 1 and page.count(page_designs_line(1)) == 1 and line not in page and "keep FP32 · not confirmed" in page, page
+    assert DESIGN_PROMPT.format("INT8 vs FP32") in html_mod.unescape((rec.root / "page.html").read_text(encoding="utf-8"))
     rec.ok("export", "--out", str(tmp_path / "export"))
     exported = html_mod.unescape(re.sub(r"<[^>]+>", "\n", (tmp_path / "export" / "page.html").read_text(encoding="utf-8")))
-    assert cmd not in exported and exported.count(LISTING) == 1 and "keep FP32 · not confirmed" in exported, exported
+    assert cmd not in exported and exported.count(LISTING) == 0 and PAGE_DESIGN_LINE in exported and "keep FP32 · not confirmed" in exported, exported
     pane = brief(rec.state(monkeypatch), "int8")
     assert pane["design"]["lines"][0] == LISTING and not [t for _, t in pane["gate_parts"] if "rb confirm" in t], pane
     assert rec.text("confirm", "int8").endswith(f"    confirm: {cmd}\n")
@@ -665,14 +681,18 @@ def test_no_line_offers_to_confirm_all_while_a_design_waits(rec):
     rec.ok("decide", "int8", "park", "--why", "later", agent=True)
     rec.ok("decide", "q-acc", "investigate", "--why", "one more seed", agent=True)
     line = "The design of 1 experiment is not confirmed: rb confirm lists it."
-    for where, text in (("status", rec.text("status")), ("context", rec.text("context")), ("page", rec.page())):
-        assert text.count(line) == 1 and "Confirm all" not in text and "Proposed, not made" in text, (where, text)
-    calls = [p["id"] for p in rec.ok("status")["data"]["pending"]]
+    # closed form (owner, Nov 13 2026): the page says the designs that wait without the command that lists them
+    for where, text, said in (("status", rec.text("status", "--full"), line), ("context", rec.text("context"), line), ("page", rec.page(), page_designs_line(1))):
+        assert text.count(said) == 1 and "Confirm all" not in text and "Proposed, not made" in text, (where, text)
+    calls = [p["id"] for p in rec.ok("status", "--full")["data"]["pending"]]
     assert rec.text("confirm").rstrip("\n").endswith(f"rb confirm {' '.join(calls)} {rec.design('int8')['confirm'].split()[-1]} confirms 2 calls and 1 design as listed.")
     confirm(rec)
-    for where, text in (("status", rec.text("status")), ("context", rec.text("context"))):
+    for where, text in (("status", rec.text("status", "--full")), ("context", rec.text("context"))):
         assert f"Confirm all 2: rb confirm {' '.join(calls)}" in text and line not in text, (where, text)
-    assert f"Confirm all 2\n\n\nrb confirm {' '.join(calls)}\n" in rec.page()
+    # closed form (owner, Nov 13 2026): on a page Confirm all is a prompt button for their agent, never the command
+    page = rec.page()
+    assert "Confirm all 2" in page and f"rb confirm {' '.join(calls)}" not in page, page
+    assert ALL_PROMPT in (rec.root / "page.html").read_text(encoding="utf-8")
 
 
 def test_a_design_a_session_touched_waits_once_even_when_it_is_wholly_the_users_again(rec):
@@ -690,10 +710,10 @@ def test_a_design_a_session_touched_waits_once_even_when_it_is_wholly_the_users_
         rec.ok("retract", f"c{int(who)}", "--why", "not needed", agent=who)
         d = rec.design("int8")
         assert (d["standing"], d["key"], d["changes"]) == ("not_confirmed", mine["key"], []), d
-        assert LISTING in rec.text("show", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
+        assert LISTING in rec.text("show", "--long", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
     rec.ok(*rec.design("int8")["confirm"].split()[1:])
     assert rec.design("int8")["standing"] == "confirmed"
-    for w in (("status",), ("show", "int8"), ("confirm",)):
+    for w in (("status", "--full"), ("show", "--long", "int8"), ("confirm",)):
         text = rec.text(*w)
         assert not [m for m in ("design not confirmed", "changed since you confirmed it", "The design of") if m in text], (w, text)
 
@@ -745,7 +765,7 @@ def test_a_variants_own_setting_named_like_a_shared_one_is_its_own_part(rec):
     assert rec.text("confirm", "int8").count("    setting optim.lr: ") == 2
     out = rec.text(*rec.design("int8")["confirm"].split()[1:])
     assert out.startswith("int8's design is confirmed.\n"), out
-    assert rec.design("int8")["standing"] == "confirmed" and "The design of" not in rec.text("status")
+    assert rec.design("int8")["standing"] == "confirmed" and "The design of" not in rec.text("status", "--full")
     [kept] = [line["detail"]["parts"] for line in map(json.loads, (rec.root / ".rb" / "log.jsonl").read_text(encoding="utf-8").splitlines())
               if line["op"] == "gate" and "design" in line.get("detail", {})]
     keys = [k for k, _ in kept]
@@ -795,7 +815,7 @@ def test_the_users_write_of_one_element_never_makes_a_sessions_write_of_another_
         rec.ok(*user)
         d = rec.design("int8")
         assert d["standing"] == ("changed" if confirmed else "not_confirmed"), (user, d)
-        shown = rec.text("show", "int8")
+        shown = rec.text("show", "--long", "int8")
         assert f"{LISTING}\n" in shown and rec.text("confirm") != "Nothing waits for a confirmation.\n", (user, shown)
         if confirmed:
             assert f"  changed since you confirmed it: {line}\n" in shown, (user, shown)
@@ -828,7 +848,7 @@ def three_records(rec: Rec) -> None:
 
 
 def standings(rec: Rec) -> dict:
-    return {e["id"]: e["design"] for e in rec.ok("status")["data"]["experiments"]}
+    return {e["id"]: e["design"] for e in rec.ok("status", "--full")["data"]["experiments"]}
 
 
 def clone_of(rec: Rec, tmp_path) -> Rec:
@@ -900,7 +920,7 @@ def test_a_sessions_adoption_an_older_rb_wrote_after_a_confirmation_waits_in_a_c
     there = clone_of(rec, tmp_path)
     d = there.design("int8")
     assert (d["standing"], d["changes"]) == ("not_confirmed", []), d
-    assert LISTING in there.text("show", "int8") and there.text("confirm") != "Nothing waits for a confirmation.\n"
+    assert LISTING in there.text("show", "--long", "int8") and there.text("confirm") != "Nothing waits for a confirmation.\n"
 
 
 def test_the_users_write_merged_in_after_a_confirmation_is_what_a_sessions_change_is_read_against(rec):
@@ -923,7 +943,7 @@ def test_the_users_write_merged_in_after_a_confirmation_is_what_a_sessions_chang
     confirm(rec)
     rec.ok("spec", "set", "int8", "optim.lr", "0.004", agent=True)
     assert ("setting optim.lr", "changed", "0.003", "0.004") in changes(rec), changes(rec)
-    assert "  changed since you confirmed it: setting optim.lr, was 0.003, now 0.004\n" in rec.text("show", "int8")
+    assert "  changed since you confirmed it: setting optim.lr, was 0.003, now 0.004\n" in rec.text("show", "--long", "int8")
     rec.ok("spec", "set", "int8", "optim.lr", "0.003", agent=True)
     assert rec.design("int8")["standing"] == "confirmed"
     rec.ok("spec", "set", "int8", "optim.lr", "0.001", agent=True)
@@ -939,12 +959,12 @@ def test_an_experiments_why_reads_in_the_voice_of_whoever_wrote_it(rec):
     user_design(rec)
     edit(rec, "experiments/int8/experiment.yaml", "why: docs/plan.md:3 names INT8", "why: the session thinks INT8 is enough")
     rec.ok("doctor", "--adopt", "--why", "a better reason", agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert "  note: the session thinks INT8 is enough · not confirmed\n" in shown and rec.design("int8")["standing"] == "not_confirmed", shown
     rec.ok("experiment", "add", "INT8 latency", "--id", "lat", "-q", "q-acc", "--hypothesis", "INT8 halves CPU latency", "-m", "docs/plan.md:9 says so", agent=True)
     edit(rec, "experiments/lat/experiment.yaml", "why: docs/plan.md:9 says so", "why: my own reason, typed by me")
     rec.ok("doctor", "--adopt", "--why", "my why")
-    shown = rec.text("show", "lat")
+    shown = rec.text("show", "--long", "lat")
     assert rec.design("lat")["standing"] == "not_confirmed", shown
     assert "  why: my own reason, typed by me\n" in shown and "my own reason, typed by me · not confirmed" not in shown, shown
 
@@ -959,21 +979,21 @@ def test_a_gate_the_user_confirmed_stays_theirs_until_a_session_changes_it(rec):
     confirm(rec)
     rec.ok("spec", "set", "int8", "optim.lr", "0.002", agent=True)
     rec.ok("variant", "add", "int8", "int4", "--role", "ablation", agent=True)
-    st = rec.ok("status")["data"]
+    st = rec.ok("status", "--full")["data"]
     [e] = st["experiments"]
     assert (e["gate_by"], st["gates_pending"], e["design"]["standing"]) == ("human:ana", [], "changed"), (e["gate_by"], st["gates_pending"])
-    for argv in (("status",), ("context",), ("show", "int8")):
+    for argv in (("status", "--full"), ("context",), ("show", "--long", "int8")):
         text = rec.text(*argv)
         assert "keep FP32 · not confirmed" not in text, (argv, text)
-    assert rec.text("show", "int8").count("not confirmed") == 1
+    assert rec.text("show", "--long", "int8").count("not confirmed") == 1
     rec.ok("experiment", "gate", "int8", "--if-not", "drop INT8 for good", agent=True)
-    st = rec.ok("status")["data"]
+    st = rec.ok("status", "--full")["data"]
     assert st["experiments"][0]["gate_by"] == "agent:claude-code" and [g["confirm"] for g in st["gates_pending"]] == [rec.design("int8")["confirm"]]
-    assert "if not: drop INT8 for good · not confirmed\n" in rec.text("show", "int8")
+    assert "if not: drop INT8 for good · not confirmed\n" in rec.text("show", "--long", "int8")
     # the user setting the other branch leaves the session's branch waiting with the design
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8 next week")
     line = 'the gate, was "if it holds: ship INT8 · if not: keep FP32", now "if it holds: ship INT8 next week · if not: drop INT8 for good"'
-    assert rec.design("int8")["standing"] == "changed" and f"  changed since you confirmed it: {line}\n" in rec.text("show", "int8")
+    assert rec.design("int8")["standing"] == "changed" and f"  changed since you confirmed it: {line}\n" in rec.text("show", "--long", "int8")
 
 
 def test_words_the_user_gives_with_a_gate_are_theirs_once_the_gate_is(rec):
@@ -985,10 +1005,10 @@ def test_words_the_user_gives_with_a_gate_are_theirs_once_the_gate_is(rec):
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8 next week", "--words", "I ship INT8 if it holds", agent=True)
     assert rec.design("int8")["standing"] == "not_confirmed"
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8 this week", "--words", "I ship INT8 if it holds")
-    assert rec.design("int8")["standing"] == "not_confirmed" and 'words (as given): "I ship INT8 if it holds"' in rec.text("show", "int8")
-    assert [g["experiment"] for g in rec.ok("status")["data"]["gates_pending"]] == ["int8"]
+    assert rec.design("int8")["standing"] == "not_confirmed" and 'words (as given): "I ship INT8 if it holds"' in rec.text("show", "--long", "int8")
+    assert [g["experiment"] for g in rec.ok("status", "--full")["data"]["gates_pending"]] == ["int8"]
     rec.ok(*rec.design("int8")["confirm"].split()[1:])
-    assert 'your words: "I ship INT8 if it holds"' in rec.text("show", "int8") and rec.ok("status")["data"]["gates_pending"] == []
+    assert 'your words: "I ship INT8 if it holds"' in rec.text("show", "--long", "int8") and rec.ok("status", "--full")["data"]["gates_pending"] == []
 
 
 def test_rb_confirm_and_rb_log_say_what_is_true_of_a_design(rec):
@@ -998,7 +1018,7 @@ def test_rb_confirm_and_rb_log_say_what_is_true_of_a_design(rec):
     session_design(rec)
     rec.ok("experiment", "add", "Calibration size", "--id", "cal", "-q", "q-acc", "--purpose", "top-1 at calibration size 512", agent=True)
     rec.ok("decide", "int8", "park", "--why", "later", agent=True)
-    call = rec.ok("status")["data"]["pending"][0]["id"]
+    call = rec.ok("status", "--full")["data"]["pending"][0]["id"]
     every = f"{call} {rec.design('int8')['confirm'].split()[-1]} {rec.design('cal')['confirm'].split()[-1]}"
     assert rec.text("confirm").rstrip("\n").endswith(f"rb confirm {every} confirms 1 call and 2 designs as listed.")
     never = json.loads(rec.run("confirm", "int8@0000000", "--json").stdout)["errors"][0]
@@ -1031,7 +1051,7 @@ def test_each_change_since_a_confirmation_is_said_where_its_part_is_listed(rec):
     rec.ok("spec", "set", "int8", "optim.lr", "0.002", agent=True)
     edit(rec, "experiments/int8/criteria/acc-tol.yaml", "target: -0.005", "target: -0.003")
     rec.ok("doctor", "--adopt", "--why", "the plan says 0.3", agent=True)
-    lines = [l.strip() for l in rec.text("show", "int8").splitlines() if l.strip().startswith("changed since you confirmed it:")]
+    lines = [l.strip() for l in rec.text("show", "--long", "int8").splitlines() if l.strip().startswith("changed since you confirmed it:")]
     assert lines == ["changed since you confirmed it: setting optim.lr, was 0.001, now 0.002",
                      "changed since you confirmed it: setting optim.lr's source removed, was configs/train.yaml#optim.lr",
                      "changed since you confirmed it: criterion acc-tol's rule, was change.top1 ≥ -0.005, now change.top1 ≥ -0.003"], lines
@@ -1050,7 +1070,7 @@ def test_a_variant_file_edited_outside_rb_after_a_confirmation_reads_changed_unt
     r = rec.run(*rec.design("int8")["confirm"].split()[1:], "--json")
     assert r.returncode != 0 and json.loads(r.stdout)["errors"][0]["code"] == "E_STATE_EDITED", r.stdout
     rec.ok("doctor", "--restore")
-    assert rec.design("int8")["standing"] == "confirmed" and "changed since you confirmed it" not in rec.text("show", "int8")
+    assert rec.design("int8")["standing"] == "confirmed" and "changed since you confirmed it" not in rec.text("show", "--long", "int8")
 
 
 # Recheck of group E, round 2.
@@ -1086,7 +1106,7 @@ def test_the_users_write_of_what_a_session_wrote_the_same_on_a_branch_waits_for_
         git(rec, "merge", "-q", "--no-edit", "-")
     d = rec.design("int8")
     assert (d["standing"], d["changes"]) == ("not_confirmed", []), d
-    assert LISTING in rec.text("show", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
+    assert LISTING in rec.text("show", "--long", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
     rec.ok(*d["confirm"].split()[1:])
     assert rec.design("int8")["standing"] == "confirmed" and rec.text("confirm") == "Nothing waits for a confirmation.\n"
 
@@ -1111,7 +1131,7 @@ def test_a_setting_the_user_states_as_a_session_left_it_waits_for_one_confirmati
     rec.ok(*rec.design("int8")["confirm"].split()[1:])
     d = rec.design("int8")
     assert (d["standing"], d["changes"]) == ("confirmed", []), d
-    assert "design not confirmed" not in rec.text("show", "int8")
+    assert "design not confirmed" not in rec.text("show", "--long", "int8")
 
 
 def test_filing_a_criterion_in_the_words_it_has_says_nothing_changed(rec):
@@ -1140,15 +1160,15 @@ def test_a_sessions_why_the_design_waits_on_again_reads_as_not_confirmed(rec):
     confirm(rec)
     edit(rec, why, "why: docs/plan.md:4 names INT8", "why: the plan says so")
     rec.ok("doctor", "--adopt", "--why", "my own reason")
-    assert rec.design("int8")["standing"] == "confirmed" and "  why: the plan says so\n" in rec.text("show", "int8")
+    assert rec.design("int8")["standing"] == "confirmed" and "  why: the plan says so\n" in rec.text("show", "--long", "int8")
     edit(rec, why, "why: the plan says so", "why: docs/plan.md:5 names INT8")
     rec.ok("doctor", "--adopt", "--why", "the plan moved again", agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert '  changed since you confirmed it: why, was "the plan says so", now "docs/plan.md:5 names INT8"\n' in shown, shown
     assert "  note: docs/plan.md:5 names INT8 · not confirmed\n" in shown, shown
     edit(rec, why, "why: docs/plan.md:5 names INT8", "why: docs/plan.md:4 names INT8")
     rec.ok("doctor", "--adopt", "--why", "the plan as confirmed", agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert rec.design("int8")["standing"] == "confirmed" and "  note: docs/plan.md:4 names INT8\n" in shown, shown
 
 
@@ -1174,7 +1194,7 @@ def test_a_design_the_user_confirmed_on_a_branch_reads_confirmed_after_a_merge(r
         git(rec, "merge", "-q", "--no-edit", "-")
     d = rec.design("int8")
     assert (d["standing"], d["changes"]) == ("confirmed", []), d
-    assert "design not confirmed" not in rec.text("show", "int8")
+    assert "design not confirmed" not in rec.text("show", "--long", "int8")
     rec.ok("spec", "set", "int8", "optim.wd", "0.0005", agent=True)
     assert changes(rec) == [("setting optim.wd", "added", None, "0.0005")], changes(rec)
 
@@ -1194,9 +1214,9 @@ def test_a_design_that_waits_waits_in_a_clone_of_its_bundle(rec, tmp_path):
     other.root, other.env = home / "int8", rec.env
     d = other.design("int8")
     assert (d["standing"], d["not_recorded"]) == ("not_confirmed", []), d
-    shown = other.text("show", "int8")
+    shown = other.text("show", "--long", "int8")
     assert f"  {LISTING}\n" in shown and "  note: docs/plan.md:3 names INT8 · not confirmed\n" in shown, shown
-    assert other.design("cal")["standing"] == "yours" and "design not confirmed" not in other.text("show", "cal")
+    assert other.design("cal")["standing"] == "yours" and "design not confirmed" not in other.text("show", "--long", "cal")
     other.ok(*d["confirm"].split()[1:])
     assert other.design("int8")["standing"] == "confirmed"
 
@@ -1208,9 +1228,9 @@ def test_a_reason_given_with_an_interpretation_the_user_confirmed_reads_as_its_n
     user_design(rec)
     rec.ok("criterion", "add", "INT8 loses at most 0.5 top-1", "-e", "int8", "--metric", "change.top1", "--at-least", "-0.005", "--id", "acc-tol")
     rec.ok("criterion", "file", "acc-tol", "q-acc", "--when-met", "INT8 is good enough", "--why", "it bears on it", agent=True)
-    assert "declared when met, not confirmed: 'INT8 is good enough'; note: it bears on it." in rec.text("status")
+    assert "declared when met, not confirmed: 'INT8 is good enough'; note: it bears on it." in rec.text("status", "--full")
     confirm(rec)
-    status = rec.text("status")
+    status = rec.text("status", "--full")
     assert "declared when met: 'INT8 is good enough'; note: it bears on it." in status and "it bears on it · not confirmed" not in status, status
     assert rec.text("confirm") == "Nothing waits for a confirmation.\n"
 
@@ -1233,7 +1253,7 @@ def test_the_command_rb_confirm_ends_with_confirms_only_what_it_listed(rec):
     err = json.loads(r.stdout)["errors"][0]
     assert r.returncode != 0 and err["message"].startswith("int8's design does not match "), err
     assert rec.design("int8")["pending"] and rec.design("snk")["pending"]
-    assert "your words" not in rec.text("show", "int8")
+    assert "your words" not in rec.text("show", "--long", "int8")
 
 
 def test_an_experiment_a_session_imported_says_what_it_does_not_record(rec):
@@ -1249,9 +1269,9 @@ def test_an_experiment_a_session_imported_says_what_it_does_not_record(rec):
     rec.ok("reconcile", "--apply", agent=True)
     d = rec.design("sweep0")
     assert (d["standing"], d["not_recorded"]) == ("yours", ["hypothesis or purpose", "why"]), d
-    shown = rec.text("show", "sweep0")
+    shown = rec.text("show", "--long", "sweep0")
     assert "  hypothesis or purpose: not recorded\n" in shown and "  why: not recorded\n" in shown, shown
-    assert "not recorded" not in rec.text("status")
+    assert "not recorded" not in rec.text("status", "--full")
 
 
 def test_a_page_says_a_change_since_the_confirmation_to_whoever_reads_it(rec, tmp_path):
@@ -1265,7 +1285,7 @@ def test_a_page_says_a_change_since_the_confirmation_to_whoever_reads_it(rec, tm
     exported = html_mod.unescape(re.sub(r"<[^>]+>", "\n", (tmp_path / "export" / "page.html").read_text(encoding="utf-8")))
     for page in (rec.page(), exported):
         assert f"changed since it was confirmed: {line}" in page and "you confirmed" not in page, page
-    assert f"  changed since you confirmed it: {line}\n" in rec.text("show", "int8")
+    assert f"  changed since you confirmed it: {line}\n" in rec.text("show", "--long", "int8")
 
 
 def test_an_empty_key_is_refused_as_naming_none(rec):
@@ -1315,7 +1335,7 @@ def test_a_sessions_change_git_merged_with_the_users_in_one_part_waits(rec, tmp_
     merged(rec, into)
     for there in (rec, clone_of(rec, tmp_path)):
         assert changes(there) == [("criterion acc-tol's rule", "changed", "change.top1 ≥ -0.003", "change.top1 ≥ -0.003 (n ≥ 3)")], changes(there)
-        assert "  changed since you confirmed it: criterion acc-tol's rule, was change.top1 ≥ -0.003, now change.top1 ≥ -0.003 (n ≥ 3)\n" in there.text("show", "int8")
+        assert "  changed since you confirmed it: criterion acc-tol's rule, was change.top1 ≥ -0.003, now change.top1 ≥ -0.003 (n ≥ 3)\n" in there.text("show", "--long", "int8")
         assert there.text("confirm") != "Nothing waits for a confirmation.\n"
 
 
@@ -1364,7 +1384,7 @@ def test_a_merge_resolved_to_a_sessions_side_waits_after_the_user_adopts_it(rec)
     rec.commit()
     rec.ok("doctor", "--adopt", "--why", "kept the branch's value")
     assert ("setting optim.lr", "changed", "0.003", "0.002") in changes(rec), changes(rec)
-    assert "  changed since you confirmed it: setting optim.lr, was 0.003, now 0.002\n" in rec.text("show", "int8")
+    assert "  changed since you confirmed it: setting optim.lr, was 0.003, now 0.002\n" in rec.text("show", "--long", "int8")
 
 
 @pytest.mark.parametrize("into", ["main", "side"])
@@ -1387,7 +1407,7 @@ def test_a_sessions_retraction_merged_with_the_users_change_says_what_was_remove
     rec.ok("doctor", "--adopt", "--why", "my changes")
     rec.commit()
     merged(rec, into)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     for line in ("criterion acc-tol removed, was change.top1 ≥ -0.003 (primary)", "variant int8pc (control) removed"):
         assert f"  changed since you confirmed it: {line}\n" in shown, shown
     assert "acc-tol's role removed" not in shown and "no longer filed under" not in shown, shown
@@ -1416,7 +1436,7 @@ def test_an_older_rbs_adoption_by_the_user_keeps_no_design_and_reads_the_same_in
     there = clone_of(rec, tmp_path)
     for d in (rec, there):
         assert changes(d) == [("criterion acc-tol's role", "changed", "primary", "exploratory")], changes(d)
-        assert "  changed since you confirmed it: criterion acc-tol's role, was primary, now exploratory\n" in d.text("show", "int8")
+        assert "  changed since you confirmed it: criterion acc-tol's role, was primary, now exploratory\n" in d.text("show", "--long", "int8")
 
 
 def test_a_gate_a_session_put_back_as_the_user_had_it_waits_once_with_its_design(rec):
@@ -1426,17 +1446,17 @@ def test_a_gate_a_session_put_back_as_the_user_had_it_waits_once_with_its_design
     own, until the user confirms the design once; then nothing waits and the gate is theirs."""
     user_design(rec)
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8 now", agent=True)
-    assert rec.ok("status")["data"]["gates_pending"], "a session's gate waits with its design"
+    assert rec.ok("status", "--full")["data"]["gates_pending"], "a session's gate waits with its design"
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8", agent=True)
-    st = rec.ok("status")["data"]
+    st = rec.ok("status", "--full")["data"]
     [e] = st["experiments"]
     cmd = e["design"]["confirm"]
     assert (e["design"]["standing"], [g["confirm"] for g in st["gates_pending"]]) == ("not_confirmed", [cmd]), (e, st["gates_pending"])
-    assert "if it holds: ship INT8 · not confirmed\n" in rec.text("show", "int8") and "Gates set, not confirmed" not in rec.text("status")
+    assert "if it holds: ship INT8 · not confirmed\n" in rec.text("show", "--long", "int8") and "Gates set, not confirmed" not in rec.text("status", "--full")
     rec.ok(*cmd.split()[1:])
-    st = rec.ok("status")["data"]
+    st = rec.ok("status", "--full")["data"]
     assert (st["experiments"][0]["design"]["standing"], st["gates_pending"], st["experiments"][0]["gate_by"]) == ("confirmed", [], "human:ana"), st["experiments"][0]
-    for argv in (("status",), ("show", "int8"), ("context",)):
+    for argv in (("status", "--full"), ("show", "--long", "int8"), ("context",)):
         text = rec.text(*argv)
         assert "not confirmed" not in text and "rb confirm int8" not in text, (argv, text)
     assert rec.text("confirm") == "Nothing waits for a confirmation.\n"
@@ -1452,8 +1472,8 @@ def test_rb_confirm_naming_several_designs_ends_with_the_command_for_all_and_a_s
     keys = f"{rec.design('int8')['confirm'].split()[-1]} {rec.design('bsz')['confirm'].split()[-1]}"
     end = f"rb confirm <experiment>@<hash> confirms one; rb confirm {keys} confirms these 2 as listed.\n"
     assert rec.text("confirm", "int8", "bsz").endswith(end), rec.text("confirm", "int8", "bsz")
-    assert "\nThe design of 1 experiment is not confirmed: rb confirm bsz lists it.\n" in rec.text("status", "bsz"), rec.text("status", "bsz")
-    assert "\nThe design of 2 experiments is not confirmed: rb confirm lists them.\n" in rec.text("status")
+    assert "\nThe design of 1 experiment is not confirmed: rb confirm bsz lists it.\n" in rec.text("status", "--full", "bsz"), rec.text("status", "--full", "bsz")
+    assert "\nThe design of 2 experiments is not confirmed: rb confirm lists them.\n" in rec.text("status", "--full")
 
 
 # The snapshot rule (Oct 14): no order, no clock, no copy of what rb wrote.
@@ -1552,7 +1572,7 @@ def test_a_sessions_change_rb_says_alike_is_a_write_to_the_design(rec):
     [line] = [json.loads(x) for x in (rec.root / ".rb" / "log.jsonl").read_text(encoding="utf-8").splitlines()[-1:]]
     assert "setting:data.batch_size" in line["detail"]["changed_parts"]["int8"], line
     assert rec.readings() != before and rec.design("int8")["standing"] == "not_confirmed"
-    assert LISTING in rec.text("show", "int8")
+    assert LISTING in rec.text("show", "--long", "int8")
 
 
 def test_a_sessions_new_term_for_a_source_is_a_write_to_the_design(rec):
@@ -1599,7 +1619,7 @@ def test_a_sessions_write_that_changes_no_part_leaves_the_users_design_as_it_was
         return [x for x in map(json.loads, (rec.root / ".rb" / "log.jsonl").read_text(encoding="utf-8").splitlines()) if x["op"] == "spec_set"][-1]
     rec.ok("spec", "set", "int8", "optim.lr", "--source", "configs/train.yaml#optim.lr", agent=True)
     assert last_set()["actor"].startswith("agent:") and last_set()["detail"]["changed_parts"] == {"int8": {}}, last_set()
-    assert rec.design("int8")["standing"] == "yours" and "design not confirmed" not in rec.text("show", "int8")
+    assert rec.design("int8")["standing"] == "yours" and "design not confirmed" not in rec.text("show", "--long", "int8")
     rec.ok("spec", "set", "int8", "optim.lr", "--source", "configs/train.yaml#optim.lr")
     assert sorted(last_set()["detail"]["changed_parts"]["int8"]) == ["setting:optim.lr", "source:optim.lr"], last_set()
 
@@ -1665,7 +1685,7 @@ def test_a_sessions_change_rb_says_alike_reopens_a_design_an_earlier_build_confi
     d = rec.design("int8")
     source = ("setting optim.lr's source", "changed", "docs/train.md:3", 'docs/train.md:3 (term "weight decay")')
     assert (d["standing"], [(c["part"], c["change"], c["was"], c["now"]) for c in d["changes"]]) == ("changed", [source]), d
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert f"{LISTING}\n" in shown and '  changed since you confirmed it: setting optim.lr\'s source, was docs/train.md:3, now docs/train.md:3 (term "weight decay")\n' in shown, shown
     assert rec.text("confirm") != "Nothing waits for a confirmation.\n"
     rec.ok(*d["confirm"].split()[1:])
@@ -1692,7 +1712,7 @@ def waits_after_the_users_adoption(rec: Rec, change: tuple) -> None:
     assert line["op"] == "adopt" and "owned" not in line["detail"], line
     d = rec.design("int8")
     assert d["standing"] == "changed" and change in [(c["part"], c["change"], c["was"], c["now"]) for c in d["changes"]], d
-    assert LISTING in rec.text("show", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
+    assert LISTING in rec.text("show", "--long", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
 
 
 def test_the_users_adoption_after_a_worktree_merge_keeps_no_design_rb_cannot_read_before_it(rec, tmp_path):
@@ -1770,7 +1790,7 @@ def test_the_users_adoption_keeps_no_design_a_clock_put_before_a_sessions(rec, t
     d = rec.design("int8")
     change = ("hypothesis", "changed", HYPOTHESIS, HYPOTHESIS.replace("within 0.5 points", "within 3 points"))
     assert d["standing"] == "changed" and change in [(c["part"], c["change"], c["was"], c["now"]) for c in d["changes"]], d
-    assert LISTING in rec.text("show", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
+    assert LISTING in rec.text("show", "--long", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
 
 
 def test_the_users_own_edit_committed_and_adopted_keeps_a_confirmed_design_theirs(rec):
@@ -1797,10 +1817,10 @@ def test_a_sessions_gate_branch_reads_as_not_confirmed_beside_the_users_later_br
         confirm(rec)
     rec.ok("experiment", "gate", "int8", "--if-not", "drop INT8 for good", agent=True)
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8 next week")
-    st = rec.ok("status")["data"]
+    st = rec.ok("status", "--full")["data"]
     [e] = st["experiments"]
     assert [g["experiment"] for g in st["gates_pending"]] == ["int8"] and not e["gate_by"].startswith("human:"), (st["gates_pending"], e["gate_by"])
-    assert "if not: drop INT8 for good · not confirmed\n" in rec.text("show", "int8")
+    assert "if not: drop INT8 for good · not confirmed\n" in rec.text("show", "--long", "int8")
     assert "- if not: drop INT8 for good · not confirmed\n" in rec.text("context")
     assert "  gate: if it holds: ship INT8 next week · if not: drop INT8 for good · not confirmed\n" in rec.text("confirm", "int8")
 
@@ -1821,7 +1841,7 @@ def test_a_clock_never_puts_the_users_voice_on_a_sessions_gate_or_why(rec):
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8 to every customer today", agent=True)
     edit(rec, "experiments/int8/experiment.yaml", "why: my own reason", "why: the session reason, it is cheaper")
     rec.ok("doctor", "--adopt", "--why", "cheaper", agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert "  note: the session reason, it is cheaper · not confirmed\n" in shown and "why: the session reason" not in shown, shown
     assert "  if it holds: ship INT8 to every customer today · not confirmed\n" in shown, shown
     assert "your words" not in shown and "note: the session reason, it is cheaper · not confirmed" in rec.text("confirm", "int8")
@@ -1841,7 +1861,7 @@ def test_a_change_rb_says_alike_is_told_apart_on_its_line(rec):
     assert changes(rec) == [
         ("setting optim.lr's source", "changed", 'docs/train.md:3 (term "learning rate")', 'docs/train.md:3 (term "weight decay")'),
         ("setting seeds", "changed", "3 (a number)", "3 (text)")], changes(rec)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     for line in ("setting seeds, was 3 (a number), now 3 (text)", "setting optim.lr's source, was docs/train.md:3 (term \"learning rate\"), now docs/train.md:3 (term \"weight decay\")"):
         assert f"  changed since you confirmed it: {line}\n" in shown, shown
 
@@ -1970,7 +1990,7 @@ def test_a_sessions_change_an_earlier_build_adopted_as_changing_no_part_waits(re
     assert line["op"] == "adopt" and line["actor"].startswith("agent:"), line
     d = rec.design("int8")
     assert d["standing"] == ("not_confirmed" if start == "the-users-own" else "changed"), d
-    assert LISTING in rec.text("show", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
+    assert LISTING in rec.text("show", "--long", "int8") and rec.text("confirm") != "Nothing waits for a confirmation.\n"
     readings = rec.readings()
     rec.ok(*d["confirm"].split()[1:])
     assert rec.design("int8")["standing"] == "confirmed" and rec.readings() == readings
@@ -1992,7 +2012,7 @@ def test_a_criterion_an_earlier_build_moved_out_of_the_users_design_makes_both_w
     line = last_line_as_an_earlier_build_wrote_it(rec, None if older == "no-changed-parts" else {"bsz": {}})
     assert (line["kind"], line["id"], line["path"]) == ("criterion", "c9", ".rb/experiments/bsz/criteria/c9.yaml"), line
     assert [rec.design(e)["standing"] for e in ("int8", "bsz")] == ["not_confirmed", "not_confirmed"]
-    assert LISTING in rec.text("show", "int8")
+    assert LISTING in rec.text("show", "--long", "int8")
 
 
 @pytest.mark.parametrize("change", [("term: learning rate", "term: rate"), ("value: 3", "value: '3'")], ids=["a-term", "a-type"])
@@ -2010,7 +2030,7 @@ def test_a_design_an_earlier_build_confirmed_waits_while_a_file_of_it_is_edited_
     assert rec.design("int8")["standing"] == "confirmed"
     edit(rec, "experiments/int8/experiment.yaml", *change)
     assert "edited_outside_rb" in rec.text("doctor")
-    assert rec.design("int8")["standing"] == "changed" and LISTING in rec.text("show", "int8")
+    assert rec.design("int8")["standing"] == "changed" and LISTING in rec.text("show", "--long", "int8")
     r = rec.run(*rec.design("int8")["confirm"].split()[1:], "--json")
     assert r.returncode != 0 and json.loads(r.stdout)["errors"][0]["code"] == "E_STATE_EDITED", r.stdout
     rec.ok("doctor", "--restore")
@@ -2081,7 +2101,7 @@ def test_a_gate_on_two_lines_says_not_confirmed_on_the_branch_a_session_wrote(re
         exp.write_text(text.replace("if_not: keep FP32", "if_not: drop INT8 for good"), encoding="utf-8", newline="")
         rec.commit()
         rec.ok("doctor", "--adopt", "--why", "both changes")
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert "  if it holds: ship INT8 next week · not confirmed\n" in shown and "  if not: drop INT8 for good\n" in shown, shown
     assert "- if it holds: ship INT8 next week · not confirmed\n" in rec.text("context")
 
@@ -2386,7 +2406,7 @@ def test_a_confirmation_that_names_no_line_it_saw_asks_again_wherever_its_line_f
         a_type_change_adopted_in_a_session(rec, "2099-01-01T00:10:00+00:00")
     d = rec.design("int8")
     assert (d["standing"], d["changes"]) == ("not_confirmed", []), d
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert LISTING in shown and "changed since" not in shown and "changed since" not in rec.text("confirm"), shown
     # the user's next write keeps no design, as it was made from one that waits; nothing is said against the
     # confirmation, as any session's line may be after it
@@ -2395,7 +2415,7 @@ def test_a_confirmation_that_names_no_line_it_saw_asks_again_wherever_its_line_f
     assert (rec.design("int8")["standing"], changes(rec)) == ("not_confirmed", []), changes(rec)
     stamped(rec, "2099-01-01T02:00:00+00:00", "spec", "set", "int8", "optim.mom", "0.9", agent=True)
     assert (rec.design("int8")["standing"], changes(rec)) == ("not_confirmed", []), changes(rec)
-    assert "changed since" not in rec.text("show", "int8") and "changed since" not in rec.text("confirm", "int8")
+    assert "changed since" not in rec.text("show", "--long", "int8") and "changed since" not in rec.text("confirm", "int8")
     readings = rec.readings()
     stamped(rec, "2099-01-01T03:00:00+00:00", *rec.design("int8")["confirm"].split()[1:])
     assert rec.design("int8")["standing"] == "confirmed" and rec.readings() == readings
@@ -2430,7 +2450,7 @@ def test_a_change_rb_says_alike_after_an_earlier_builds_confirmation_says_what_i
         said = ".rb/experiments/int8/experiment.yaml was written again"
         expected = (".rb/experiments/int8/experiment.yaml", "changed", None, None)
     assert (rec.design("int8")["standing"], changes(rec)) == ("changed", [expected]), changes(rec)
-    assert f"{LISTING}\n  changed since you confirmed it: {said}\n" in rec.text("show", "int8"), rec.text("show", "int8")
+    assert f"{LISTING}\n  changed since you confirmed it: {said}\n" in rec.text("show", "--long", "int8"), rec.text("show", "--long", "int8")
     assert f"    changed since you confirmed it: {said}\n" in rec.text("confirm", "int8")
 
 
@@ -2515,7 +2535,7 @@ def test_a_changed_since_line_tells_apart_what_reads_alike_on_screen(rec, change
         part = "hypothesis"
     [c] = [c for c in rec.design("int8")["changes"] if c["part"] == part]
     assert c["change"] == "changed" and c["was"] != c["now"], c
-    [line] = [x for x in rec.text("show", "int8").splitlines() if x.startswith(f"  changed since you confirmed it: {part}, was ")]
+    [line] = [x for x in rec.text("show", "--long", "int8").splitlines() if x.startswith(f"  changed since you confirmed it: {part}, was ")]
     was, now = line.split(", was ", 1)[1].split(", now ", 1)
     assert was != now and not [x for x in line if ord(x) < 0x20 or 0x7f <= ord(x) <= 0x9f], line
 
@@ -2530,8 +2550,8 @@ def test_a_value_holding_a_line_separator_keeps_the_log_and_the_journal_whole(re
     session_design(rec)
     value = f"fp{char}int8"
     rec.ok("spec", "set", "int8", "label", json.dumps(value), agent=True)
-    assert rec.run("status").returncode == 0, rec.run("status").stderr
-    [setting] = [s for s in rec.ok("show", "int8")["data"]["object"]["settings"] if s["name"] == "label"]
+    assert rec.run("status", "--full").returncode == 0, rec.run("status", "--full").stderr
+    [setting] = [s for s in rec.ok("show", "--long", "int8")["data"]["object"]["settings"] if s["name"] == "label"]
     assert setting["value"] == value
     log = (rec.root / ".rb" / "log.jsonl").read_text(encoding="utf-8")
     assert char not in log and value in [json.loads(x).get("detail", {}).get("value") for x in log.split("\n") if x]
@@ -2571,7 +2591,7 @@ def test_rb_confirm_shows_characters_a_terminal_draws_as_nothing_as_escapes(rec,
     confirm(rec)
     assert HYPOTHESIS + hidden in (rec.root / ".rb" / "experiments" / "int8" / "experiment.yaml").read_text(encoding="utf-8")
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8", "--if-not", "keep FP32" + hidden, agent=True)
-    [said] = [x for x in rec.text("show", "int8").splitlines() if x.startswith("  changed since you confirmed it: the gate")]
+    [said] = [x for x in rec.text("show", "--long", "int8").splitlines() if x.startswith("  changed since you confirmed it: the gate")]
     assert f"keep FP32{escaped}" in said and hidden[0] not in said, repr(said)
 
 
@@ -2626,7 +2646,7 @@ def test_after_an_earlier_builds_confirmation_each_change_is_said_by_the_part_it
         expected = [("setting optim.lr's source", "removed", "configs/train.yaml#optim.lr", None), (".rb/experiments/int8/experiment.yaml", "changed", None, None)]
         said = ["setting optim.lr's source removed, was configs/train.yaml#optim.lr", ".rb/experiments/int8/experiment.yaml was written again"]
     assert (rec.design("int8")["standing"], changes(rec)) == ("changed", expected), changes(rec)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert f"{LISTING}\n" + "".join(f"  changed since you confirmed it: {x}\n" for x in said) in shown, shown
     assert "".join(f"    changed since you confirmed it: {x}\n" for x in said) in rec.text("confirm", "int8")
 
@@ -2642,10 +2662,13 @@ def test_a_page_keeps_the_spaces_of_a_designs_changed_since_lines(rec):
     rec.ok("page", "--out", str(out))
     page = out.read_text(encoding="utf-8")
     assert ".dline{white-space:pre-wrap}" in page
-    [line] = [html_mod.unescape(x) for x in re.findall(r'<p class="dline">([^<]*changed since it was confirmed[^<]*)</p>', page)]
+    # closed form (owner, Nov 13 2026): a design's line is a link to the experiment's record card, and its standing is
+    # the plain line, a link with its old words on hover
+    [line] = [html_mod.unescape(x) for x in re.findall(r'<p class="dline">(?:<a href="#k-int8">)?([^<]*changed since it was confirmed[^<]*)(?:</a>)?</p>', page)]
     assert "if it holds: ship INT8 · if not: keep FP32" in line and "if it holds: ship  INT8 · if not: keep FP32" in line, line
-    assert re.findall(r'<p class="dline">([^<]*)', page)[0].startswith("design not confirmed")
-    assert not [x for x in re.findall(r'<p class="dline">([^<]*)</p>', page) if x.startswith(("hypothesis", "why"))]
+    assert '<div class="dstate"><a class="fch fch-warn" href="#k-int8" title="Design not confirmed">This experiment&#x27;s design is not confirmed.</a>' in page and line.startswith("changed since")
+    assert 'id="k-int8"' in page
+    assert not [x for x in re.findall(r'<p class="dline">(?:<a [^>]*>)?([^<]*)', page) if x.startswith(("hypothesis", "why"))]
 
 
 def test_a_page_has_the_rule_for_a_designs_lines_only_where_it_shows_one(rec):
@@ -2661,7 +2684,8 @@ def test_a_page_has_the_rule_for_a_designs_lines_only_where_it_shows_one(rec):
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship  INT8", "--if-not", "keep FP32", agent=True)
     rec.ok("page", "--out", str(out))
     waits = out.read_text(encoding="utf-8")
-    assert '<p class="dline">design not confirmed' in waits
+    # closed form (owner, Nov 13 2026): the standing is the plain line, a link to the experiment's record card
+    assert '<div class="dstate"><a class="fch fch-warn" href="#k-int8" title="Design not confirmed">This experiment&#x27;s design is not confirmed.</a>' in waits
     # the shell's one stylesheet holds the rule whatever the record: a page with no design line reads as it did
     assert style(waits) == style(yours) and ".dline{white-space:pre-wrap}" in style(yours)
 
@@ -2680,7 +2704,7 @@ def test_a_gate_and_its_words_weigh_as_one_part_of_the_design_said_against(rec):
     was, now = "if it holds: ship INT8 next month · if not: keep FP32", "if it holds: ship INT8 next month · if not: rerun with calibration 2"
     assert changes(rec) == [("the gate", "changed", was, now), ("the gate's words (as given)", "removed", "we ship INT8 next month", None)], changes(rec)
     said = [f'the gate, was "{was}", now "{now}"', 'the gate\'s words (as given) removed, was "we ship INT8 next month"']
-    assert f"{LISTING}\n" + "".join(f"  changed since you confirmed it: {x}\n" for x in said) in rec.text("show", "int8"), rec.text("show", "int8")
+    assert f"{LISTING}\n" + "".join(f"  changed since you confirmed it: {x}\n" for x in said) in rec.text("show", "--long", "int8"), rec.text("show", "--long", "int8")
 
 
 # The closing pass after the snapshot rule's last recheck.
@@ -2700,14 +2724,14 @@ def test_every_screen_draws_what_the_user_confirms_with_the_characters_a_termina
     rec.ok("experiment", "add", "INT4 vs FP32" + TAGS, "--id", "int4", "-q", "q-acc", "--hypothesis", "INT4 cuts latency" + TAGS, "-m", "the budget" + TAGS,
            "--baseline", "fp32", "--candidate", "int4", "--if-holds", "ship INT4" + TAGS, "--if-not", "keep FP32", agent=True)
     rec.ok("spec", "set", "int4", "opt.name", json.dumps("alpha" + TAGS), agent=True)
-    [call] = [d["id"] for d in rec.ok("status")["data"]["pending"]]
-    screens = {argv: rec.text(*argv) for argv in (("status",), ("context",), ("show", "int4"), ("show", "int8"), ("show", call), ("log",), ("confirm",))}
+    [call] = [d["id"] for d in rec.ok("status", "--full")["data"]["pending"]]
+    screens = {argv: rec.text(*argv) for argv in (("status", "--full"), ("context",), ("show", "--long", "int4"), ("show", "--long", "int8"), ("show", "--long", call), ("log",), ("confirm",))}
     for argv, text in screens.items():
         assert TAGS[0] not in text, (argv, text)
-    for argv in (("status",), ("context",), ("show", "int8"), ("show", call), ("confirm",)):
+    for argv in (("status", "--full"), ("context",), ("show", "--long", "int8"), ("show", "--long", call), ("confirm",)):
         assert f"note: it holds{ESCAPED} · words (as given): \"ship it{ESCAPED}\"" in screens[argv], (argv, screens[argv])
     for line in (f"Experiment int4: INT4 vs FP32{ESCAPED}", f"  hypothesis: INT4 cuts latency{ESCAPED}", f"  if it holds: ship INT4{ESCAPED}", f"alpha{ESCAPED}"):
-        assert line in screens[("show", "int4")], (line, screens[("show", "int4")])
+        assert line in screens[("show", "--long", "int4")], (line, screens[("show", "--long", "int4")])
     assert TAGS[0] not in rec.page()
     state = rec.state(monkeypatch)
     assert TAGS[0] not in json.dumps(state, ensure_ascii=False)
@@ -2715,7 +2739,7 @@ def test_every_screen_draws_what_the_user_confirms_with_the_characters_a_termina
     assert f"note: it holds{ESCAPED} · words (as given): \"ship it{ESCAPED}\"" in rows["proposed"]["text"], rows
     assert rows["design"]["text"] == f"int4's design: INT4 vs FP32{ESCAPED}" and brief(state, "int4")["hypothesis"] == f"INT4 cuts latency{ESCAPED}"
     # --json and the record keep the text as it was given
-    data = rec.ok("status")["data"]
+    data = rec.ok("status", "--full")["data"]
     assert [d["why"] for d in data["pending"]] == ["it holds" + TAGS] and "INT4 cuts latency" + TAGS in [e["hypothesis"] for e in data["experiments"]]
     # and so does what confirming each says
     receipt = rec.text("confirm", call)
@@ -2729,7 +2753,7 @@ def test_a_record_no_session_wrote_in_draws_its_text_as_it_always_has(rec, monke
     them, and its screens draw its text as group F's did, a character a terminal hides included."""
     user_design(rec)
     rec.ok("experiment", "add", "INT4 vs FP32", "--id", "int4", "-q", "q-acc", "--hypothesis", "INT4 cuts latency" + TAGS, "--baseline", "fp32", "--candidate", "int4")
-    assert f"  hypothesis: INT4 cuts latency{TAGS}\n" in rec.text("show", "int4") and f"INT4 cuts latency{TAGS}" in rec.text("status")
+    assert f"  hypothesis: INT4 cuts latency{TAGS}\n" in rec.text("show", "--long", "int4") and f"INT4 cuts latency{TAGS}" in rec.text("status", "--full")
     assert f"INT4 cuts latency{TAGS}" in rec.page()
     assert brief(rec.state(monkeypatch), "int4")["hypothesis"] == "INT4 cuts latency" + TAGS
 
@@ -2752,7 +2776,7 @@ def test_an_earlier_builds_line_that_says_one_part_also_names_the_file_it_wrote(
     expected = [("setting optim.lr", "changed", "0.001", "0.002"), (".rb/experiments/int8/experiment.yaml", "changed", None, None)]
     assert (rec.design("int8")["standing"], changes(rec)) == ("changed", expected), changes(rec)
     said = ["setting optim.lr, was 0.001, now 0.002", ".rb/experiments/int8/experiment.yaml was written again"]
-    assert f"{LISTING}\n" + "".join(f"  changed since you confirmed it: {x}\n" for x in said) in rec.text("show", "int8"), rec.text("show", "int8")
+    assert f"{LISTING}\n" + "".join(f"  changed since you confirmed it: {x}\n" for x in said) in rec.text("show", "--long", "int8"), rec.text("show", "--long", "int8")
     assert "".join(f"    changed since you confirmed it: {x}\n" for x in said) in rec.text("confirm", "int8")
 
 
@@ -2774,7 +2798,7 @@ def test_after_an_earlier_builds_confirmation_a_sessions_value_and_term_are_both
     as_an_earlier_build_confirmed_it(rec, True)
     assert rec.design("int8")["standing"] == "confirmed"
     rec.ok("spec", "set", "int8", "optim.wd", value, "--source", source, "--term", "weight decay", "--no-verify", agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert f"{LISTING}\n" + "".join(f"  changed since you confirmed it: {x}\n" for x in said) in shown, shown
     # a session's write of the value alone names the setting, not the source it left as it was
     rec.ok("spec", "set", "int8", "optim.wd", "0.0003", "--source", source, "--term", "weight decay", "--no-verify", agent=True)
@@ -2796,7 +2820,7 @@ def test_a_was_and_a_now_a_screen_would_draw_alike_are_quoted_and_escaped(rec, f
     rec.ok("spec", "set", "int8", "opt.name", first, agent=True)
     confirm(rec)
     rec.ok("spec", "set", "int8", "opt.name", second, agent=True)
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert f"{LISTING}\n  changed since you confirmed it: {said}\n" in shown, shown
 
 
@@ -2809,7 +2833,7 @@ def test_what_meeting_a_criterion_would_mean_is_said_escaped_where_it_changed(re
     confirm(rec)
     rec.ok("criterion", "file", "acc-tol", "q-acc", "--when-met", "INT8 stays­", "-m", "reworded", agent=True)
     said = 'what meeting acc-tol would mean for q-acc, was "INT8 stays\\\\u00ad", now "INT8 stays\\u00ad"'
-    shown = rec.text("show", "int8")
+    shown = rec.text("show", "--long", "int8")
     assert f"  changed since you confirmed it: {said}\n" in shown, shown
 
 
@@ -2828,7 +2852,8 @@ def test_a_page_that_draws_escapes_wraps_them_and_one_that_draws_none_keeps_its_
     drawn = out.read_text(encoding="utf-8")
     assert TAGS[0] not in drawn and ESCAPED in drawn
     # the shell's one stylesheet wraps every word, however long, whatever the record draws
-    assert f'<p class="wt">park int8 · note: later{ESCAPED}' in drawn
+    # closed form (owner, Nov 13 2026): the waiting call's line is a link to what it is on
+    assert f'<p class="wt"><a href="#x-int8">park int8 · note: later{ESCAPED}' in drawn
     assert style(drawn) == style(plain) and ".wt,.wp{margin:0;overflow-wrap:break-word}" in style(plain) and "overflow-wrap:break-word}" in style(plain)
 
 
@@ -2850,7 +2875,7 @@ def test_rb_contexts_data_keeps_a_waiting_calls_text_as_written(rec):
     briefings = {"rb context --json": rec.ok("context")["data"]["markdown"], "MCP": tool["content"][0]["text"], "SDK": rabbit_brain.open(rec.root).context()}
     for where, markdown in briefings.items():
         assert f'note: it holds{TAGS} · words (as given): "ship it{TAGS}"' in markdown and "\\udb40" not in markdown, (where, markdown)
-    for argv in (("context",), ("status",)):
+    for argv in (("context",), ("status", "--full")):
         text = rec.text(*argv)
         assert f'note: it holds{ESCAPED} · words (as given): "ship it{ESCAPED}"' in text and TAGS[0] not in text, (argv, text)
 
@@ -2863,19 +2888,19 @@ def test_rb_shows_warning_of_a_hand_edit_draws_what_a_terminal_hides_as_escapes(
     warning says them as group F did."""
     rec.ok("experiment", "add", "INT4 vs FP32", "--id", "int4", "-q", "q-acc", "--hypothesis", "INT4 cuts latency", "--baseline", "fp32", "--candidate", "int4")
     edit(rec, "experiments/int4/experiment.yaml", "hypothesis: INT4 cuts latency", "hypothesis: " + json.dumps("INT4 cuts latency" + TAGS, ensure_ascii=False))
-    r = rec.run("show", "int4")
+    r = rec.run("show", "--long", "int4")
     assert "edited outside rb" in r.stderr and TAGS in r.stderr and ESCAPED not in r.stderr, r.stderr
     session_design(rec)
     confirm(rec)
     rec.ok("decide", "int8", "park", "-m", "later", agent=True)
-    [call] = [d["id"] for d in rec.ok("status")["data"]["pending"]]
+    [call] = [d["id"] for d in rec.ok("status", "--full")["data"]["pending"]]
     edit(rec, "experiments/int8/experiment.yaml", f"hypothesis: {HYPOTHESIS}", "hypothesis: " + json.dumps(HYPOTHESIS + TAGS, ensure_ascii=False))
     edit(rec, "experiments/int8/criteria/acc-tol.yaml", "INT8 stays within the accuracy budget", "INT8 stays within the accuracy budget" + TAGS)
     edit(rec, f"decisions/{call}.yaml", "later", "later" + TAGS)
     for subject in ("int4", "int8", "acc-tol", call):
-        r = rec.run("show", subject)
+        r = rec.run("show", "--long", subject)
         assert "edited outside rb" in r.stderr and ESCAPED in r.stderr and TAGS[0] not in r.stdout + r.stderr, (subject, r.stdout, r.stderr)
-        r = rec.run("show", subject, "--json")
+        r = rec.run("show", "--long", subject, "--json")
         [warning] = json.loads(r.stdout)["data"]["warnings"]
         assert TAGS in warning and ESCAPED in r.stderr and TAGS[0] not in r.stderr, (subject, warning, r.stderr)
 
@@ -2898,7 +2923,7 @@ def test_a_designs_data_gives_its_gate_as_written(rec):
         [e] = [e for e in data["experiments"] if e["id"] == exp] if "experiments" in data else [data]
         return {p["key"]: p["value"] for p in e["design"]["parts"]}
 
-    for argv in (("status",), ("show", "int4")):
+    for argv in (("status",), ("show", "--long", "int4")):
         said = parts("int4", *argv)
         assert (said["gate"], said["hypothesis"]) == (gate, "INT4 cuts latency" + rlo), (argv, said)
     # a design a session wrote: its data as written, its listing escaped

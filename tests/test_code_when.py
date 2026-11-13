@@ -70,7 +70,7 @@ def test_an_edit_between_the_run_and_its_recording_keeps_the_code_the_command_st
     p = run["receipt"]["produced"]
     assert (p["captured"], p["tree"], p["from"], p["kept"]) == ("start", start, "journal", "whole")
     assert run["receipt"]["attached"]["tree"] != start
-    out = say(root, "show", run["id"])
+    out = say(root, "show", "--long", run["id"])
     assert f"The code when the run started: git tree {start[:12]}." in out
     assert f"Its code is from the start of: {sys.executable} train.py 1 (rb journal run, " in out
     changed = [w for w in r["data"]["warnings"] if w.startswith("The code changed after the run")]
@@ -91,7 +91,7 @@ def test_a_typed_tree_this_repository_lacks_is_recorded_as_given_with_exit_0(roo
     r = rb(root, "run", "add", "int8", "top1=75.1", "--variant", "int8", "--tree", tree, "--produced-at", "2026-11-01")
     p = r["data"]["object"]["receipt"]["produced"]
     assert (p["captured"], p["tree"], p["here"]) == ("given", tree, False)
-    shown = say(root, "show", r["data"]["object"]["id"])
+    shown = say(root, "show", "--long", r["data"]["object"]["id"])
     assert f"The code as given: git tree {tree[:12]}, which this repository does not have." in shown
     # a tree given alone names no commit: rb show offers no git diff against one (S7 shots)
     assert f"  code that made it: git tree {tree[:12]} (as given)\n" in shown and "git diff  " not in shown, shown
@@ -103,7 +103,7 @@ def test_a_given_tree_here_is_pinned_as_rb_pins_its_own(root):
     p = r["data"]["object"]["receipt"]["produced"]
     assert p["captured"] == "given" and "here" not in p
     assert git(root, "for-each-ref", "--format=%(objectname)", f"refs/rb/snapshots/{tree}") == tree
-    assert f"The code as given: git tree {tree[:12]}." in say(root, "show", r["data"]["object"]["id"])
+    assert f"The code as given: git tree {tree[:12]}." in say(root, "show", "--long", r["data"]["object"]["id"])
 
 
 def test_a_run_card_says_when_its_code_was_captured_on_rb_ui_and_a_page(root, tmp_path):
@@ -146,7 +146,7 @@ def test_an_sdk_run_block_names_the_code_it_started_with(root):
     attached = run.record.receipt.attached
     attached = attached if isinstance(attached, dict) else attached.model_dump()
     assert p["tree"] != attached["tree"]
-    out = say(root, "show", run.record.id)
+    out = say(root, "show", "--long", run.record.id)
     assert f"The code when the run started: git tree {p['tree'][:12]}." in out
     assert "Its code is from the start of" not in out
     later = exp.record({"int8.top1": 77.6}, produced_at="2026-11-01")
@@ -185,20 +185,20 @@ def test_a_tree_git_gc_removed_reads_as_gone_in_the_clone_that_recorded_the_run(
     after = run["receipt"]["attached"]["tree"][:12]
     for ref in git(root, "for-each-ref", "--format=%(refname)", "refs/rb/").split():
         git(root, "update-ref", "-d", ref)
-    out = say(root, "show", run["id"])
+    out = say(root, "show", "--long", run["id"])
     assert f"git tree {start} is in this repository, but no ref keeps it, so git gc may remove it." in out, out
     git(root, "reflog", "expire", "--expire=now", "--all")
     git(root, "gc", "-q", "--prune=now")
     assert subprocess.run([GIT, "cat-file", "-e", f"{start}^{{tree}}"], cwd=root, capture_output=True).returncode != 0
-    out = say(root, "show", run["id"])
+    out = say(root, "show", "--long", run["id"])
     assert "in the clone that recorded the run" not in out, out
     assert f"This run's code is gone from this clone: rb kept the code its command started with here as git tree {start}, and git no longer has it" in out, out
     assert f"which rb kept here as git tree {after}, and git no longer has it" in out, out
-    row = say(root, "show", "int8")
+    row = say(root, "show", "--long", "int8")
     assert "in the clone that recorded it" not in row and "code gone for 1 run: rb kept it in this clone as git tree" in row, row
     # the finding's evidence line and its note say it as the run does (MP-1110-2303's later; fails on f73697b)
     rb(root, "criterion", "add", "INT8 loses at most ten points", "-e", "int8", "--metric", "change.top1", "--at-least", "-10", "--id", "c9")
-    f = rb(root, "show", "c9")["data"]["finding"]
+    f = rb(root, "show", "--long", "c9")["data"]["finding"]
     assert "1 run's code gone from this clone" in f["says"]["evidence"] and "not in this clone" not in f["says"]["evidence"], f["says"]
     notes = " ".join(c["text"] for c in f["caveats"])
     assert f"run {run['id']}'s code is gone from this clone" in notes and "is not in this clone" not in notes, notes
@@ -215,7 +215,7 @@ def test_inquiry_integrity_ends_with_one_full_stop_and_forget_of_one_record_says
     subprocess.run([*command(), "journal", "run", "--", sys.executable, "train.py", "1"], cwd=root, env=environment(), check=True, capture_output=True)
     rb(root, "run", "add", "int8", "--from", "out/seed1/metrics.json")
     git(root, "checkout", "--", ".")
-    for argv in (("status",), ("context",), ("show", "q-acc")):
+    for argv in (("status", "--full"), ("context",), ("show", "--long", "q-acc")):
         said = say(root, *argv)
         assert "then.." not in said and "again then." in said, (argv, said)
     from rbtest import object_card
@@ -246,7 +246,7 @@ def test_the_code_changed_after_the_run_only_where_its_code_did(root):
     assert not [w for w in r["data"]["warnings"] if w.startswith("The code changed after the run")], r["data"]["warnings"]
     # git checkout -- . puts the code back after the recording: the code did not change after the run
     git(root, "checkout", "--", "train.py")
-    out = say(root, "show", run["id"])
+    out = say(root, "show", "--long", run["id"])
     assert "The code changed after the run" not in out, out
     # a real change between the run and its recording is said, naming only the file of code
     subprocess.run([*command(), "journal", "run", "--", sys.executable, "train.py", "3"], cwd=root, env=environment(), check=True, capture_output=True)

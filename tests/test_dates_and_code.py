@@ -54,7 +54,7 @@ def rb(tmp_path, monkeypatch, capsys):
 
 
 def postdates(rb):
-    f = rb("show", "c1").data["finding"]
+    f = rb("show", "--long", "c1").data["finding"]
     return [c["text"] for c in f["caveats"] if c["code"] == "source_postdates_run"]
 
 
@@ -81,7 +81,7 @@ def test_a_setting_is_dated_only_against_the_runs_the_reading_counts(rb):
     # a run before the config, whose own config disagrees with what it was given: not counted, so not what dates it
     rb("run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.0", "--set", "seed=9", "--set", "eval.crop=resize", "--config", "early.yaml",
        "--produced-at", "2026-05-03")
-    f = rb("show", "c1").data["finding"]
+    f = rb("show", "--long", "c1").data["finding"]
     assert any(not o["counted"] for o in f["observations"])
     assert postdates(rb) == []
 
@@ -92,6 +92,6 @@ def test_the_integrity_line_never_says_ok_above_a_run_on_uncommitted_code(rb):
         cfg.write_text(f"seed: {seed}\ndirty: {'true' if seed == 2 else 'false'}\n", encoding="utf-8")
         rb("run", "add", "int8", f"fp32.top1=76.{seed}", f"int8.top1=75.{seed}", "--set", f"seed={seed}", "--config", cfg.name,
            "--produced-at", "2026-05-12")
-    code, out = rb("show", "c1", text=True)
+    code, out = rb("show", "--long", "c1", text=True)
     assert "integrity: ok" not in out
     assert "integrity: a run it counts has a config that says the code had uncommitted changes when it ran, as said below" in out, out

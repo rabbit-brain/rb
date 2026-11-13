@@ -6,14 +6,8 @@ pub const PAGE_MADE: &str = crate::export::PAGE_MARK;
 /// rb open's footer, as rb open says it today: what it is, and where it lives.
 pub const OPEN_MADE: &str = "recomputed from the record on every refresh";
 pub const OPEN_WHERE: &str = "this page lives on 127.0.0.1 of this machine";
-pub const HOW_TO_READ: &str = "How to read this record";
 /// The honesty line: once, in the footer (BP 2a, `one_honesty_line`).
-pub const HONEST: &str = "A decision records a call; it does not change a reading.";
-pub const HOW_TO_READ_AXES: &str = "each rule is read on axes: the comparison it reads with its interval, whether the rule as declared is met, \
-     when it was declared against its evidence, how many independent units it rests on, and anything wrong with what it rests on. No single word \
-     stands for all of that.";
-pub const HOW_TO_READ_COMPUTED: &str =
-    "findings are computed, never stored, so regenerate this file after new runs. If this page and rb status ever disagree, rb status is right.";
+pub const HONEST: &str = "A decision does not change a reading.";
 
 pub const SKIP: &str = "Skip to the record";
 /// About's line on the record: "Research record <id> · rb <version>" (the top bar names the record by its title alone).
@@ -36,29 +30,48 @@ pub const YOUR_CALL: &str = "Your call";
 pub const ABOUT: &str = "About";
 pub const ABOUT_TITLE: &str = "About this record";
 
-/// The views' headings and ledes, rb's words as rb page has them.
-pub const RESEARCH_LEDE: &str = "Each question has its own answer, evidence and open questions.";
-pub const EXPERIMENTS_LEDE: &str = "Open an experiment for its comparison, settings and record.";
-pub const RUNS_LEDE: &str = "Each run keeps when its output was produced and when it was recorded, the repository's state when it was recorded, and what it read and made.";
-pub const HISTORY_LEDE: &str = "Each call keeps its reason and its date. A call does not change a finding.";
 
 /// A question's view (SHELL-SPEC section 4.3).
 pub const EXPERIMENTS_BEHIND: &str = "Experiments behind this question";
 pub const NO_EXPERIMENT_HERE: &str = "No experiment is filed under this question.";
 pub const NOTHING_WAITS_HERE: &str = "Nothing waits on you here.";
 pub const NEXT_STEP: &str = "Next step";
-pub const CALLS_MADE: &str = "Calls made";
+pub const CALLS_MADE: &str = "Decisions made";
 /// After a criterion whose rule cites a number someone else stated.
 pub const CITED: &str = "cited";
 pub const NOT_IN_AN_INTERPRETATION: &str = "Rules no note speaks to";
 /// A question no rule is linked to says this one sentence under its status (plain words pass 4), where rb gives no line
 /// of its own for it.
 pub const NO_RULE_TESTS: &str = "No rule tests this question yet.";
+/// Empty states, shown not written (the UX lead's rule, Nov 13 2026): the chip on a question no rule tests, or one
+/// tested through its sub-questions, and on an experiment with no run.
+pub const NOT_TESTED_YET: &str = "Not tested yet";
+pub const TESTED_BELOW: &str = "Tested in its sub-questions";
+pub const NO_RUNS_CHIP: &str = "No runs yet";
+pub const NO_RESOURCES_YET: &str = "No resources yet";
+pub const NO_QUESTION_YET: &str = "No question yet";
+/// How rb's quiet line begins on a record with nothing in it (view.rs).
+pub const NOTHING_RECORDED: &str = "Nothing recorded yet";
+/// The Next step's prompt for a question no rule or experiment tests yet, around its words.
+pub const PLAN_PROMPT_HEAD: &str = "In this repository, use Rabbit Brain to plan a test for the question ";
+pub const PLAN_PROMPT_TAIL: &str = ": propose the rule a result must meet and the runs to make, record them with rb, and don't run anything until I confirm.";
+/// The prompt a design that waits offers for their agent (owner, msg 47: an action, never a command to type),
+/// around the experiment's words. Confirming itself stays their, in their own terminal (model gap G5).
+pub const DESIGN_PROMPT_HEAD: &str = "In this repository, use Rabbit Brain to show me the design of ";
+pub const DESIGN_PROMPT_TAIL: &str = " that waits for my confirmation, part by part, and how I confirm it.";
+/// The same for a call that waits, around what it is on.
+pub const CALL_PROMPT_HEAD: &str = "In this repository, use Rabbit Brain to show me what waits for my confirmation on ";
+pub const CALL_PROMPT_TAIL: &str = ", and how I confirm it.";
+/// The same for every call that waits, together.
+pub const ALL_PROMPT: &str = "In this repository, use Rabbit Brain to show me every decision that waits for my confirmation, and how I confirm them.";
+/// The one plain line beside it.
+pub const DESIGN_WAITS: &str = "This experiment's design is not confirmed.";
+/// The Next step's prompt for an experiment with no run, around its words.
+pub const RUN_PROMPT_HEAD: &str = "Run ";
+pub const RUN_PROMPT_TAIL: &str = " with rb journal run, as its design says, and record each run.";
 /// The notes whose words name a question, listed on its page (plain words pass 4); with none, nothing.
 pub const NOTES_ABOUT_QUESTION: &str = "Notes about this question";
-pub const WHICH_COMPARISONS: &str = "Which comparisons carry these qualifications?";
 pub const BY_READING: &str = "By reading";
-pub const DIRECTIONS_ALIGNED: &str = "Directions are aligned to the same comparison order.";
 pub const SUB_QUESTION: &str = "Sub-question";
 pub const DETAILS: &str = "details";
 pub const WHEN_AND_WHY: &str = "when and why";
@@ -140,6 +153,20 @@ pub fn short_rule(word: &str) -> &str {
         "undetermined" => "can't tell yet",
         "untested" => "not tested",
         other => other,
+    }
+}
+
+/// A rule word as a screen's tally says it beside its count (closed form, owner Nov 13 2026: no "met", no "can't tell
+/// yet" on a screen): "4 hold", "1 does not hold", "5 not settled", "3 not tested"; any other ("not reproduced") as rb
+/// gives it. The same meaning as rb status's words (`short_rule`), said plainer.
+pub fn tally_word(word: &str, n: i64) -> &str {
+    match word {
+        "meets" if n == 1 => "holds",
+        "meets" => "hold",
+        "misses" if n == 1 => "does not hold",
+        "misses" => "do not hold",
+        "undetermined" => "not settled",
+        other => short_rule(other),
     }
 }
 
@@ -227,9 +254,12 @@ pub fn rests_afterwards(afterwards: i64, total: i64) -> String {
     }
 }
 
-/// Resources (SHELL-SPEC section 4.8).
-pub const RESOURCES_LEDE: &str = "What the runs read and made, how each is identified, how to get it again, and what depends on it.";
 pub const HOW_TO_GET_IT_AGAIN: &str = "how to get it again";
+/// a resource's one way to get it (getit.rs), and what a page says where the record holds none
+pub const GET_IT: &str = "Get it";
+pub const IN_THE_REPOSITORY: &str = "in the repository";
+pub const NO_DOWNLOAD_LINK: &str = "No download link";
+pub const NEXT_STEP_LABEL: &str = "Next step:";
 pub const IDENTITY: &str = "identity";
 pub const WHERE: &str = "where";
 pub const URL: &str = "url";
@@ -265,10 +295,8 @@ pub fn made_commands(given: i64, runs: i64) -> String {
 }
 /// The Overview's fallback for "Latest changes" until History's sittings exist (SHELL-SPEC section 15, `last_write`).
 pub const LAST_WRITE: &str = "last write ";
-/// The glossary's key for a recorded interpretation, which the screens call a note (plain words pass 3, P9).
-pub const RECORDED_INTERPRETATION: &str = "note (on a question)";
-pub const CONDITIONAL_INTERPRETATION: &str = "Conditional interpretation";
-pub const COMPUTED_COMPARISON: &str = "Computed comparison";
+/// rb's computed comparison of two rules, drawn side by side (no glossary, show instead).
+pub const COMPUTED_COMPARISON: &str = "Side by side";
 pub const NO_INTERPRETATION_YET: &str = "No note on these rules yet.";
 /// rb's mark on what a session wrote and the user has not confirmed (D3: such an interpretation reads as a note).
 pub const NOT_CONFIRMED: &str = "not confirmed";
@@ -283,6 +311,22 @@ pub const RULES_LEAD: &str = "Rules: ";
 pub const EXPERIMENT_WORD: &str = "Experiment";
 /// The tag on a rule that is the exception where most were written after their results (design pass 1, P6).
 pub const WRITTEN_BEFORE: &str = "written before its results";
+
+/// A rule and its first result placed in time, in the order they came (no glossary, show instead): "results 14 Oct
+/// ──▶ rule 20 Oct" for a rule written after its results, "rule 10 Oct ──▶ results 14 Oct" for one written before
+/// them; each day a `YYYY-MM-DD`. Where a day is not known, the words alone.
+pub fn in_time(late: bool, rule: &str, results: &str) -> String {
+    // the earlier day first, whatever the timing code says (a rule read on its subject's runs can follow its baseline's
+    // first result); on the same day, the order the timing gives
+    let results_first = results < rule || (results == rule && late);
+    let (rule, results) = (crate::card::day(rule, true), crate::card::day(results, true));
+    match (rule.is_empty() || results.is_empty(), results_first) {
+        (false, true) => format!("results {results} \u{2500}\u{2500}\u{25b6} rule {rule}"),
+        (false, false) => format!("rule {rule} \u{2500}\u{2500}\u{25b6} results {results}"),
+        (true, true) => "written after its results".to_string(),
+        (true, false) => WRITTEN_BEFORE.to_string(),
+    }
+}
 /// A question's state names its subject (plain words pass 3): "Open question", "Answered question".
 pub fn question_state(word: &str) -> String {
     let w = word.trim();
@@ -303,9 +347,9 @@ pub fn holds_sentence(holds: &str) -> String {
         return String::new();
     }
     let one = match h {
-        "its rule met" => Some("Its rule is met."),
-        "its rule not met" => Some("Its rule is not met."),
-        "its rule: can't tell yet" => Some("rb can't tell yet whether its rule is met."),
+        "its rule met" => Some("Its rule holds."),
+        "its rule not met" => Some("Its rule does not hold."),
+        "its rule: can't tell yet" => Some("Its rule is not settled."),
         "its rule: not tested" => Some("Its rule has no results yet."),
         _ => None,
     };
@@ -318,10 +362,10 @@ pub fn holds_sentence(holds: &str) -> String {
         return holds_sentence(h);
     }
     if let Some(n) = h.strip_prefix("its ").and_then(|r| r.strip_suffix(" rules met")).filter(|n| n.chars().all(|c| c.is_ascii_digit())) {
-        return format!("Its {n} rules are met.");
+        return format!("Its {n} rules hold.");
     }
     if let Some(n) = h.strip_prefix("its ").and_then(|r| r.strip_suffix(" rules not met")).filter(|n| n.chars().all(|c| c.is_ascii_digit())) {
-        return format!("Its {n} rules are not met.");
+        return format!("Its {n} rules do not hold.");
     }
     let mut c = h.chars();
     format!("{}{}.", c.next().map(|f| f.to_uppercase().collect::<String>()).unwrap_or_default(), c.as_str())
@@ -411,6 +455,7 @@ pub const VARIES: &str = "varies";
 pub const RECEIPT_LINK: &str = "receipt";
 /// A design that waits for the user's confirmation, in rb's words (AGENTS.md: its own views say it once).
 pub const DESIGN_NOT_CONFIRMED: &str = "design not confirmed";
+pub const DESIGN_NOT_CONFIRMED_CHIP: &str = "Design not confirmed";
 pub const NOTE: &str = "note: ";
 
 pub const FOUND: &str = "Found in the repository";
@@ -486,8 +531,7 @@ pub fn inspect_uncited(n: usize) -> String {
 }
 /// What the shell calls an active recorded interpretation, as the model's standing card does (M's
 /// interpretation_label): the user's reading where they own it, a recorded reading where it waits for their
-/// confirmation, and the recorded reading on a page that leaves the machine, which says no one's. The glossary's
-/// "Recorded interpretation" stays its hint.
+/// confirmation, and the recorded reading on a page that leaves the machine, which says no one's.
 pub fn reading_label(confirmed: bool, away: bool) -> &'static str {
     match (confirmed, away) {
         (_, true) => "The recorded reading",
@@ -498,20 +542,10 @@ pub fn reading_label(confirmed: bool, away: bool) -> &'static str {
 
 /// The export's name for Your call (polish 1, Oct 22 00:10): a page that leaves the machine cannot know who reads it.
 pub const OPEN_CALLS: &str = "Open calls";
-pub const OPEN_CALLS_LEDE: &str = "Calls are made with rb in a terminal, never on this page.";
 /// Said once, in About (plain words pass 4): no view repeats it.
 pub const RB_NEVER_DECIDES: &str = "rb computes; it never decides.";
-/// The queue's lead line on the export (plain words pass 4): the owner's view and a file with no viewer named, then a
-/// reader's, which makes no call.
-pub const QUEUE_LEDE: &str = "Open one to see why it waits and decide it.";
-pub const QUEUE_LEDE_READER: &str = "Not decided yet. Open one to see why it waits.";
 pub const NO_CALL_OPEN: &str = "No call is open.";
 pub const SEE_OPEN_CALLS: &str = "See the open calls \u{2192}";
-/// The export as the hub serves it names its viewer (OWNER-READER, Oct 25): the owner, signed in at their record's
-/// address, reads a working view in rb open's words; a reader at a share link reads where the calls stand, with no
-/// action. With no viewer named (an export opened from disk) the export's own words above stand.
-pub const OWNER_CALLS_LEDE: &str = "Your calls are made with rb in a terminal; this page gives you the command.";
-pub const READER_CALLS_LEDE: &str = "Calls are made with rb in a terminal, not on this page; it shows where they stand.";
 pub const SEE_YOUR_CALLS: &str = "See your calls \u{2192}";
 /// The queue's heading in the reader's view: the same rows, as status, not tasks.
 pub const STILL_OPEN: &str = "Still open";
@@ -521,10 +555,9 @@ pub const READER_NOT_CONFIRMED: &str = "It is not confirmed yet.";
 pub const READER_DESIGN_NOT_CONFIRMED: &str = "The design is not confirmed yet.";
 
 /// An experiment's folds (OVERVIEW-V2: settings, config values and the recipe one click down).
-pub const SOURCE_DETAILS: &str = "Source details";
+pub const SOURCE_DETAILS: &str = "Where it comes from";
 pub const REVIEW_THE_CALLS: &str = "Review the calls waiting on you →";
-pub const CALL_IN_YOUR_TERMINAL: &str = "You make a call in your terminal; rb records it with your reason.";
-pub const KEYS_LINE: &str = "<kbd>j</kbd> <kbd>k</kbd> move through the calls · <kbd>a</kbd> <kbd>r</kbd> <kbd>i</kbd> choose an action · <kbd>c</kbd> copies the command";
+pub const KEYS_LINE: &str = "<kbd>j</kbd> <kbd>k</kbd> move through the decisions · <kbd>a</kbd> <kbd>r</kbd> <kbd>i</kbd> choose an action · <kbd>c</kbd> copies the command";
 pub const OPEN_IN_THE_RECORD: &str = "Also open in the record";
 /// An open item's state words (design pass 1, target 2).
 pub const NO_RUNS_YET: &str = "no runs yet";
@@ -559,8 +592,6 @@ pub const REVIEW_WILL_READ: &str = "The record will say: ";
 
 /// Reproduce this project, an Overview action on an export made with --url (rb's words, as rb page has them).
 pub const REPRODUCE: &str = "Reproduce this project";
-pub const REPRODUCE_LEDE: &str =
-    "Everything on this page was computed from the record this bundle carries. Rerun that computation, and the runs behind it, on your machine:";
 pub const REPRODUCE_AFTER: &str = "The clone carries the structure, inherited: each rule is not tested there until runs recorded on your machine read \
      reproduced or not reproduced on it, computed like any finding. What you find is yours to publish back.";
 
@@ -671,90 +702,17 @@ pub fn and_more(n: usize) -> String {
     format!("and {n} more")
 }
 
-/// The glossary (SHELL-SPEC sections 7.5 and 12, row 32): each term the page draws with a hint, with rb's own line for
-/// it (rb context's Words, rb page's, AGENTS.md's, the freeze help). The fold "What the words on this page mean" holds
-/// the same lines, so the document has them with no script.
-pub const HINTS: [(&str, &str); 41] = [
-    ("open (question)", "no call has closed it. A call on the question closes it: answered (accept), dropped (reject), parked, stopped, pivoted or shipped; investigate and continue keep it open. A finding or an interpretation does not make that call."),
-    ("note (on a question)", "recorded words on what meeting a rule would mean for the question. A note counts only while its rule is met; rb computes the finding and never asserts the inverse."),
-    ("Computed comparison", "rb's reading of a declared reversal between two rules: both numbers and intervals stay visible, and it makes no call on the question."),
-    ("headline", "rb's one line on a question's evidence, the first that applies: No rule tests this question yet (rules are filed here but none is linked to it), Evidence needs review (an integrity problem), No evidence recorded yet, Measured differences; uncertainty remains (an interval includes 0), Evidence includes point estimates only (a reading has no interval), else Evidence available for review."),
-    ("rule written before the results", "the rule was declared before the evidence it reads existed: a test planned in advance."),
-    ("rule written after the results", "the rule or its question link was declared after the evidence existed or after the data was seen: never read as a test planned in advance."),
-    ("no interval", "one estimate with no interval, so how much it could vary is unknown. rb gives one from 3 units, and none across fixed design cells."),
-    ("Uncertainty remains", "unresolved: the interval includes 0."),
-    ("Fixed design cells", "the reading spans fixed design choices: each cell is read on its own, with how many meet and their range, and no sampling interval across cells."),
-    ("Reversal observed; repeatability uncertain", "the two sides of a declared reversal measured opposite directions, but not both with intervals clear of 0."),
-    ("rb's interval", "95%, from 3 units: a Student t interval when the arms pair up by their unit, Welch (unpaired) when they never share one."),
-    ("straddles", "the interval crosses the rule's threshold: the rule word holds on the estimate, not across the whole interval."),
-    ("rule", "a threshold or comparison declared for a question; commands call it a criterion."),
-    ("can't tell yet", "there are results, but they don't settle the rule: it needs an interval, more units, or the metric's direction."),
-    ("result", "gain or loss (the interval clear of 0, read in the metric's direction), unresolved (the interval includes 0), equivalent (inside a declared margin), no interval (one estimate, no interval yet), measured (a level), higher or lower (the metric has no direction), not tested."),
-    ("timing", "declared before the evidence (before its runs, when only its baseline's runs came first: timing is read on the subject's runs); after the evidence existed; after the data was seen; order unknown."),
-    ("units", "the independent units a reading rests on. A repeat checks a run and adds no unit; a reanalysis adds none."),
-    // the cards say "checks: ok" (plain words pass 1); "integrity" is the key rb's JSON and older callers use (ALIASES)
-    ("checks", "problems with what a finding depends on (a stale source, an undeclared difference, a record edited outside rb). ok when there are none. Not the repository's own checks."),
-    ("estimate meets the rule", "met on the estimate, not across the whole interval; never drawn green."),
-    ("verified", "the named file, run or database row states this setting's value. It does not mean a run used it. provisional: given, not checked."),
-    ("open (experiment)", "planned: an experiment nothing tests yet. open: evidence and no call. accepted, rejected, investigating, parked, stopped, pivoted, shipped: what the latest call on it made it."),
-    ("locked", "the spec and rules are locked; a later change is recorded as an amendment."),
-    ("not locked", "rules and settings can still change; a freeze locks them."),
-    // a reading's result, as rb page always said it on the word (AGENTS.md: "a level with an interval", "untested")
-    ("not tested", "no results for this rule yet: no recorded run reads this comparison"),
-    ("measured", "one arm on its own, with its interval, so neither better nor worse"),
-    ("command (as given)", "--command records what produced the numbers. rb did not run it."),
-    // a tag on what waits for the user's confirmation (OVERVIEW-V2: ontology in tags), naming no writer
-    ("not confirmed", "it waits to be confirmed with rb in a terminal; until then it reads as a note, never as a call made or an answer."),
-    ("reconstructible", "present, changed, remote, reconstructible or lost: reconstructible means no copy is recorded, but how to get it again is."),
-    // the kept terms of art the cards draw (plain words pass 2: every one has a one-line hover)
-    ("gain", "the interval is clear of 0 on the better side."),
-    ("loss", "the interval is clear of 0 on the worse side."),
-    ("unresolved", "the interval includes 0, which is not evidence of no difference."),
-    ("equivalent", "the interval lies inside the margin an equivalence rule declares."),
-    ("reproduced", "a rule from a cited source or from the record this one was cloned from, met by the runs recorded here."),
-    ("not reproduced", "a rule from a cited source or from the record this one was cloned from, not met by the runs recorded here."),
-    ("paired difference", "each unit's subject minus its reference, averaged over the units."),
-    ("cited", "a number someone else stated (a paper's table, say), checked against the source's own words."),
-    ("margin", "how far the value the rule judges (the estimate, an interval bound or the worst unit) sits from its threshold: positive inside it, negative outside. Not a declared equivalence or noninferiority margin."),
-    ("question link", "the question a rule's finding bears on, with the recorded words on what meeting the rule would mean for it."),
-    ("identity", "how exactly a resource is named: exact (the hash of its bytes), version (a release) or name only."),
-    ("amended", "changed after the rules and settings were locked; the change, its reason and what it changed from are kept."),
-    // rb open's alone: a page has no viewer's checkout (the glossary on a page leaves it out)
-    (YOUR_CHECKOUT, "the folder rb open started in, as git sees it now, compared file by file with the code the runs ran. The record and the files the runs name are left out, and so are files that code never held. Show code diff still lists those, with any file added since."),
-];
-
-/// Reproduce's subject on rb open (the term, its line in HINTS) and the fold that holds the diff to copy.
+/// Reproduce's subject on rb open and the fold that holds the diff to copy.
 pub const YOUR_CHECKOUT: &str = "your checkout";
 pub const SHOW_CODE_DIFF: &str = "Show code diff";
 
-/// The glossary fold's summary, and the anchor of each line: `g-` and the term in lower case, each run of other
-/// characters one hyphen ("g-open-question", "g-rb-s-interval").
-pub const WORDS: &str = "What the words on this page mean";
-
-pub fn glossary_id(term: &str) -> String {
-    let term = canonical(term);
-    let mut out = String::from("g-");
-    let mut gap = false;
-    for c in term.chars().flat_map(char::to_lowercase) {
-        if c.is_ascii_alphanumeric() {
-            if gap && out.len() > 2 {
-                out.push('-');
-            }
-            gap = false;
-            out.push(c);
-        } else {
-            gap = true;
-        }
-    }
-    out
-}
-
 /// rb's rule words as the shell's screens say them (plain words pass 1): the display noun is "rule" ("3 rules met",
 /// "rule not met"), undetermined reads "can't tell yet", untested "not tested", a reading's point only "no interval",
-/// the tags Retrospective and No interval "rule written after the results" and "no interval" (each the glossary's key).
+/// the tags Retrospective and No interval "rule written after the results" and "no interval".
 /// Commands, keys and rb's own phrase (which keys colours and anchors) are unchanged; this is display text only. A
 /// leading count is kept; any other phrase ("not reproduced", "gate missed") is as rb gives it.
-pub fn plain_word(phrase: &str) -> String {
+/// rb status's own rule words (cmds/reading.rs), as the screens said them before the closed-form pass.
+pub fn terminal_word(phrase: &str) -> String {
     let (n, rest) = match phrase.split_once(' ') {
         Some((n, rest)) if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => (Some(n), rest),
         _ => (None, phrase),
@@ -778,19 +736,35 @@ pub fn plain_word(phrase: &str) -> String {
     }
 }
 
-/// rb's line for a term the page draws, if it has one.
-/// Other keys a caller may ask for, each with the glossary term it means: the rule chip asks for the noun ("rule
-/// (noun)"), and a finding's checks are rb's "integrity". Each resolves to one glossary line, so the fold holds no term
-/// twice and every hover points at a line that is there.
-pub const ALIASES: [(&str, &str); 2] = [("rule (noun)", "rule"), ("integrity", "checks")];
-
-fn canonical(term: &str) -> &str {
-    ALIASES.iter().find(|(a, _)| *a == term).map_or(term, |(_, t)| *t)
-}
-
-pub fn hint(term: &str) -> Option<&'static str> {
-    let term = canonical(term);
-    HINTS.iter().find(|(t, _)| *t == term).map(|(_, line)| *line)
+pub fn plain_word(phrase: &str) -> String {
+    let (n, rest) = match phrase.split_once(' ') {
+        Some((n, rest)) if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => (Some(n), rest),
+        _ => (None, phrase),
+    };
+    // the screens' words (closed form, owner Nov 13 2026): a rule holds or does not hold, is not settled, has no range
+    // yet; rb status keeps its own (`terminal_word`)
+    let one = n == Some("1") || n.is_none();
+    let said = match rest {
+        "criteria met" | "criterion met" => if one { "rule holds" } else { "rules hold" },
+        "criteria not met" | "criterion not met" => if one { "rule does not hold" } else { "rules do not hold" },
+        "criteria undetermined" | "criterion undetermined" | "undetermined" => "not settled",
+        "criteria untested" | "criterion untested" | "untested" => "not tested",
+        "met" => if one { "holds" } else { "hold" },
+        "not met" => if one { "does not hold" } else { "do not hold" },
+        "can't tell yet" => "not settled",
+        "gate undetermined" | "gate, can't tell yet" => "gate, not settled",
+        "gate met" => "gate holds",
+        "gate untested" => "gate not tested",
+        "estimate meets criterion" => "estimate meets the rule",
+        "recorded values meet criterion" => "recorded values meet the rule",
+        "point only" | "No interval" | "no interval" => "no range yet",
+        "Retrospective" | "retrospective" => "rule written after the results",
+        other => other,
+    };
+    match n {
+        Some(n) => format!("{n} {said}"),
+        None => said.to_string(),
+    }
 }
 
 /// What git took out of the record (E1), in the one line every surface says: rb status, rb context, rb open, rb ui and
@@ -1024,72 +998,96 @@ mod tests {
         assert_eq!(made_criteria(1, 1), ("The one rule".to_string(), " was written after its results came in \u{b7} "));
         assert_eq!(made_criteria(6, 6).0, "All 6 rules");
         assert_eq!(made_criteria(1, 6), ("1 of 6 rules".to_string(), " was written after its results came in \u{b7} "));
-        assert_eq!(holds_sentence("its rule met"), "Its rule is met.");
-        assert_eq!(holds_sentence("its 2 criteria met"), "Its 2 rules are met.");
-        assert_eq!(holds_sentence("its rule: can't tell yet"), "rb can't tell yet whether its rule is met.");
-        assert_eq!(holds_sentence("its criterion not met"), "Its rule is not met.");
+        assert_eq!(holds_sentence("its rule met"), "Its rule holds.");
+        assert_eq!(holds_sentence("its 2 criteria met"), "Its 2 rules hold.");
+        assert_eq!(holds_sentence("its rule: can't tell yet"), "Its rule is not settled.");
+        assert_eq!(holds_sentence("its criterion not met"), "Its rule does not hold.");
         assert_eq!(note_label(false), "A note, not confirmed");
         assert_eq!(rerun_ready(4, 4), "Rerun recipe: all 4 parts ready");
         assert_eq!(open_group("no_interval", 2).unwrap().0, "Rules rb can't judge yet (2).");
+    }
+
+    /// A rule and its results placed in time, in the order their days came; the words alone where a day is unknown.
+    #[test]
+    fn a_rule_and_its_results_are_placed_in_time() {
+        assert_eq!(in_time(true, "2026-10-20", "2026-10-14"), "results 14 Oct \u{2500}\u{2500}\u{25b6} rule 20 Oct");
+        assert_eq!(in_time(false, "2026-10-10", "2026-10-14"), "rule 10 Oct \u{2500}\u{2500}\u{25b6} results 14 Oct");
+        assert_eq!(in_time(true, "2026-10-20", ""), "written after its results");
+        assert_eq!(in_time(false, "", "2026-10-14"), WRITTEN_BEFORE);
+        // the earlier day first, even where the timing reads the rule as before its subject's results
+        assert_eq!(in_time(false, "2026-10-20", "2026-10-14"), "results 14 Oct \u{2500}\u{2500}\u{25b6} rule 20 Oct");
     }
 
     /// Plain words pass 1: rb's rule phrases as the screens say them, a count kept, anything else as rb gives it.
     #[test]
     fn rbs_rule_words_read_plainly() {
         for (rb, shown) in [
-            ("criterion met", "rule met"),
-            ("3 criteria met", "3 rules met"),
-            ("1 criterion not met", "1 rule not met"),
-            ("2 criteria undetermined", "2 can't tell yet"),
+            ("criterion met", "rule holds"),
+            ("3 criteria met", "3 rules hold"),
+            ("1 criterion not met", "1 rule does not hold"),
+            ("2 criteria undetermined", "2 not settled"),
             ("criterion untested", "not tested"),
             ("estimate meets criterion", "estimate meets the rule"),
-            ("point only", "no interval"),
+            ("point only", "no range yet"),
             ("Retrospective", "rule written after the results"),
             ("not reproduced", "not reproduced"),
             ("gate missed", "gate missed"),
-            ("gate undetermined", "gate, can't tell yet"),
+            ("gate undetermined", "gate, not settled"),
             ("1 gate untested", "1 gate not tested"),
         ] {
             assert_eq!(plain_word(rb), shown, "{rb}");
         }
-        // every plain word a tag or a tally draws has its glossary line
-        for key in ["can't tell yet", "not tested", "no interval", "rule written after the results", "estimate meets the rule", "rule"] {
-            assert!(hint(key).is_some(), "{key}");
-        }
     }
+}
 
-    /// Plain words pass 2: every term the cards and views ask the glossary for has its line and an anchor the fold
-    /// holds, the rule chip's noun and the cards' "checks" included; the fold holds no term twice; and no line names a
-    /// role ("the record's owner"): it says how a call is made, never who makes it.
-    #[test]
-    fn every_term_asked_for_has_one_line_and_no_role_word() {
-        let src = [include_str!("nodes.rs"), include_str!("views.rs")].concat();
-        let asked: Vec<&str> = ["term(\"", "term_as(\""]
-            .iter()
-            .flat_map(|call| src.split(call).skip(1))
-            .filter_map(|rest| rest.split('"').next())
-            .collect();
-        for key in asked.iter().copied().chain(["rule (noun)", "integrity", "checks", "rule", "gain", "loss", "unresolved", "not reproduced", "paired difference", "amended"]) {
-            let line = hint(key).unwrap_or_else(|| panic!("no glossary line for {key:?}"));
-            assert!(!line.contains('\n') && !line.contains('\u{2014}'), "{key}");
-            assert!(HINTS.iter().any(|(t, _)| glossary_id(t) == glossary_id(key)), "{key} points at no line");
-        }
-        assert_eq!(glossary_id("rule (noun)"), "g-rule");
-        assert_eq!(glossary_id("integrity"), "g-checks");
-        // a card's margin is the estimate's distance to the threshold (assess.rs threshold()), and reproduced is said
-        // of an inherited rule as of a cited one (assess.rs standing words)
-        // (the estimate, or for a --bound rule an interval bound, or for --each the worst unit: assess.rs)
-        assert!(hint("margin").unwrap().starts_with("how far the value the rule judges (the estimate, an interval bound or the worst unit) sits from its threshold"));
-        for word in ["reproduced", "not reproduced"] {
-            assert!(hint(word).unwrap().contains("cited source or from the record this one was cloned from"), "{word}");
-        }
-        assert_eq!(hint("rule (noun)"), Some("a threshold or comparison declared for a question; commands call it a criterion."));
-        let mut ids: Vec<String> = HINTS.iter().map(|(t, _)| glossary_id(t)).collect();
-        ids.sort();
-        ids.dedup();
-        assert_eq!(ids.len(), HINTS.len());
-        for line in HINTS.iter().map(|(_, l)| *l).chain([CONFIRM_HERE, CONFIRM_HERE_EXPORT, OPEN_CALLS_LEDE, OWNER_CALLS_LEDE, READER_CALLS_LEDE, STILL_OPEN, READER_NOTHING_OPEN, READER_NOT_CONFIRMED, READER_DESIGN_NOT_CONFIRMED]) {
-            assert!(!line.contains("owner"), "{line}");
-        }
-    }
+// The Overview's four blocks (UX5 1.2, round 1): labels only, each of three words or fewer; what a figure shows is its
+// `said`, never a sentence on the screen. The approved names: check, passed, failed, can't tell yet, no results yet,
+// decision, range.
+pub const SO_FAR: &str = "So far";
+pub const RESTS_ON: &str = "What it rests on";
+pub const DECISIONS: &str = "Decisions";
+pub const OTHER_QUESTIONS: &str = "Other questions";
+pub const MADE: &str = "made";
+pub const CHIP_DECIDE: &str = "decide";
+pub const CHIP_CONFIRM: &str = "confirm";
+pub const CHIP_OPEN: &str = "open";
+/// What each chip is, on hover and keyboard focus (owner, msg 31: "you can't do a hover?").
+pub const TIP_DECIDE: &str = "A decision that waits on you";
+pub const TIP_CONFIRM: &str = "It waits for your confirmation";
+pub const TIP_OPEN: &str = "Not decided yet";
+/// A resource with no address a reader can get it from: the record holds none.
+pub const TIP_NO_DOWNLOAD: &str = "The record holds no address to download it from";
+/// The chip of a chart row whose check checks a claim someone stated (a cited number or ordering).
+pub const CHIP_CLAIM: &str = "claim";
+/// A field card's OPEN: the card the page drew before, one step away (`rb show <id> --long` on the CLI).
+pub const LONG_FORM: &str = "the long form";
+pub const NOTHING_WAITS: &str = "Nothing waits.";
+pub const KEY: &str = "Key";
+pub const FILES: &str = "Files";
+pub const FILTER_FILES: &str = "Filter files";
+pub const NO_BRANCH: &str = "no branch";
+pub const SNAPSHOT: &str = "snapshot";
+pub const ALL: &str = "All";
+pub const EXPERIMENT_KIND: &str = "Experiment";
+pub const CONFIRM: &str = "Confirm";
+pub const NOTE_SOURCE: &str = "source";
+pub const LIVE_ON_THIS_MACHINE: &str = "live on this machine";
+pub const NO_COMMIT_YET: &str = "no commit yet";
+pub const COPY_THE_COMMIT: &str = "Copy the commit";
+pub const RECORD_FILES_NOT_COMMITTED: &str = "Record files not committed";
+pub const NO_FILE_MATCHES: &str = "no file matches";
+
+/// rb's computed lines, said with the screens' plainer labels (closed form, owner Nov 13 2026): a setting not checked,
+/// never "provisional"; a reading with no range yet, never "no interval". The meaning is the line's own.
+pub fn plainer(line: &str) -> String {
+    line.replace("rule not met", "rule does not hold")
+        .replace("Rule not met", "Rule does not hold")
+        .replace("Can't tell yet", "Not settled")
+        .replace("rules not met", "rules do not hold")
+        .replace("can't tell yet", "not settled")
+        .replace(" is provisional", " is not checked")
+        .replace(" are provisional", " are not checked")
+        .replace("no interval yet", "no range yet")
+        .replace("no interval", "no range yet")
+        .replace("No interval", "No range yet")
 }

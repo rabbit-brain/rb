@@ -100,7 +100,7 @@ def test_what_someone_else_wrote_is_told_with_what_it_changed_why_and_their_word
     for c in ("c1", "c2"):
         study("criterion", "add", f"warmup costs no loss, {c}", "-e", "e1", "--metric", "change.loss", "--at-most", "0", "--id", c)
     study("resource", "add", "holdout", "--type", "dataset", "--name", "held-out set")
-    title = study("status").data["project"]["title"]
+    title = study("status", "--full").data["project"]["title"]
     server = Mcp("claude-code")
 
     def told_over_mcp(name, arguments):
@@ -222,7 +222,7 @@ def test_a_store_an_earlier_rb_wrote_is_read_as_it_read_it_once(study):
 
 def test_status_and_context_tell_everything_so_after_them_nothing_repeats(study):
     (study.root / "results" / "warmup_transfer" / "independent_audit.json").write_text('{"passed": false}')
-    assert study("status", agent="s1").rb_delta == []
+    assert study("status", "--full", agent="s1").rb_delta == []
     assert study("show", "warmup_transfer", agent="s1").rb_delta == []
 
 
@@ -250,12 +250,12 @@ def test_a_watched_run_that_prints_its_metrics_tells_the_session_it_is_unrecorde
     study("metric", "add", "steps", "--minimize")
     study("experiment", "add", "the peak rate", "--id", "peak")
     study("criterion", "add", "few steps", "-e", "peak", "--metric", "steps", "--at-most", "50")
-    study("status", agent="s1")
+    study("status", "--full", agent="s1")
     (study.root / "peak.py").write_text('print(\'{"metrics": {"steps": 41.5}}\')\n', encoding="utf-8")
     env = study("journal", "run", "--", sys.executable, "peak.py", agent="s1")
     assert [d["code"] for d in env.rb_delta] == ["unrecorded"] and env.rb_delta[0]["do"] == "rb reconcile"
     study("reconcile", "--apply", agent="s1")
-    assert not [d for d in study("status", agent="s1").rb_delta]
+    assert not [d for d in study("status", "--full", agent="s1").rb_delta]
 
 
 def test_the_user_gets_no_delta_and_the_text_form_says_since_when(study, capsys, monkeypatch):

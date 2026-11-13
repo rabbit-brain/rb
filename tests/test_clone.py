@@ -185,7 +185,7 @@ def test_a_fresh_clone_never_says_it_was_kept_with_rb_since_it_began(bundle, cap
     assert code == 0 and "since it began" not in page
     n = len(state(dest).status()["experiments"])
     said = "1 experiment reproduces an experiment" if n == 1 else f"{n} experiments reproduce experiments"
-    assert page.count('class="dim sm wit">Kept with rb since ') == 2 and page.count(f". {said} of another record.</p>") == 2
+    assert page.count('class="dim sm wit"><a href="#history">Kept with rb since ') == 2 and page.count(f". {said} of another record.</a></p>") == 2
     assert "Kept with rb since" in (src / "page.html").read_text(encoding="utf-8")
 
 
@@ -212,7 +212,8 @@ def test_a_resource_keeps_its_identity_and_leaves_another_machines_paths_behind(
     rec = state(dest)
     res = rec.get("imagenet", "resource")
     assert (res.uid, res.name, res.version, res.sha256) == (theirs.uid, "ImageNet-1k", "validation", theirs.sha256)
-    assert [(x.provider, x.ref) for x in theirs.locations if x.provider == "local" and Path(x.ref).is_absolute()]
+    # the bundle already leaves the exporting machine's own path out (getit.rs), and the clone keeps none either
+    assert not [(x.provider, x.ref) for x in theirs.locations if x.provider == "local" and Path(x.ref).is_absolute()]
     assert [(x.provider, x.ref) for x in res.locations] == [("local", "data/imagenet.bin"), ("s3", "s3://lab-bucket/imagenet")]
     assert rec.availability("imagenet")["state"] == "remote"   # the bytes are not in this checkout; the s3 copy is recorded
     (dest / "data").mkdir()
@@ -383,8 +384,8 @@ def test_a_published_fork_links_its_parent_only_at_a_web_address(bundle, capsys,
     with zipfile.ZipFile(out / "bundle.zip") as z:
         assert [n for n in z.namelist() if b"s3cret" in z.read(n)] == []   # the whole bundle, the record in it too
     assert man["parent"]["url"] == f"{base}/pub.zip"
-    # About's line on the record says it (plain words pass 4: the top bar names the record by its title alone)
-    about = page.split('<p class="recid', 1)[1].split("</p>", 1)[0]
+    # About says it (plain words pass 4: the top bar names the record by its title alone)
+    about = page.split('id="sec-about"', 1)[1]                             # About's strip of facts (owner, Nov 13 2026)
     assert f'a fork of <a href="{base}/pub.zip">{base}/pub.zip</a>' in about
     assert f"(cloned from {base}/pub.zip)" in page                         # and the experiment it reproduces says so
     # what the record says it came from is whatever was adopted there, as a clone by an earlier rb kept it: an address
@@ -401,7 +402,7 @@ def test_a_published_fork_links_its_parent_only_at_a_web_address(bundle, capsys,
         page, man, _ = published()
         if linked:
             assert man["parent"]["url"] == linked
-            assert f'a fork of <a href="{linked}">{linked}</a>' in page.split('<p class="recid', 1)[1].split("</p>", 1)[0] and f"(cloned from {linked})" in page
+            assert f'a fork of <a href="{linked}">{linked}</a>' in page.split('id="sec-about"', 1)[1] and f"(cloned from {linked})" in page
         else:
             assert man["parent"]["url"] == parent
             assert "a fork of" not in page and "javascript:" not in page.lower()

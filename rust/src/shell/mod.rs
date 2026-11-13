@@ -10,6 +10,7 @@ pub mod figure;
 pub mod strings;
 pub mod open;
 pub mod history_view;
+pub mod fields;
 
 use crate::errors::{RBError, Res};
 use crate::ledger::Ledger;
@@ -19,7 +20,7 @@ use std::path::PathBuf;
 
 /// The exact bytes a page that runs the shell's script (rb page, rb open) inlines between `<script>` and `</script>`; the
 /// export, which runs none, names their sha256 so a host may serve these bytes and no others.
-pub const SCRIPT: &str = include_str!("assets/script.js");
+pub const SCRIPT: &str = include_str!("assets/script.min.js");
 
 /// Where a document is drawn: rb page, rb export (inert, no script) or rb open.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,7 +64,13 @@ pub fn document(led: &Ledger, surface: Surface, place: Option<&Chosen>) -> Res<V
 
 /// The page `surface` serves of `led`: its document, drawn.
 pub fn page(led: &Ledger, surface: Surface, place: Option<&Chosen>) -> Res<String> {
-    render(&document(led, surface, place)?, surface)
+    let doc = document(led, surface, place)?;
+    render_with(&doc, surface, fields::of(led, &doc, surface)?)
+}
+
+/// The page of `doc` with `cards`, the field cards it holds (fields.rs), which come with the document, never in it.
+pub fn render_with(doc: &Value, surface: Surface, cards: fields::Cards) -> Res<String> {
+    fields::with(cards, || render(doc, surface))
 }
 
 /// One document in, one page out: the frame (top bar, nav, footer) around every view and the cards region. A pure

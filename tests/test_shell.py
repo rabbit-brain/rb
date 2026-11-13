@@ -588,10 +588,9 @@ def _gone(said: dict, within: float = 10) -> None:
 
 def _title(demo) -> str:
     """The record's title, which rb open's script draws from the record once it has read it."""
-    return demo.rb("status")["project"]["title"]
+    return demo.rb("status", "--full")["project"]["title"]
 
 
-@pytest.mark.xfail(os.name == "nt", reason="the harness's Chrome does not start on Windows (issue #1)", strict=False)
 def test_the_app_runner_starts(int8_demo, tmp_path):
     """The app runner starts rb open on the INT8 demo on a free port, loads its page in headless Chrome, sees the record
     drawn with nothing thrown, takes a screenshot and stops both; at a page that cannot be loaded, it fails, and stops
@@ -614,7 +613,6 @@ def test_the_app_runner_starts(int8_demo, tmp_path):
     _gone(said)
 
 
-@pytest.mark.xfail(os.name == "nt", reason="the harness's Chrome does not start on Windows (issue #1)", strict=False)
 def test_the_app_runner_stops_what_it_started_at_its_deadlines(int8_demo):
     """A page that never answers holds the runner to its deadlines: the page's own to load, then the whole run's. It
     fails at whichever comes first, and rb open and Chrome end with it."""
@@ -680,6 +678,51 @@ def test_on_windows_the_runner_ends_chromes_whole_tree():
                                "ended.push(cdp.killTree(null, { platform: 'win32', run }));\n"
                                "console.log(JSON.stringify({ ended, calls }));")
     assert said == {"ended": [True, False, False, False], "calls": [["taskkill", "/T", "/F", "/PID", "4321"]]}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="the stand-in launcher is a POSIX script")
+def test_a_chrome_whose_first_process_hands_its_start_on_is_used_and_stopped(tmp_path):
+    """The Windows proof: chrome.exe can exit 0 at once, having handed its start to another Chrome on the same profile,
+    which no tree of the first holds. cdp.mjs waits for the port that one writes, and stopping ends it too."""
+    node = _node()
+    if not (os.environ.get("RB_CHROME") or _chrome()):
+        _without("no Chrome here")
+    launcher = tmp_path / "chrome"
+    launcher.write_text('#!/bin/sh\n"$RB_REAL_CHROME" "$@" >/dev/null 2>&1 &\nexit 0\n', encoding="utf-8")
+    launcher.chmod(0o755)
+    said = _node_says(node, f"process.env.RB_REAL_CHROME = cdp.findChrome();\n"
+                            f"const c = await cdp.launchChrome({{ chrome: {json.dumps(str(launcher))} }});\n"
+                            "const page = await c.page();\n"
+                            "const two = (await page.send('Runtime.evaluate', { expression: '1 + 1', returnByValue: true })).result.value;\n"
+                            "const profile = cdp.started.chrome_profile, running = cdp.holderPids(profile).length;\n"
+                            "await cdp.stopAll();\n"
+                            "console.log(JSON.stringify({ exit: c.proc.exitCode, two, running, left: cdp.holderPids(profile).length }));")
+    assert said["exit"] == 0 and said["two"] == 2 and said["running"] > 0, said
+    assert said["left"] == 0, said
+
+
+def test_on_windows_chrome_reads_the_account_s_own_profile_folder():
+    """A runner given a stand-in home (the INT8 demo's, beside its record) leaves Chrome on Windows no AppData there, and
+    Chrome then refuses remote debugging ("requires a non-default data directory") whatever --user-data-dir says: on
+    Windows Chrome's USERPROFILE is the account's own, in the case the caller wrote it, and every other variable is
+    kept. On Linux and macOS it gets a home of its own beside its profile."""
+    said = _node_says(_node(), "const env = { Path: 'C:/bin', UserProfile: 'C:/rec/home', HOME: 'C:/rec/home', LOCALAPPDATA: 'C:/Users/ana/AppData/Local' };\n"
+                               "const win = cdp.chromeEnv({ home: 'C:/t/home', platform: 'win32', env, account: 'C:/Users/ana' });\n"
+                               "const none = cdp.chromeEnv({ home: 'C:/t/home', platform: 'win32', env, account: null });\n"
+                               "const linux = cdp.chromeEnv({ home: '/t/home', platform: 'linux', env: { PATH: '/bin', HOME: '/rec/home' } });\n"
+                               "console.log(JSON.stringify({ win, none, linux }));")
+    assert said["win"] == {"Path": "C:/bin", "UserProfile": "C:/Users/ana", "HOME": "C:/rec/home", "LOCALAPPDATA": "C:/Users/ana/AppData/Local"}
+    assert said["none"] == {"Path": "C:/bin", "UserProfile": "C:/rec/home", "HOME": "C:/rec/home", "LOCALAPPDATA": "C:/Users/ana/AppData/Local"}
+    assert said["linux"]["HOME"] == "/t/home" and said["linux"]["XDG_CONFIG_HOME"].replace("\\", "/") == "/t/home/.config" and said["linux"]["PATH"] == "/bin"
+
+
+def test_on_windows_the_clipboard_holds_each_line_ending_as_crlf():
+    """Chrome writes a page's text to Windows' clipboard with each line ending as \\r\\n and reads it back so: what the
+    rerun walk reads off the system's clipboard is the prompt the page copied, its line endings as Windows writes
+    them; elsewhere the text as written, so a different prompt still reads as different."""
+    said = _node_says(_node(), "const t = 'Rerun this research\\nrb clone x\\r\\n';\n"
+                               "console.log(JSON.stringify(['win32', 'linux', 'darwin'].map(p => cdp.onTheClipboard(t, p))));")
+    assert said == ["Rerun this research\r\nrb clone x\r\n", "Rerun this research\nrb clone x\r\n", "Rerun this research\nrb clone x\r\n"]
 
 
 def _cdp_script(path: Path, body: str) -> str:
@@ -833,7 +876,6 @@ def _png_size(path: Path) -> tuple:
     return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
 
 
-@pytest.mark.xfail(os.name == "nt", reason="the harness's Chrome does not start on Windows (issue #1)", strict=False)
 def test_the_screenshot_runner_shoots_every_view(int8_demo, tmp_path):
     """Every view of rb open and of rb page on the INT8 demo is shot, rb page printed and with its script off too, once
     more with the shell's three-pane class set on its document, and the manifest lists each file as it is."""
@@ -860,35 +902,73 @@ def test_the_screenshot_runner_shoots_every_view(int8_demo, tmp_path):
     assert sorted(p.name for p in out.iterdir()) == sorted([s["file"] for s in m["shots"]] + ["manifest.json", "page.html"])
 
 
-# the browser step's run line: this file, and A's app harness beside it once the workflow runs both
-RUNNER_STEPS = ("python -m pytest -q -n auto --reruns 2 tests/test_shell.py", "python -m pytest -q -n auto --reruns 2 tests/test_shell.py tests/app/")
+# the browser step's run line: this file, and A's app harness beside it once the workflow runs both; the release check
+# runs the browser checks it names in RELEASE_CHECK_BROWSER
+RUNNER_STEPS = ("python -m pytest -q -n auto --reruns 2 tests/test_shell.py", "python -m pytest -q -n auto --reruns 2 tests/test_shell.py tests/app/",
+                "python -m pytest -q -n auto --reruns 2 $RELEASE_CHECK_BROWSER")
+# when a job runs: the release check on every push, pull request and tag, the full matrix after the tag, daily and by hand
+WHEN = {"release-check": "github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'",
+        "full": "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')"}
 
 
 def test_ci_runs_the_app_runner_on_every_system_and_never_skips_it():
-    """Each job in tests.yml sets up node 22, then runs this file with RB_REQUIRE_BROWSER=1 in a step with no condition,
-    so on Linux, macOS and Windows a missing node or Chrome fails the run instead of skipping the app runner."""
+    """Each job in tests.yml sets up node 22, then runs the app runner with RB_REQUIRE_BROWSER=1 in a step with no
+    condition, so on Linux, macOS and Windows a missing node or Chrome fails the run instead of skipping the app runner. A
+    job is chosen by when it runs alone (the release check, or the full matrix), and never allowed to fail."""
     flow = ROOT / ".github" / "workflows" / "tests.yml"
     if not flow.is_file():
         pytest.skip("the workflows are not beside the tests")
     yaml = pytest.importorskip("yaml")
     systems = set()
-    for name, job in yaml.load(flow.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)["jobs"].items():
+    workflow = yaml.load(flow.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    for name, job in workflow["jobs"].items():
         steps = job["steps"]
         node = [i for i, s in enumerate(steps) if s.get("uses", "").startswith("actions/setup-node@")]
         runs = [i for i, s in enumerate(steps) if s.get("env", {}).get("RB_REQUIRE_BROWSER") == "1"]
         assert len(node) == 1 and len(runs) == 1 and node[0] < runs[0], name
         assert int(steps[node[0]]["with"]["node-version"].split(".")[0]) >= 22, name
         step = steps[runs[0]]
-        assert set(step) == {"name", "env", "run"} and step["run"] in RUNNER_STEPS, (name, step)
-        assert "continue-on-error" not in job and "if" not in job, name
+        assert set(step) - {"timeout-minutes"} == {"name", "env", "run"} and step["run"] in RUNNER_STEPS, (name, step)
+        if "$RELEASE_CHECK_BROWSER" in step["run"]:
+            named = workflow["env"]["RELEASE_CHECK_BROWSER"].split()
+            assert "tests/test_shell.py::test_the_app_runner_starts" in named and any(n.startswith("tests/app/") for n in named), named
+        assert "continue-on-error" not in job and job.get("if") in WHEN.values(), name
         runs_on = job["runs-on"]
         systems |= set(job["strategy"]["matrix"]["os"]) if runs_on == "${{ matrix.os }}" else {runs_on}
     assert {s.split("-")[0] for s in systems} == {"ubuntu", "macos", "windows"}
 
 
+def test_the_release_check_is_windows_and_macos_on_every_push_and_the_full_matrix_comes_after():
+    """The release check (tests.yml's release-check job) builds rb on Windows and macOS and runs what differs there on
+    every push to main, pull request and release tag, within half an hour; every other job is the full matrix, which
+    runs after the tag, daily and by hand. Each test the release check names is one that exists."""
+    flow = ROOT / ".github" / "workflows" / "tests.yml"
+    if not flow.is_file():
+        pytest.skip("the workflows are not beside the tests")
+    yaml = pytest.importorskip("yaml")
+    workflow = yaml.load(flow.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    on = workflow["on"]
+    assert on["push"]["branches"] == ["main"] and on["push"]["tags"] and "pull_request" in on and "workflow_dispatch" in on and on["schedule"]
+    jobs = workflow["jobs"]
+    check = jobs["release-check"]
+    assert check["if"] == WHEN["release-check"] and sorted(check["strategy"]["matrix"]["os"]) == ["macos-latest", "windows-latest"]
+    assert int(check["timeout-minutes"]) <= 30
+    assert all(job["if"] == WHEN["full"] for name, job in jobs.items() if name != "release-check")
+    # the tests that prove plat-1b's Windows fixes run where those fixes matter (MP-1113-1145 S1)
+    named = workflow["env"]["RELEASE_CHECK_TESTS"].split() + workflow["env"]["RELEASE_CHECK_BROWSER"].split()
+    for proof in ("tests/test_surface.py::test_rb_in_a_uv_tool_dir_of_any_name_upgrades_itself_through_uv",
+                  "tests/test_live.py::test_a_chrome_that_hands_its_start_on_is_waited_for_and_stopped_and_one_that_fails_says_why",
+                  "tests/test_shell.py::test_a_chrome_whose_first_process_hands_its_start_on_is_used_and_stopped"):
+        assert proof in named, proof
+    for node in named:
+        path, _, test = node.partition("::")
+        assert (ROOT / path).exists(), node
+        assert not test or f"def {test}(" in (ROOT / path).read_text(encoding="utf-8"), node
+
+
 FIX = Path(__file__).parent / "fixtures" / "shell"
 PAGE_MARK = "made with rb page · a snapshot of the record at "
-HONEST = "A decision records a call; it does not change a reading."
+HONEST = "A decision does not change a reading."
 
 
 def example(name: str = "owner") -> dict:
@@ -1021,6 +1101,12 @@ def said(text: str) -> str:
     return " ".join(text.split())
 
 
+def joined(text: str) -> str:
+    """said(), with no space before a stop: closed form (owner, Nov 13 2026) makes each reason in a line a link, so a
+    text join of its nodes puts a space before the punctuation that follows a link ("confirmation ."); not a defect."""
+    return re.sub(r" ([.,:;])", r"\1", said(text))
+
+
 def view_text(page: str, ident: str) -> str:
     t = Html(page)
     el = t.by_id(ident)
@@ -1092,6 +1178,10 @@ EXEMPT = [
      "a repository manifest's own \"frozen\", the file's word, not rb's lock (repo.rs)"),
     ("SS12", r"metrics the runs report that no criterion reads", "an approved open-item head: absence over a record object (SHELL-SPEC 12)"),
     ("SS12b", r"\bthe same bytes are recorded by\b", "rb's same-bytes line names a run that recorded a file, not a writer (SHELL-SPEC 12)"),
+    ("U2C", r"(?<![\w-])claim(?![\w-])",
+     "the chip on a chart row or a card whose check checks a claim someone stated, as the UX lead ruled (UX-DIRECTION.md, Nov 12 05:30 +08, row 5)"),
+    ("MN2", r"(?<![\w-])Claimed(?= [+\-\u2212]?\d)",
+     "a cited rule's number beside rb's on the card's Result, as the UX lead's card asks (Nov 13 2026, part 2.3)"),
     ("G1", r"\bverified(?= the named file, run or database row states)",
      "the glossary's term for a setting's status, before rb's line defining it (SHELL-SPEC 7.5)"),
 ]
@@ -1187,6 +1277,8 @@ KEPT = {
     "SS12": "Metrics the runs report that no criterion reads · 1",
     "SS12b": "int8 · calib images 512: the same bytes are recorded by fp32 and int8 · seed 1 (e1), which made ckpt-int8-s1.",
     "G1": "verified the named file, run or database row states this setting's value.",
+    "U2C": "fp32 top1 claim 76.05 to 76.15",
+    "MN2": "Claimed 3.6 points",
 }
 
 
@@ -1216,7 +1308,8 @@ def test_rbs_words_only(record):
     assert words_problems("<p>the result was verified README.md:3</p>")
     doc = example()
     doc["home"]["integrity"]["affects"] = "4 calls wait on you; the evidence is established."
-    doc["home"]["open_line"] = "open in the record \u2014 3"
+    # an em dash in rb's words: the record's line on what is open is drawn on no view since round 1, so a reason's
+    doc["calls"][1]["reason"]["detail"] = "open in the record \u2014 3"
     doc["questions"][0]["text"] = "Is it established that INT8 holds, as an agent claims?"
     doc["project"]["title"] = "INT8 ResNet-50: an agent's frozen claims"
     doc["home"]["scope"] += " a source contradicts a setting; 20 verified"
@@ -1264,12 +1357,13 @@ def test_the_shell_draws_rb_page_and_rb_export_whatever_the_hook_says(record):
         out = record / f"hook-{value}.html"
         r = rb(record, "page", "--out", str(out), **env)
         assert r.returncode == 0, r.stderr
-        page = out.read_text(encoding="utf-8")
+        # the markup draws no tablist of page.rs's (the inline script and style name the card tabs the script makes)
+        page = re.sub(r"<script>.*?</script>|<style>.*?</style>", "", out.read_text(encoding="utf-8"), flags=re.S)
         assert 'id="nav"' in page and 'role="tablist"' not in page, value
         bundle = record / f"hook-{value}-export"
         r = rb(record, "export", "--out", str(bundle), **env)
         assert r.returncode == 0, r.stderr
-        page = (bundle / "page.html").read_text(encoding="utf-8")
+        page = re.sub(r"<script>.*?</script>|<style>.*?</style>", "", (bundle / "page.html").read_text(encoding="utf-8"), flags=re.S)
         assert 'id="nav"' in page and 'role="tablist"' not in page, value
 
 
@@ -1309,8 +1403,8 @@ def test_one_honesty_line(record):
         page = page_of(record, surface=surface)
         assert page.count(HONEST) == 1, surface
         t = Html(page)
-        foot = next(e for e in t.all() if e["tag"] == "footer")
-        holder = next(e for e in t.all(foot) if HONEST in t.text(e) and e["tag"] == "p")
+        # About's honest line, under its strip of facts (owner, Nov 13 2026)
+        holder = next(e for e in t.all(t.by_id("about")) if HONEST in t.text(e) and e["tag"] == "p" and t.has(e, "honest1"))
         up, folded = holder, False
         while up is not None:
             folded |= up.get("tag") == "details"
@@ -1323,16 +1417,28 @@ def test_the_nav_and_its_counts(record):
     to the record's views, over Runs, Resources, History), and Your call (N) at the foot, each count rb's."""
     t = Html(page_of(record))
     nav = t.by_id("nav")
-    links = [(e["attrs"]["href"], said(t.text(e))) for e in t.all(nav) if e["tag"] == "a"]
+    files = t.by_id("files")
+    links = [(e["attrs"]["href"], said(t.text(e))) for e in t.all(nav) if e["tag"] == "a" and not t.inside(e, files)]
     hrefs = [h for h, _ in links]
+    # Files (n) under Record opens the Files tree (owner, Nov 13 2026)
     assert hrefs == ["#overview", "#research", "#q-q1", "#q-q1a", "#criteria", "#experiments", "#x-e1", "#x-e2", "#record", "#runs",
-                     "#resources", "#history", "#your-call"]
+                     "#resources", "#history", "#files", "#your-call"]
     shown = dict(links)
     assert shown["#research"] == "Research 2" and shown["#criteria"] == "Rules 6" and shown["#runs"] == "Runs 9" and shown["#record"] == "Record"
     # an experiment by its short title, its id trailing (design pass 1, P3)
     assert shown["#x-e2"] == "calibration set size e2" and shown["#q-q1a"].startswith("↳ How many")
-    # the user's calls alone: what waits for a confirmation is never under Your call (AGENTS.md)
-    assert shown["#your-call"] == "Your call 4"
+    # the pinned Your call counts the Overview's decisions, the same number on every surface (UX5 1.3)
+    assert shown["#your-call"] == f"Your call {len(example()['overview']['decisions'])}"
+
+
+def _decision_rows(t: "Html") -> list:
+    """The Overview's Decisions rows: one line each, wholly a link to its card (story.rs still_row)."""
+    return [e for e in t.all(t.by_id("overview")) if t.has(e, "dr") and t.has(e, "dl1")]
+
+
+def _decision_kind(d: dict) -> str:
+    """The kind a Decisions row and its filter chip say of an overview.decisions row (story.rs decisions_block)."""
+    return "decide" if d["kind"] != "confirm" else "design" if d.get("code") == "design_pending" else "confirm"
 
 
 def _queue_as_rb_gives_it(doc: dict) -> dict:
@@ -1359,25 +1465,29 @@ def _queue_as_rb_gives_it(doc: dict) -> dict:
     return doc
 
 
-def test_your_calls_count_is_the_users_calls_and_the_queue_heading_counts_nothing(record):
-    """OVERVIEW-V2's queue holds everything rb cannot settle and the user can; its heading counts nothing (FIX4); Your call's badge and
-    heading count the user's calls alone (your_call.n): a proposed or past call and a design waiting for a confirmation
-    are listed apart, never under Your call (AGENTS.md, "Whose call it is"; test_call_authority's pins). Five found
-    items are one row."""
+def test_the_decisions_count_is_the_pins_and_your_call_counts_the_users_calls(record):
+    """The Overview's Decisions list a row per overview.decisions row (the calls to make and what waits for a
+    confirmation), counted by kind in filter chips (its heading carries no count); the pinned Your call says the
+    number of rows, and each row is of its kind, with its title; Your call's own heading counts the user's calls
+    (your_call.n)."""
     doc = example()
-    doc["home"]["found"] = [dict(doc["home"]["found"][0], request_id=f"f{i}", title=f"Record results/seed{i}/metrics.json on e1") for i in range(5)]
-    doc["home"]["found_total"] = 5
     doc["your_call"]["n"] = 3
-    _queue_as_rb_gives_it(doc)
     t = Html(page_of(record, doc))
-    rows = t.of_class("qrow", t.by_id("queue"))
-    # rb's queue in its rank order, a row each as rb gives it (contract 1.6)
-    assert [r["attrs"]["data-kind"] for r in rows] == [r["kind"] for r in doc["home"]["queue"]] == [
-        "baseline", "call", "call", "call", "design", "pending_call", "pending_call", "found", "uncited"]
-    assert said(t.text(t.by_id("h-queue"))) == "Needs your judgment"  # FIX4: the line under it counts
+    n = len(doc["overview"]["decisions"])
+    head = t.by_id("decisions")
+    assert said(t.text(head)).startswith("Decisions") and not t.of_class("n", head)
     nav_yc = next(e for e in t.all(t.by_id("nav")) if e["tag"] == "a" and e["attrs"]["href"] == "#your-call")
-    assert said(t.text(nav_yc)) == "Your call 3" and said(t.text(t.by_id("h-your-call"))) == "Your call (3)"
-    assert said(t.text(rows[7])).startswith("Record 5 results found in the repository")
+    assert said(t.text(nav_yc)) == f"Your call {n}" and said(t.text(t.by_id("h-your-call"))) == "Your call (3)"
+    rows = _decision_rows(t)
+    assert [r["attrs"].get("data-kind") for r in rows] == [_decision_kind(d) for d in doc["overview"]["decisions"]]
+    assert all(d["title"] in said(t.text(r)) for r, d in zip(rows, doc["overview"]["decisions"]))
+    # a chip per kind, counting its rows (a design's row counts the designs its title names)
+    chips = {e["attrs"]["data-filter"]: said(t.text(e)) for e in t.of_class("dchip", t.by_id("overview"))}
+    kinds = [_decision_kind(d) for d in doc["overview"]["decisions"]]
+    assert set(chips) == set(kinds), chips
+    for k in ("decide", "confirm"):
+        if k in chips:
+            assert chips[k].startswith(f"{kinds.count(k)} "), chips
 
 
 def test_headings_never_skip(record):
@@ -1417,21 +1527,25 @@ def _calls_everywhere() -> dict:
 # ---------------------------------------------------------------- the Overview
 
 def test_the_overview_top_to_bottom(record):
-    """OVERVIEW-V2: the title and its one line; a standing card per top-level question; Evidence integrity; Needs your
-    judgment, with what waits for a confirmation folded under it; the research questions; then, folded, how rb reads
-    this repository, the recent changes and the notes. No second copy of the calls (no rail) and no command in view."""
+    """UX5 2.2: the question (the project's title is the top bar's), So far (its state, the strip and the chart), What it rests on, and
+    Decisions, in that order and nothing else; what the Overview held before (the standing cards, the record's line,
+    how rb reads the repository, the notes) is one click away, on Research and at the head of History."""
     page = page_of(record)
     t = Html(page)
     ov = t.by_id("overview")
-    marks = ("st-q1", "integrity", "queue", "ov-questions", "how-made")
-    order = [e["attrs"]["id"] for e in t.all(ov) if e["attrs"].get("id") in marks]
-    assert order == list(marks)
-    folds = [e["attrs"].get("data-fold") for e in t.all(ov) if e["tag"] == "details" and (e["up"] is ov or e["up"]["up"] is ov)]
-    assert folds == ["to-confirm", "how-made", "recent", "notes"], folds
-    assert t.by_id("ov-calls") is None and t.inside(t.by_id("found"), t.by_id("how-made"))
-    assert not [e for e in t.all(ov) if "data-rail" in e["attrs"]]
-    # no command in view: the confirmations' commands are one click down, in their fold
-    assert all(t.inside(e, t.by_id("to-confirm")) for e in t.all(ov) if e["tag"] == "pre"), "no command on the Overview"
+    kinds = []
+    for e in t.all(ov):
+        cls = e["attrs"].get("class", "")
+        for mark in ("ovq", "ovstrip", "ovchart", "marks", "dq"):
+            if mark in cls.split():
+                kinds.append(mark)
+    assert [k for i, k in enumerate(kinds) if k not in kinds[:i]] == ["ovq", "ovstrip", "ovchart", "marks", "dq"]
+    heads = [said(t.text(e)) for e in t.of_class("ovh2", ov)]
+    assert heads[0].startswith("So far") and heads[1] == "What it rests on" and heads[2].startswith("Decisions")
+    for gone in ("st-q1", "integrity", "queue", "ov-questions", "how-made", "to-confirm"):
+        assert not (t.by_id(gone) and t.inside(t.by_id(gone), ov)), gone
+    hist = t.by_id("history")
+    assert t.inside(t.by_id("how-made"), hist) and t.inside(t.by_id("integrity"), hist)
     line = said(t.text(t.of_class("ovh", ov)[0]))
     assert line == f"{example()['home']['counts']['runs']} recorded runs · changed {example()['home']['last_write']['at']}"
     # the absolute time, which rb open's live view says relative in the browser from its datetime
@@ -1445,31 +1559,29 @@ def test_a_standing_card_per_top_level_question(record):
     reading. No sub-question, hypothesis or setting in it; its sub-questions are rows below, each once."""
     doc = example()
     t = Html(page_of(record, doc))
-    ov = t.by_id("overview")
-    cards = t.of_class("stand", ov)
-    assert [c["attrs"]["id"] for c in cards] == ["st-q1"]
+    ov = t.by_id("research")
+    cards = [c for c in t.of_class("stand", ov) if c["attrs"]["id"] == "rs-q1"]
+    assert cards
     card = cards[0]
     standing = doc["home"]["standing"][0]
     # its state names its subject (plain words pass 3)
-    assert said(t.text(t.of_class("sth", card)[0])) == "Open question" and standing["state_word"] == "Open" and t.of_class("term", t.of_class("sth", card)[0])
+    assert said(t.text(t.of_class("sth", card)[0])) == "Open question" and standing["state_word"] == "Open" and not t.of_class("term", t.of_class("sth", card)[0])
     stq = t.of_class("stq", card)[0]
     assert said(t.text(stq)) == doc["questions"][0]["text"] and t.of_class("au", stq)
     assert next(e for e in t.all(stq) if e["tag"] == "a")["attrs"]["href"] == "#q-q1"
-    assert said(t.text(t.of_class("str", card)[0])) == said(standing["line"])
-    assert said(t.text(t.of_class("stt", card)[0])) == "Rules: 3 met · 1 not reproduced"
+    # closed form (owner, Nov 13 2026): each reason in rb's line is a link (joined() drops the join's space before a stop)
+    assert joined(t.text(t.of_class("str", card)[0])) == said(standing["line"])
+    assert [a["attrs"]["href"] for a in t.all(t.of_class("str", card)[0]) if a["tag"] == "a"] == ["#q-q1:evidence", "#c-c2", "#to-confirm"]  # closed form: two designs open the list of what waits
+    # closed form (owner, Nov 13 2026): rb's "3 met" reads "3 hold" on the pages
+    assert said(t.text(t.of_class("stt", card)[0])) == "Rules: 3 hold · 1 not reproduced"
     tallies = [(e["attrs"].get("class"), said(t.text(e)), e["attrs"].get("href")) for e in t.all(t.of_class("stt", card)[0]) if t.has(e, "sw")]
-    assert tallies == [("sw good", "3 met", "#q-q1:rd:criteria-met"), ("sw bad", "1 not reproduced", "#q-q1:rd:not-reproduced")]
+    assert tallies == [("sw good", "3 hold", "#q-q1:rd:criteria-met"), ("sw bad", "1 not reproduced", "#q-q1:rd:not-reproduced")]
     # rb's tallies are the card's: where rb gives none, none is drawn, never the question's older counts
     bare = copy.deepcopy(doc)
     bare["home"]["standing"][0]["tallies"] = []
-    assert not Html(page_of(record, bare)).of_class("stt", Html(page_of(record, bare)).by_id("st-q1"))
+    assert not Html(page_of(record, bare)).of_class("stt", Html(page_of(record, bare)).by_id("rs-q1"))
     for other in (doc["questions"][1]["text"], doc["experiments"][0].get("hypothesis") or "no hypothesis"):
         assert said(other) not in said(t.text(card))
-    rows = t.of_class("qr", t.by_id("ov-questions"))
-    assert [r["attrs"]["data-go"] for r in rows] == ["q-q1a"]
-    assert doc["questions"][1]["status"] == "OPEN · no call yet"
-    assert said(t.text(rows[0])) == f"{doc['questions'][1]['text']} Open question · Rules: 1 not met"
-    assert said(t.raw(ov)).count(said(doc["questions"][0]["text"])) == 1
 
 
 def test_a_standing_cards_interpretation_is_one_line_with_its_tag(record):
@@ -1479,24 +1591,26 @@ def test_a_standing_cards_interpretation_is_one_line_with_its_tag(record):
     are met."). An inactive one is not drawn."""
     doc = example()
     t = Html(page_of(record, doc))
-    card = t.by_id("st-q1")
+    card = t.by_id("rs-q1")
     line = t.of_class("sti", card)[0]
     given = doc["home"]["standing"][0]["interpretation"]
     assert given["holds"] == "its 2 rules met"
-    assert said(t.text(line)) == f"Note: {given['text']} Its 2 rules are met."
+    # closed form (owner, Nov 13 2026): the pages say a rule holds or does not hold
+    assert said(t.text(line)) == f"Note: {given['text']} Its 2 rules hold."
     assert [said(t.text(e)) for e in t.of_class("au", line)] == [given["text"]]
     label = t.of_class("k", line)[0]
-    assert said(t.text(label)) == "Note:" and label["up"]["attrs"]["aria-describedby"] == "g-note-on-a-question"
+    assert said(t.text(label)) == "Note:" and "aria-describedby" not in label["up"]["attrs"]   # no hover defines it
     assert not t.of_class("tag", card)
     given["confirmed"] = False
     t = Html(page_of(record, doc))
-    line = t.of_class("sti", t.by_id("st-q1"))[0]
-    assert said(t.text(line)) == f"A note, not confirmed: {given['text']} Its 2 rules are met."
-    assert not t.of_class("tag", t.by_id("st-q1"))
+    line = t.of_class("sti", t.by_id("rs-q1"))[0]
+    # closed form (owner, Nov 13 2026): the pages say a rule holds
+    assert said(t.text(line)) == f"A note, not confirmed: {given['text']} Its 2 rules hold."
+    assert not t.of_class("tag", t.by_id("rs-q1"))
     # an inactive one rb gives as empty: none is drawn, and nothing from the question's lead in its place
     doc["home"]["standing"][0]["interpretation"] = {"line": "", "text": "", "holds": "", "confirmed": False}
     t = Html(page_of(record, doc))
-    assert not t.of_class("sti", t.by_id("st-q1"))
+    assert not t.of_class("sti", t.by_id("rs-q1"))
 
 
 def _led_by_a_comparison() -> dict:
@@ -1517,11 +1631,11 @@ def test_a_card_led_by_a_computed_comparison(record):
     rb's voice, outside author text, so the word lint reads it."""
     doc = _led_by_a_comparison()
     t = Html(page_of(record, doc))
-    card = t.by_id("st-q1")
+    card = t.by_id("rs-q1")
     line = said(t.raw(t.of_class("sti", card)[0]))
-    assert line == "Computed comparison: The measured direction reverses; repeatability remains uncertain. · 1 declared comparison"
+    assert line == "Side by side: The measured direction reverses; repeatability remains uncertain. · 1 declared comparison"
     assert not [e for e in t.of_class("au", card) if "direction reverses" in t.text(e)]
-    assert said(t.raw(t.by_id("overview"))).count("direction reverses") == 1
+    assert said(t.raw(t.by_id("research"))).count("direction reverses") == 1
     doc["questions"][0]["lead"]["text"] = "The measured direction reverses; repeatability is established."
     assert any(" B04 " in h and "repeatability is established" in h for h in words_problems(page_of(record, doc)))
 
@@ -1581,7 +1695,9 @@ def test_evidence_integrity_says_each_part_once(record):
     assert lines == [said(p["line"]) for p in given["parts"]] + [said(given["affects"])]
     # each part links to the list it counts: the criteria to All criteria, the runs to Runs
     to = {"after_evidence": "#criteria", "without_command": "#runs", "retracted": "#runs"}
-    assert [(e["attrs"]["href"], said(t.text(e))) for e in t.all(box) if e["tag"] == "a"] == [(to[p["kind"]], said(p["line"])) for p in given["parts"]]
+    # closed form (owner, Nov 13 2026): the line on what they affect opens the rules it is about
+    assert [(e["attrs"]["href"], said(t.text(e))) for e in t.all(box) if e["tag"] == "a"] == [(to[p["kind"]], said(p["line"])) for p in given["parts"]] + [
+        ("#criteria", said(given["affects"]))]
     # with no part of rb's own, rb's line on how the record was made, a part a line, "command (as given)" with its hint
     del doc["home"]["integrity"]
     t = Html(page_of(record, doc))
@@ -1590,8 +1706,8 @@ def test_evidence_integrity_says_each_part_once(record):
     assert lines == ["2 of 6 rules were written after their results came in", "1 of 8 runs records its command (as given)", "1 run retracted"]
     assert [(e["attrs"]["href"], said(t.text(e))) for e in t.all(box) if e["tag"] == "a"] == [
         ("#criteria", "2 of 6 rules were written after their results came in"), ("#runs", "1 run retracted")]
-    hinted = t.of_class("term", box)
-    assert [said(t.text(e)) for e in hinted] == ["command (as given)"] and "rb did not run it" in hinted[0]["attrs"]["data-hint"]
+    # no hover defines "command (as given)" (no glossary, show instead, Nov 12 20:35 +08)
+    assert not t.of_class("term", box)
     doc["home"]["integrity"] = {"parts": [{"code": "late", "line": "9 of 13 criteria were declared after their evidence existed.", "n": 9, "target": "criteria"}],
                                 "affects": "Read them as a description of what happened, not as a test."}
     t = Html(page_of(record, doc))
@@ -1621,8 +1737,8 @@ def test_found_apart_and_capped(record):
         assert len(items) == 10 and all("found by rb watching the repository" in t.text(i) for i in items)
         assert "and 13 more" in said(t.text(found))
     assert t.inside(t.by_id("found"), t.by_id("how-made")) and t.by_id("yc-found") is None and "seed0" not in view_text(page, "your-call")
-    row = next(r for r in t.of_class("qrow", t.by_id("queue")) if r["attrs"]["data-kind"] == "found")
-    assert said(t.text(row)) == "Record 23 results found in the repository for int8 against fp32 Inspect" and "seed0" not in t.raw(t.by_id("queue"))
+    # one click away, at the head of History (UX5 1.3's table); the Overview names none of them
+    assert t.inside(t.by_id("how-made"), t.by_id("history")) and "seed0" not in t.raw(t.by_id("overview"))
     assert "nothing waits" not in said(page).lower()
     doc["home"]["found_total"] = 10
     doc["home"]["found"] = doc["home"]["found"][:10]
@@ -1643,27 +1759,31 @@ def test_nothing_says_nothing_waits_while_something_does(record, waits):
     if waits == "found":
         doc["home"]["found"], doc["home"]["found_total"] = doc["home"]["found"][:1], 1
         doc["pending"]["rows"] = []
+        doc["overview"]["decisions"] = []
     else:
         doc["home"]["found"], doc["home"]["found_total"] = [], 0
+        doc["overview"]["decisions"] = [d for d in doc["overview"]["decisions"] if d["kind"] == "confirm"]
     _queue_as_rb_gives_it(doc)
     page = page_of(record, doc)
     t = Html(page)
     assert "nothing waits" not in said(page).lower() and "nothing waits" not in said(t.raw(t.root)).lower()
-    assert said(t.text(t.by_id("h-your-call"))) == "Your call (0)"
-    # one row for what rb found; one for the designs and one for each other confirmation
-    n = 1 if waits == "found" else 1 + len([r for r in doc["pending"]["rows"] if r["kind"] != "design"])
-    assert said(t.text(t.by_id("h-queue"))) == "Needs your judgment" and len(doc["home"]["queue"]) == n
+    # the pin's list holds every confirmation that waits too (the rulings of Nov 12 07:15 +08), so its heading counts them
+    assert said(t.text(t.by_id("h-your-call"))) == f"Your call ({len(doc['overview']['decisions'])})"
+    # the Decisions list what waits for a confirmation, a row each; what rb found is said where it is listed, never
+    # "nothing waits"
+    assert said(t.text(t.by_id("decisions"))).startswith("Decisions") and len(_decision_rows(t)) == len(doc["overview"]["decisions"])
     if waits == "found":
         assert said(t.text(t.by_id("h-found"))) == "Found in the repository (1)" and t.by_id("to-confirm") is None
     else:
         assert t.by_id("found") is None and len([e for e in t.all(t.by_id("to-confirm")) if e["tag"] == "li"]) == len(doc["pending"]["rows"])
     doc["pending"]["rows"], doc["home"]["found"], doc["home"]["found_total"] = [], [], 0
+    doc["overview"]["decisions"] = []
     t = Html(page_of(record, _queue_as_rb_gives_it(doc)))
-    assert "Nothing waits on your judgment." in said(t.text(t.by_id("queue")))
+    assert "Nothing waits" in [said(t.text(e)) for e in t.of_class("echip", t.by_id("overview"))] and not _decision_rows(t)
 
 
 def test_waiting_for_confirmation_apart(record):
-    """What waits for a confirmation is folded under the Overview's queue, in its four groups, each line ending in its
+    """What waits for a confirmation is folded in Experiments (UX5 1.3: the Overview's Decisions name it, Your call links to it), in its four groups, each line ending in its
     one rb confirm in the user's own terminal; the queue's row says it with no command, hash or path; never in Your call
     or a call's row (AGENTS.md: listed apart, never under Your call); rb's confirm-all line only while no design waits."""
     doc = example()
@@ -1672,51 +1792,50 @@ def test_waiting_for_confirmation_apart(record):
     wait = t.by_id("to-confirm")
     # inside its fold, so a link to it opens the fold around it
     fold = wait["up"]
-    assert fold["tag"] == "details" and "open" not in fold["attrs"] and t.inside(wait, t.by_id("overview"))
+    assert fold["tag"] == "details" and "open" not in fold["attrs"] and t.inside(wait, t.by_id("experiments")) and not t.inside(wait, t.by_id("your-call"))
     assert said(t.text(next(k for k in fold["kids"] if isinstance(k, dict)))) == "Waiting for your confirmation"
+    # never a call's row: the calls' list holds none of them (AGENTS.md: listed apart, never under Your call)
+    calls = said(t.text(t.of_class("list", t.by_id("your-call"))[0]))
     for r in doc["pending"]["rows"]:
-        assert said(r["text"]) not in view_text(page, "your-call") and r["confirm"] not in view_text(page, "your-call")
-    assert [said(t.text(e)) for e in t.all(wait) if e["tag"] == "h3"] == [
+        assert said(r["text"]) not in calls and r["confirm"] not in calls
+    assert [said(t.text(e)) for e in t.all(wait) if e["tag"] == "h2"] == [
         "Proposed, not made (1)", "Past calls mentioned, not confirmed (1)", "Experiment designs not confirmed (2)"]
     lis = [e for e in t.all(wait) if e["tag"] == "li"]
     assert len([r for r in lis if t.has(r, "wd")]) == len([r for r in doc["pending"]["rows"] if r["kind"] == "design"]) > 0
+    # owner, msg 47: each row offers a prompt for their agent, never a command to type
     for row in lis:
         kids = [k for k in row["kids"] if isinstance(k, dict)]
-        assert t.has(kids[-1], "cmdbox") and said(t.text(kids[-1])).startswith("rb confirm ")
+        assert "rb confirm" not in t.raw(row) and t.of_class("cpprompt", row), t.raw(row)
         if t.has(row, "wd"):
-            assert len(kids) == 2 and next(e for e in t.all(kids[0]) if e["tag"] == "a")["attrs"]["href"].startswith("#x-")
-            assert re.fullmatch(r"rb confirm [\w.-]+", said(t.text(kids[-1]))), t.text(kids[-1])
+            assert len(kids) == 1 and next(e for e in t.all(kids[0]) if e["tag"] == "a")["attrs"]["href"].startswith("#x-")
         else:
-            assert t.has(kids[-2], "cf") and said(t.text(kids[-2])) == "confirm in your own terminal:"
-    queue = t.by_id("queue")
-    # each confirmation's row as rb gives it (contract 1.6): the designs one row by their titles, each other call a row
-    # by its action and subject, with no command, hash or path
-    drawn = [said(t.text(r)) for r in t.of_class("qrow", queue) if r["attrs"]["data-kind"] in ("design", "pending_call")]
-    given = [r for r in doc["home"]["queue"] if r["kind"] in ("design", "pending_call")]
-    assert drawn == [said(f"{r['title']} {r['detail']} Review") for r in given]
-    assert drawn[0] == "Confirm 2 experiment designs int8 against fp32 · calibration set size Review"
+            # closed form (owner, Nov 13 2026): the plain line, then the prompt button; no "confirm in your own terminal:" label
+            assert len(kids) == 2 and t.has(kids[0], "wt") and t.has(kids[-1], "cpprompt") and not t.of_class("cf", row)
+            assert "confirm in your own terminal" not in t.text(row)
+    # the Overview's Decisions say them as rows with no hash or path; their one command is the confirm-all
+    dq = t.of_class("dq", t.by_id("overview"))[0]
     past = next(r["text"] for r in doc["pending"]["rows"] if r["kind"] == "past")
-    assert ".md" in past and not [d for d in drawn if ".md" in d or "@" in d]
-    assert "rb confirm" not in t.raw(t.by_id("queue"))
+    assert ".md" in past and ".md" not in t.raw(dq) and "@" not in t.raw(dq)
     rows = doc["pending"]["rows"]
     d1, d2 = (r for r in rows if r["kind"] == "design")
     d1["confirm"], d2["confirm"] = "cd /p/wt-b && " + d1["confirm"], ""
     t = Html(page_of(record, doc))
     wds = t.of_class("wd", t.by_id("to-confirm"))
-    assert said(t.text(t.of_class("cmdbox", wds[0])[0])) == f"cd /p/wt-b && rb confirm {d1['id'].split('@')[0]}"
-    assert not t.of_class("cmdbox", wds[1])
+    assert t.of_class("cpprompt", wds[0]) and "rb confirm" not in t.raw(wds[0])
+    assert not t.of_class("cpprompt", wds[1])
     for row in t.of_class("crow") + t.of_class("callrow"):
         assert "rb confirm" not in t.text(row)
     doc = example()
     doc["pending"]["confirm_all"] = "Confirm all 2 waiting at once: rb confirm --all"
     assert "rb confirm --all" not in said(page_of(record, doc))
     doc["pending"]["rows"] = [r for r in doc["pending"]["rows"] if r["kind"] != "design"]
-    assert "rb confirm --all" in view_text(page_of(record, doc), "to-confirm")
+    assert "rb confirm --all" not in view_text(page_of(record, doc), "to-confirm")
+    assert "show me every decision that waits for my confirmation" in page_of(record, doc)
     gate = dict(doc["pending"]["rows"][0], id="e2@1a2b", kind="gate", text="e2's gate: if it holds, ship int8", confirm="rb confirm e2@1a2b")
     odd = dict(doc["pending"]["rows"][0], id="dec8", kind="relation", text="a relation, proposed", confirm="rb confirm dec8")
     doc["pending"]["rows"] += [gate, odd]
     t = Html(page_of(record, doc))
-    heads = [said(t.text(e)) for e in t.all(t.by_id("to-confirm")) if e["tag"] == "h3"]
+    heads = [said(t.text(e)) for e in t.all(t.by_id("to-confirm")) if e["tag"] == "h2"]
     assert heads[-2:] == ["Gates set, not confirmed (1)", "Also waiting for your confirmation (1)"], heads
 
 
@@ -1748,9 +1867,6 @@ def test_calls_lead_with_a_reason(record):
             first = next(e for e in t.all(first))
         assert t.has(first, "rsn"), row
         assert said(t.text(t.of_class("rl", first)[0])) in labels
-    calls = [r for r in t.of_class("qrow", t.by_id("queue")) if r["attrs"]["data-kind"] in ("baseline", "call")]
-    given = [r for r in doc["home"]["queue"] if r["kind"] in ("baseline", "call")]
-    assert [said(t.text(t.of_class("qv", r)[0])) for r in calls] == [said(r["title"]) for r in given] and given
 
 
 def _calls_in_queue_order(doc: dict) -> list:
@@ -1766,9 +1882,9 @@ def test_each_call_once(record):
     t = Html(page_of(record, doc))
     subjects = [r["attrs"]["data-for"] for r in t.of_class("crow", t.by_id("your-call"))]
     assert subjects == [f"call-{c['subject']}" for c in _calls_in_queue_order(doc)] and len(subjects) == len(doc["calls"])
-    calls = [r for r in t.of_class("qrow", t.by_id("queue")) if r["attrs"]["data-kind"] in ("baseline", "call")]
-    hrefs = [next(e for e in t.all(r) if t.has(e, "qbtn"))["attrs"]["href"] for r in calls]
-    assert hrefs == [f"#call-{r['target']}" for r in doc["home"]["queue"] if r["kind"] in ("baseline", "call")] and len(set(hrefs)) == len(hrefs)
+    # the Overview's Decisions name each call once, by the overview's rows (UX5 1.3), and draw no call's row
+    decided = [d["subject"] for d in doc["overview"]["decisions"] if d["kind"] == "decide"]
+    assert len(set(decided)) == len(decided)
     assert not t.of_class("callrow", t.by_id("overview"))
     for q in doc["questions"]:
         rail = t.by_id(f"q-{q['id']}:rail")
@@ -1783,13 +1899,15 @@ def test_your_call_in_the_queues_order(record):
     t = Html(page_of(record, doc))
     yc = t.by_id("your-call")
     assert [r["attrs"]["data-for"] for r in t.of_class("crow", yc)] == [f"call-{c['subject']}" for c in _calls_in_queue_order(doc)]
-    link = next(e for e in t.all(yc) if e["tag"] == "a" and e["attrs"]["href"] == "#to-confirm")
+    link = next(e for e in t.all(t.of_class("wlink", yc)[0]) if e["tag"] == "a" and e["attrs"]["href"] == "#to-confirm")
     assert said(t.text(link)) == doc["home"]["waiting_line"]
     marks = [("calls" if t.has(e, "list") else "open" if t.has(e, "oilink") else "link") for e in t.all(yc) if t.has(e, "list") or t.has(e, "wlink") or t.has(e, "oilink")]
     assert marks == ["calls", "link", "open"]
     no_wait = copy.deepcopy(doc)
     no_wait["pending"]["rows"] = []
-    assert 'href="#to-confirm"' not in page_of(record, no_wait)
+    no_wait["overview"]["decisions"] = [d for d in no_wait["overview"]["decisions"] if d["kind"] != "confirm"]
+    # drawn in the markup (the inline script's reader rule names the link it hides)
+    assert 'href="#to-confirm"' not in re.sub(r"<script>.*?</script>", "", page_of(record, no_wait), flags=re.S)
 
 
 def test_your_call_lines_and_what_is_open(record):
@@ -1800,8 +1918,9 @@ def test_your_call_lines_and_what_is_open(record):
     t = Html(page_of(record, doc))
     yc = t.by_id("your-call")
     lede = t.of_class("lede", yc)[0]
-    assert said(t.text(lede)) == f"{doc['home']['quiet']} You make a call in your terminal; rb records it with your reason."
-    lines = [said(t.text(e)) for e in t.all(yc) if e["tag"] == "pre"]
+    assert said(t.text(lede)) == doc['home']['quiet']   # no line explains where a call is made (Nov 12 20:35 +08)
+    # the calls' own lines; what waits for a confirmation follows in its fold, with its own commands
+    lines = [said(t.text(e)) for e in t.all(t.of_class("list", yc)[0]) if e["tag"] == "pre"]
     assert lines == [a["line"] for c in _calls_in_queue_order(doc) for a in c["actions"]]
     items = t.by_id("open-items")
     # design pass 1, target 2: a checklist grouped by what is missing, each group a plain sentence with its count, each
@@ -1812,8 +1931,9 @@ def test_your_call_lines_and_what_is_open(record):
     late = t.of_class("chk", items)[0]
     c2 = doc["findings"]["c2"]
     assert doc["open_items"][0]["items"][0]["units"] == "c2 3 of 3 units"
-    assert said(t.raw(late)) == f"{c2['statement']}: all 3 of its results came first c2"
-    assert [e["attrs"]["href"] for e in t.all(late) if e["tag"] == "a"] == ["#c-c2"] and said(t.text(t.of_class("cid", late)[0])) == "c2"
+    # closed form (owner, Nov 13 2026): a rule's row names it by its words alone, with no trailing id chip
+    assert said(t.raw(late)) == f"{c2['statement']}: all 3 of its results came first"
+    assert [e["attrs"]["href"] for e in t.all(late) if e["tag"] == "a"] == ["#c-c2"] and not t.of_class("cid", late)
     raw = [said(t.text(e)) for e in t.of_class("raw", items)]
     assert raw == ["details " + ". ".join(x for x in (g["head"], g["under"]) if x) for g in doc["open_items"]]
     assert "rb " not in said(t.text(items))
@@ -1821,8 +1941,6 @@ def test_your_call_lines_and_what_is_open(record):
     assert items["attrs"]["data-crumb"] == "Also open in the record" and items["attrs"]["data-home"] == "your-call"
     line = t.of_class("oilink", yc)[0]
     assert said(t.text(line)) == "Also open in the record (3) →" and [e["attrs"]["href"] for e in t.all(line) if e["tag"] == "a"] == ["#open-items"]
-    over = t.of_class("openrec", t.by_id("queue"))[0]
-    assert [e["attrs"]["href"] for e in t.all(over) if e["tag"] == "a"] == ["#open-items"]
 
 
 def test_unfiled_work_stays_shown(record):
@@ -1833,7 +1951,6 @@ def test_unfiled_work_stays_shown(record):
     unfiled = [c for c in doc["calls"] if c["question"] == ":unfiled"]
     assert unfiled
     assert {f"call-{c['subject']}" for c in unfiled} <= {r["attrs"]["data-for"] for r in t.of_class("crow", t.by_id("your-call"))}
-    assert {f"#call-{c['subject']}" for c in unfiled} <= {e["attrs"]["href"] for e in t.of_class("qbtn", t.by_id("queue"))}
     for o in doc["unfiled"]["open_items"]:
         assert said(o["what"]) in said(t.text(t.by_id("open-items")))
 
@@ -1917,12 +2034,13 @@ def test_words_ids_and_values_break_only_between_them(record):
     joined = [w for w in doc["project"]["title"].split() if re.search(r"\w-\w", w)]
     assert joined and [said(t.text(e)) for e in t.of_class("nw", title)] == joined
     assert not t.of_class("oid", t.by_id("top")) and doc["project"]["id"] not in t.text(t.by_id("top"))
-    recid = t.of_class("recid", t.by_id("about"))[0]
-    assert [said(t.text(e)) for e in t.of_class("mono", recid)] == [doc["project"]["id"]]
+    # About's strip says the record's id as a chip of its own (owner, Nov 13 2026)
+    strip = t.by_id("in-git")
+    assert [said(t.text(e)) for e in t.all(strip) if e["attrs"].get("title") == "Research record"] == [doc["project"]["id"]]
     rules = css(page)
     app = next(sheet for media, sheet in rules.items() if media == "@media screen")
     assert app["html.app header.top .ttl"]["text-overflow"] == "ellipsis" and app["html.app header.top .ttl"]["white-space"] == "nowrap"
-    assert rules[""][".recid .mono"]["overflow-wrap"] == "break-word"
+    assert next(d for sel, d in rules[""].items() if ".astrip .fch" in sel)["overflow-wrap"] == "break-word"
     for media, sheet in rules.items():
         if "print" not in media:
             assert not [sel for sel, decl in sheet.items() if decl.get("overflow-wrap") == "anywhere"], media
@@ -2247,16 +2365,16 @@ def test_the_rerun_panel_with_no_script_opens_under_the_bar_with_a_way_out(recor
 # the Overview at 390: how far below the title Needs your judgment starts, and its first row ends
 _QUEUE_AT = """<script>
 const t0 = document.querySelector('#h-overview').getBoundingClientRect().top;
-const row = document.querySelector('#queue .qrow').getBoundingClientRect();
-parent.document.body.setAttribute('data-queue', JSON.stringify({head: document.querySelector('#h-queue').getBoundingClientRect().top - t0,
+const row = document.querySelector('#overview .dq .dr').getBoundingClientRect();
+parent.document.body.setAttribute('data-queue', JSON.stringify({head: document.querySelector('#decisions').getBoundingClientRect().top - t0,
   row: row.bottom - t0, W: document.documentElement.clientWidth}));
 </script>"""
 
 
 def test_at_390_needs_your_judgment_starts_on_the_first_screen(record, tmp_path):
-    """Look 3, film pass 2: at 390 the standing card and the integrity strip stay compact (the integrity parts flow as
-    one paragraph), so the queue's heading and its first row sit on the first screen under rb open's top bar and nav
-    (about 155 pixels of an 844-pixel phone screen): its first row ends within 600 pixels of the title."""
+    """Look 3, film pass 2, on the Decisions since UX5 1.3: at 390 the strip, the chart and the marks stay compact, so
+    the Decisions heading and its first row sit on the first screen under rb open's top bar and nav (about 155 pixels
+    of an 844-pixel phone screen): its first row ends on that first screen."""
     chrome = _chrome()
     if not chrome:
         pytest.skip("measured in Chrome, and none is installed here")
@@ -2270,7 +2388,8 @@ def test_at_390_needs_your_judgment_starts_on_the_first_screen(record, tmp_path)
     m = re.search(r'data-queue="([^"]*)"', r.stdout)
     assert m, (r.returncode, r.stderr[-2000:])
     at = json.loads(html.unescape(m.group(1)))
-    assert 370 <= at["W"] <= 390 and at["row"] <= 600, at
+    # the first screen: 844 pixels less rb open's bar and nav
+    assert 370 <= at["W"] <= 390 and at["row"] <= 844 - 155, at
 
 
 # what the page shows inside the hub's frame (sandbox="allow-scripts", no allow-same-origin: an opaque origin where
@@ -2285,7 +2404,8 @@ setTimeout(() => {
   parent.postMessage(JSON.stringify({stored: stored, origin: String(window.origin), hosted: document.documentElement.classList.contains('hosted'),
     ready: document.documentElement.classList.contains('ready'), guide: vis(document.querySelector('.guide')),
     top: vis(document.querySelector('header.top')), bar: vis(document.querySelector('header.top')) ? document.querySelector('header.top').innerText.trim() : '', theme: document.documentElement.dataset.theme || null,
-    line: line ? line.textContent : '', ctl: document.querySelectorAll('#nav .navctl .ctl').length, errors: said}), '*');
+    // the theme, ? and About (the phone's "..." button and its Files item are the menu's own, not controls that moved)
+    line: line ? line.textContent : '', ctl: document.querySelectorAll('#nav .navctl .ctl:not([data-more]):not(.ftab)').length, errors: said}), '*');
 }, 1500);
 </script>"""
 _HOST = """<!doctype html><html><body style="margin:0"><script>
@@ -2348,7 +2468,7 @@ def test_a_hosted_page_keeps_nothing_shows_no_guide_by_itself_and_folds_its_top_
     # the export (rb's page with no script of its own) under the hub's copy of the script: the same fold, its controls
     # drawn in the navigator
     export = page_of(record, surface="export")
-    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.js").read_text(encoding="utf-8")
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.min.js").read_text(encoding="utf-8")
     # the hub names the viewer on every page it serves (OWNER-READER): its meta, before its copy of the script
     meta = '<meta name="rb-viewer" content="owner">'
     export = export.replace("</head>", f"{meta}<script>{script}</script></head>", 1)
@@ -2440,7 +2560,7 @@ def test_one_navigator_at_every_width(record, tmp_path):
     view, from 1280 beside it. Every view marks one visible navigator item, at every width."""
     page = page_of(record)
     export = page_of(record, surface="export")
-    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.js").read_text(encoding="utf-8")
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.min.js").read_text(encoding="utf-8")
     hub = lambda who: export.replace("<head>", f'<head><meta name="rb-viewer" content="{who}"><script>{script}</script>', 1)  # noqa: E731
     bare = re.sub(r"<script>.*?</script>", "", page, flags=re.S)
     # rb page with a reader's meta (the preview's reader page): a reader's row too
@@ -2456,7 +2576,8 @@ def test_one_navigator_at_every_width(record, tmp_path):
     hidden = [k for k, v in printed.items() if v.get("display", "").startswith("none")]
     assert {"nav.nav", "nav.subrow", "p.rlink"} <= set(hidden), hidden
     got = _nav(tmp_path, pages)
-    owner = ["Overview", "Research 2", "Experiments 2", "Record", "Your call 4"]
+    # the pin counts the Overview's decisions (UX5 1.3)
+    owner = ["Overview", "Research 2", "Experiments 2", "Record", f"Your call {len(example()['overview']['decisions'])}"]
     for w in (390, 720):
         for name in ("owner", "hub-owner", "noscript"):
             g = got[f"{name}-{w}"]
@@ -2493,15 +2614,14 @@ def test_plain_words_pass_1_on_the_views(record):
     page = page_of(record, doc)
     t = Html(page)
     assert said(t.text(t.by_id("h-criteria"))).startswith("Rules") and 'href="#criteria"><span class="tx">Rules</span>' in page
-    assert '<h1 id="h-criteria"><span class="term" data-hint="a threshold or comparison declared for a question; commands call it a criterion.' in page
-    tally = said(t.text(t.of_class("quiet", t.by_id("criteria"))[0]))
-    assert tally == "Rules: 3 met · 2 can't tell yet · 1 not tested · 1 gate, can't tell yet · 2 gate not tested", tally
-    assert re.search(r'<span class="term" data-hint="there are results, but they don\'t settle the rule[^"]*" aria-describedby="g-can-t-tell-yet">can(?:\'|&#x27;|&#39;)t tell yet</span>', page) or \
-        re.search(r'data-hint="there are results, but they don[^"]*settle the rule[^"]*" aria-describedby="g-can-t-tell-yet">', page), "can't tell yet has its hover"
-    assert 'aria-describedby="g-not-tested">not tested</span>' in page
+    assert '<h1 id="h-criteria">Rules' in page and "data-hint" not in page   # no hover defines a word (Nov 12 20:35 +08)
+    # each count a chip that filters the rules (owner, Nov 13 2026: counts click)
+    tally = [said(t.text(e)) for e in t.of_class("rflt", t.by_id("criteria"))]
+    # closed form (owner, Nov 13 2026): the pages say "hold", "not settled" and "no range yet"
+    assert tally == ["All 9", "3 hold", "2 not settled", "1 not tested", "1 gate, not settled", "2 gate not tested"], tally
     c3 = said(t.text(t.by_id("f-c3:q1")))
-    assert "can't tell yet" in c3 and "no interval" in c3 and "point only" not in c3, c3
-    assert "How far to trust it" in view_text(page, "overview") and "Evidence integrity" not in page
+    assert "not settled" in c3 and "no range yet" in c3 and "point only" not in c3 and "can't tell yet" not in c3, c3
+    assert "How far to trust it" in view_text(page, "history") and "Evidence integrity" not in page
     assert said(t.text(t.by_id("h-research"))) == "Research" and "Evidence by question" not in page
     assert 'placeholder="Filter by ID, words or state"' in page
     assert "8 runs · 1 retracted stays on record" in view_text(page, "runs") and "not retracted" not in page and "runs stand" not in page
@@ -2509,7 +2629,8 @@ def test_plain_words_pass_1_on_the_views(record):
     assert 'href="#q-q1:rd:criteria-met"' in page
     # rb's line that leads with a rule word says it plainly: the rule as declared (a call's reason is the model's
     # drawn field, verbatim, and moves with M's pass)
-    assert "<dt>as declared</dt><dd>rule met: estimate" in page and "<dd>criterion met:" not in page
+    # closed form (owner, Nov 13 2026): "rule met" reads "rule holds" on the pages
+    assert "<dt>as declared</dt><dd>rule holds: estimate" in page and "<dd>criterion met:" not in page and "<dd>rule met:" not in page
     # none of rb's words for these in what the views draw themselves: state words, tallies, tags, result words,
     # headings and the nav (the cards are C's and rb's computed lines M's: each moves in its owner's pass)
     views = Html(re.sub(r'<div class="nodes">.*', "", page, flags=re.S))
@@ -2532,26 +2653,15 @@ def test_plain_words_pass_2_no_role_word_and_every_card_term_has_its_hover(recor
         t = Html(page)
         # the cards' own sentence (C's nodes.rs) moves in C's pass; every line of R's says no role
         assert "record's owner" not in html.unescape(page), surface
-        # "not confirmed" is said in a note's own line now (plain words pass 3); its glossary line still says no role
-        assert re.search(r'<dd id="g-not-confirmed">it waits to be confirmed with rb in a terminal; until then it reads as a note', page), surface
-        # a term's line is written once a page, on its first use; its later uses name the entry, which the script reads
-        chips = re.findall(r'<span class="kind"><span class="term"(?: data-hint="([^"]*)")? aria-describedby="g-rule">rule</span></span>', page)
-        assert chips and all(h in ("", "a threshold or comparison declared for a question; commands call it a criterion.") for h in chips), surface
-        assert re.findall(r'data-hint="([^"]*)" aria-describedby="g-rule"', page) == ["a threshold or comparison declared for a question; commands call it a criterion."], surface
-        assert re.findall(r'data-hint="(problems with what a finding depends on[^"]*Not the repository(?:\'|&#x27;)s own checks\.)" aria-describedby="g-checks"', page), surface
-        assert re.search(r'<span class="term"(?: data-hint="[^"]*")? aria-describedby="g-checks">checks</span>', page), surface
-        fold = {said(t.text(e)) for e in t.all() if e["tag"] == "dt"}
-        assert "checks" in fold and "integrity" not in fold and "rule (noun)" not in fold, surface
-        # the glossary holds what every surface may say: no "your call" (the export says no "you" of a call) and
+        # no glossary and no hover that defines a word (no glossary, show instead, Nov 12 20:35 +08)
+        assert "data-hint" not in page and 'aria-describedby="g-' not in page and "What the words on this page mean" not in page, surface
         # none of the words rb's screens ban (the lock is "locked", never the freeze)
-        assert "your call" not in fold and not words_problems(page), (surface, words_problems(page)[:3])
-        for kept in ("gain", "loss", "unresolved", "reproduced", "not reproduced", "paired difference", "cited", "margin", "question link",
-                     "identity", "amended", "locked", "rb's interval", "units", "timing", "result"):
-            assert t.by_id("g-" + re.sub(r"[^a-z0-9]+", "-", kept.lower()).strip("-")) is not None, (surface, kept)
+        assert not words_problems(page), (surface, words_problems(page)[:3])
     export = page_of(record, doc, "export")
     # plain words pass 4: "rb computes; it never decides" is said once, in About, and no view repeats it
-    assert "Calls are made with rb in a terminal, never on this page." in export and export.count("rb computes; it never decides.") == 1
-    assert "it is confirmed with rb in a terminal:" in export or "Waiting for a confirmation" not in export
+    assert "Calls are made with rb in a terminal, never on this page." not in export and export.count("rb computes; it never decides.") == 1
+    # closed form (owner, msg 47): what waits is offered to its owner as a prompt for their agent, no terminal line
+    assert "it is confirmed with rb in a terminal:" not in export and ("cpprompt" in export or "Waiting for a confirmation" not in export)
 
 
 def test_no_place_on_a_page(record):
@@ -2566,17 +2676,20 @@ def test_no_place_on_a_page(record):
         # how the checkout held the record is said in About's line 2 and in the owner's span on the Overview, and
         # nowhere else: no branch, no path
         held = [re.sub(r"<[^>]+>", "", h) for h in re.findall(r'<span(?: class="held" data-vw="owner")?>((?:[^<]|<a href="#in-git">|</a>)*)</span>', page) if "record files" in h]
-        assert held == [" \u00b7 2 record files not committed", "2 record files not committed \u00b7 at commit 3f2a9c1e8d0b"], (surface, held)
-        assert page.count("record files not committed") == 2 and 'data-vw="owner"> \u00b7 <a href="#in-git">2 record files' in page, surface
+        # (About says it as chips now, owner Nov 13 2026: the amber chip's hover and the header's)
+        assert held == [" \u00b7 2 record files not committed"], (surface, held)
+        assert page.count("record files not committed") == 3 and 'data-vw="owner"> \u00b7 <a href="#in-git">2 record files' in page, surface
 
 
 def test_reproduce_this_project_only_with_an_address(record):
     """An export made with --url carries Reproduce this project on its Overview, with the one button that opens Rerun
     this research, and the bar carries the same button; the panel says the prompt, the clone command for that address
     and the code line once for the page. Without one, there is no Reproduce, no Rerun and no https:// on the page; rb
-    page draws neither, whatever its document holds (REPRODUCE-WORDS.md)."""
+    page draws neither, whatever its document holds (REPRODUCE-WORDS.md). A resource's public address is where a reader
+    gets it (getit.rs): the only https:// on such a page."""
     page = page_of(record, surface="export")
-    assert "Reproduce this project" not in page and "https://" not in page and "Rerun this research" not in page
+    assert "Reproduce this project" not in page and "Rerun this research" not in page
+    assert "https://" not in re.sub(r'<a class="getit" href="https://[^"]*"[^>]*>Get it <span class="mono">https://[^<]*</span></a>', "", page)
     doc = example()
     doc["reproduce_url"] = "https://lab.example/int8/bundle.zip"
     page = page_of(record, doc, surface="export")
@@ -2686,15 +2799,16 @@ def test_green_only_for_a_sound_met_rule(record):
     line and the Overview's standing card, each linked to its reading; each tally led by what it counts ("Rules: 3
     met", plain words pass 3)."""
     page = page_of(record)
-    assert page.count('<span class="k">Rules: </span><span class="sw good">3 met</span>') == 1                  # Rules' tally
-    assert len(re.findall(r'<span class="k">Rules: </span><a class="sw good" href="#q-q1:rd:criteria-met">3 met</a>', page)) == 3  # both cards, the question
+    # closed form (owner, Nov 13 2026): rb's "3 met" reads "3 hold" on the pages
+    assert page.count('<button type="button" class="rflt good" data-rule="meets" aria-pressed="false">3 hold</button>') == 1  # Rules' tally
+    assert len(re.findall(r'<span class="k">Rules: </span><a class="sw good" href="#q-q1:rd:criteria-met">3 hold</a>', page)) == 2  # Research's card, the question
     doc = example()
     doc["home"]["muted"] = ["meets"]
     doc["home"]["tree"][0]["muted"] = ["meets"]
     for st in doc["home"]["standing"]:
         st["muted"] = ["meets"]
     page = page_of(record, doc)
-    assert '<span class="sw good">3 met' not in page and 'class="sw good" href="#q-q1:rd' not in page and "3 met" in page
+    assert '<span class="sw good">3 hold' not in page and 'class="sw good" href="#q-q1:rd' not in page and "3 hold" in page
 
 
 def test_numbers_in_rbs_digits(record):
@@ -2732,7 +2846,8 @@ def test_absent_fields_draw_nothing(record):
     assert said(t.text(next(e for e in t.all(t.by_id("nav")) if e["tag"] == "a" and e["attrs"]["href"] == "#your-call"))) == "Your call"
     ov = said(t.text(t.by_id("overview")))
     assert "No recorded interpretation yet." not in ov
-    assert doc["questions"][0]["overview"]["headline"] in ov
+    # a document from before the view model leads with its first question, as it reads
+    assert said(doc["questions"][0]["text"]) in ov
 
 
 # ---------------------------------------------------------------- R3: Research, a question, All criteria, the glossary
@@ -2752,8 +2867,6 @@ def test_research_holds_the_cards_and_unfiled_work(record):
     cards = [e for e in t.all(res) if t.has(e, "stand")]
     assert [c["attrs"]["data-go"] for c in cards] == [f"q-{q['id']}" for q in doc["questions"]]
     assert [t.has(c, "d1") for c in cards] == [q.get("depth", 0) > 0 for q in doc["questions"]]
-    # the top question's card reads word for word as the Overview's
-    assert said(t.text(cards[0])) == said(t.text(t.by_id("st-q1")))
     assert said(doc["home"]["standing"][0]["interpretation"]["text"]) in said(t.text(res))
     for chain in ("no interval ·", "linked here:", "below it:", "Uncertainty remains"):
         assert chain not in said(t.text(cards[0])), chain
@@ -2803,6 +2916,10 @@ def test_an_interpretation_group_holds_its_links_when_and_why_once(record):
     assert all(again[c] == 1 for c in ip["criteria"] if c in again)
 
 
+# a rule placed against its results in time, the earlier day first (no glossary, show instead, Nov 12 20:35 +08)
+PLACED = r"(results|rule) \d{1,2} [A-Z][a-z]{2} \u2500\u2500\u25b6 (rule|results) \d{1,2} [A-Z][a-z]{2}|written (before|after) its results"
+
+
 def test_question_rows_meaning_first(record):
     """A question's evidence row is compact (design pass 1, P2, P3, P5, P6, P8): its statement and rb's state word,
     then rb's reading as one plain sentence ("int8 is 0.0029 lower than the fp32 baseline on top1, -0.0046 to
@@ -2817,7 +2934,8 @@ def test_question_rows_meaning_first(record):
     f = doc["findings"]["c1"]
     head, value, fold = [k for k in row["kids"] if isinstance(k, dict)]
     units = [e for e in t.of_class("evu", fold) if not t.has(e, "rbr")][0]
-    assert t.has(head, "evh") and said(t.text(head)) == f"{f['statement']} {f['standing'].replace('criterion met', 'rule met')}"
+    # closed form (owner, Nov 13 2026): rb's "criterion met" reads "rule holds" on the pages
+    assert t.has(head, "evh") and said(t.text(head)) == f"{f['statement']} {f['standing'].replace('criterion met', 'rule holds')}"
     assert said(t.text(t.of_class("au", head)[0])) == f["statement"]
     assert f["reading"] == {**f["reading"], "estimate": -0.0029, "lo": -0.0046, "hi": -0.0012, "n": 3, "unit": "seed", "unit_text": "top1"}
     assert said(t.text(value)) == "INT8 is 0.0029 lower than the FP32 baseline (-0.0046 to -0.0012) on top1, 3 seeds. c1"
@@ -2853,13 +2971,15 @@ def test_question_rows_meaning_first(record):
     for c in doc["questions"][0]["findings"]:
         v = [k for k in t.by_id(f"f-{c}:q1")["kids"] if isinstance(k, dict)][1]
         tags = [said(t.text(e)) for e in t.of_class("tag", v)]
-        assert tags == (["rule written after the results"] if c in late else []), (c, tags)
+        # placed in time against its results (no glossary, show instead, Nov 12 20:35 +08)
+        assert len(tags) == (1 if c in late else 0) and all(re.fullmatch(r"results \d{1,2} [A-Z][a-z]{2} \u2500\u2500\u25b6 rule \d{1,2} [A-Z][a-z]{2}|written after its results", x) for x in tags), (c, tags)
     for c in doc["findings"]:
         doc["findings"][c]["tags"] = ["retrospective"] if c != "c1" else []
     t = Html(page_of(record, doc))
     v = [k for k in t.by_id("f-c1:q1")["kids"] if isinstance(k, dict)][1]
-    assert [said(t.text(e)) for e in t.of_class("tag", v)] == ["written before its results"]
-    assert [e["attrs"]["aria-describedby"] for e in t.all(v) if t.has(e, "term")] == ["g-rule-written-before-the-results"]
+    [tag] = [said(t.text(e)) for e in t.of_class("tag", v)]
+    assert re.fullmatch(PLACED, tag), tag
+    assert [e for e in t.all(v) if t.has(e, "term")] == []   # no hover defines it (Nov 12 20:35 +08)
     v = [k for k in t.by_id("f-c2:q1")["kids"] if isinstance(k, dict)][1]
     assert not t.of_class("tag", v)
     head = t.of_class("late", t.by_id("q-q1"))
@@ -2937,34 +3057,6 @@ def test_all_criteria_lists_each_criterion_once_by_experiment(record):
     assert f"#{to}" in links and not ({"#c-c1", "#cr-c1"} - {f"#{to}"}) & links
 
 
-def test_the_glossary_describes_each_term(record):
-    """Every term drawn with rb's hint names its glossary entry, and the glossary fold, open in the About view (design
-    pass 1, P10), holds each line once, so the document has them with no script. The page writes a term's line once,
-    on its first use (Nov 10 2026): its later uses name the entry alone, and the script gives them its line."""
-    t = Html(page_of(record))
-    words = t.by_id("words")
-    assert words is not None and words["up"]["tag"] == "details" and "open" in words["up"]["attrs"] and t.inside(words, t.by_id("about"))
-    entries = {e["attrs"]["id"]: said(t.text(e)) for e in t.all(words) if e["tag"] == "dd"}
-    terms = [e for e in t.all() if t.has(e, "term")]
-    assert terms
-    seen = set()
-    for e in terms:
-        named = e["attrs"].get("aria-describedby")
-        assert named in entries, e["attrs"]
-        if named in seen:
-            assert "data-hint" not in e["attrs"], e["attrs"]
-        else:
-            assert entries[named] == said(e["attrs"]["data-hint"]), e["attrs"]
-            seen.add(named)
-    assert len(seen) < len(terms)
-    assert "g-open-question" in entries and "g-rb-s-interval" in entries and "g-not-confirmed" in entries and len(entries) == 40
-    q = t.by_id("q-q1")
-    assert {e["attrs"]["aria-describedby"] for e in t.all(q) if t.has(e, "term")} >= {"g-open-question", "g-rule-written-after-the-results"}
-    # rb's headline carries its hint where it leads a question's evidence: a sub-question's (a top-level one's view
-    # leads with rb's line on why, contract 1.6's standing)
-    assert "g-headline" in {e["attrs"]["aria-describedby"] for e in t.all(t.by_id("q-q1a")) if t.has(e, "term")}
-
-
 def test_no_verdict_sentence(record):
     """Where a question's answer would be, the page draws only the record's words (an interpretation, as written),
     rb's computed comparison or rb's "No recorded interpretation yet.": never an answer of the renderer's own."""
@@ -2981,8 +3073,10 @@ def test_no_verdict_sentence(record):
                 if author:
                     rest = rest.replace(said(t.text(author[0])), "").strip()
                 # a note's label, then whether its rule holds as a sentence of rb's (plain words pass 3)
-                assert rest == "No note on these rules yet." or re.fullmatch(r"(?:Note:|A note, not confirmed:)?\s*(?:Its (?:rule|\d+ rules) (?:is|are) (?:not )?met\.|rb can't tell yet whether its rule is met\.|Its rule has no results yet\.)?", rest), rest
-    assert said(t.text(t.by_id("q-q1a:evidence"))) and "No note on these rules yet." in said(t.text(t.by_id("q-q1a")))
+                # closed form (owner, Nov 13 2026): "Its rule holds.", "Its 2 rules do not hold.", "Its rule is not settled."
+                assert re.fullmatch(r"(?:Note:|A note, not confirmed:)?\s*(?:Its rule (?:holds|does not hold)\.|Its \d+ rules (?:hold|do not hold)\.|Its rule is not settled\.|Its rule has no results yet\.)?", rest), rest
+    # rules with no note on them are listed with no heading that says so (the UX lead's rule, Nov 13 2026)
+    assert said(t.text(t.by_id("q-q1a:evidence"))) and "No note on these rules yet." not in said(t.text(t.by_id("q-q1a")))
 
 
 def test_counts_count_what_was_recorded(record):
@@ -3000,21 +3094,18 @@ def test_counts_count_what_was_recorded(record):
 
 
 def test_qualifications_and_readings_land_in_their_folds(record):
-    """Each qualification on a question's evidence line links to its place in "Which comparisons carry these
-    qualifications?", with what it means and the criteria that carry it; each count of a reading links to its group in
-    "By reading"; the Overview's card links land there too."""
+    """No fold lists a question's qualifications with what each means (no glossary, show instead, Nov 12 20:35 +08);
+    each count of a reading links to its group in "By reading"; the Overview's card links land there too."""
     doc = example()
     t = Html(page_of(record, doc))
-    q = t.by_id("q-q1")
-    for i, lim in enumerate(doc["questions"][0]["overview"]["limits"]):
-        held = t.by_id(f"q-q1:lim:{i}")
-        assert held is not None and t.inside(held, q) and held["up"]["tag"] == "details"
-        assert [e["attrs"]["href"] for e in t.all(held) if e["tag"] == "a"] == [f"#f-{c}:q1" for c in lim["criteria"]]
-        # design pass 1, target 1: no card or evidence line chains its qualifications; the question's fold holds them
-        assert sum(1 for e in t.all() if e["attrs"].get("href") == f"#q-q1:lim:{i}") == 0
+    for i, _ in enumerate(doc["questions"][0]["overview"]["limits"]):
+        assert t.by_id(f"q-q1:lim:{i}") is None
     met = t.by_id("q-q1:rd:criteria-met")
     assert met["up"]["tag"] == "details"
-    assert sorted(e["attrs"]["href"] for e in t.all(met) if e["tag"] == "a") == ["#f-c1:q1", "#f-c3:q1", "#f-c4:q1"]
+    # closed form (owner, Nov 13 2026): the group's head is a count that opens Rules filtered to those it counts
+    head = next(e for e in t.all(met) if e["tag"] == "a")
+    assert head["attrs"]["href"] == "#criteria" and head["attrs"]["data-ids"] == "c-c1 c-c3 c-c4" and said(t.text(head)) == "rule holds · 3"
+    assert sorted(e["attrs"]["href"] for e in t.all(met) if e["tag"] == "a" and e is not head) == ["#f-c1:q1", "#f-c3:q1", "#f-c4:q1"]
     assert t.by_id("q-q1:rd:not-reproduced") is not None
 
 
@@ -3050,13 +3141,13 @@ def test_a_computed_comparison_reads_in_rbs_voice_on_its_question(record):
     pair = t.of_class("pair", rel)[0]
     assert [c["attrs"]["data-go"] for c in t.of_class("pc", pair)] == [f"c-{c}" if t.by_id(f"c-{c}") is not None else f"cr-{c}" for c in ("c1", "c3")]
     assert said(t.text(t.of_class("pv", pair)[0])) == "reverses"
-    assert "Directions are aligned to the same comparison order." in said(t.text(rel))
+    assert "Directions are aligned to the same comparison order." not in said(t.text(rel))
 
 
 @pytest.mark.parametrize("waits", ["calls", "nothing"])
 def test_nothing_waits_here_only_while_nothing_waits(record, waits):
-    """A question with no call says "Nothing waits on you here." only while nothing at all waits on the page: no call,
-    no found item and nothing waiting for a confirmation."""
+    """A question with no call shows "Nothing waits" (a chip, since the UX lead's rule of Nov 13 2026, never a sentence)
+    only while nothing at all waits on the page: no call, no found item and nothing waiting for a confirmation."""
     doc = example()
     for q in doc["questions"]:
         q["calls"] = []
@@ -3068,16 +3159,17 @@ def test_nothing_waits_here_only_while_nothing_waits(record, waits):
     # while something waits elsewhere, the rail opens on what is behind the question: no empty "Your call (0)" box
     assert rail.startswith("Your call (0)") == (waits == "nothing")
     assert rail.startswith("Experiments behind this question") == (waits == "calls")
-    assert ("Nothing waits on you here." in rail) == (waits == "nothing")
+    assert ("Nothing waits" in rail) == (waits == "nothing") and "Nothing waits on you here." not in rail
 
 
 def test_an_empty_question_says_so(record):
-    """Plain words pass 4: a question with nothing linked to it says one thing under its status, "No rule tests this
-    question yet.", never a headline and a box that say it again, and links to no other view's notes; where the viewer
-    may act (rb page, the export's owner and a file with no viewer) the command rb gives for it is its one copy line, a
-    reader reads the sentence alone; the notes that name it are listed under their own heading; its rail is headed by
-    the question, since no call waits there; and it still lists the experiments behind it. No tallies beside the
-    sentence (a top-level question's count its sub-questions' rules), and rb's standing line does not replace it."""
+    """An empty state is shown, not written: a question with nothing linked to it shows one chip under its status,
+    "Not tested yet", and an outline where its rules would sit, never a sentence, a headline or a box that say it again,
+    and links to no other view's notes; where the viewer may act (rb page, the export's owner and a file with no viewer)
+    one Next step gives a prompt written from the question, with a Copy prompt button, and no rb command; a reader is
+    shown the chip and the outline alone; the notes that name it are listed under their own heading; its rail is headed
+    by the question, since no call waits there; and it still lists the experiments behind it. No tallies beside the
+    chip, and rb's standing line does not replace it."""
     doc = example()
     q = doc["questions"][1]
     q["findings"], q["overview"]["evidence_count"], q["calls"] = [], 0, []
@@ -3090,18 +3182,25 @@ def test_an_empty_question_says_so(record):
         t = Html(page)
         view = t.by_id("q-q1a")
         text = said(t.text(view))
-        assert said(t.text(t.by_id("q-q1a:evidence"))) == "No rule tests this question yet.", surface
-        assert text.count("No rule tests this question yet") == 1 and "No test linked yet" not in text and not t.of_class("empty", view), surface
+        assert said(t.text(t.by_id("q-q1a:evidence"))) == "Not tested yet", surface
+        assert text.count("Not tested yet") == 1 and "No rule tests this question yet" not in text and "No test linked yet" not in text, surface
+        assert not t.of_class("empty", view) and len(t.of_class("ghost", view)) >= 1, surface
         assert not any(e["attrs"].get("href") == "#notes" for e in t.all(view)) and "Notes on the project" not in text, surface
-        cmds = [e for e in t.all(view) if e["tag"] == "pre" and e["attrs"].get("class") == "cmd"]
-        assert [said(t.text(e)) for e in cmds] == [do], surface
+        # no rb command: one Next step, the prompt written from the question, with its copy button
+        assert not [e for e in t.all(view) if e["tag"] == "pre" and e["attrs"].get("class") == "cmd"] and do not in text, surface
+        [nextc] = t.of_class("nextc", view)
+        prompt = said(t.text(t.of_class("prompt", nextc)[0]))
+        assert f'"{said(q["text"])}"' in prompt and prompt.startswith("In this repository, use Rabbit Brain to plan a test"), prompt
+        [copy_btn] = t.of_class("cpp", nextc)
+        assert said(t.text(copy_btn)) == "Copy prompt" and said(copy_btn["attrs"]["data-text"]) == prompt, copy_btn["attrs"]
         if surface == "export":
-            # the owner's view and a file with no viewer copy it; a reader's draws none of it (shell.css by data-vw)
-            box = next(e for e in t.all(view) if e["attrs"].get("data-vw") and t.inside(cmds[0], e))
+            # the owner's view and a file with no viewer have it; a reader's draws none of it (shell.css by data-vw)
+            box = next(e for e in t.all(view) if e["attrs"].get("data-vw") and t.inside(nextc, e))
             assert box["attrs"]["data-vw"] == "none owner", box["attrs"]
             reader = Html(page, "reader")
             rv = reader.by_id("q-q1a")
-            assert not [e for e in reader.all(rv) if e["tag"] == "pre"] and said(reader.text(reader.by_id("q-q1a:evidence"))) == "No rule tests this question yet."
+            assert not reader.of_class("nextc", rv) and not [e for e in reader.all(rv) if e["tag"] == "pre"]
+            assert said(reader.text(reader.by_id("q-q1a:evidence"))) == "Not tested yet" and reader.of_class("ghost", rv)
         heads = [said(t.text(e)) for e in t.all(view) if e["tag"] == "h2" and t.has(e, "qnh")]
         notes = [said(t.text(e)) for e in t.all(view) if e["tag"] == "li" and t.has(e, "pnote")]
         assert heads == ["Notes about this question"] and len(notes) == 2, surface
@@ -3115,10 +3214,10 @@ def test_an_empty_question_says_so(record):
     t = Html(page_of(record, doc))
     view = t.by_id("q-q1a")
     assert not t.of_class("qnh", view)
-    # a top-level question with nothing linked says the same sentence, never rb's standing line in its place
+    # a top-level question with nothing linked shows the same chip, never rb's standing line in its place
     doc["questions"][0]["findings"] = []
     t = Html(page_of(record, doc))
-    assert said(t.text(t.by_id("q-q1:evidence"))) == "No rule tests this question yet." and doc["home"]["standing"][0]["line"] not in said(t.text(t.by_id("q-q1"))) and not [e for e in t.all(view) if e["tag"] == "pre" and e["attrs"].get("class") == "cmd"]
+    assert said(t.text(t.by_id("q-q1:evidence"))) == "Not tested yet" and doc["home"]["standing"][0]["line"] not in said(t.text(t.by_id("q-q1"))) and not [e for e in t.all(view) if e["tag"] == "pre" and e["attrs"].get("class") == "cmd"]
 
 
 def test_the_open_items_line_opens_its_list_beside_the_view_it_is_on(record, tmp_path):
@@ -3133,7 +3232,7 @@ await cdp.run(async () => {
   const page = await (await cdp.launchChrome()).page();
   await page.viewport(1440, 900);
   const probe = "({view: document.querySelector('main .view.on').id, insp: (document.querySelector('#insp .ibody .tt') || {}).textContent || '', crumbs: (document.querySelector('#insp .crumbs') || {}).textContent || '', hash: location.hash})";
-  for (const [from, sel] of [['overview', '#queue .openrec a'], ['your-call', '#your-call .oilink a']]) {
+  for (const [from, sel] of [['your-call', '#your-call .oilink a']]) {
     await page.goto(URL + '#' + from); await cdp.sleep(500);
     await page.ev("[...document.querySelectorAll('button')].filter(b => b.textContent.trim() === 'Skip').forEach(b => b.click())");
     await page.ev(`document.querySelector(${JSON.stringify(sel)}).click()`); await cdp.sleep(400);
@@ -3148,7 +3247,7 @@ console.log(JSON.stringify({ ok: true, out }));
 """.replace("URL", json.dumps(at.as_uri())))
     code, got, err = _runner(_node(), js, env=dict(os.environ), timeout=180)
     assert code == 0 and got.get("ok"), err[-3000:]
-    for view in ("overview", "your-call"):
+    for view in ("your-call",):
         o, back = got["out"][view], got["out"][view + ":back"]
         assert o["view"] == view and said(o["insp"]) == "Also open in the record (3)" and o["hash"] == "#open-items", o
         assert back["view"] == view and "Also open in the record" not in back["insp"], back
@@ -3161,9 +3260,7 @@ def test_no_line_opens_an_open_items_list_that_has_no_row(record):
     doc["open_items"] = [{"code": "late", "head": "Declared after the evidence existed", "n": 1, "under": "", "items": []}]
     doc["unfiled"]["open_items"] = []
     t = Html(page_of(record, doc))
-    assert t.by_id("open-items") is None and not t.of_class("oilink")
-    line = t.of_class("openrec", t.by_id("queue"))[0]
-    assert t.has(line, "dim") and not [e for e in t.all(line) if e["tag"] == "a"]
+    assert t.by_id("open-items") is None and not t.of_class("oilink") and 'href="#open-items"' not in page_of(record, doc)
 
 
 def test_a_questions_crumb_names_titles_and_its_state_word_once(record):
@@ -3177,12 +3274,14 @@ def test_a_questions_crumb_names_titles_and_its_state_word_once(record):
         s["state_word"] = "Open question"
     t = Html(page_of(record, doc))
     crumb = t.of_class("crumb", t.by_id("q-q1a"))[0]
-    assert said(t.text(crumb)) == f"Research › Does telling a small AI model to think… q1 › How many calibration images does INT8 need? q1a"
-    assert [e["attrs"]["href"] for e in t.all(crumb) if e["tag"] == "a"] == ["#research", "#q-q1"]
-    assert [said(t.text(e)) for e in t.all(crumb) if t.has(e, "cid")] == ["q1", "q1a"]
+    # closed form (owner, Nov 13 2026): the crumb names each question by its words, each a link, with no id chip
+    assert said(t.text(crumb)) == f"Research › Does telling a small AI model to think… › How many calibration images does INT8 need?"
+    assert [e["attrs"]["href"] for e in t.all(crumb) if e["tag"] == "a"] == ["#research", "#q-q1", "#q-q1a"]
+    assert not [e for e in t.all(crumb) if t.has(e, "cid")]
     x = doc["experiments"][0]
     xc = t.of_class("crumb", t.by_id(f"x-{x['id']}"))[0]
-    assert said(t.text(xc)).startswith("Experiments › ") and said(t.text(xc)).endswith(f" {x['id']}") and said(x["title"][:20]) in said(t.text(xc))
+    assert said(t.text(xc)).startswith("Experiments › ") and said(t.text(xc)).endswith(said(x["title"][:20])) and said(x["title"][:20]) in said(t.text(xc))
+    assert [e["attrs"]["href"] for e in t.all(xc) if e["tag"] == "a"] == ["#experiments", f"#x-{x['id']}"]
     page = said(t.text(t.by_id("overview"))) + said(t.text(t.by_id("q-q1")))
     assert "Open question question" not in page and "Open question" in page
 
@@ -3207,7 +3306,7 @@ def test_experiments_rows_carry_state_and_quiet_design_standing(record):
         link = next(e for e in t.all(r) if e["attrs"].get("href") == f"#x-{x['id']}:reproduce")
         assert link["kids"][0]["attrs"]["title"] == x["reproduce"]["ready_line"]
         assert said(t.text(t.of_class("cid", r)[0])) == x["id"]
-        assert any(e["attrs"].get("aria-describedby") == "g-locked" for e in t.all(r))
+        assert not any(e["attrs"].get("aria-describedby", "").startswith("g-") for e in t.all(r))
 
 
 def test_design_standing_once(record):
@@ -3217,14 +3316,17 @@ def test_design_standing_once(record):
     t = Html(page_of(record, doc))
     for x in doc["experiments"]:
         view = said(t.text(t.by_id(f"x-{x['id']}")))
-        assert view.count(x["design"]["standing"]) == 1, x["id"]
+        # rb's word, or the plain line that says it (owner, msg 47), once
+        assert view.lower().count(x["design"]["standing"].lower()) + view.lower().count("design is not confirmed") == 1, x["id"]
         for line in x["design"]["lines"]:
-            assert said(line) in view
+            # the line that lists it to confirm is one plain line and a prompt for their agent (owner, msg 47)
+            listing = f"design not confirmed \u00b7 list it to confirm: rb confirm {x['id']}"
+            assert (said(line) in view) if line != listing else ("This experiment's design is not confirmed." in view and "rb confirm" not in view), line
         for part in x["design"]["not_recorded"]:
             assert f"{part}: not recorded" in view
     doc["experiments"][1]["design"]["lines"] = []
     view = said(Html(page_of(record, doc)).text(Html(page_of(record, doc)).by_id("x-e2")))
-    assert view.count("design not confirmed") == 1
+    assert view.lower().count("design not confirmed") == 1
 
 
 def test_design_standing_in_rbs_words_from_rbs_code(record):
@@ -3241,7 +3343,8 @@ def test_design_standing_in_rbs_words_from_rbs_code(record):
             view = said(t.text(t.by_id(f"x-{x['id']}")))
             for where in (said(t.text(row)), view):
                 assert "not_confirmed" not in where and "changed" not in where.replace("changed since", ""), x["id"]
-            assert "design not confirmed" in said(t.text(row)) and view.count("design not confirmed") == 1, (surface, x["id"])
+            once = view.lower().count("design not confirmed") + view.lower().count("design is not confirmed")
+            assert "design not confirmed" in said(t.text(row)) and once == 1, (surface, x["id"])
 
 
 def test_reproduce_says_how_rb_knows_each_command_from_its_own_words_first(record):
@@ -3393,11 +3496,16 @@ def test_resources_say_how_to_get_each_again(record):
     for rid, r in doc["resources"].items():
         row = next(e for e in t.of_class("resrow", view) if e["attrs"]["data-for"] == f"r-{rid}")
         summary = said(t.text(row["kids"][0]))
-        assert r["name"] in summary and r["availability"] in summary
+        # where a reader gets it, never the word for where its bytes stood on the recording machine (getit.rs)
+        assert r["name"] in summary and ("Get it" in summary if r["get"]["kind"] != "none" else "No download link" in summary)
+        assert r["availability"] not in summary
         if r["acquisition"]:
             assert f"how to get it again · {r['acquisition']['command']}" in summary
-        if r["read_by"]["runs"]:
-            assert f"read by {len(r['read_by']['runs'])} run" in summary
+        # how many runs read it and rules rest on it: chips that link to their lists on its card (owner, Nov 13 2026)
+        n = len(r["read_by"]["runs"])
+        if n:
+            assert f"{n} run" in summary and "read by" not in summary
+            assert any(e["attrs"].get("href") == f"#r-{rid}:readers" for e in t.all(row["kids"][0]) if e["tag"] == "a")
 
 
 def test_history_as_log_rows_newest_first(record):
@@ -3430,8 +3538,7 @@ def test_history_as_log_rows_newest_first(record):
 
 def test_history_draws_its_sittings_and_the_overview_its_newest(record):
     """History draws the model's sittings (H's history_view) above the log rows, each sitting by its head, newest
-    first; the Overview says rb's Latest changes line linked to History, and the newest sitting under Recent calls and
-    changes, both in the Recent changes fold, after the queue and before the notes."""
+    first; the Overview's line links History for them (UX5 round 1: no recent changes on the Overview)."""
     doc = example()
     t = Html(page_of(record, doc))
     hist = t.by_id("history")
@@ -3441,22 +3548,11 @@ def test_history_draws_its_sittings_and_the_overview_its_newest(record):
     assert len([e for e in t.all(hist) if e["attrs"].get("class") == "counts"]) == 0, "the summary is said once"
     log = next(e for e in t.all(hist) if e["tag"] == "ol" and "log" in e["attrs"].get("class", ""))
     assert t.raw(hist).index(t.raw(sits[-1])) < t.raw(hist).index(t.raw(log)), "the sittings come before the log rows"
+    # since round 1 (UX5 1.3's table) the Overview draws no recent changes: its line's "changed" links History, which
+    # draws each sitting, the newest first
     ov = t.by_id("overview")
-    latest = t.of_class("latest", ov)[0]
-    link = next(e for e in t.all(latest) if e["tag"] == "a")
-    assert link["attrs"]["href"] == "#history" and said(t.text(link)) == doc["home"]["latest"]["line"]
-    assert len(t.of_class("latest", ov)) == 1, "one place draws the Latest changes line"
-    recent = t.of_class("recent", ov)[0]
-    # the newest sitting's head is said once on the Overview: the Latest changes line holds it whole (H may drop the
-    # sitting's own head from recent(), P10: one line said once)
-    assert doc["history"]["sittings"][0]["head"] in said(t.text(latest))
-    assert all(said(t.text(h)) == doc["history"]["sittings"][0]["head"] for h in t.of_class("sith", recent))
-    order = list(t.all(ov))
-    head = next(e for e in order if e["tag"] == "h2" and said(t.text(e)) == "Recent calls and changes")
-    notes = next(e for e in order if e["attrs"].get("data-fold") == "notes")
-    fold = next(e for e in order if e["attrs"].get("data-fold") == "recent")
-    assert t.inside(latest, fold) and t.inside(recent, fold) and t.inside(head, fold)
-    assert order.index(t.by_id("queue")) < order.index(fold) and order.index(head) < order.index(recent) < order.index(notes)
+    assert not t.of_class("recent", ov) and not t.of_class("latest", ov)
+    assert any(e["tag"] == "a" and e["attrs"].get("href") == "#history" for e in t.all(t.of_class("ovh", ov)[0]))
     dead = {e["attrs"]["href"][1:] for e in [*t.all(ov), *t.all(hist)] if e["tag"] == "a" and e["attrs"].get("href", "").startswith("#")} - {e["attrs"].get("id") for e in t.all()}
     assert not dead, sorted(dead)
     assert not words_problems(page_of(record, doc))
@@ -3492,7 +3588,7 @@ def test_an_interpretation_never_reads_as_confirmed_unless_rb_says_so(record):
     assert [g["attrs"]["id"] for g in groups] == ["q-q1:ip:3", "q-q1:ip:1", "q-q1:ip:2"]
     for g in groups[1:]:
         assert t.has(next(e for e in t.all(g) if e["tag"] == "h3"), "note"), g["attrs"]["id"]
-    card = t.by_id("st-q1")
+    card = t.by_id("rs-q1")
     assert not t.of_class("tag", card) and said(t.text(t.of_class("sti", card)[0])).startswith("A note, not confirmed: ")
     rules = css(page_of(record))[""]
     assert rules[".igroup > .said.note"]["font-weight"] == "400"
@@ -3506,11 +3602,12 @@ def test_a_call_made_draws_only_its_note_as_the_writers(record):
     m["note"], m["line"] = "accepted", "accepted 2026-10-15 · note: accepted · not confirmed"
     t = Html(page_of(record, doc))
     li = next(e for e in t.all(t.by_id("q-q1:rail")) if e["tag"] == "li" and "note: accepted" in said(t.text(e)))
-    spans = [k for k in li["kids"] if isinstance(k, dict)]
+    # closed form (owner, Nov 13 2026): the whole line is one link to what the call is on, with no trailing id chip
+    links = [e for e in t.all(li) if e["tag"] == "a"]
+    assert len(links) == 1 and links[0]["attrs"]["href"] and not t.of_class("cid", li)
+    spans = [k for k in links[0]["kids"] if isinstance(k, dict)]
     assert [said(t.raw(k)) for k in spans if t.has(k, "au")] == ["accepted"]
-    # the call's line first, what it is on trailing as its id (design pass 1, P3), opening it
-    assert said(t.raw(li)) == f"accepted 2026-10-15 · note: accepted · not confirmed {m['subject']}"
-    assert [e["attrs"]["href"] for e in t.all(li) if e["tag"] == "a"] and t.of_class("cid", li)
+    assert said(t.raw(li)) == "accepted 2026-10-15 · note: accepted · not confirmed"
     assert t.raw(spans[[t.has(k, "au") for k in spans].index(True) - 1]).endswith("note: ")
 
 
@@ -3538,7 +3635,7 @@ def test_an_experiment_draws_rbs_digits_and_no_mark_on_a_design_the_user_owns(re
     for i in range(20):
         doc["runs"][f"runx{i}"] = dict(base, run_id=f"runx{i}", label=f"fp32 and int8 · seed {10 + i}")
         x["run_ids"].append(f"runx{i}")
-    doc["resources"]["resnet50-fp32"]["how"] = "downloaded from the model zoo's v1.5 page"
+    doc["resources"]["resnet50-fp32"]["cite"] = ["downloaded from the model zoo's v1.5 page"]
     t = Html(page_of(record, doc))
     cmp = said(t.text(t.by_id("x-e1:cmp")))
     # a mean in a screen's digits (P5, PIVOT: two decimals, more where its column's values need them), never a float's
@@ -3559,7 +3656,9 @@ def test_an_experiment_draws_rbs_digits_and_no_mark_on_a_design_the_user_owns(re
     assert len([e for e in t.all(body) if e["tag"] == "tr"]) == len(x["run_ids"]) and not [e for e in t.all(runs) if e["tag"] == "details"]
     assert t.by_id("x-e1:lock")["tag"] == "p" and view.count(x["who_line"]) == 1 and x["who_line"].startswith("locked ")
     res = next(e for e in t.of_class("resrow", t.by_id("resources")) if e["attrs"]["data-for"] == "r-resnet50-fp32")
-    assert "how to get it again · downloaded from the model zoo's v1.5 page" in said(t.text(res)) and not [e for e in t.all(res) if e["tag"] == "code"]
+    # what it comes from is a chip beside where to get it, never the way to get it (getit.rs)
+    assert "downloaded from the model zoo's v1.5 page" in said(t.text(res)) and "how to get it again" not in said(t.text(res))
+    assert not [e for e in t.all(res) if e["tag"] == "code"]
 
 
 # ---------------------------------------------------------------- what rb open's live module and the hosted page read
@@ -3614,26 +3713,26 @@ def test_the_export_says_open_calls(record):
     page = page_of(record, surface="export")
     t = Html(page)
     nav = next(e for e in t.all(t.by_id("nav")) if e["tag"] == "a" and e["attrs"]["href"] == "#your-call")
-    n, rows = example()["your_call"]["n"], len(t.of_class("qrow", t.by_id("queue")))
-    assert said(t.text(nav)) == f"Open calls {n}" and said(t.text(t.by_id("h-your-call"))) == f"Open calls ({n})"
-    assert said(t.text(t.by_id("h-queue"))) == "Needs judgment" and rows and not t.of_class("qbtn")
-    # plain words pass 4: the queue's lead says what a row is for; Your call keeps how calls are made
-    assert said(t.text(t.of_class("lede", t.by_id("queue"))[0])) == "Open one to see why it waits and decide it."
-    assert said(t.text(t.of_class("lede", t.by_id("your-call"))[0])) == "Calls are made with rb in a terminal, never on this page."
+    n, d = example()["your_call"]["n"], len(example()["overview"]["decisions"])
+    # the pin and the view it opens count the Overview's decisions, one list (UX5 1.3, the rulings of Nov 12 07:15 +08)
+    assert n and said(t.text(nav)) == f"Open calls {d}" and said(t.text(t.by_id("h-your-call"))) == f"Open calls ({d})"
+    assert said(t.text(t.by_id("decisions"))).startswith("Decisions") and len(_decision_rows(t)) == d and not t.of_class("qbtn")
+    # Your call keeps how calls are made
+    assert not t.of_class("lede", t.by_id("your-call"))   # no line explains where a call is made (Nov 12 20:35 +08)
     assert said(t.text(next(e for e in t.all(t.by_id("to-confirm")["up"]) if e["tag"] == "summary"))) == "Waiting for a confirmation"
-    assert [said(t.text(e)) for e in t.all(t.by_id("queue")) if e["tag"] == "a" and e["attrs"]["href"] == "#your-call" and not t.has(e, "qa")] == ["See the open calls →"]
     assert t.inside(t.by_id("open-calls"), t.by_id("your-call"))
-    views = " ".join(said(t.text(v)) for v in t.all() if t.has(v, "view"))
+    # closed form (owner, Nov 13 2026): each reason in a line is a link; joined() drops the text join's space before a stop
+    views = " ".join(joined(t.text(v)) for v in t.all() if t.has(v, "view"))
     # rb's line on why each question stands is drawn as rb gives it; its voice on a page that leaves the machine is
     # the model's (requested of M; test_a_real_exports_standing_line_is_no_ones holds it), so it alone is set aside here
     given = [said(s["line"]) for s in example()["home"]["standing"]]
-    assert [said(t.text(e)) for e in t.of_class("str", t.by_id("overview"))] == given
+    assert [joined(t.text(e)) for e in t.of_class("str", t.by_id("research"))][:len(given)] == given
     for line in given:
         views = views.replace(line, "")
     for word in ("Your call", "waits on you", "your terminal", "your own terminal", "your confirmation"):
         assert word not in views, word
     mine = Html(page_of(record))
-    assert said(mine.text(mine.by_id("h-queue"))).startswith("Needs your judgment") and said(mine.text(mine.by_id("h-your-call"))).startswith("Your call (")
+    assert said(mine.text(mine.by_id("h-your-call"))).startswith("Your call (")
 
 
 def test_a_real_exports_standing_line_is_no_ones(int8_demo, tmp_path):
@@ -3669,35 +3768,31 @@ def test_the_overview_draws_rbs_projection_when_it_gives_one(record):
         {"kind": "baseline", "title": "Review the fp32 baseline mismatch", "detail": "observed 75.97 % · cited 76.13 %", "target": "c2", "targets": ["c2"], "action": "Review", "rank": 1},
         {"kind": "uncited", "title": "Inspect a changed file nothing in the record cites", "detail": "data.yaml", "target": "", "targets": [], "action": "Inspect", "rank": 5}]
     t = Html(page_of(record, doc))
-    card = t.by_id("st-q1")
+    card = t.by_id("rs-q1")
     assert said(t.text(t.of_class("str", card)[0])) == "The record does not answer it yet: the fp32 baseline is not reproduced."
-    assert [said(t.text(e)) for e in t.all(t.of_class("stt", card)[0]) if t.has(e, "sw")] == ["3 met", "1 not reproduced"]
+    # closed form (owner, Nov 13 2026): rb's "3 met" reads "3 hold" on the pages
+    assert [said(t.text(e)) for e in t.all(t.of_class("stt", card)[0]) if t.has(e, "sw")] == ["3 hold", "1 not reproduced"]
     # an empty interpretation in rb's projection means none is active: the question's lead is not drawn in its place
     assert not t.of_class("sti", card) and said(doc["questions"][0]["lead"]["text"]) not in said(t.text(card))
     box = t.by_id("integrity")
     assert [(said(t.text(e)), [a["attrs"]["href"] for a in t.all(e) if a["tag"] == "a"]) for e in box["kids"] if isinstance(e, dict) and e["tag"] == "p"] == [
         ("2 of 6 criteria were declared after their evidence existed.", ["#criteria"]), ("6 of the 8 runs record no command.", ["#runs"]),
-        ("Read them as a description of what happened, not as a test.", [])]
-    rows = t.of_class("qrow", t.by_id("queue"))
-    assert [r["attrs"]["data-kind"] for r in rows] == ["baseline", "design", "uncited"]
-    # two designs wait: their row opens the list that names each (design pass 1, P11)
-    assert [next(e for e in t.all(r) if t.has(e, "qbtn"))["attrs"]["href"] for r in rows] == ["#call-c2", "#to-confirm", "#how-made"]
-    assert said(t.text(rows[0])) == "Review the fp32 baseline mismatch observed 75.97 % · cited 76.13 % Review"
-    assert said(t.text(t.by_id("h-queue"))) == "Needs your judgment"
-    # Your call holds the calls at the Decide level, the queue's first, and none of what waits for a confirmation
+        # closed form (owner, Nov 13 2026): the line on what they affect opens the rules it is about
+        ("Read them as a description of what happened, not as a test.", ["#criteria"])]
+    # Your call holds the calls at the Decide level, the queue's first; what waits for a confirmation is its own fold
+    # there, apart from the calls' list (UX5 1.3)
     yc = t.by_id("your-call")
-    assert [r["attrs"]["data-for"] for r in t.of_class("crow", yc)][0] == "call-c2" and not t.inside(t.by_id("to-confirm"), yc)
+    assert [r["attrs"]["data-for"] for r in t.of_class("crow", yc)][0] == "call-c2" and not t.inside(t.by_id("to-confirm"), t.of_class("list", yc)[0])
     doc["home"]["integrity"] = {"parts": [], "affects": ""}
     assert Html(page_of(record, doc)).by_id("integrity") is None
     # rb's interpretation, where it gives one, is the one drawn
     doc["home"]["standing"][0]["interpretation"] = {"line": "", "text": "INT8 holds within a third of a point.", "holds": "its 2 criteria met", "confirmed": True}
     t = Html(page_of(record, doc))
     # a recorded interpretation is a note (plain words pass 3), its rules' state a sentence of its own
-    assert said(t.raw(t.of_class("sti", t.by_id("st-q1"))[0])) == "Note: INT8 holds within a third of a point. Its 2 rules are met."
-    # an empty queue is rb's answer: nothing waits, and nothing from the older fields is added to it
-    doc["home"]["queue"] = []
-    t = Html(page_of(record, doc))
-    assert not t.of_class("qrow") and said(t.text(t.by_id("h-queue"))) == "Needs your judgment"
+    # closed form (owner, Nov 13 2026): the pages say a rule holds
+    assert said(t.raw(t.of_class("sti", t.by_id("rs-q1"))[0])) == "Note: INT8 holds within a third of a point. Its 2 rules hold."
+    # the Overview draws no queue: its Decisions are the overview's rows alone (UX5 1.3)
+    assert not t.of_class("qrow")
 
 
 def test_a_tag_every_row_shares_is_said_once_in_its_heading(record):
@@ -3717,19 +3812,21 @@ def test_a_tag_every_row_shares_is_said_once_in_its_heading(record):
     view = t.by_id("q-q1")
     late = t.of_class("late", view)
     assert [said(t.text(e)) for e in late] == [f"All {len(mine)} rules were written after their results came in"]
-    assert late[0]["kids"][0]["attrs"]["aria-describedby"] == "g-rule-written-after-the-results"
+    assert not isinstance(late[0]["kids"][0], dict) or "aria-describedby" not in late[0]["kids"][0]["attrs"]
     rows = [t.by_id(f"f-{c}:q1") for c in mine]
     assert all(not t.of_class("tag", r) for r in rows)
     groups = [e for e in t.all(view) if t.has(e, "igroup") and not t.has(e, "rest")]
     assert groups and all(not t.of_class("tag", g) for g in groups)
     doc["findings"][mine[1]]["tags"] = []
     t = Html(page_of(record, doc))
-    assert [[said(t.text(e)) for e in t.of_class("tag", t.by_id(f"f-{c}:q1"))] for c in mine] == [[], ["written before its results"]] + [[]] * (len(mine) - 2)
+    tags = [[said(t.text(e)) for e in t.of_class("tag", t.by_id(f"f-{c}:q1"))] for c in mine]
+    assert tags[0] == [] and len(tags[1]) == 1 and re.fullmatch(PLACED, tags[1][0]) and not any(tags[2:]), tags
     for c in mine[1:]:
         doc["findings"][c]["tags"] = []
     t = Html(page_of(record, doc))
     assert said(t.text(t.of_class("late", t.by_id("q-q1"))[0])) == f"1 of {len(mine)} rules was written after its results came in"
-    assert [[said(t.text(e)) for e in t.of_class("tag", t.by_id(f"f-{c}:q1"))] for c in mine] == [["rule written after the results"]] + [[]] * (len(mine) - 1)
+    tags = [[said(t.text(e)) for e in t.of_class("tag", t.by_id(f"f-{c}:q1"))] for c in mine]
+    assert len(tags[0]) == 1 and re.fullmatch(PLACED, tags[0][0]) and not any(tags[1:]), tags
 
 
 def test_a_recorded_interpretation_is_drawn_as_the_models_reading(record):
@@ -3740,10 +3837,10 @@ def test_a_recorded_interpretation_is_drawn_as_the_models_reading(record):
     doc = example()
     given = doc["home"]["standing"][0]["interpretation"]
     t = Html(page_of(record, doc))
-    line = t.of_class("sti", t.by_id("st-q1"))[0]
-    assert said(t.raw(line)) == f"Note: {given['text']} Its 2 rules are met."
-    hint = next(e for e in t.all(line) if t.has(e, "term"))
-    assert hint["attrs"]["aria-describedby"] == "g-note-on-a-question" and said(t.text(hint)) == "Note:"
+    line = t.of_class("sti", t.by_id("rs-q1"))[0]
+    # closed form (owner, Nov 13 2026): the pages say a rule holds or does not hold
+    assert said(t.raw(line)) == f"Note: {given['text']} Its 2 rules hold."
+    assert not [e for e in t.all(line) if t.has(e, "term")]   # no hover defines "Note" (Nov 12 20:35 +08)
     ips = doc["questions"][0]["overview"]["interpretations"]
     assert ips and all(ip.get("active", True) for ip in ips)
     for surface in ("page", "export"):
@@ -3772,14 +3869,18 @@ def test_an_experiments_first_screen(record):
     assert kids.index(cmpl) < kids.index(next(k for k in kids if t.has(k, "facts"))) < kids.index(next(k for k in kids if any(t.has(e, "grid") for e in t.all(k))))
     facts = next(k for k in kids if t.has(k, "facts"))
     assert "varies" not in [said(t.text(e)) for e in t.all(facts) if e["tag"] == "dt"]
-    hyp = next(e for e in t.all(facts) if e["tag"] == "details" and t.has(e, "oneline"))
+    # the key statement shown whole, never behind a click (owner, Nov 13 2026)
+    hyp = next(e for e in t.all(facts) if e["tag"] == "div" and t.has(e, "kst"))
+    assert not [e for e in t.all(facts) if e["tag"] == "details"]
     assert said(t.text(hyp)) == said(x["hypothesis"]) and said(t.raw(facts)).count(said(x["hypothesis"])) == 1
     repro = t.by_id(f"x-{x['id']}:reproduce")
     fold = next(k for k in repro["kids"] if isinstance(k, dict))
     assert fold["tag"] == "details" and "open" not in fold["attrs"] and "data-rail" not in repro["attrs"]
     assert said(t.text(next(k for k in fold["kids"] if isinstance(k, dict)))).startswith("Reproduce")
     settings = next(e for e in t.all(view) if e["tag"] == "details" and e["attrs"].get("data-fold") == f"x-{x['id']}:settings-fold")
-    assert said(t.text(next(k for k in settings["kids"] if isinstance(k, dict)))) == f"Source details · {x['settings_line']}"
+    # the settings line in the page's words: checked, not checked (owner, Nov 13 2026)
+    line = x["settings_line"].replace(" provisional", " not checked").replace(" verified", " checked")
+    assert said(t.text(next(k for k in settings["kids"] if isinstance(k, dict)))) == f"Where it comes from · {line}"
     del x["compares"]
     t = Html(page_of(record, doc))
     facts = t.of_class("facts", t.by_id(f"x-{x['id']}"))[0]
@@ -3814,7 +3915,8 @@ def test_a_questions_view_counts_as_its_card_does(record):
     below = doc["questions"][0]["rollup"].split("below it: ")[1] if "below it: " in doc["questions"][0]["rollup"] else None
     # the view's line is the card's, led by what it counts (plain words pass 3); what sits below it is its sub-questions'
     # own cards, never a chain here (design pass 1, target 1)
-    assert rolls[-1] == "Rules: 17 can't tell yet" == said(t.text(t.of_class("stt", t.by_id("st-q1"))[0]))
+    # closed form (owner, Nov 13 2026): "can't tell yet" reads "not settled" on the pages
+    assert rolls[-1] == "Rules: 17 not settled" == said(t.text(t.of_class("stt", t.by_id("rs-q1"))[0]))
     assert below is None or below not in rolls[-1]
 
 
@@ -3868,20 +3970,22 @@ def test_an_exports_open_calls_count_calls_and_its_queue_says_needs_judgment(int
     r = subprocess.run([*command(), "export", "--out", str(out)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
                        stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1", "RB_TEST_SHELL_DUMP": str(dump)})
     assert r.returncode == 0, r.stderr
-    calls = json.loads(dump.read_text(encoding="utf-8"))["your_call"]["n"]
+    doc = json.loads(dump.read_text(encoding="utf-8"))
+    calls, rows = doc["your_call"]["n"], len(doc["overview"]["decisions"])
     t = Html((out / "page.html").read_text(encoding="utf-8"))
-    rows = len(t.of_class("qrow", t.by_id("queue")))
-    assert rows and said(t.text(t.by_id("h-queue"))) == "Needs judgment"
-    assert said(t.text(t.of_class("lede", t.by_id("queue"))[0])) == "Open one to see why it waits and decide it."
-    assert said(t.text(t.by_id("h-your-call"))) == f"Open calls ({calls})"
+    # the Decisions list a row each, counted in their kind chips, with no count on the heading
+    head = t.by_id("decisions")
+    assert rows and said(t.text(head)).startswith("Decisions") and not t.of_class("n", head) and len(_decision_rows(t)) == rows
+    # the view the pin opens is the Decisions list, with its count (the rulings of Nov 12 07:15 +08)
+    assert said(t.text(t.by_id("h-your-call"))) == f"Open calls ({rows})"
+    # the pin says the decisions' count, the one number every surface gives (UX5 1.3)
     nav = [said(t.text(e)) for e in t.all(t.by_id("nav")) if e["tag"] == "a" and said(t.text(e)).startswith("Open calls")]
-    assert nav == [f"Open calls {calls}"], nav
+    assert nav == [f"Open calls {rows}"], nav
     # each question's rail counts that question's calls: calls too, so never more than the page's open calls
     named = [(e["attrs"].get("id", ""), said(t.text(e))) for e in t.all() if e["tag"] in ("h1", "h2", "h3") and said(t.text(e)).startswith("Open calls")]
     for id_, s in named:
         m = re.fullmatch(r"Open calls(?: \((\d+)\))?", s)
-        assert m and (m.group(1) is None or (int(m.group(1)) == calls if id_ == "h-your-call" else id_.startswith("calls-") and int(m.group(1)) <= calls)), (id_, s)
-    assert rows != calls, "the demo's queue holds more than its calls, so the two counts tell apart"
+        assert m and (m.group(1) is None or (int(m.group(1)) == rows if id_ == "h-your-call" else id_.startswith("calls-") and int(m.group(1)) <= calls)), (id_, s)
 
 
 # ---------------------------------------------------------------- the owner's view and the reader's (Oct 25)
@@ -3895,8 +3999,9 @@ _VIEWER_PROBE = r"""(() => {
   const acts = [...view.querySelectorAll('pre.cmd, [data-copybtn$=":confirm"], .qbtn')].filter(shown)
     .filter(e => !e.matches('pre.cmd') || /^\s*(rb |")/.test(e.textContent));
   const next = [...view.querySelectorAll('h3')].filter(h => shown(h) && h.textContent.trim() === 'Next step');
-  return {nav: words('#nav li.yc a'), head: words('#h-queue'), ovh: words('#overview .ovh'), lede: words('#queue .lede'), rows: words('#queue .qrow').length,
-    buttons: words('#queue .qbtn').length, callsHead: words('#h-your-call'), callsLede: words('#your-call .lede'),
+  return {nav: words('#nav li.yc a'), head: words('#decisions'), ovh: words('#overview .ovh'), chips: words('#overview .dfil .dchip'), rows: words('#overview .dq .dr').length,
+    state: words('#overview .dstate'),
+    buttons: words('#overview .qbtn').length, callsHead: words('#h-your-call'), callsLede: words('#your-call .lede'),
     actions: acts.length, commands: view.innerText.split('\n').filter(l => /\brb (confirm|decide|reconcile)\b/.test(l)).length,
     next: next.length, nextSaid: next.filter(h => { let e = h.nextElementSibling; while (e && !shown(e)) e = e.nextElementSibling;
       return e && !/^H[1-6]$/.test(e.tagName) && e.innerText.trim().length > 2; }).length};
@@ -3938,8 +4043,8 @@ def test_the_hub_names_who_reads_the_export_and_it_reads_their_words(int8_demo, 
                        stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
     assert r.returncode == 0, r.stderr
     page = (out / "page.html").read_text(encoding="utf-8")
-    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.js").read_text(encoding="utf-8")
-    st = subprocess.run([*command(), "status", "--json"], cwd=int8_demo.root, capture_output=True, encoding="utf-8", stdin=subprocess.DEVNULL, env=int8_demo.env)
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.min.js").read_text(encoding="utf-8")
+    st = subprocess.run([*command(), "status", "--full", "--json"], cwd=int8_demo.root, capture_output=True, encoding="utf-8", stdin=subprocess.DEVNULL, env=int8_demo.env)
     held = json.loads(st.stdout)["data"]["repository"]["said"]
     runs = []
     for viewer in ("none", "owner", "reader", "guest"):
@@ -3970,20 +4075,22 @@ console.log(JSON.stringify({ ok: true, out }));
         none, owner, reader, guest = (got["out"][f"{v}@{width}"] for v in ("none", "owner", "reader", "guest"))
         assert any(v.startswith("x-") for v in reader) and any(v.startswith("q-") for v in reader), list(reader)
         ov = {name: g["overview"] for name, g in (("none", none), ("owner", owner), ("reader", reader))}
+        # the Decisions: the owner and an export opened from disk read every row as rb gives it, counted in its kind
+        # chips; a reader reads the record's state alone ("N results not decided"), no row, chip or confirmation
         n = ov["none"]["rows"]
-        assert n and ov["owner"]["rows"] == ov["reader"]["rows"] == n, ov
+        assert n and ov["owner"]["rows"] == n and ov["none"]["chips"] and ov["owner"]["chips"] == ov["none"]["chips"], ov
+        assert ov["reader"]["rows"] == 0 and ov["reader"]["chips"] == [] and ov["none"]["state"] == ov["owner"]["state"] == [], ov
+        assert len(ov["reader"]["state"]) == 1 and re.fullmatch(r"\d+ results? not decided", ov["reader"]["state"][0]), ov
         # a reader's row holds the four places (NAV-SPEC): under 960 the export with no viewer named and the reader have
         # no call item; the column keeps it
         calls = lambda nav, word: nav[0].startswith(word) if width >= 960 else nav == []  # noqa: E731
-        assert ov["none"]["head"] == ["Needs judgment"] and calls(ov["none"]["nav"], "Open calls") and ov["none"]["buttons"] == 0, ov
-        assert ov["none"]["lede"] == ["Open one to see why it waits and decide it."], ov
-        assert ov["owner"]["head"] == ["Needs your judgment"] and ov["owner"]["nav"][0].startswith("Your call"), ov
-        assert ov["owner"]["lede"] == ["Open one to see why it waits and decide it."], ov
+        assert ov["none"]["head"][0].lower().startswith("decisions") and calls(ov["none"]["nav"], "Open calls") and ov["none"]["buttons"] == 0, ov
+        assert ov["owner"]["head"][0].lower().startswith("decisions") and ov["owner"]["nav"][0].startswith("Your call"), ov
         # each row opens its item for every viewer (the owner's composer is in the item): the export draws no button
         assert ov["owner"]["buttons"] == 0 and owner["your-call"]["callsHead"][0].startswith("Your call ("), owner["your-call"]
-        assert ov["reader"]["head"] == ["Still open"] and calls(ov["reader"]["nav"], "Open calls"), ov
-        assert ov["reader"]["lede"] == ["Not decided yet. Open one to see why it waits."], ov
-        assert reader["your-call"]["callsLede"] == ["Calls are made with rb in a terminal, not on this page; it shows where they stand."] and reader["your-call"]["callsHead"][0].startswith("Open calls ("), reader["your-call"]
+        # a reader is shown state, never the owner's actions: no pin to the calls, and #your-call opens the Overview
+        assert ov["reader"]["head"][0].lower().startswith("decisions") and ov["reader"]["nav"] == [], ov
+        assert reader["your-call"]["callsLede"] == [] and reader["your-call"]["callsHead"] == [], reader["your-call"]
         # every view: the reader sees no action and no rb command, and every Next step its words; the others see actions
         for v, g in reader.items():
             assert g["actions"] == 0 and g["commands"] == 0 and g["nextSaid"] == g["next"], (v, g)
@@ -4047,36 +4154,22 @@ def test_a_notes_citations_are_chips_on_every_surface(record):
 # ---------------------------------------------------------------- design pass 1 (Oct 25)
 
 def test_every_needs_judgment_row_opens_its_item(record):
-    """Design pass 1, P11 (the owner: "i can't click onto / into the items listed in 'Needs judgment'"): on rb page and on
-    the export, which draws no Review button, each queue row is a link to its item, the whole row following it
-    (data-go) with a hover state and the link's keyboard focus: a baseline mismatch its rule's call, a call its call, a
-    design its experiment, a changed file nothing cites where it is listed."""
+    """Design pass 1, P11 (the owner: "i can't click onto / into the items listed in 'Needs judgment'"), on the Decisions:
+    on rb page and on the export, each row is wholly a link that lands on its item: a row about a rule (a call to make
+    or a call on it to confirm) its rule's card, read before it is decided (on the export its Decide tab sends a call to
+    its call card), a design to confirm the list of what waits."""
     doc = example()
     for surface in ("page", "export"):
-        page = page_of(record, doc, surface)
-        t = Html(page)
-        rows = t.of_class("qrow", t.by_id("queue"))
-        assert rows, surface
+        t = Html(page_of(record, doc, surface))
+        rows = _decision_rows(t)
+        assert len(rows) == len(doc["overview"]["decisions"]), surface
         ids = {e["attrs"].get("id") for e in t.all()}
-        for r in rows:
-            go = r["attrs"].get("data-go")
-            assert go and go in ids, (surface, said(t.text(r)))
-            assert [e["attrs"]["href"] for e in t.all(r) if t.has(e, "qa")] == [f"#{go}"], (surface, said(t.text(r)))
-        kinds = {r["attrs"]["data-kind"]: r["attrs"]["data-go"] for r in rows}
-        # two designs wait: the row opens the list that names each (one alone opens its experiment)
-        assert [len(e.get("targets", [])) for e in doc["home"]["queue"] if e["kind"] == "design"] == [2]
-        assert kinds["baseline"] == "call-c2" and kinds["design"] == "to-confirm" and kinds["uncited"] == "how-made", kinds
-    one = copy.deepcopy(doc)
-    for e in one["home"]["queue"]:
-        if e["kind"] == "design":
-            e["targets"] = e["targets"][:1]
-    t = Html(page_of(record, one))
-    assert next(r for r in t.of_class("qrow", t.by_id("queue")) if r["attrs"]["data-kind"] == "design")["attrs"]["data-go"] == "x-e1"
-    rules = css(page)[""]
-    assert rules["li.qrow[data-go]"]["cursor"] == "pointer" and "background" in rules["li.qrow[data-go]:hover"]
-    # with no script (the export as served) the words' link covers the whole row
-    assert rules["li.qrow[data-go]"]["position"] == "relative" and rules["li.qrow[data-go] a.qa::after"]["inset"] == "0"
-    assert "outline" in rules["li.qrow a.qa:focus-visible"]
+        links = [[e for e in t.all(r) if e["tag"] == "a"] for r in rows]
+        assert all(len(a) == 1 and t.has(a[0], "drow") for a in links), surface
+        hrefs = [a[0]["attrs"]["href"] for a in links]
+        assert all(h[1:] in ids for h in hrefs), (surface, hrefs)
+        want = [f"#c-{d['subject']}" if d["subject"] in doc["findings"] else "#to-confirm" for d in doc["overview"]["decisions"]]
+        assert hrefs == want and "#c-c2" in hrefs, (surface, hrefs)
 
 
 def test_the_about_view_holds_the_boilerplate_once(record):
@@ -4090,10 +4183,10 @@ def test_the_about_view_holds_the_boilerplate_once(record):
         assert about is not None and said(t.text(t.by_id("h-about"))) == "About this record"
         links = {at: [e["attrs"]["href"] for e in t.all(t.by_id(at)) if e["tag"] == "a" and said(t.text(e)) == "About"] for at in ("top", "nav")}
         assert links == ({"top": ["#about"], "nav": []} if surface == "page" else {"top": [], "nav": ["#about"]}), (surface, links)
-        feet = [e for e in t.all() if e["tag"] == "footer"]
-        assert len(feet) == 1 and t.inside(feet[0], about), surface
-        assert t.inside(t.by_id("words"), about) and len([e for e in t.all() if e["attrs"].get("id") == "words"]) == 1
-        assert [e for e in t.all() if t.has(e, "term") and not t.inside(e, about)], "the hovers stay on the views"
+        # the honest line once, under About's strip of facts (owner, Nov 13 2026)
+        assert len(t.of_class("honest1")) == 1 and t.inside(t.of_class("honest1")[0], about) and t.by_id("in-git") is not None, surface
+        assert t.by_id("words") is None   # no glossary (Nov 12 20:35 +08)
+        assert not [e for e in t.all() if t.has(e, "term")], "no hover defines a word (Nov 12 20:35 +08)"
 
 
 def test_also_open_in_the_record_is_a_checklist_by_what_is_missing(record):
@@ -4115,10 +4208,12 @@ def test_also_open_in_the_record_is_a_checklist_by_what_is_missing(record):
     assert heads[:3] == ["Rules rb can't judge yet (1). Each needs results from 3 or more runs for an interval.", "Rules with no runs yet (1).",
                          "Settings never checked against a source (1)."]
     rows = [said(t.raw(li)) for li in t.all(items) if li["tag"] == "li"]
-    assert rows[:3] == [f"{doc['findings']['c5']['statement']}: 1 design cell so far c5", f"{doc['findings']['c6']['statement']}: no runs yet c6",
+    # closed form (owner, Nov 13 2026): a rule's row names it by its words and drops the trailing id chip; a setting's row keeps it
+    assert rows[:3] == [f"{doc['findings']['c5']['statement']}: 1 design cell so far", f"{doc['findings']['c6']['statement']}: no runs yet",
                         "fp32.precision in e1: given as fp32, not checked. Its note: FP32 model as trained. e1/fp32.precision"]
-    first = next(li for li in t.all(items) if li["tag"] == "li")
-    assert [e["attrs"]["href"] for e in t.all(first) if e["tag"] == "a"] == ["#c-c5"] and t.of_class("cid", first)
+    first, third = [li for li in t.all(items) if li["tag"] == "li"][0:3:2]
+    assert [e["attrs"]["href"] for e in t.all(first) if e["tag"] == "a"] == ["#c-c5"] and not t.of_class("cid", first)
+    assert t.of_class("cid", third)
     assert said(t.text(t.of_class("tt", items)[0])) == "Also open in the record (4)"
     assert css(page_of(record, doc))[""]["ul.oi.chk a.ans"]["color"] == "var(--ink)"
 
@@ -4178,7 +4273,7 @@ def test_inside_the_hub_the_page_draws_no_bar_of_its_own_and_one_bar_elsewhere(i
                        stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
     assert r.returncode == 0, r.stderr
     export = (out / "page.html").read_text(encoding="utf-8")
-    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.js").read_text(encoding="utf-8")
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.min.js").read_text(encoding="utf-8")
     # the record's own title, id, version and time, as the page draws them
     title = html.unescape(re.search(r"<title>(.*?)</title>", export).group(1))
     pid = re.search(r"^id: (\S+)", (int8_demo.root / ".rb/project.yaml").read_text(encoding="utf-8"), re.M).group(1).strip('"')
@@ -4198,6 +4293,8 @@ def test_inside_the_hub_the_page_draws_no_bar_of_its_own_and_one_bar_elsewhere(i
     runs += [["page@1440", page.as_uri(), 1440], ["page@390", page.as_uri(), 390]]
     got = _bar_runs(tmp_path, runs, title, """
     got.aboutView = null;
+    // under 600 About is in the "..." menu (the record's navigation on a phone, Nov 13): it is opened first
+    await page.clickEl("[...document.querySelectorAll('button[data-more]')].find(e => e.getBoundingClientRect().width > 0)");
     if (await page.clickEl("[...document.querySelectorAll('#nav .navctl a[href=\\"#about\\"], header.top a[href=\\"#about\\"]')].find(e => e.getBoundingClientRect().width > 0)")) {
       await cdp.sleep(300);
       got.aboutView = await page.ev("(() => { const v = document.querySelector('main .view.on'); return v ? [v.id, v.innerText] : null; })()");
@@ -4213,8 +4310,9 @@ def test_inside_the_hub_the_page_draws_no_bar_of_its_own_and_one_bar_elsewhere(i
         assert g["runs"] == "runs" and ov["navTabs"] > 3, (name, g)
         if name.startswith("page"):
             continue
-        # inside the hub: About is in the navigator at every width (the script adds the theme and ? beside it, below)
-        assert ov["about"], (name, ov)
+        # inside the hub: About is in the navigator at every width (the script adds the theme and ? beside it, below);
+        # under 600 in its "..." menu, which the steps above opened
+        assert ov["about"] or name.endswith("@390"), (name, ov)
         if name.endswith("@1440"):
             assert not ov["top"] and ov["mainTop"] == 0 and ov["repeats"] == [], (name, ov)
     for w in (1440, 390):
@@ -4230,7 +4328,8 @@ def test_inside_the_hub_the_page_draws_no_bar_of_its_own_and_one_bar_elsewhere(i
 def test_the_one_bar_names_the_view_shown_and_any_viewer_meta_folds_it(int8_demo, tmp_path):
     """Plain words pass 4, one bar, the script's part (A): the bar says rb's mark, the title, then the view's crumb, which
     follows the navigator (Runs after Runs is picked); inside the hub under 1280 the slim bar says the view's name
-    alone, and the theme switch and ? sit beside About in the navigator; and rb page with an rb-viewer meta (the preview's reader page) folds its bar at 1440 as the export does, its
+    alone (from 600: under it the tab row says it, test_on_a_phone_the_record_has_one_navigation_row), and the theme
+    switch and ? sit beside About in the navigator; and rb page with an rb-viewer meta (the preview's reader page) folds its bar at 1440 as the export does, its
     About, theme and ? in the navigator."""
     page = tmp_path / "page.html"
     rp = subprocess.run([*command(), "page", "--out", str(page)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
@@ -4244,10 +4343,10 @@ def test_the_one_bar_names_the_view_shown_and_any_viewer_meta_folds_it(int8_demo
     r = subprocess.run([*command(), "export", "--out", str(out)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
                        stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
     assert r.returncode == 0, r.stderr
-    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.js").read_text(encoding="utf-8")
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.min.js").read_text(encoding="utf-8")
     hub = tmp_path / "hub.html"
     hub.write_text((out / "page.html").read_text(encoding="utf-8").replace("</head>", f'<meta name="rb-viewer" content="owner"><script>{script}</script></head>', 1), encoding="utf-8")
-    got = _bar_runs(tmp_path, [["page@1440", page.as_uri(), 1440], ["meta@1440", meta.as_uri(), 1440], ["hub@390", hub.as_uri(), 390]], title, """
+    got = _bar_runs(tmp_path, [["page@1440", page.as_uri(), 1440], ["meta@1440", meta.as_uri(), 1440], ["hub@720", hub.as_uri(), 720]], title, """
     await page.clickEl("[...document.querySelectorAll('#nav a[href=\\"#runs\\"], #nav a[href=\\"#record\\"]')].find(e => e.getBoundingClientRect().width > 0)");
     await cdp.sleep(300);
     got.runs = await page.ev(PROBE);
@@ -4257,8 +4356,158 @@ def test_the_one_bar_names_the_view_shown_and_any_viewer_meta_folds_it(int8_demo
     assert p["ov"]["bar"].startswith(f"rb. {title} Overview") and p["runs"]["bar"].startswith(f"rb. {title} Runs") and p["ov"]["slash"] == '"/ "', p
     m = got["meta@1440"]["ov"]
     assert not m["top"] and m["about"] and m["theme"] and m["keys"] and m["repeats"] == [], m
-    h = got["hub@390"]
+    h = got["hub@720"]
     assert h["ov"]["bar"] == "Overview" and h["runs"]["bar"] == "Runs" and h["ov"]["theme"] and h["ov"]["keys"], h
+
+
+# ---------------------------------------------------------------- the record's navigation on a phone (Nov 13 2026)
+
+_PHONE_PROBE = r"""(() => {
+  const vis = e => !!e && e.checkVisibility() && e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0;
+  const R = e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)]; };
+  const row = document.querySelector('#nav > ul');
+  const tabs = ['overview', 'research', 'experiments', 'record', 'your-call'].map(h => document.querySelector('#nav > ul > li > a[href="#' + h + '"]'));
+  const yc = document.querySelector('#nav > ul > li.yc > a'), more = document.querySelector('button[data-more]');
+  const on = document.querySelector('#nav > ul > li > a[aria-current="page"], #nav > ul > li > a.in');
+  const view = document.querySelector('main .view.on') || {};
+  // a line outside the tab row that says the open tab's name and nothing else
+  const name = on ? on.firstChild.textContent.trim() : '';
+  const again = [...document.querySelectorAll('body *')].filter(e => vis(e) && !e.closest('#nav, #main, aside.insp, .help, .guide')
+    && e.textContent.trim() === name && ![...e.children].some(c => c.textContent.trim() === name)).map(e => e.tagName + '.' + e.className);
+  return { W: innerWidth, H: innerHeight, view: view.id || '',
+    tabs: tabs.map(a => a && vis(a) ? R(a) : null), rowBox: row ? R(row) : null, scroll: row ? [row.scrollLeft, row.scrollWidth, row.clientWidth] : null,
+    overflowX: row ? getComputedStyle(row).overflowX : '', wrap: row ? getComputedStyle(row).flexWrap : '',
+    on: on ? [on.getAttribute('href'), R(on)] : null, yc: yc && vis(yc) ? R(yc) : null, again,
+    more: vis(more) ? R(more) : null, expanded: more ? more.getAttribute('aria-expanded') : null,
+    about: [...document.querySelectorAll('a.abt')].filter(vis).map(R), theme: [...document.querySelectorAll('button[data-theme]')].filter(vis).map(R),
+    keys: [...document.querySelectorAll('button[data-keys]')].filter(vis).map(R),
+    top: vis(document.querySelector('header.top')) ? R(document.querySelector('header.top')) : null,
+    focus: document.activeElement ? (document.activeElement.matches('button[data-more]') ? 'more' : document.activeElement.tagName) : '' };
+})()"""
+
+# every control on the screen whose box reaches into its bottom 72 px (the hub's "Try it yourself" pill): fixed and sticky
+# ones at any scroll, and, scrolled to the end, any
+_BOTTOM = r"""((end) => {
+  const vis = e => e.checkVisibility() && e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0;
+  const pinned = e => { for (let n = e; n && n !== document.body; n = n.parentElement) { const p = getComputedStyle(n).position; if (p === 'fixed' || p === 'sticky') return true; } return false; };
+  return [...document.querySelectorAll('a[href], button, summary, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter(e => vis(e) && (end || pinned(e))).map(e => [e, e.getBoundingClientRect()]).filter(([e, r]) => r.bottom > innerHeight - 72 && r.top < innerHeight && r.right > 0 && r.left < innerWidth)
+    // one a sheet covers is not on the screen
+    .filter(([e, r]) => { const t = document.elementFromPoint(Math.min(Math.max((r.left + r.right) / 2, 1), innerWidth - 1), Math.min(Math.max(r.bottom - 2, innerHeight - 70), innerHeight - 1)); return !!t && (e.contains(t) || t.contains(e)); })
+    .map(([e, r]) => e.tagName + '.' + e.className + ' ' + (e.textContent || '').trim().slice(0, 30) + ' @' + Math.round(r.top));
+})"""
+
+
+def test_on_a_phone_the_record_has_one_navigation_row(int8_demo, tmp_path):
+    """The record's navigation on a phone (the UX lead's call, Nov 13 2026; the owner, on the sample record on a phone:
+    "on mobile the catalog ui abit ..need ui fix"), on rb page and on rb export's page as the hub serves it to its owner,
+    at 390 and 360: (1) one navigation row, the tabs on a single line that scrolls sideways, the open tab marked and
+    brought into view, Your call pinned at the row's right end; (2) no line repeats the open tab's name; (3) About, the
+    theme button and ? fold into one "..." button at the right of the header (inside the hub, of the row), which opens a
+    small menu with the three; (4) no control sits in the screen's bottom 72 px, where the hub's pill is, on any view
+    scrolled to its end, in an open card or the keys list; and at 1440 none of it: the three stand in the bar or the
+    navigator, with no "..." button."""
+    page = tmp_path / "page.html"
+    rp = subprocess.run([*command(), "page", "--out", str(page)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
+                        stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
+    assert rp.returncode == 0, rp.stderr
+    out = tmp_path / "export"
+    r = subprocess.run([*command(), "export", "--out", str(out)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
+                       stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
+    assert r.returncode == 0, r.stderr
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.min.js").read_text(encoding="utf-8")
+    hub = tmp_path / "hub.html"
+    hub.write_text((out / "page.html").read_text(encoding="utf-8").replace("</head>", f'<meta name="rb-viewer" content="owner"><script>{script}</script></head>', 1), encoding="utf-8")
+    runs = [[f"{name}@{w}", url, w] for name, url in (("page", page.as_uri()), ("hub", hub.as_uri())) for w in (390, 360, 1440)]
+    js = _cdp_script(tmp_path / "phone.mjs", """
+const out = {};
+const PROBE = %s, BOTTOM = %s;
+await cdp.run(async () => {
+  for (const [name, url, width] of %s) {
+    const page = await (await cdp.launchChrome()).page();
+    await page.viewport(width, width < 600 ? 780 : 900);
+    await page.goto(url);
+    await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
+    await page.goto(url + '#overview');
+    await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await cdp.sleep(500);
+    const got = { ov: await page.ev(PROBE) };
+    if (width < 600) {
+      const row = "document.querySelector('#nav > ul')";
+      // the row scrolled to each end: Your call stays where it is
+      await page.ev(row + ".scrollLeft = 0; true"); await cdp.sleep(100); got.ycLeft = (await page.ev(PROBE)).yc;
+      await page.ev(row + ".scrollLeft = 9999; true"); await cdp.sleep(100); got.ycRight = (await page.ev(PROBE)).yc;
+      await page.ev(row + ".scrollLeft = 0; true"); await cdp.sleep(100);
+      // Runs, under Record, the tab furthest along: marked and brought into view
+      await page.ev("location.hash = '#runs'; true"); await cdp.sleep(400);
+      got.runs = await page.ev(PROBE);
+      // the "..." menu: opened, its three shown; Escape closes it and gives focus back; About opens its view
+      await page.clickEl("document.querySelector('button[data-more]')"); got.menu = await page.ev(PROBE);
+      await page.key('Escape', 'Escape', 27); got.esc = await page.ev(PROBE);
+      await page.clickEl("document.querySelector('button[data-more]')");
+      await page.clickEl("document.querySelector('a.abt')"); got.about = await page.ev(PROBE);
+      // the bottom 72 px: each view scrolled to its end, a card opened, and the keys list
+      got.bottom = {};
+      for (const v of ['overview', 'research', 'experiments', 'runs', 'your-call', 'about']) {
+        await page.ev("location.hash = '#" + v + "'; true"); await cdp.sleep(300);
+        await page.ev("(() => { const m = document.querySelector('#main'); m.scrollTop = m.scrollHeight; document.scrollingElement.scrollTop = 1e6; return true; })()"); await cdp.sleep(200);
+        got.bottom[v] = await page.ev(BOTTOM + '(true)');
+      }
+      await page.ev("location.hash = '#runs'; true"); await cdp.sleep(300);
+      await page.clickEl("[...document.querySelectorAll('#runs a[href]')].find(a => a.getAttribute('href').startsWith('#run-'))"); await cdp.sleep(400);
+      got.sheet = await page.ev("document.documentElement.classList.contains('sheet')");
+      await page.ev("(() => { for (const e of document.querySelectorAll('aside.insp, aside.insp .ibody')) e.scrollTop = e.scrollHeight; return true; })()"); await cdp.sleep(200);
+      got.bottom.card = await page.ev(BOTTOM + '(true)');
+      await page.key('Escape', 'Escape', 27); await cdp.sleep(300);
+      await page.clickEl("document.querySelector('button[data-more]')");
+      await page.clickEl("document.querySelector('button[data-keys]')"); await cdp.sleep(200);
+      got.help = await page.ev("(() => { const h = document.querySelector('.help'); if (!h || h.hidden) return null; const r = h.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom), innerHeight]; })()");
+      got.bottom.help = await page.ev(BOTTOM + '(false)');
+    }
+    out[name] = got;
+    await cdp.stopAll();
+  }
+  return {};
+}, { timeoutMs: 300000 });
+console.log(JSON.stringify({ ok: true, out }));
+""" % (json.dumps(_PHONE_PROBE), json.dumps(_BOTTOM), json.dumps(runs)))
+    code, said, err = _runner(_node(), js, env=dict(os.environ), timeout=330)
+    assert code == 0 and said.get("ok"), err[-3000:]
+    got = said["out"]
+    for name, g in got.items():
+        ov, W = g["ov"], g["ov"]["W"]
+        if W >= 600:
+            # from 600 nothing changes: no "..." button, the three where they stood
+            assert ov["more"] is None and len(ov["about"]) == 1 and len(ov["theme"]) == 1 and len(ov["keys"]) == 1, (name, ov)
+            continue
+        # (1) one row: the five tabs on one line (tops alike) of a row that scrolls sideways and never wraps
+        shown = [t for t in ov["tabs"] if t]
+        assert ov["overflowX"] == "auto" and ov["wrap"] == "nowrap" and len(shown) == 5, (name, ov)
+        assert max(t[1] for t in shown) - min(t[1] for t in shown) <= 2, (name, ov["tabs"])
+        assert ov["on"] and ov["on"][0] == "#overview", (name, ov)
+        # Your call pinned at the row's right end, inside the screen, wherever the row is scrolled
+        assert ov["yc"] and ov["yc"][2] <= W and ov["yc"][2] >= ov["rowBox"][2] - 2, (name, ov)
+        assert g["ycLeft"] == g["ycRight"] == ov["yc"], (name, g["ycLeft"], g["ycRight"], ov["yc"])
+        # Runs opens under Record, which the row marks and brings into view, clear of Your call's pin
+        rn = g["runs"]
+        assert rn["view"] == "runs" and rn["on"] and rn["on"][0] == "#record", (name, rn)
+        assert rn["on"][1][0] >= rn["rowBox"][0] - 1 and rn["on"][1][2] <= rn["yc"][0] + 1, (name, rn)
+        # (2) the open tab's name is said once, by its tab
+        assert ov["again"] == [] and rn["again"] == [], (name, ov["again"], rn["again"])
+        # (3) one "..." button at the screen's right, top, the three hidden until it opens them, then all on the screen
+        assert ov["more"] and ov["more"][2] >= W - 16 and ov["more"][3] <= 60 and ov["expanded"] == "false", (name, ov)
+        assert ov["about"] == [] and ov["theme"] == [] and ov["keys"] == [], (name, ov)
+        m = g["menu"]
+        assert m["expanded"] == "true" and len(m["about"]) == len(m["theme"]) == len(m["keys"]) == 1, (name, m)
+        assert all(r[0] >= 0 and r[2] <= W and r[1] >= m["more"][3] for r in m["about"] + m["theme"] + m["keys"]), (name, m)
+        assert g["esc"]["expanded"] == "false" and g["esc"]["focus"] == "more" and g["esc"]["about"] == [], (name, g["esc"])
+        assert g["about"]["view"] == "about" and g["about"]["expanded"] == "false", (name, g["about"])
+        if name.startswith("hub"):
+            # inside the hub the page draws no bar of its own under the hub's: the row is the page's first line
+            assert ov["top"] is None and ov["rowBox"][1] <= 1, (name, ov)
+        # (4) nothing in the bottom 72 px
+        assert g["sheet"], name
+        assert {k: v for k, v in g["bottom"].items() if v} == {}, name
+        assert g["help"] and g["help"][1] <= g["help"][2] - 72, (name, g["help"])
 
 
 # ---------------------------------------------------------------- PIVOT: the experiment's comparison as a grid
@@ -4332,7 +4581,8 @@ def test_several_sets_are_columns_an_empty_cell_says_not_run(record):
     assert title == "top1 (%)" and heads == ["", "Calib images: 128 · Per tensor", "Calib images: 512 · Per channel"], heads
     assert rows["FP32 baseline"] == ["76.13 · 3 seeds", "76.20 · 1 run"], rows
     assert rows["INT8"] == ["75.80 · 3 seeds 0.33 points lower than FP32 (-0.50 to -0.16)", "Not run"], rows
-    assert rows["W8a16"] == ["Not run", "76.10 · 1 run 0.10 points lower than FP32 · one run, so no interval"], rows
+    # closed form (owner, Nov 13 2026): a difference with no interval says "no range yet" on the pages
+    assert rows["W8a16"] == ["Not run", "76.10 · 1 run 0.10 points lower than FP32 · one run, so no range yet"], rows
     sec = said(t.text(t.by_id("x-e1:cmp")))
     assert sec.count("Each column is measured under its own settings. Compare within a column, not across.") == 1
 
@@ -4350,7 +4600,8 @@ def test_a_difference_whose_units_do_not_pair_says_so(record):
     t = Html(page_of(record, doc))
     [(_, heads, rows, _)] = grids(t, "x-e1")
     assert heads == ["", "accuracy (%)"]
-    assert rows["INT8"] == ["40.60 · 2 seeds 2.60 points lower than FP32 · seeds don't match, so no interval"], rows
+    # closed form (owner, Nov 13 2026): a difference with no interval says "no range yet" on the pages
+    assert rows["INT8"] == ["40.60 · 2 seeds 2.60 points lower than FP32 · seeds don't match, so no range yet"], rows
     assert "lower" in rows["INT8"][0] and "unpaired" not in rows["INT8"][0]
 
 
@@ -4424,22 +4675,27 @@ def test_a_cell_opens_its_runs_and_a_difference_its_rule(record):
 
 
 def test_a_reader_s_queue_rows_say_what_stands_not_an_ask(record):
-    """A reader of a shared page is asked to do nothing: each queue row says the state (rb's reader_title), never a verb
-    to act on first; the owner and a page with no viewer read the ask."""
+    """A reader of a shared page is asked to do nothing: Decisions show them the record's state alone ("1 result not
+    decided": the results no call is made on), no row, filter chip or link into the owner's list, and nothing that
+    waits for the owner's confirmation; the owner and a page with no viewer read every row, of its kind, as rb gives
+    them."""
     doc = example()
-    for i, q in enumerate(doc["home"]["queue"]):
-        q["reader_title"] = f"State {i} stands"
+    undecided = sum(1 for d in doc["overview"]["decisions"] if d["kind"] == "decide" and d.get("code") in ("undecided", "gate_missed"))
+    assert undecided
     for surface in ("page", "export"):
         page = page_of(record, doc, surface)
-        for viewer, first in (("reader", "State"), ("owner", None), ("none", None)):
+        for viewer in ("reader", "owner", "none"):
             t = Html(page, viewer)
-            rows = [said(t.reading(e)) for e in t.of_class("qv", t.by_id("queue"))]
-            assert rows, surface
-            if first:
-                assert all(r.startswith(first) for r in rows), (surface, rows)
-                assert not [r for r in rows if r.split()[0] in ("Review", "Confirm", "Inspect", "Record", "Choose", "Revisit")], rows
+            ov = t.by_id("overview")
+            rows = _decision_rows(t)
+            if viewer == "reader":
+                assert not rows and not t.of_class("dchip", ov) and not t.of_class("dq", ov), surface
+                state = [said(t.text(e)) for e in t.of_class("dstate", ov)]
+                assert state == [f"{undecided} result{'s' if undecided != 1 else ''} not decided"], (surface, state)
+                assert said(t.text(t.by_id("decisions"))).startswith("Decisions") and "confirm" not in said(t.text(ov)).lower(), surface
             else:
-                assert rows[0] == doc["home"]["queue"][0]["title"], (surface, viewer, rows)
+                assert [r["attrs"].get("data-kind") for r in rows] == [_decision_kind(d) for d in doc["overview"]["decisions"]], (surface, viewer)
+                assert not t.of_class("dstate", ov), (surface, viewer)
 
 
 def test_a_difference_keeps_the_rules_digits_where_two_decimals_would_say_another_number(record):
@@ -4492,7 +4748,8 @@ def test_a_variant_that_varies_two_settings_names_each_and_its_difference_the_ba
     t = Html(page_of(record, doc))
     [(_, _, rows, _)] = grids(t, "x-e1")
     assert list(rows) == ["FP32 · Calib: 1024 baseline", "INT8 · Calib: 512"], rows
-    assert rows["INT8 · Calib: 512"] == ["0.745 · 1 run 0.017 lower than the baseline · one run, so no interval · also differs in precision and calib"], rows
+    # closed form (owner, Nov 13 2026): a difference with no interval says "no range yet" on the pages
+    assert rows["INT8 · Calib: 512"] == ["0.745 · 1 run 0.017 lower than the baseline · one run, so no range yet · also differs in precision and calib"], rows
 
 
 def test_a_difference_is_never_said_where_its_column_has_no_baseline(record):
@@ -4548,17 +4805,18 @@ def _ups(e):
 
 
 def test_the_record_says_once_what_rb_saw_and_what_it_recorded_afterwards(int8_demo, tmp_path):
-    """WITNESS: the INT8 demo's record says, in one quiet line on the Overview and on About, when rb began keeping it and
+    """WITNESS: the INT8 demo's record says, in one quiet line at the head of History and on About, when rb began keeping it and
     how many runs and calls were recorded afterwards, from rb status's facts; a run rb did not see happen says
     "recorded afterwards" where a run it saw shows its receipt; a finding resting on such runs counts them in its
     evidence line; and nothing else on the page says it: no badge, no line each."""
-    st = int8_demo.rb("status")
+    st = int8_demo.rb("status", "--full")
     assert st["witness"]["runs"]["afterwards"] == 2 and st["witness"]["calls"]["afterwards"] == 1
     line = _witness_said(st)
     assert line.startswith("Kept with rb since ") and line.endswith(". 2 runs and 1 call were recorded afterwards, not as they happened.")
     for page in (_page(int8_demo, tmp_path, "page"), _export(int8_demo, tmp_path)):
         t = Html(page)
-        assert _witness_lines(t) == [("overview", line), ("about", line)]
+        # since round 1 the record's line heads History, one click from the Overview, and is About's (UX5 1.3)
+        assert _witness_lines(t) == [("history", line), ("about", line)]
         late = {r["id"] for r in st["runs"] if r["witness"]["seen"] == "afterwards"}
         # each run's row in a Runs table: its last cell's one link, by what rb saw of it
         rows = [e for e in t.all() if e["tag"] == "tr" and e["attrs"].get("id", "").startswith("rr-")]
@@ -4579,8 +4837,9 @@ def test_the_record_says_once_what_rb_saw_and_what_it_recorded_afterwards(int8_d
                 else:
                     assert "recorded afterwards" not in units, (f["criterion"], units)
         assert any(f["witness"]["afterwards"] for f in st["findings"])
-        # nowhere else outside the cards: the record's line twice, a row's link each time a run's row is drawn, and the
-        # evidence lines; no badge, and no line that disclaims each item
+        # nowhere else outside the cards: the record's line once in each of its two places (the head of History and About,
+        # UX5 1.3), a row's link each time a run's row is drawn, and the evidence lines; no badge, and no line that
+        # disclaims each item
         cards = t.of_class("nodes")[0]
         outside = [e for e in t.all() if isinstance(e, dict) and not t.inside(e, cards)]
         bare = sum(k.count("recorded afterwards") for e in outside for k in e["kids"] if isinstance(k, str))
@@ -4592,7 +4851,7 @@ def test_the_record_says_once_what_rb_saw_and_what_it_recorded_afterwards(int8_d
 
 def test_a_record_kept_with_rb_from_its_start_says_so_once(tmp_path):
     """WITNESS: a record rb kept from its first write, whose one run was recorded as it was made, says "Kept with rb since
-    it began." on the Overview and on About, and its run's row shows its receipt."""
+    it began." at the head of History and on About, and its run's row shows its receipt."""
     from rbtest import Recorder
     rec = Recorder(tmp_path, "int8")
     rec.start()
@@ -4600,21 +4859,22 @@ def test_a_record_kept_with_rb_from_its_start_says_so_once(tmp_path):
     rec.rb("question", "add", "Does INT8 cost top-1 accuracy on ImageNet?", "--id", "q1")
     rec.rb("experiment", "add", "INT8 vs FP32 on ImageNet", "--id", "e1", "-q", "q1", "--baseline", "fp32", "--candidate", "int8", "--varies", "precision")
     rec.rb("run", "add", "e1", "fp32.top1=76.1", "int8.top1=75.9")
-    st = rec.rb("status")
+    st = rec.rb("status", "--full")
     assert st["witness"]["runs"] == {"total": 1, "afterwards": 0, "before": 0, "unknown": 0}
     t = Html(_page(rec, tmp_path, "page"))
-    assert _witness_lines(t) == [("overview", "Kept with rb since it began."), ("about", "Kept with rb since it began.")]
+    assert _witness_lines(t) == [("history", "Kept with rb since it began."), ("about", "Kept with rb since it began.")]
     assert "recorded afterwards" not in said(t.text(t.root))
 
 
 def test_the_record_line_sits_under_the_questions_never_above_the_queue(record):
-    """WITNESS2: on the Overview the record's line follows the research questions and comes before the folds, so the
-    queue's first row stays on a phone's first screen; About keeps it after the record's id line."""
+    """WITNESS2 since UX5 round 1: the record's line heads History (AGENTS.md: the record's line, what weakens the whole
+    body of evidence, where rb looks and the project's notes head History) and is About's, after the record's id line;
+    the Overview, whose blocks stay on a phone's first screen, draws none."""
     t = Html(page_of(record))
-    ov = t.by_id("overview")
-    order = [e["attrs"].get("id") or ("wit" if "wit" in e["attrs"].get("class", "").split() else None) for e in ov["kids"] if isinstance(e, dict)]
-    order = [o for o in order if o]
-    assert "wit" in order and order.index("queue") < order.index("ov-questions") < order.index("wit") < order.index("how-made"), order
+    assert not t.of_class("wit", t.by_id("overview"))
+    [head] = t.of_class("about-record", t.by_id("history"))
+    assert t.has(next(k for k in head["kids"] if isinstance(k, dict)), "wit")
+    assert t.of_class("wit", t.by_id("about"))
 
 
 def test_no_since_it_began_where_the_record_holds_older_work(record):
@@ -4624,7 +4884,10 @@ def test_no_since_it_began_where_the_record_holds_older_work(record):
     how many, and a record of questions alone (which may be a clone) draws no line; with something counted, the line
     says it as anywhere."""
     def line(doc):
-        return [said(Html(page_of(record, doc)).text(e)) for e in Html(page_of(record, doc)).of_class("wit")]
+        # the line heads History and is About's (UX5 1.3): the same words in both
+        lines = [said(Html(page_of(record, doc)).text(e)) for e in Html(page_of(record, doc)).of_class("wit")]
+        assert len(lines) in (0, 2) and len(set(lines)) <= 1, lines
+        return lines[:1]
     doc = example()
     zero = {"began": "2026-10-28 09:00 UTC", "runs": {"total": 0, "afterwards": 0, "before": 0, "unknown": 0},
             "analyses": {"total": 0, "afterwards": 0}, "calls": {"total": 0, "afterwards": 0}, "notes": {"total": 0, "afterwards": 0}}
@@ -4632,34 +4895,34 @@ def test_no_since_it_began_where_the_record_holds_older_work(record):
     for e in doc["experiments"]:
         e["folder"] = ""
     doc["project"]["parent"] = ""
-    assert line(doc) == ["Kept with rb since it began."] * 2
-    clone = ["Kept with rb since 28 Oct 2026. It began as a clone of another record."] * 2
+    assert line(doc) == ["Kept with rb since it began."]
+    clone = ["Kept with rb since 28 Oct 2026. It began as a clone of another record."]
     doc["project"]["parent"] = "https://example.org/int8/"
     assert line(doc) == clone
     doc["project"]["parent"] = ""
     # a clone from a path: no address on a page, and its experiments reproduce the parent's, as rb clone relates them;
     # a relation made by hand reads the same, so the line says what the relation says, never that it began as a clone
     doc["experiments"][0]["relations"] = ["reproduces exp_01M62XFCZAKSMW6RGQM8X5W0SR"]
-    assert line(doc) == ["Kept with rb since 28 Oct 2026. 1 experiment reproduces an experiment of another record."] * 2
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. 1 experiment reproduces an experiment of another record."]
     doc["experiments"][0]["relations"] = ["reproduces e2"]
-    assert line(doc) == ["Kept with rb since it began."] * 2
+    assert line(doc) == ["Kept with rb since it began."]
     # a record of questions alone: nothing tells a clone of them from a record begun here
     kept = doc["experiments"]
     doc["experiments"] = []
     assert line(doc) == []
     doc["experiments"] = kept
     doc["experiments"][0]["folder"] = "results/"
-    assert line(doc) == ["Kept with rb since 28 Oct 2026. 1 experiment was read from its results folder."] * 2
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. 1 experiment was read from its results folder."]
     doc["experiments"][1]["folder"] = "results/calib/"
-    assert line(doc) == ["Kept with rb since 28 Oct 2026. 2 experiments were read from their results folders."] * 2
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. 2 experiments were read from their results folders."]
     doc["experiments"][0]["relations"] = ["reproduces exp_01M62XFCZAKSMW6RGQM8X5W0SR"]
-    assert line(doc) == ["Kept with rb since 28 Oct 2026. 1 experiment reproduces an experiment of another record."] * 2
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. 1 experiment reproduces an experiment of another record."]
     doc["project"]["parent"] = "https://example.org/int8/"
     assert line(doc) == clone
     doc["project"]["parent"] = ""
     doc["experiments"][0]["relations"] = []
     doc["home"]["witness"]["runs"] = {"total": 3, "afterwards": 3, "before": 3, "unknown": 0}
-    assert line(doc) == ["Kept with rb since 28 Oct 2026. All 3 runs were recorded afterwards, not as they happened."] * 2
+    assert line(doc) == ["Kept with rb since 28 Oct 2026. All 3 runs were recorded afterwards, not as they happened."]
 
 
 def test_a_record_rb_reconcile_started_never_says_it_was_kept_from_its_start(tmp_path):
@@ -4674,7 +4937,7 @@ def test_a_record_rb_reconcile_started_never_says_it_was_kept_from_its_start(tmp
     rec.git("add", "-A")
     rec.git("commit", "-qm", "calibration results")
     rec.rb("reconcile", "--apply", "--no-agents")
-    st = rec.rb("status")
+    st = rec.rb("status", "--full")
     assert [e["id"] for e in st["experiments"]] == ["calib"] and not st["runs"]
     assert all(v["afterwards"] == 0 for v in st["witness"].values() if isinstance(v, dict))
     t = Html(_page(rec, tmp_path, "page"))
@@ -4695,7 +4958,7 @@ def test_a_record_begun_here_never_says_it_began_as_a_clone(tmp_path):
     rec.rb("question", "add", "Does INT8 cost top-1 accuracy on ImageNet?", "--id", "q1")
     rec.rb("experiment", "add", "INT8 vs FP32 on ImageNet", "--id", "int8", "-q", "q1", "--baseline", "fp32", "--candidate", "int8")
     rec.rb("experiment", "relate", "int8", "reproduces", "exp_01M62XFCZAKSMW6RGQM8X5W0SR")
-    st = rec.rb("status")
+    st = rec.rb("status", "--full")
     assert all(v["afterwards"] == 0 for v in st["witness"].values() if isinstance(v, dict))
     t = Html(_page(rec, tmp_path, "page"))
     assert "began as a clone" not in said(t.text(t.root))
@@ -4710,3 +4973,379 @@ def test_a_record_with_no_write_draws_no_record_line(record):
     assert not Html(page_of(record, doc)).of_class("wit")
     doc["home"]["witness"] = {"began": "", "runs": {"total": 0, "afterwards": 0}}
     assert not Html(page_of(record, doc)).of_class("wit")
+
+
+# ---------------------------------------------------------------- a card's tabs (the UX lead's card, Nov 13 2026)
+
+_CARD_PROBE = r"""(() => {
+  const vis = e => !!e && e.checkVisibility() && e.getBoundingClientRect().width > 0;
+  const k = document.querySelector('#insp .ibody > .card');
+  const tabs = k ? [...k.querySelectorAll('[role="tablist"] [role="tab"]')] : [];
+  const panels = k ? [...k.querySelectorAll('[role="tabpanel"]')] : [];
+  const bar = document.querySelector('#insp .ibar');
+  const btn = act => { const b = bar && bar.querySelector('[data-act="' + act + '"]'); return b ? { label: b.getAttribute('aria-label'), title: b.title, text: b.textContent.trim(), svg: !!b.querySelector('svg'), shown: vis(b) } : null; };
+  const vs = k && k.querySelector('.vs');
+  const how = k && k.querySelector('details.how');
+  return { hash: decodeURIComponent(location.hash), scroll: document.querySelector('#insp') ? document.querySelector('#insp').scrollTop : -1,
+    tabs: tabs.map(t => [t.textContent.trim(), t.getAttribute('aria-selected'), t.tabIndex]),
+    shown: panels.filter(p => !p.hidden && vis(p)).map(p => p.dataset.id), panels: panels.length,
+    focus: document.activeElement && document.activeElement.getAttribute('role') === 'tab' ? document.activeElement.textContent.trim() : '',
+    back: btn('back'), link: btn('link'), close: btn('close'),
+    textButtons: bar ? [...bar.querySelectorAll('button')].filter(b => vis(b) && b.textContent.trim() && !b.querySelector('svg')).map(b => b.textContent.trim()) : [],
+    claimed: vs ? [vs.querySelector('.cl .lb').textContent.trim(), vs.querySelector('.cl .n').textContent.trim()] : null,
+    rb: vs ? vs.querySelector('.rbn .e').textContent.trim() : null,
+    bounds: vs ? [...vs.querySelectorAll('.rbn .iv .nb')].map(n => n.textContent.trim()) : null,
+    mark: vs && vs.querySelector('.vmk') ? vs.querySelector('.vmk').textContent.trim() : '',
+    chips: k ? [...k.querySelectorAll('ul.chips .chip')].map(c => [c.className.replace('chip ', ''), c.textContent.trim(), !!c.querySelector('.ic')]) : [],
+    sentence: k ? !!k.querySelector('.stand .str') : null,
+    how: how ? [how.querySelector('summary').textContent.trim(), how.open] : null,
+    sha: k && k.querySelector('.sha12') ? k.querySelector('.sha12').textContent.trim() : null };
+})()"""
+
+
+def test_a_card_opens_as_tabs_with_its_result_drawn(int8_demo, tmp_path):
+    """The rule card (the UX lead's card, Nov 13 2026; the owner on a cited rule's card: "what am i looking at?", "i
+    click Source details for example, and then how do i go back?"), at 1440 and 390: (1) the inspector's header is
+    icons, a back arrow, the breadcrumb, a link button labelled "Copy a link to this card" and the x, with no text
+    button; (2) its parts are real tabs, Result, Rule, Runs, Used by, Source, one panel shown at a time, Result first;
+    a click swaps the panel and keeps the part in the address, Back returns to the tab before, the arrow keys move
+    between tabs, and a chip of the runs opens Runs; (3) Result draws the claim beside rb's number, with the mark of
+    the rule's outcome and chips, its numbers rb's own reading, and no sentence repeating it; (7) Source holds the
+    quoted line and its hash in 12 characters, and rb's working under "How rb worked it out", closed."""
+    shown = subprocess.run([*command(), "show", "c2", "--json"], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
+                           stdin=subprocess.DEVNULL, env=int8_demo.env)
+    assert shown.returncode == 0, shown.stderr
+    reading = json.loads(shown.stdout)["data"]["finding"]["comparison"]
+    page = tmp_path / "page.html"
+    rp = subprocess.run([*command(), "page", "--out", str(page)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
+                        stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
+    assert rp.returncode == 0, rp.stderr
+    js = _cdp_script(tmp_path / "tabs.mjs", """
+const out = {};
+const PROBE = %s;
+await cdp.run(async () => {
+  for (const width of [1440, 390]) {
+    const page = await (await cdp.launchChrome()).page();
+    await page.viewport(width, width < 600 ? 844 : 900);
+    await page.goto(%s);
+    await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
+    await page.goto(%s + '#c-c2');
+    await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await cdp.sleep(500);
+    const got = { open: await page.ev(PROBE) };
+    const tab = name => "[...document.querySelectorAll('#insp [role=tab]')].find(t => t.textContent.trim() === '" + name + "')";
+    await page.clickEl(tab('Rule')); await cdp.sleep(250); got.rule = await page.ev(PROBE);
+    await page.clickEl(tab('Source')); await cdp.sleep(250); got.source = await page.ev(PROBE);
+    await page.ev("history.back(); true"); await cdp.sleep(500); got.back = await page.ev(PROBE);
+    await page.ev("history.back(); true"); await cdp.sleep(500); got.back2 = await page.ev(PROBE);
+    await page.ev(tab('Result') + ".focus(); true");
+    await page.key('ArrowRight', 'ArrowRight', 39); await cdp.sleep(250); got.arrow = await page.ev(PROBE);
+    await page.key('ArrowLeft', 'ArrowLeft', 37); await cdp.sleep(250);
+    await page.clickEl("document.querySelector('#insp .chip.k-runs')"); await cdp.sleep(250); got.chip = await page.ev(PROBE);
+    out[width] = got;
+    await cdp.stopAll();
+  }
+  return {};
+}, { timeoutMs: 120000 });
+console.log(JSON.stringify({ ok: true, out }));
+""" % (json.dumps(_CARD_PROBE), json.dumps(page.as_uri()), json.dumps(page.as_uri())))
+    code, said, err = _runner(_node(), js, env=dict(os.environ), timeout=180)
+    assert code == 0 and said.get("ok"), err[-3000:]
+    for width, g in said["out"].items():
+        o = g["open"]
+        # (1) icons only: Back and the link say what they do to a screen reader and on hover
+        assert o["link"] == {"label": "Copy a link to this card", "title": "Copy a link to this card", "text": "", "svg": True, "shown": True}, (width, o)
+        assert o["back"]["label"] == "Back" and o["back"]["svg"] and o["close"]["label"] == "Close" and o["textButtons"] == [], (width, o)
+        # (2) the tabs, Result open first, one panel shown
+        # (a call waiting on the rule is its Decide, a sixth tab in your view)
+        assert [t[0] for t in o["tabs"]][:5] == ["Result", "Rule", "Runs", "Used by", "Source"], (width, o["tabs"])
+        assert o["tabs"][0][1] == "true" and all(t[1] == "false" for t in o["tabs"][1:]), (width, o["tabs"])
+        assert o["shown"] == ["c-c2:reading"] and o["hash"] == "#c-c2", (width, o)
+        assert g["rule"]["shown"] == ["c-c2:rule"] and g["rule"]["hash"] == "#c-c2:rule", (width, g["rule"])
+        assert g["source"]["shown"] == ["c-c2:source"] and g["source"]["hash"] == "#c-c2:source", (width, g["source"])
+        # a click swaps the panel where it is: the inspector is not scrolled
+        assert g["rule"]["scroll"] == o["scroll"] and g["source"]["scroll"] == o["scroll"], (width, o["scroll"], g["rule"]["scroll"])
+        # Back returns to the tab before, then to Result
+        assert g["back"]["shown"] == ["c-c2:rule"] and g["back"]["hash"] == "#c-c2:rule", (width, g["back"])
+        assert g["back2"]["shown"] == ["c-c2:reading"] and g["back2"]["hash"] == "#c-c2", (width, g["back2"])
+        assert g["arrow"]["shown"] == ["c-c2:rule"] and g["arrow"]["focus"] == "Rule", (width, g["arrow"])
+        assert g["chip"]["shown"] == ["c-c2:runs"] and g["chip"]["hash"] == "#c-c2:runs", (width, g["chip"])
+        # (3) the claim beside rb's number: the cited 76.1, rb's estimate and bounds as rb show reads them
+        assert o["claimed"][0] == "Claimed" and o["claimed"][1].startswith("76.1"), (width, o["claimed"])
+        assert abs(float(o["rb"].replace("−", "-")) - reading["estimate"]) < 0.006, (width, o["rb"], reading)
+        lo, hi = (float(b.replace("−", "-").rstrip("%")) for b in o["bounds"])
+        assert abs(lo - reading["lo"]) < 0.006 and abs(hi - reading["hi"]) < 0.006, (width, o["bounds"], reading)
+        assert o["mark"] in ("✓", "✗") and o["sentence"] is False, (width, o)
+        assert o["chips"] and all(c[2] for c in o["chips"]) and o["chips"][-1][0] == "k-runs", (width, o["chips"])
+        # (7) Source: the hash in 12, rb's working folded and closed
+        assert g["source"]["sha"] and len(g["source"]["sha"]) == 12 and g["source"]["how"] == ["How rb worked it out", False], (width, g["source"])
+
+
+_STILL_PROBE = r"""(() => {
+  const vis = e => !!e && e.checkVisibility() && e.getBoundingClientRect().width > 0;
+  const h = document.getElementById('decisions'), sec = h && h.parentElement;
+  const chips = [...document.querySelectorAll('.dfil button[data-filter]')].filter(vis).map(b => [b.dataset.filter, b.textContent.trim(), b.getAttribute('aria-pressed'), getComputedStyle(b).cursor]);
+  const rows = [...document.querySelectorAll('ul.dql > li.dr')].filter(vis).map(li => {
+    const a = li.querySelector('a.drow'), r = a.getBoundingClientRect(), lr = li.getBoundingClientRect();
+    return { kind: li.dataset.kind, text: a.textContent.trim(), st: a.querySelector('.st').textContent.trim(), href: a.getAttribute('href'), full: a.title,
+      lines: Math.round(a.querySelector('.dt').getBoundingClientRect().height / parseFloat(getComputedStyle(a.querySelector('.dt')).lineHeight || 20)),
+      whole: Math.abs(r.width - lr.width) < 20 && Math.abs(r.height - lr.height) < 4, bar: !!a.querySelector('svg.mbar'), chev: !!a.querySelector('.chev') };
+  });
+  // sentences in the section: any text block of its own that is not a heading, a chip or a row
+  const block = []; for (let n = h && h.nextElementSibling; n && !/^H[12]$/.test(n.tagName); n = n.nextElementSibling) block.push(n);
+  const own = block.flatMap(b => [b, ...b.querySelectorAll('p')]).filter(p => p.tagName === 'P' && vis(p) && !p.closest('ul.dql, .dfil') && !p.matches('.dstate')).map(p => p.textContent.trim());
+  const pv = document.getElementById('rb-preview');
+  return { chips, rows, own, preview: pv && !pv.hidden ? { vs: !!pv.querySelector('.vs'), chips: pv.querySelectorAll('.chip').length, fig: !!pv.querySelector('svg') } : null,
+    reader: [...document.querySelectorAll('.dstate')].filter(vis).map(p => p.textContent.trim()) };
+})()"""
+
+
+def test_still_open_counts_in_chips_that_filter_and_rows_preview_their_result(int8_demo, tmp_path):
+    """What waits on the Overview (the UX lead's Still open, Nov 13 2026; the owner: "if i can see 5 calls i can't
+    click... what do you expect me to do?", "you can't do a hover?"): (1) the summary is chips, one per kind, counting
+    the record's own rows, each filtering the rows to its kind and the same chip again clearing it; (2) no sentence
+    explains the section; (3) each row is one line and wholly a link to its card, its status said once, in its chip, with
+    a mini bar where the rule has a number and a chevron; (4) resting a mouse on a row shows a small card of its result,
+    and so does reaching it by key; Escape hides it. And in Reader's view the section shows the state alone."""
+    st = subprocess.run([*command(), "status", "--json"], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
+                        stdin=subprocess.DEVNULL, env=int8_demo.env)
+    assert st.returncode in (0, 1), st.stderr
+    rows = json.loads(st.stdout)["data"]["overview"]["decisions"]
+    decide = [r for r in rows if r["kind"] == "decide"]
+    # what a reader is told stands undecided: a rule's miss or doubt with no call, a gate missed
+    undecided = [r for r in rows if r["kind"] == "decide" and r["code"] in ("undecided", "gate_missed")]
+    assert decide, rows
+    page = tmp_path / "page.html"
+    rp = subprocess.run([*command(), "page", "--out", str(page)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
+                        stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
+    assert rp.returncode == 0, rp.stderr
+    reader = tmp_path / "reader.html"
+    reader.write_text(page.read_text(encoding="utf-8").replace("</head>", '<meta name="rb-viewer" content="reader"></head>', 1), encoding="utf-8")
+    js = _cdp_script(tmp_path / "still.mjs", """
+const out = {};
+const PROBE = %s;
+await cdp.run(async () => {
+  for (const [name, url, width] of [['page', %s, 1440], ['page', %s, 390], ['reader', %s, 1440]]) {
+    const page = await (await cdp.launchChrome()).page();
+    await page.viewport(width, 900);
+    await page.goto(url);
+    await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
+    await page.goto(url + '#overview');
+    await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await cdp.sleep(400);
+    await page.ev("(() => { const b = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Skip' && b.offsetParent); if (b) b.click(); document.getElementById('decisions').scrollIntoView({block: 'start'}); return true; })()"); await cdp.sleep(200);
+    const got = { open: await page.ev(PROBE) };
+    if (name === 'page') {
+      await page.clickEl("document.querySelector('.dfil button[data-filter=\\"decide\\"]')"); got.filtered = await page.ev(PROBE);
+      await page.clickEl("document.querySelector('.dfil button[data-filter=\\"decide\\"]')"); got.cleared = await page.ev(PROBE);
+      if (width >= 600) {
+        const r = await page.ev("(() => { const a = document.querySelector('a.drow[data-preview]:not([data-preview=\\"\\"])'); const r = a.getBoundingClientRect(); return {x: r.x + 200, y: r.y + r.height / 2}; })()");
+        await page.mouse(r.x, r.y); await cdp.sleep(120); got.early = await page.ev(PROBE);
+        await cdp.sleep(500); got.hover = await page.ev(PROBE);
+        await page.key('Escape', 'Escape', 27); await cdp.sleep(150); got.esc = await page.ev(PROBE);
+        await page.mouse(5, 5); await cdp.sleep(150);
+        // by key: focus the chip before the rows, then Tab onto the first row with a result
+        await page.ev("(() => { const b = [...document.querySelectorAll('.dfil button')].pop(); b.focus(); return true; })()");
+        for (let i = 0; i < 8; i++) {
+          await page.key('Tab', 'Tab', 9); await cdp.sleep(80);
+          if (await page.ev("!!(document.activeElement && document.activeElement.matches('a.drow[data-preview]:not([data-preview=\\"\\"])'))")) break;
+        }
+        await cdp.sleep(150); got.focus = await page.ev(PROBE);
+      }
+    }
+    out[name + '@' + width] = got;
+    await cdp.stopAll();
+  }
+  return {};
+}, { timeoutMs: 120000 });
+console.log(JSON.stringify({ ok: true, out }));
+""" % (json.dumps(_STILL_PROBE), json.dumps(page.as_uri()), json.dumps(page.as_uri()), json.dumps(reader.as_uri())))
+    code, said, err = _runner(_node(), js, env=dict(os.environ), timeout=180)
+    assert code == 0 and said.get("ok"), err[-3000:]
+    statuses = {"not met", "not reproduced", "gate missed", "can't tell yet", "no results yet", "met", "reproduced", "design", "to confirm", "to decide"}
+    for name, g in said["out"].items():
+        o = g["open"]
+        if name.startswith("reader"):
+            # the state alone: no chip, no row, no link into the owner's list
+            assert o["chips"] == [] and o["rows"] == [] and o["preview"] is None, (name, o)
+            assert o["reader"] == ([f"{len(undecided)} result{'s' if len(undecided) != 1 else ''} not decided"] if undecided else []), (name, o["reader"])
+            continue
+        # (1) chips count the record's rows by kind
+        assert o["chips"][0][:2] == ["decide", f"{len(decide)} decision{'s' if len(decide) != 1 else ''}"], (name, o["chips"])
+        assert all(c[2] == "false" and c[3] == "pointer" for c in o["chips"]), (name, o["chips"])
+        assert len(o["rows"]) == len(rows), (name, o["rows"])
+        f = g["filtered"]
+        assert f["chips"][0][2] == "true" and {r["kind"] for r in f["rows"]} == {"decide"} and len(f["rows"]) == len(decide), (name, f)
+        assert g["cleared"]["rows"] == o["rows"] and g["cleared"]["chips"][0][2] == "false", (name, g["cleared"])
+        # (2) no sentence of its own in the section
+        assert o["own"] == [], (name, o["own"])
+        for r in o["rows"]:
+            # (3) one line, wholly a link, its status once and in its chip
+            assert r["lines"] == 1 and r["whole"] and r["chev"] and r["href"].startswith("#"), (name, r)
+            rest = r["text"][len(r["st"]):]
+            assert r["st"] in statuses and r["text"].startswith(r["st"]), (name, r)
+            assert not any(re.search(r"\b" + re.escape(w) + r"\b", rest) for w in ("not met", "not reproduced", "can't tell yet", "no results yet", "gate missed", "to confirm")), (name, r)
+            assert r["full"] and len(r["text"]) <= len(r["st"]) + 75 + 2, (name, r)
+        if name.endswith("@1440"):
+            assert any(r["bar"] for r in o["rows"]) and all(r["href"].startswith("#c-") for r in o["rows"] if r["kind"] == "decide" and r["bar"]), (name, o["rows"])
+            # (4) a mouse resting about 300 ms, not at once; Escape hides it; a key brings it too
+            assert g["early"]["preview"] is None and g["hover"]["preview"] and g["hover"]["preview"]["vs"] and g["hover"]["preview"]["chips"] > 0, (name, g)
+            assert g["esc"]["preview"] is None, (name, g["esc"])
+            assert g["focus"]["preview"] and g["focus"]["preview"]["vs"], (name, g["focus"])
+
+
+_CLIP_PROBE = r"""(() => {
+  const W = document.documentElement.clientWidth, se = document.scrollingElement;
+  // an element cut by the window's right edge: begun inside it and running past it (a closed drawer parked past the
+  // edge is not on the screen at all)
+  const cut = [...document.querySelectorAll('header *, #insp *, #main *, #nav *')].filter(e => e.checkVisibility() && e.getBoundingClientRect().width > 0)
+    .filter(e => { const r = e.getBoundingClientRect(); return r.left < W - 1 && r.right > W + 1 && !e.closest('.ovx, pre, .wrap, [role="tablist"], #nav > ul'); })
+    .slice(0, 5).map(e => e.tagName + '.' + String(e.className).slice(0, 30) + ' ' + Math.round(e.getBoundingClientRect().right));
+  const vis = e => e.checkVisibility() && e.getBoundingClientRect().width > 0;
+  const owner = [...document.querySelectorAll('a[href="#your-call"], a[href="#to-confirm"], a[href^="#call-"], .dfil, ul.dql, .decide, .waitblk, .calls-in')].filter(vis).map(e => e.tagName + ' ' + (e.getAttribute('href') || e.className));
+  const words = [...document.querySelectorAll('main *, #insp *')].filter(e => vis(e) && !e.children.length && /See the open calls|waiting for a confirmation|Waiting for your confirmation|rb confirm|Record a call/i.test(e.textContent)).map(e => e.textContent.trim().slice(0, 60));
+  return { sx: se.scrollWidth - se.clientWidth, cut, owner, words, card: !!document.querySelector('#insp .ibody > .card'), at: decodeURIComponent(location.hash) };
+})()"""
+
+
+def test_nothing_scrolls_sideways_and_a_reader_is_shown_state_not_actions(int8_demo, tmp_path):
+    """Layout and the reader (the UX lead, Nov 13 2026; the owner, on a hosted record in Reader's view with a card
+    open: "what do you see????"): (1) at 1024, 1280, 1440 and 1920, with no card and with a rule's card open, in your
+    view and Reader's view, the page never scrolls sideways and nothing in its header, panes or card is cut by the
+    window's edge; (2) Reader's view shows the record's state, never the owner's actions: no list of calls, no link
+    into it, no filter, no confirm prompt and nothing waiting for a confirmation, wherever a reader goes, an address
+    into the owner's list included."""
+    out = tmp_path / "export"
+    r = subprocess.run([*command(), "export", "--out", str(out)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
+                       stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
+    assert r.returncode == 0, r.stderr
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.min.js").read_text(encoding="utf-8")
+    pages = {}
+    for v in ("owner", "reader"):
+        pages[v] = tmp_path / f"{v}.html"
+        pages[v].write_text((out / "page.html").read_text(encoding="utf-8").replace("</head>", f'<meta name="rb-viewer" content="{v}"><script>{script}</script></head>', 1), encoding="utf-8")
+    js = _cdp_script(tmp_path / "clip.mjs", """
+const out = {};
+const PROBE = %s;
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  for (const [v, url] of %s) {
+    await page.viewport(1440, 900); await page.goto(url); await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
+    for (const w of [1024, 1280, 1440, 1920]) for (const h of ['#overview', '#c-c1', '#c-c2']) {
+      await page.viewport(w, 900); await page.goto(url + h);
+      await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await cdp.sleep(250);
+      out[v + '@' + w + h] = await page.ev(PROBE);
+    }
+    if (v === 'reader') for (const h of ['#your-call', '#to-confirm', '#call-c1', '#q-q1', '#experiments', '#x-e1']) {
+      await page.viewport(1440, 900); await page.goto(url + h);
+      await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await cdp.sleep(250);
+      out['reader-go' + h] = await page.ev(PROBE);
+    }
+  }
+  await cdp.stopAll();
+  return {};
+}, { timeoutMs: 240000 });
+console.log(JSON.stringify({ ok: true, out }));
+""" % (json.dumps(_CLIP_PROBE), json.dumps([[v, p.as_uri()] for v, p in pages.items()])))
+    code, said, err = _runner(_node(), js, env=dict(os.environ), timeout=300)
+    assert code == 0 and said.get("ok"), err[-3000:]
+    got = said["out"]
+    for k, g in got.items():
+        # (1) no sideways scroll, nothing cut
+        assert g["sx"] == 0 and g["cut"] == [], (k, g)
+        if k.endswith("#c-c1") or k.endswith("#c-c2"):
+            assert g["card"], (k, g)
+        # (2) a reader: state, never the owner's actions
+        if k.startswith("reader"):
+            assert g["owner"] == [] and g["words"] == [], (k, g)
+    # the owner's view keeps its list
+    assert got["owner@1440#overview"]["owner"], got["owner@1440#overview"]
+
+
+# empty-state sentences as they were written before the UX lead's rule (Nov 13 2026); none may be drawn
+_EMPTY_SENTENCES = r"No rule tests this question yet|No experiment is filed under this question|No recorded run is read yet|Nothing links to it yet|Nothing recorded yet|Nothing waits\.|Not tested: nothing is read|No note on these rules yet|Nothing waits on you here|No call is open"
+
+_EMPTY_PROBE = r"""((re) => {
+  const vis = e => e.checkVisibility() && e.getBoundingClientRect().width > 0;
+  const v = document.querySelector('main .view.on');
+  const scope = [v, document.querySelector('#insp')].filter(Boolean);
+  const said = scope.flatMap(s => [...s.querySelectorAll('*')]).filter(e => vis(e) && [...e.childNodes].some(n => n.nodeType === 3 && new RegExp(re).test(n.textContent))).map(e => e.textContent.trim().slice(0, 80));
+  const next = [...document.querySelectorAll('section.nextc')].filter(vis).map(n => [n.querySelector('.prompt').textContent.trim(), n.querySelector('button').textContent.trim()]);
+  return { view: v ? v.id : '', said, next, chips: [...document.querySelectorAll('main .view.on .echip')].filter(vis).map(c => c.textContent.trim()),
+    ghosts: [...document.querySelectorAll('main .view.on .ghost')].filter(vis).length };
+})"""
+
+
+def test_an_empty_state_is_shown_with_its_next_step_in_your_view(tmp_path):
+    """Empty states lead to the next action (the UX lead's rule, Nov 13 2026; the owner, on a question with nothing
+    under it: "no cta no next action i can take??"): no empty-state sentence is drawn anywhere; the state is a chip on
+    the item and a muted outline where the missing thing would sit; in your view one Next step card holds a prompt
+    written from the record for this item, naming its real title, with a Copy prompt button; in Reader's view only the
+    chip and the outline."""
+    root = tmp_path / "work"
+    root.mkdir()
+    env = {**environment(), "RB_ACTOR": "human:ana", "RB_TELEMETRY": "0"}
+    for k in AGENT_VARS:
+        env.pop(k, None)
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    def rb(*a):
+        r = subprocess.run([*command(), *a], cwd=root, capture_output=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, env=env)
+        assert r.returncode == 0, (a, r.stdout, r.stderr)
+    rb("init", "INT8 ResNet-50", "--no-agents")
+    empty_page = tmp_path / "empty.html"
+    rb("page", "--out", str(empty_page))
+    q_acc, q_calib, x_title = "Does INT8 cost accuracy on the held-out set?", "How many calibration images does INT8 need?", "INT8 vs FP32 on the held-out set"
+    rb("question", "add", q_acc, "--id", "q-acc")
+    rb("question", "add", q_calib, "--id", "q-calib")
+    rb("experiment", "add", x_title, "--id", "int8", "-q", "q-acc", "--baseline", "fp32", "--candidate", "int8", "--varies", "precision",
+       "--hypothesis", "INT8 keeps top-1 within 1 point of FP32")
+    rb("metric", "add", "top1", "--unit", "%", "--maximize")
+    rb("criterion", "add", "INT8 keeps top-1 within 1 point of FP32", "-e", "int8", "-q", "q-acc", "--metric", "change.top1", "--at-least", "-1", "--id", "c-acc")
+    page = tmp_path / "page.html"
+    rb("page", "--out", str(page))
+    out = tmp_path / "export"
+    rb("export", "--out", str(out))
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.min.js").read_text(encoding="utf-8")
+    reader = tmp_path / "reader.html"
+    reader.write_text((out / "page.html").read_text(encoding="utf-8").replace("</head>", f'<meta name="rb-viewer" content="reader"><script>{script}</script></head>', 1), encoding="utf-8")
+    js = _cdp_script(tmp_path / "empty.mjs", """
+const out = {};
+const PROBE = %s, RE = %s;
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  for (const [name, url, views] of %s) for (const w of [1440, 390]) {
+    await page.viewport(w, 900); await page.goto(url); await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
+    for (const v of views) {
+      await page.goto(url + '#' + v);
+      await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await cdp.sleep(200);
+      out[name + '@' + w + '#' + v] = await page.ev(PROBE + '(' + JSON.stringify(RE) + ')');
+    }
+  }
+  await cdp.stopAll();
+  return {};
+}, { timeoutMs: 240000 });
+console.log(JSON.stringify({ ok: true, out }));
+""" % (json.dumps(_EMPTY_PROBE), json.dumps(_EMPTY_SENTENCES), json.dumps([
+        ["empty", empty_page.as_uri(), ["overview", "research", "experiments", "runs", "resources", "history", "your-call"]],
+        ["page", page.as_uri(), ["overview", "research", "q-q-acc", "q-q-calib", "x-int8", "runs", "resources", "your-call", "c-c-acc", "c-c-acc:runs", "c-c-acc:impact"]],
+        ["reader", reader.as_uri(), ["overview", "q-q-calib", "x-int8", "runs", "resources"]]])))
+    code, said, err = _runner(_node(), js, env=dict(os.environ), timeout=300)
+    assert code == 0 and said.get("ok"), err[-3000:]
+    got = said["out"]
+    plan = f'In this repository, use Rabbit Brain to plan a test for the question "{q_calib}": propose the rule a result must meet and the runs to make, record them with rb, and don\'t run anything until I confirm.'
+    run = f'Run "{x_title}" with rb journal run, as its design says, and record each run.'
+    for k, g in got.items():
+        # no empty-state sentence anywhere
+        assert g["said"] == [], (k, g)
+        if k.startswith("reader"):
+            # a reader: the chip and the outline, no prompt
+            assert g["next"] == [], (k, g)
+    for w in (1440, 390):
+        q = got[f"page@{w}#q-q-calib"]
+        assert "Not tested yet" in q["chips"] and q["ghosts"] >= 1 and q["next"] == [[plan, "Copy prompt"]], q
+        x = got[f"page@{w}#x-int8"]
+        assert "No runs yet" in x["chips"] and x["ghosts"] >= 1 and x["next"] == [[run, "Copy prompt"]], x
+        assert got[f"page@{w}#runs"]["chips"] == ["No runs yet"] and got[f"page@{w}#resources"]["chips"] == ["No resources yet"], (got[f"page@{w}#runs"], got[f"page@{w}#resources"])
+        e = got[f"empty@{w}#overview"]
+        assert "No question yet" in e["chips"] and e["next"] == [["Use Rabbit Brain to track this: read rb context, then record where the work stands.", "Copy prompt"]], e
+        for v in ("q-q-calib", "x-int8"):
+            r = got[f"reader@{w}#{v}"]
+            assert r["chips"] and r["ghosts"] >= 1 and r["next"] == [], (v, r)

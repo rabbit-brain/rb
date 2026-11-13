@@ -178,6 +178,26 @@
     timer = setTimeout(poll, wait);
   }
 
+  // a field card is served when it is opened: put in the page's cards, then the script opens it (listened for from the
+  // first, since the script may open one as the page loads)
+  const asking = new Set();
+  document.addEventListener('rb:want', async e => {
+    const id = e.detail.id;
+    // a field card's anchor, or a file's: rb open serves one only for a subject or a file its page lists, and says no
+    // to the rest
+    if (typeof id !== 'string' || !/^(k-[^/]|file-.)/.test(id) || asking.has(id) || byId(id)) return;
+    asking.add(id);
+    try {
+      const r = await fetch('/o/' + encodeURIComponent(id) + '.html' + query, { cache: 'no-store' });
+      const box = document.querySelector('main > .nodes');
+      if (!r.ok || !box || byId(id)) return;
+      const t = document.createElement('template');
+      t.innerHTML = await r.text();
+      box.append(...t.content.childNodes);
+      document.dispatchEvent(new CustomEvent('rb:got', { detail: { id } }));
+    } catch (_) {} finally { asking.delete(id); }
+  });
+
   function start() {
     inspected();
     document.addEventListener('rb:card', () => { if (!swapping) inspected(); });

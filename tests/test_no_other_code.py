@@ -62,7 +62,7 @@ def recorded(home: Path) -> tuple[Path, str, str]:
     (root / "out").mkdir()
     (root / "out" / "m.json").write_text('{"int8": {"top1": 75.1}, "fp32": {"top1": 76.0}}', encoding="utf-8")
     run = rb(root, "run", "add", "int8", "--from", "out/m.json", "--command", "python train.py")["data"]["object"]["id"]
-    tree = rb(root, "show", run)["data"]["object"]["receipt"]["attached"]["tree"]
+    tree = rb(root, "show", "--long", run)["data"]["object"]["receipt"]["attached"]["tree"]
     git(root, "add", ".rb", "out")
     git(root, "commit", "-qm", "the run")
     return root, run, tree
@@ -82,9 +82,9 @@ def test_a_clone_without_the_run_s_tree_hands_out_no_command(home):
     t12 = tree[:12]
     not_here = (f"This run's code is not in this clone: it had changes outside the record not committed, and rb kept them as git tree {t12}"
                 " in the clone that recorded the run.")
-    shown = text(other, "show", run)
+    shown = text(other, "show", "--long", run)
     assert not_here in shown and "the clone that recorded the run kept it" not in shown, shown
-    row = next(r for r in rb(other, "show", "int8")["data"]["rerunnability"] if r["what"] == "code")
+    row = next(r for r in rb(other, "show", "--long", "int8")["data"]["rerunnability"] if r["what"] == "code")
     assert row["state"] == "missing" and f"code not in this clone for 1 run: rb kept it as git tree {t12} in the clone that recorded it" in row["detail"], row
     assert "never committed" not in row["detail"], row      # the contradiction goes: it was kept, elsewhere
     # rb ui's run card, which has no Reproduce, says it in the same words; the clone that recorded it does not
@@ -108,7 +108,7 @@ def test_a_clone_without_the_run_s_tree_hands_out_no_command(home):
 
 def test_the_restore_line_never_touches_the_index(home):
     root, run, tree = recorded(home)
-    shown = text(root, "show", run)
+    shown = text(root, "show", "--long", run)
     [line] = [l for l in shown.splitlines() if "Restore a file:" in l]
     restore = line.split("Restore a file: ", 1)[1].strip()
     assert restore == f"git restore --source={tree} --worktree -- <path>", restore
@@ -124,7 +124,7 @@ def test_the_restore_line_never_touches_the_index(home):
 def test_your_checkout_differs_in_a_file_the_run_had_that_it_lacks(home):
     root, run, tree = recorded(home)
     (root / "calib.py").unlink()
-    got = rb(root, "show", "int8")["data"]
+    got = rb(root, "show", "--long", "int8")["data"]
     said = json.dumps(got)
     assert "your checkout differs in 1 file: calib.py" in said, said[:2000]
 
@@ -195,7 +195,7 @@ def test_a_start_captured_tree_a_clone_lacks_reads_as_not_in_this_clone(home):
     write = "import os; os.makedirs('out', exist_ok=True); open('out/m.json', 'w').write('{\"int8\": {\"top1\": 75.1}, \"fp32\": {\"top1\": 76.0}}')"
     subprocess.run([*command(), "journal", "run", "--", sys.executable, "-c", write], cwd=root, env=environment(), check=True, capture_output=True)
     run = rb(root, "run", "add", "int8", "--from", "out/m.json")["data"]["object"]["id"]
-    produced = rb(root, "show", run)["data"]["object"]["receipt"]["produced"]
+    produced = rb(root, "show", "--long", run)["data"]["object"]["receipt"]["produced"]
     assert produced.get("captured") == "start" and produced.get("tree"), produced
     t12 = produced["tree"][:12]
     git(root, "add", ".rb", "out", "train.py")
@@ -204,10 +204,10 @@ def test_a_start_captured_tree_a_clone_lacks_reads_as_not_in_this_clone(home):
     git(home, "clone", "-q", "--no-local", str(root), str(other))
     away = (f"This run's code is not in this clone: rb kept the code its command started with as git tree {t12} in the clone that"
             " recorded the run.")
-    shown = text(other, "show", run)
+    shown = text(other, "show", "--long", run)
     assert away in shown, shown
     assert f"git diff {produced['commit'][:12]} {t12}" not in shown, shown
     from rbtest import object_card
     assert away in object_card(run, other)["facts"], object_card(run, other)["facts"]
-    mine = text(root, "show", run)
+    mine = text(root, "show", "--long", run)
     assert away not in mine and f"git diff {produced['commit'][:12]} {t12}" in mine, mine

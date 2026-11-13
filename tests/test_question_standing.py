@@ -92,7 +92,7 @@ def test_the_brief_says_where_each_question_stands_in_sentences(rb):
     assert not any("q1 is open" in line for line in b.still_open)
     assert rb("question", "add", "Does a third batch help?", "--id", "q2")[0] == 0
     q2 = next(x for x in home().briefs if x.id == "q2")
-    assert any(i["subject"] == "q2" and i["code"] == "open_question" for i in rb("status")[1].data["open"])
+    assert any(i["subject"] == "q2" and i["code"] == "open_question" for i in rb("status", "--full")[1].data["open"])
     assert not any("q2 is open" in line for line in q2.still_open)
     assert any(c.startswith('rb experiment add "<what would test it>" -q q2') for c in q2.next)
 
@@ -115,7 +115,7 @@ def test_a_met_rule_reads_with_what_it_rests_on(rb):
 
 def test_population_declarations_never_block_and_are_not_nags(rb):
     prefetch(rb)
-    code, env = rb("status")
+    code, env = rb("status", "--full")
     assert code == 0
     # No open item nags about population.*, and no finding reads a population declaration as a problem or a note.
     assert not any("population." in i["subject"] for i in env.data["open"])
@@ -145,7 +145,7 @@ def test_a_scoped_retraction_supersedes_one_measurement_and_keeps_the_rest(rb):
     assert cells["adaptive2"]["io_calls"]["n"] == 2
     assert cells["adaptive2"]["wall_s"]["n"] == 1
     # status still lists the run, saying what it is superseded for.
-    code, env = rb("status")
+    code, env = rb("status", "--full")
     row = next(x for x in env.data["runs"] if x["id"] == first)
     assert row["superseded_for"] == ["wall_s"]
 
@@ -172,7 +172,7 @@ def test_status_text_leads_with_the_question_before_the_lists(rb, capsys):
     # the page.
     assert rb("question", "add", "Does a third batch help?", "--id", "q2")[0] == 0
     assert rb("decide", "ct", "investigate", "-m", "the timing runs share one machine")[0] == 0
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     out = capsys.readouterr().out
     q = out.index("Can two prefetched batches keep the benefit of six? (open)")
     assert q < out.index("estimate meets criterion: estimate -9.85 ≤ -5") < out.index("Needs judgment") < out.index("Can be done now")
@@ -195,9 +195,9 @@ def test_the_page_opens_on_the_question_and_waits_on_you_near_the_end(rb, capsys
     assert '<table class="grid">' in experiments and 'id="h-experiments"' in experiments
     # Population beside the counts, supersession language nowhere (nothing superseded yet).
     assert "declared: datasets = 2 · shards = 8" in plain
-    # The honesty line about decisions appears exactly once, in the footer.
-    assert plain.count("A decision records a call; it does not change a reading.") == 1
-    assert text.index("A decision records a call") > text.index("<footer class=\"foot\">")
+    # The honesty line about decisions appears exactly once, in About, under its strip of facts.
+    assert plain.count("A decision does not change a reading.") == 1
+    assert text.index("A decision does not change a reading") > text.index('<div class="astrip" id="in-git"')
     assert "\u2014" not in text
     # An agent's call lands as the agent's, proposed; once the user confirms it, it reads under its question. It steers
     # the line of work (continue keeps it open), so the page still asks for the next measurement.
@@ -221,7 +221,8 @@ def test_the_page_opens_on_the_question_and_waits_on_you_near_the_end(rb, capsys
     capsys.readouterr()
     text2 = out_file.read_text(encoding="utf-8")
     overview2 = sec(text2, "sec-overview", "sec-research")
-    assert 'id="queue"' in overview2 and re.search(r'<a class="qbtn" href="#call-[^"]+"[^>]*>Review</a>', overview2)
+    # since UX5 round 1 the Overview's Decisions block holds the calls and confirmations; a run rb found is Your call's
+    assert 'id="decisions"' in overview2 and re.search(r'href="#call-[^"]+"', text2)
     # Your call is a view of its own, never a drawer the overview opens
     assert re.search(r'<section class="view" id="your-call"', text2) and not re.search(r'<details\b[^>]*\bid="your-call"', text2)
     assert "Record fourth.json on pf" in text2 and "rb approve" not in text2
@@ -231,8 +232,8 @@ def test_the_page_opens_on_the_question_and_waits_on_you_near_the_end(rb, capsys
     # experiment's Reproduce asks in words for one more measurement of what its criteria read.
     plain2 = re.sub(r"<[^>]+>", " ", text2)
     question = html_mod.unescape(re.sub(r"<[^>]+>", "", text2.split('id="q-q1"', 1)[1].split("<article", 1)[0]))
-    # the call's line first, what it is on trailing (design pass 1, P3)
-    assert re.search(r"continued \d{4}-\d{2}-\d{2} · note: both runs show it ?pf", question), question
+    # the call's line, which opens what it is on (closed form: ids off screens)
+    assert re.search(r"continued \d{4}-\d{2}-\d{2} · note: both runs show it", question), question
     for cmd in ("rb run add", "rb freeze", "rb experiment add", "rb spec set"):
         assert cmd not in plain2
     assert main(["status", "--json"]) in (0, 1)
@@ -241,7 +242,7 @@ def test_the_page_opens_on_the_question_and_waits_on_you_near_the_end(rb, capsys
     assert "Next step" not in rail and "run one more" not in rail
     reproduce = html_mod.unescape(re.sub(r"<[^>]+>", " ", text2.split('id="x-pf:reproduce"', 1)[1].split("</section>", 1)[0]))
     assert re.search(r'Next step\s+"run one more io_calls measurement on two-batch prefetch, adaptive2 vs static2, and record it in rb"', reproduce), reproduce
-    assert "criterion" in plain2 and "margin" in plain2
+    assert "criterion" in plain2 and "distance from the rule's number" in plain2
 
 
 def test_the_question_card_carries_the_brief(rb):

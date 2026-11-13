@@ -11,7 +11,7 @@ python -m pip install -e ".[dev]"
 rb version
 ```
 
-The install builds the Rust binary. Rust owns the record, source checks, findings and write rules. The Python SDK and terminal UI ask that binary for their data. Read [rust/ARCHITECTURE.md](rust/ARCHITECTURE.md) for the layout and generated files, and [AGENTS.md](AGENTS.md) for the behavior. If your working project has a `.rb/` record, read `rb context` before changing the work; do not edit that record by hand.
+The install builds the Rust binary: the `rb` binary is Rust, in `rust/`, and maturin builds it into the wheel beside the Python library and the terminal screen in `src/rabbit_brain`, so `pytest` runs the tests against that `rb`. The record's format is specified as one JSON Schema, [schema/rb-v2.schema.json](schema/rb-v2.schema.json). Rust owns the record, source checks, findings and write rules. The Python SDK and terminal UI ask that binary for their data. Read [rust/ARCHITECTURE.md](rust/ARCHITECTURE.md) for the layout and generated files, and [AGENTS.md](AGENTS.md) for the behavior. If your working project has a `.rb/` record, read `rb context` before changing the work; do not edit that record by hand.
 
 ## Make and check a change
 

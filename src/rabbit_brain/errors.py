@@ -34,6 +34,7 @@ ERRORS: dict[str, tuple[str, str]] = {
     "E_BUNDLE_INVALID": ("The bundle is not a valid rb export, or its files do not match its manifest.", "Get a fresh copy from where it was published; every file must hash to what manifest.json records. rb export --with-record writes one."),
     "E_HUB_REFUSED": ("The hub refused the request.", "The message carries the hub's reason and fix; the record on this machine is unchanged."),
     "E_HUB_UNREACHABLE": ("The hub could not be reached, or what answered at its address is not the hub.", "Check the address (--hub, or RB_HUB_URL) and the network; nothing local was affected."),
+    "E_LOGIN_PENDING": ("This machine is not signed in yet: rb login gave a code that is not approved on the hub yet, so nothing was sent.", "Approve the code at the link rb login printed (rb login shows it again), then run the command again."),
     "E_ADOPT_AUTHORITY": ("The edit changes who wrote or decided something, or through what, which an adoption must never launder into the record.", "`rb doctor --restore` puts the file back. If the authorship or decision is really wrong, make the change through rb as yourself, where it is logged as yours."),
     "E_STALE_REVIEW": ("The files changed between the review and the adoption, so what was reviewed is not what would be adopted.", "Look again: `rb doctor` lists every file changed outside rb as it is now."),
     "E_INTERNAL": ("A fault in rb itself, or an install that cannot run a part of it.", "Report it with the link its fix line gives (report_url under --json)."),

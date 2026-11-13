@@ -109,11 +109,11 @@ def test_a_table_row_reads_as_a_row_and_one_row_in_two_experiments_is_said(rb, n
     two_experiments_on_one_ledger(rb)
     env = rb("run", "add", "e1", "--from", name, "--where", "run=r1", "--produced-at", "2026-05-01")
     rid = env.data["object"]["id"]
-    code, out = rb("show", rid, text=True)
+    code, out = rb("show", "--long", rid, text=True)
     assert f"Run {rid} on e1 (row)" in out, out
     env = rb("run", "add", "e2", "--from", name, "--where", "run=r1", "--produced-at", "2026-05-01")
     assert any("is also recorded as" in w and rid in w for w in env.data.get("warnings", [])), env.data.get("warnings")
-    items = [i for i in rb("status").data["open"] if i["code"] == "row_in_several_experiments"]
+    items = [i for i in rb("status", "--full").data["open"] if i["code"] == "row_in_several_experiments"]
     assert items and set(items[0]["experiments"]) == {"e1", "e2"}, items
 
 
@@ -125,7 +125,7 @@ def test_a_run_outside_a_rule_s_selectors_says_so(rb):
     rb("criterion", "add", "INT8 gains", "-e", "e3", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
        "--subject-where", "checker=strict", "--reference-where", "checker=loose", "--at-least", "0", "--id", "c1")
     rb("run", "add", "e3", "fp32.top1=75.1", "--set", "checker=strict", "--produced-at", "2026-05-01")
-    notes = [c["text"] for c in rb("show", "c1").data["finding"]["caveats"] if c["code"] == "counts_toward_nothing"]
+    notes = [c["text"] for c in rb("show", "--long", "c1").data["finding"]["caveats"] if c["code"] == "counts_toward_nothing"]
     assert notes and "a number this rule reads, outside its per-run selectors (int8 at checker=strict; fp32 at checker=loose)" in notes[0], notes
     assert "and this rule reads" not in notes[0]
 
@@ -144,11 +144,11 @@ def test_an_analysis_reads_an_estimate_and_its_bounds_from_two_lines_of_one_tabl
     src = a["comparisons"][0]["source"]
     assert src["line"] == 7 and src.get("resolved") is None, src
     assert a["receipt"]["stated_lines"][0]["lines"] == [7, 9], a["receipt"]
-    code, out = rb("show", a["id"], text=True)
+    code, out = rb("show", "--long", a["id"], text=True)
     assert "read :7 '| Mean | 75.6100 |' and :9 '| Mean 95% CI | [75.4000, 75.8200] |'" in out, out
     # the lines are re-read: a changed bound is the document's change
     Path("RESULTS.md").write_text(Path("RESULTS.md").read_text(encoding="utf-8").replace("75.8200", "75.9200"), encoding="utf-8")
-    code, out = rb("show", a["id"], text=True)
+    code, out = rb("show", "--long", a["id"], text=True)
     assert "no longer" in out, out
 
 
@@ -167,7 +167,7 @@ def test_a_cited_rule_met_on_its_estimate_alone_says_so(rb):
     Path("README.md").write_text("INT8 scores 75.6 top-1.\n", encoding="utf-8")
     rb("criterion", "add", "The README's top-1", "-e", "e6", "--metric", "top1", "--equals", "75.6", "--tolerance", "0.05", "--source", "README.md", "--quote", "75.6", "--id", "c2")
     rb("run", "add", "e6", "top1=75.61", "--produced-at", "2026-05-01")
-    says = rb("show", "c2").data["finding"]["says"]
+    says = rb("show", "--long", "c2").data["finding"]["says"]
     assert says["rule"].startswith("reproduced on the estimate"), says
     assert says["headline"].startswith("reproduced on the estimate · "), says
 
@@ -203,7 +203,7 @@ def test_two_lines_longer_than_rb_keeps_still_read_as_unchanged(rb):
     rb("experiment", "add", "INT8 alone", "--id", "e9", "--purpose", "the reruns", "--baseline", "int8")
     Path("long.md").write_text("# Stats\nMean " + "x" * 410 + " 75.6\nCI 75.4 75.8\n", encoding="utf-8")
     rb("analysis", "add", "e9", "--compare", "int8:top1=75.6[75.4,75.8]", "--source", "long.md", "--locator", "Stats", "--id", "long")
-    code, out = rb("show", "long", text=True)
+    code, out = rb("show", "--long", "long", text=True)
     assert "no longer" not in out and "✗" not in out, out
 
 
@@ -279,9 +279,9 @@ def test_every_row_records_each_row_of_a_sqlite_table_where_picks(rb):
     assert not env.ok and "--every-row" in env.errors[0].fix, env.errors[0]
     env = rb(*args, "--every-row")
     assert env.data["recorded_count"] == 3 and len(env.data["runs"]) == 3, env.data
-    seeds = sorted(rb("show", r).data["object"]["per_run"]["seed"] for r in env.data["runs"])
+    seeds = sorted(rb("show", "--long", r).data["object"]["per_run"]["seed"] for r in env.data["runs"])
     assert seeds == [1, 2, 3], seeds
-    times = sorted(rb("show", r).data["object"]["produced_at"][:10] for r in env.data["runs"])
+    times = sorted(rb("show", "--long", r).data["object"]["produced_at"][:10] for r in env.data["runs"])
     assert times == ["2026-05-01", "2026-05-02", "2026-05-03"], times
     env = rb(*args, "--every-row")
     assert env.data["recorded_count"] == 0 and env.data["already_count"] == 3, env.data
@@ -299,9 +299,9 @@ def test_an_each_rule_keeps_reading_the_runs_beside_an_analysis_of_its_compariso
     rb("criterion", "add", "INT8 loses at most a point on every seed", "-e", "e16", "--metric", "change.top1", "--at-least", "-1", "--each", "--id", "c16")
     for seed, (a, b) in enumerate([(76.1, 75.6), (75.2, 75.1), (76.4, 75.2)], start=1):
         rb("run", "add", "e16", f"fp32.top1={a}", f"int8.top1={b}", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
-    before = rb("show", "c16").data["finding"]
+    before = rb("show", "--long", "c16").data["finding"]
     rb("analysis", "add", "e16", "--compare", "int8/fp32:top1=-0.6[-1.4,0.2]", "--method", "bootstrap", "--unit", "image", "--units", "500", "--id", "boot")
-    f = rb("show", "c16").data["finding"]
+    f = rb("show", "--long", "c16").data["finding"]
     assert f["rule_outcome"] == before["rule_outcome"] == "misses", (f["rule_outcome"], before["rule_outcome"])
     assert f["comparison"]["source"] == before["comparison"]["source"], f["comparison"]
     notes = [c for c in f["caveats"] if c["code"] == "analysis_beside"]
@@ -352,7 +352,7 @@ def test_rb_show_lists_every_run_outside_a_shared_where(rb):
     rb("criterion", "add", "seed 1 holds 75", "-e", "e18", "--metric", "top1", "--at-least", "75", "--where", "seed=1", "--id", "c18")
     for seed in range(1, 10):
         rb("run", "add", "e18", "top1=75.5", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
-    note = next(c["text"] for c in rb("show", "c18").data["finding"]["caveats"] if c["code"] == "run_scope")
+    note = next(c["text"] for c in rb("show", "--long", "c18").data["finding"]["caveats"] if c["code"] == "run_scope")
     assert all(f"(seed={s})" in note for s in range(2, 10)) and "more" not in note, note
 
 

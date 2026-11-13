@@ -417,28 +417,127 @@ fn hook_name(h: Hook) -> &'static str {
 pub const HOOK_TIMEOUT: i64 = 10;
 
 /// The command a hook runs in a POSIX shell (Claude Code's sh, or Git Bash on Windows; Codex on macOS and Linux): rb on
-/// the PATH, else where uv tool and pipx put it (~/.local/bin), else the project's own .venv, and exit 0 whichever is
-/// there or none is. rb with --hook says nothing and exits 0 itself; the shell's fallbacks cover an rb not found.
+/// the PATH, else where uv tool and pipx put it (~/.local/bin), else the project's own .venv (bin/, or Scripts/ where a
+/// Windows venv keeps it), and exit 0 whichever is there or none is. rb with --hook says nothing and exits 0 itself;
+/// the shell's fallbacks cover an rb not found.
 pub fn hook_sh(h: Hook) -> String {
-    let name = hook_name(h);
-    let venv = match h {
-        Hook::Claude => "\"$CLAUDE_PROJECT_DIR/.venv/bin/rb\"".to_string(),
-        _ => "\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.venv/bin/rb\"".to_string(),
-    };
-    let quiet = ">/dev/null 2>&1";
-    format!("rb journal scan --hook {name} {quiet} || \"$HOME/.local/bin/rb\" journal scan --hook {name} {quiet} || {venv} journal scan --hook {name} {quiet} || true")
+    sh_tries(h, true)
 }
 
-/// The command Codex runs on Windows (commandWindows), in a shell its documentation does not name: one word list, the
-/// same in PowerShell, cmd and a plain exec, with nothing to quote. Where rb is not found the hook fails, and Codex goes on.
-pub fn hook_plain(h: Hook) -> String {
+/// The POSIX tries, with the Windows venv's Scripts/ or (as rb 0.6.2 to 0.8.5 wrote them) without it.
+fn sh_tries(h: Hook, scripts: bool) -> String {
+    let name = hook_name(h);
+    let top = match h {
+        Hook::Claude => "$CLAUDE_PROJECT_DIR",
+        _ => "$(git rev-parse --show-toplevel 2>/dev/null || pwd)",
+    };
+    let quiet = ">/dev/null 2>&1";
+    let mut tries = vec!["rb".to_string(), "\"$HOME/.local/bin/rb\"".to_string(), format!("\"{top}/.venv/bin/rb\"")];
+    if scripts {
+        tries.push(format!("\"{top}/.venv/Scripts/rb\""));
+    }
+    let tries: Vec<String> = tries.iter().map(|t| format!("{t} journal scan --hook {name} {quiet}")).collect();
+    format!("{} || true", tries.join(" || "))
+}
+
+/// The command each earlier rb wrote where the hook may run in PowerShell or cmd (Codex's commandWindows; Cursor's,
+/// with `; exit 0` after it): rb on the PATH alone.
+fn hook_plain(h: Hook) -> String {
     format!("rb journal scan --hook {}", hook_name(h))
 }
 
-/// The command Cursor runs, through PowerShell on Windows and a POSIX shell elsewhere: the plain command, then `exit 0`,
-/// which both read the same way, so the hook exits 0 where rb is not found too.
-pub fn hook_either(h: Hook) -> String {
-    format!("{}; exit 0", hook_plain(h))
+/// Where the rb that installed the hook is, for the forms Windows runs, when it is in none of the places they try
+/// anyway (the PATH, ~\.local\bin where uv tool and pipx put it, the project's .venv): under the home folder by its
+/// path from there, so no account's name is in a file a team shares, else whole.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Installed {
+    Home(String),
+    Whole(String),
+}
+
+impl Installed {
+    /// As cmd reads it, inside double quotes.
+    fn cmd(&self) -> String {
+        match self {
+            Installed::Home(rel) => format!("%USERPROFILE%\\{rel}"),
+            Installed::Whole(p) => p.clone(),
+        }
+    }
+
+    /// As PowerShell reads it: single quotes only, since a shell that starts PowerShell may drop double quotes.
+    fn ps(&self) -> String {
+        match self {
+            Installed::Home(rel) => format!("($HOME + '\\{rel}')"),
+            Installed::Whole(p) => format!("'{p}'"),
+        }
+    }
+
+    /// Read back from the cmd line's last try, as `cmd` writes it.
+    fn from_cmd(text: &str) -> Option<Installed> {
+        let fits = |t: &str| !t.is_empty() && !t.contains(['"', '\'', '%', '\n', '\r']);
+        match text.strip_prefix("%USERPROFILE%\\") {
+            Some(rel) => fits(rel).then(|| Installed::Home(rel.to_string())),
+            None => fits(text).then(|| Installed::Whole(text.to_string())),
+        }
+    }
+}
+
+/// The rb running now, as the forms Windows runs name it: on Windows, where it is in none of the places they try anyway.
+fn installed_here() -> Option<Installed> {
+    if !cfg!(windows) {
+        return None;
+    }
+    let exe = std::env::current_exe().ok()?;
+    let text = exe.to_str()?.to_string();
+    let home = crate::sys::home();
+    let standard = home.join(".local").join("bin").join("rb.exe");
+    let in_venv = exe.parent().and_then(Path::parent).filter(|v| v.file_name().map_or(false, |n| n == ".venv")).and_then(Path::parent);
+    let here = std::env::current_dir().ok();
+    if exe.eq(&standard) || in_venv.map_or(false, |p| here.as_deref().map_or(false, |h| h.starts_with(p))) {
+        return None;
+    }
+    let found = match exe.strip_prefix(&home).ok().and_then(Path::to_str) {
+        Some(rel) => Installed::Home(rel.to_string()),
+        None => Installed::Whole(text),
+    };
+    Installed::from_cmd(&found.cmd()).filter(|f| *f == found)
+}
+
+/// The command a hook runs wherever it may run: a POSIX shell, PowerShell or cmd, which read it differently on purpose.
+/// The first line is cmd's, which reads no further than it: each try quiet, then `(call )`, which ends it with 0. A POSIX
+/// shell and PowerShell read that line as a comment. On the second, a POSIX shell runs `echo` with nothing (the
+/// backquotes hold a comment) and its own tries (`hook_sh`), and stops at the ` #` after them; PowerShell reads the
+/// backquote before `#` as an escape, so `<#` opens a block comment that holds the POSIX part, then runs its own tries
+/// after `#>`, each looked for first so nothing is said where one is not there, and exits 0. Each tries rb on the PATH,
+/// then ~/.local/bin (uv tool and pipx), then the project's .venv (Scripts on Windows), then, on Windows, the rb that
+/// installed the hook where it is in none of those.
+fn hook_any(h: Hook, installed: Option<&Installed>) -> String {
+    let name = hook_name(h);
+    let (cmd_venv, ps_venv) = match h {
+        Hook::Claude => ("%CLAUDE_PROJECT_DIR%\\.venv\\Scripts\\rb.exe", "($env:CLAUDE_PROJECT_DIR + '\\.venv\\Scripts\\rb.exe')"),
+        _ => (".venv\\Scripts\\rb.exe", "($PWD.Path + '\\.venv\\Scripts\\rb.exe')"),
+    };
+    let mut cmd_tries = vec!["rb".to_string(), "\"%USERPROFILE%\\.local\\bin\\rb.exe\"".to_string(), format!("\"{cmd_venv}\"")];
+    let mut ps_tries = vec!["'rb'".to_string(), "($HOME + '\\.local\\bin\\rb.exe')".to_string(), ps_venv.to_string()];
+    if let Some(i) = installed {
+        cmd_tries.push(format!("\"{}\"", i.cmd()));
+        ps_tries.push(i.ps());
+    }
+    let cmd: Vec<String> = cmd_tries.iter().map(|t| format!("{t} journal scan --hook {name} 2>nul")).collect();
+    let ps = format!(
+        "foreach ($rb in {}) {{ if (Get-Command $rb -ErrorAction Ignore) {{ & $rb journal scan --hook {name} *>$null; break }} }}; exit 0",
+        ps_tries.join(", ")
+    );
+    format!("# 2>nul || {} || (call )\necho `# <#` >/dev/null; {} #> *>$null; {ps}", cmd.join(" || "), hook_sh(h))
+}
+
+/// The rb another machine's install named in today's command `v` (the last of cmd's tries, read back as `cmd` writes
+/// it), where `v` names one.
+fn installed_in(h: Hook, v: &str) -> Option<Installed> {
+    let tail = format!("\" journal scan --hook {} 2>nul || (call )\n", hook_name(h));
+    let end = v.find(&tail)?;
+    let start = v[..end].rfind("|| \"")?;
+    Installed::from_cmd(&v[start + 4..end])
 }
 
 /// The hook's project file.
@@ -470,16 +569,34 @@ pub fn hook_events(h: Hook) -> [&'static str; 2] {
 }
 
 /// rb's part of the file under `hooks`: each event with the one item rb adds to it (a matcher group holding rb's
-/// handler for Claude Code and Codex, the handler itself for Cursor).
+/// handler for Claude Code and Codex, the handler itself for Cursor). Claude Code runs its command in sh, Git Bash or
+/// PowerShell, and Cursor in PowerShell on Windows and a POSIX shell elsewhere, so theirs is the form every shell reads
+/// (`hook_any`); Codex runs `command` on macOS and Linux and `commandWindows` on Windows, in a shell it does not name.
 pub fn hook_items(h: Hook) -> Vec<(String, Value)> {
-    let item = match h {
-        Hook::Claude => crate::obj! {"hooks" => crate::list![crate::obj! {"type" => "command", "command" => hook_sh(h), "timeout" => HOOK_TIMEOUT}]},
-        Hook::Codex => crate::obj! {"hooks" => crate::list![crate::obj! {
-            "type" => "command", "command" => hook_sh(h), "commandWindows" => hook_plain(h), "timeout" => HOOK_TIMEOUT
-        }]},
-        Hook::Cursor => crate::obj! {"command" => hook_either(h), "timeout" => HOOK_TIMEOUT},
-    };
+    let item = handler(h, installed_here().as_ref());
     hook_events(h).iter().map(|e| (e.to_string(), item.clone())).collect()
+}
+
+/// Today's item, naming the rb that installed it where the forms Windows runs would not find it otherwise.
+fn handler(h: Hook, installed: Option<&Installed>) -> Value {
+    match h {
+        Hook::Claude => crate::obj! {"hooks" => crate::list![crate::obj! {"type" => "command", "command" => hook_any(h, installed), "timeout" => HOOK_TIMEOUT}]},
+        Hook::Codex => crate::obj! {"hooks" => crate::list![crate::obj! {
+            "type" => "command", "command" => hook_sh(h), "commandWindows" => hook_any(h, installed), "timeout" => HOOK_TIMEOUT
+        }]},
+        Hook::Cursor => crate::obj! {"command" => hook_any(h, installed), "timeout" => HOOK_TIMEOUT},
+    }
+}
+
+/// Whether `v` is today's item for any rb that installed it: here, one on another machine, or none.
+fn is_today(h: Hook, v: &Value) -> bool {
+    let windows = match h {
+        Hook::Codex => v.get("hooks").and_then(Value::as_list).and_then(|l| l.first()).and_then(|x| x.get("commandWindows")),
+        Hook::Claude => v.get("hooks").and_then(Value::as_list).and_then(|l| l.first()).and_then(|x| x.get("command")),
+        Hook::Cursor => v.get("command"),
+    };
+    let Some(text) = windows.and_then(Value::as_str) else { return false };
+    *v == handler(h, None) || installed_in(h, text).map_or(false, |i| *v == handler(h, Some(&i)))
 }
 
 /// The file rb makes where there is none: rb's part alone (with Cursor's format version).
@@ -506,10 +623,22 @@ pub fn hook_file_empty(h: Hook, v: &Value) -> bool {
 
 /// Every handler rb has written for the agent's hook, today's first: one an earlier rb wrote is rb's to bring up to
 /// date. Only a whole item counts, so a handler with anything changed in it (its timeout, a matcher) is not one of them.
+/// Today's names the rb that installed it on Windows where it is in none of the places tried anyway; today's naming
+/// another machine's is today's too (`form_rank`).
 pub fn hook_forms(h: Hook) -> Vec<Value> {
     let name = hook_name(h);
     let today = hook_items(h).remove(0).1;
-    // the first form: each try quiet on stderr alone, and Cursor's command with no `exit 0` after it
+    // rb 0.6.3 to 0.8.5: the POSIX tries without the Windows venv, Codex's commandWindows and Cursor's command on the
+    // PATH alone (Cursor's with `; exit 0` after it)
+    let posix = sh_tries(h, false);
+    let before = match h {
+        Hook::Claude => crate::obj! {"hooks" => crate::list![crate::obj! {"type" => "command", "command" => posix, "timeout" => HOOK_TIMEOUT}]},
+        Hook::Codex => crate::obj! {"hooks" => crate::list![crate::obj! {
+            "type" => "command", "command" => posix, "commandWindows" => hook_plain(h), "timeout" => HOOK_TIMEOUT
+        }]},
+        Hook::Cursor => crate::obj! {"command" => format!("{}; exit 0", hook_plain(h)), "timeout" => HOOK_TIMEOUT},
+    };
+    // the first form (rb 0.6.2): each try quiet on stderr alone, and Cursor's command with no `exit 0` after it
     let venv = match h {
         Hook::Claude => "\"$CLAUDE_PROJECT_DIR/.venv/bin/rb\"".to_string(),
         _ => "\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.venv/bin/rb\"".to_string(),
@@ -522,7 +651,16 @@ pub fn hook_forms(h: Hook) -> Vec<Value> {
         }]},
         Hook::Cursor => crate::obj! {"command" => hook_plain(h), "timeout" => HOOK_TIMEOUT},
     };
-    vec![today, first]
+    vec![today, before, first]
+}
+
+/// Which of rb's forms `v` is: 0 for today's (naming any rb that installed it), then each earlier one in turn; None for
+/// a handler no rb wrote.
+pub fn form_rank(h: Hook, v: &Value) -> Option<usize> {
+    if is_today(h, v) {
+        return Some(0);
+    }
+    hook_forms(h).iter().skip(1).position(|f| f == v).map(|i| i + 1)
 }
 
 /// Whether a handler runs rb's look (`journal scan --hook` anywhere in it): one of rb's forms, or one edited by hand.
@@ -543,7 +681,16 @@ pub fn hook_form_in(h: Hook, list: &[Value]) -> Option<Value> {
 
 /// Every form rb has written that an event's list holds, each once, today's first.
 pub fn hook_forms_in(h: Hook, list: &[Value]) -> Vec<Value> {
-    hook_forms(h).into_iter().filter(|f| list.contains(f)).collect()
+    let mut found: Vec<(usize, Value)> = Vec::new();
+    for x in list {
+        if let Some(rank) = form_rank(h, x) {
+            if !found.iter().any(|(_, y)| y == x) {
+                found.push((rank, x.clone()));
+            }
+        }
+    }
+    found.sort_by_key(|(rank, _)| *rank);
+    found.into_iter().map(|(_, x)| x).collect()
 }
 
 /// The events whose handler runs rb's look and is no form rb has written: edited by hand, so rb leaves it and adds
@@ -552,12 +699,12 @@ pub fn hook_hand_edited(h: Hook, root: &Path) -> Vec<String> {
     let Some(old) = crate::dry::read(&hook_path(h, root)).ok().and_then(|b| String::from_utf8(b).ok()).and_then(|t| pyjson::loads(&t).ok()) else {
         return Vec::new();
     };
-    let forms = hook_forms(h);
+    let rb_s = |x: &Value| form_rank(h, x).is_some();
     hook_events(h)
         .iter()
         .filter(|e| {
             let list = old.get("hooks").and_then(|x| x.get(e)).and_then(Value::as_list).map(|l| l.to_vec()).unwrap_or_default();
-            list.iter().any(|x| runs_rb_look(x) && !forms.contains(x)) && !list.iter().any(|x| forms.contains(x))
+            list.iter().any(|x| runs_rb_look(x) && !rb_s(x)) && !list.iter().any(rb_s)
         })
         .map(|e| e.to_string())
         .collect()
@@ -582,7 +729,6 @@ fn hook_install(h: Hook, root: &Path) -> Result<Option<Install>, String> {
     let Some(text) = crate::dry::read(&path).ok().and_then(|b| String::from_utf8(b).ok()) else { return Err("is not JSON rb can read".into()) };
     let old = pyjson::loads(&text).map_err(|_| "is not JSON rb can read".to_string())?;
     let items = hook_items(h);
-    let forms = hook_forms(h);
     let had = old.get("hooks");
     let list_of = |e: &str| had.and_then(|x| x.get(e)).and_then(Value::as_list).map(|l| l.to_vec()).unwrap_or_default();
     // what rb's earlier write here owned: the events whose handler it said was rb's, the keys it made, the file it
@@ -619,9 +765,11 @@ fn hook_install(h: Hook, root: &Path) -> Result<Option<Install>, String> {
         let list = list_of(e);
         let rb_here = prior_ours.as_ref().map_or(true, |p| p.contains(e));
         // rb's handlers in this event, each once, today's first
-        let mine: Vec<Value> = if rb_here { forms.iter().filter(|f| list.contains(f)).cloned().collect() } else { Vec::new() };
+        let mine: Vec<Value> = if rb_here { hook_forms_in(h, &list) } else { Vec::new() };
         if let Some(first) = mine.first().cloned() {
-            if first != *today {
+            // today's form naming the rb another machine installed stays as it is: the file is the team's
+            let current = form_rank(h, &first) == Some(0);
+            if !current {
                 swaps.push((e.clone(), first.clone(), today.clone()));
                 if prior_ours.is_none() {
                     replaced.insert(e.clone(), first.clone());
@@ -638,7 +786,7 @@ fn hook_install(h: Hook, root: &Path) -> Result<Option<Install>, String> {
                 cut_at.insert(e.clone(), Value::List(mine[1..].iter().map(|x| place(&list, x)).collect()));
             }
             // today's form there with no line of rb's for the file is not rb's write here, and stays as it is
-            if prior_ours.is_some() || first != *today {
+            if prior_ours.is_some() || !current {
                 ours.push(Value::str(e));
             }
         } else if !list.iter().any(runs_rb_look) {
@@ -1307,5 +1455,26 @@ mod tests {
         assert!(said.contains("\nAGENTS.md: a new file, with rb's section, between its markers.\n"), "{said}");
         assert!(said.contains("\n.cursor/rules/rabbit-brain.mdc: a new file, with rb's rule for Cursor (what `rb skill` prints, under Cursor's own heading).\n"), "{said}");
         assert!(said.contains("\n.claude/skills/rabbit-brain/SKILL.md: a new file, with rb's own text (what `rb skill` prints).\n"), "{said}");
+    }
+
+    /// Today's form naming the rb that installed it (on Windows, where it is in none of the places tried anyway) is
+    /// today's for any such rb: the one another machine named, under the home folder or not, is read back from the
+    /// command and stays as it is; a form with anything else changed is no form of rb's.
+    #[test]
+    fn today_s_form_naming_another_machine_s_rb_is_today_s() {
+        use super::{form_rank, handler, Hook, Installed};
+        for h in [Hook::Claude, Hook::Codex, Hook::Cursor] {
+            for i in [Installed::Home("AppData\\Roaming\\Python\\Python312\\Scripts\\rb.exe".into()), Installed::Whole("D:\\tools\\rb x\\rb.exe".into())] {
+                let v = handler(h, Some(&i));
+                assert_eq!(form_rank(h, &v), Some(0), "{h:?} {i:?}");
+                assert_ne!(v, handler(h, None));
+                let text = crate::pyjson::dumps(&v).replace("rb.exe", "rb2.exe");
+                assert_eq!(form_rank(h, &crate::pyjson::loads(&text).unwrap()), None, "{h:?}");
+            }
+            assert_eq!(form_rank(h, &handler(h, None)), Some(0));
+        }
+        // a place cmd and PowerShell could not both read as written is never named
+        assert_eq!(Installed::from_cmd("C:\\it's\\rb.exe"), None);
+        assert_eq!(Installed::from_cmd("C:\\100%\\rb.exe"), None);
     }
 }

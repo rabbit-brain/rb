@@ -1396,7 +1396,7 @@ def test_the_share_beat_films_the_watch_the_new_run_and_the_link_showing_it(tmp_
         assert not (tmp_path / "bad" / "screen.mp4").exists()
         assert narrow.returncode != 0 and "does not show rb's three panes before the beat" in narrow.stderr, narrow.stderr[-800:]
         assert "1440 CSS px wide, the inspector not drawn" in narrow.stderr and not (tmp_path / "narrow" / "screen.mp4").exists()
-        assert rb("status", "--json").returncode == 0
+        assert rb("status", "--full", "--json").returncode == 0
         out = tmp_path / "seg"
         done = film(standin.link, out)
         assert done.returncode == 0, (done.stdout + done.stderr)[-2000:]
@@ -1461,7 +1461,7 @@ def test_the_share_stand_in_serves_the_link_as_the_hub_does_its_bar_over_rbs_pag
         # frame gets the host's copy of rb's script inline at the end of its <head>, run by its hash alone, no network
         import base64
         import hashlib
-        script = (MAKE_STUDY.parents[2] / "rust" / "src" / "shell" / "assets" / "script.js").read_bytes()
+        script = (MAKE_STUDY.parents[2] / "rust" / "src" / "shell" / "assets" / "script.min.js").read_bytes()
         shell = b'<!doctype html><html data-shell="sha256:00" lang="en"><head><style>p{}</style></head><body><p>22 recorded runs</p></body></html>'
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as z:

@@ -107,7 +107,7 @@ def test_status_and_context_look_before_they_read_and_say_where_and_when(rec):
     says what rb looks at, when it last looked and what it does not read or see; rb context says the same."""
     Path("outputs").mkdir()
     Path("outputs/int8_seed1.json").write_text('{"top1": 0.76}', encoding="utf-8")
-    st = rec("status").data
+    st = rec("status", "--full").data
     assert st["found_unrecorded"] == 1
     sc = st["scope"]
     assert sc["folders"] == USUAL and sc["looked_at"] and sc["cap_hit"] is False and sc["git_changes"] is True
@@ -115,7 +115,7 @@ def test_status_and_context_look_before_they_read_and_say_where_and_when(rec):
     assert sc["file_cap"] == 4000 and sc["kinds"] == [".json", ".yaml", ".yml", ".toml"] and sc["commands"] == "rb journal run"
     when = sc["looked_at"][:16].replace("T", " ")
     assert sc["said"] == f"{looks_at()} It last looked at {when} UTC. " + SCOPE_END
-    text = rec("status", text=True)
+    text = rec("status", "--full", text=True)
     assert "Found in the repository, not in the record (1): rb reconcile lists it, with the rb run add that records it" in text
     assert looks_at() in text and SCOPE_END in text
     ctx = rec("context")
@@ -131,10 +131,10 @@ def test_the_scope_line_names_the_usual_folders_and_a_folder_a_run_named_and_out
     Path("logs/eval").mkdir(parents=True)
     Path("logs/eval/int8_seed1.json").write_text('{"top1": 0.76}', encoding="utf-8")
     rec("run", "add", "int8", "--from", "logs/eval/int8_seed1.json")
-    sc = rec("status").data["scope"]
+    sc = rec("status", "--full").data["scope"]
     assert sc["folders"] == [*USUAL, "logs/eval/"] and sc["said"].startswith(looks_at("logs/eval/"))
     _leave_git()
-    said = rec("status").data["scope"]["said"]
+    said = rec("status", "--full").data["scope"]["said"]
     assert said.startswith(f"rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in {NAMED_FOR_RESULTS}, in logs/eval/, and at the files in the project's top folder. It last looked at "), said
     assert "git" not in said.split(". It reads")[0]
 
@@ -196,18 +196,40 @@ def test_a_look_that_stops_at_its_cap_says_so(rec):
     out.mkdir()
     for i in range(4001):
         (out / f"case_{i:04d}.txt").write_text("x", encoding="utf-8")
-    st = rec("status").data
+    st = rec("status", "--full").data
     assert st["scope"]["cap_hit"] is True
     assert "That look stopped at 4000 files, so some were not looked at." in st["scope"]["said"]
-    assert "That look stopped at 4000 files, so some were not looked at." in rec("status", text=True)
+    assert "That look stopped at 4000 files, so some were not looked at." in rec("status", "--full", text=True)
+
+
+async def _home_and_a(app, pilot) -> tuple:
+    """rb ui's last look as its home draws it (TUI-PARITY Q2: `as of HH:MM UTC` on the About strip, the changed files
+    nothing cites as `Files ±n` on the tab), and the whole words the OBSERVED list gives them (X10: ⏎ on its line):
+    no sentence under the panes (G3)."""
+    from rabbit_brain.tui import HomeScreen, OpenItemsScreen
+    for _ in range(100):
+        if isinstance(app.screen, HomeScreen) and app.screen.query_one("#about").render().plain:
+            break
+        await pilot.pause(0.1)
+    shown = not app.screen.query_one("#scope").display
+    content = app.screen.query_one("#about").render().plain + "\n" + str(app.screen.query_one("#tree-panel").border_title)
+    app.screen.query_one("#observed").focus()
+    await pilot.press("enter")
+    for _ in range(100):
+        if isinstance(app.screen, OpenItemsScreen):
+            break
+        await pilot.pause(0.1)
+    whole = list(app.screen.looked)
+    await pilot.press("escape")
+    return shown, content, whole
 
 
 def test_the_user_s_screens_say_what_rb_looks_at(rec, tmp_path_factory):
     """rb ui, rb open and rb page carry the scope line where they show what rb found; the page keeps its time on one
-    line."""
+    line. rb ui's home says it in rb's one-line form, and its whole words one key away (a)."""
     from rabbit_brain.tui import DIM, RBApp
 
-    rec("status")
+    rec("status", "--full")
     h = home()
     assert h.scope.startswith(looks_at() + " It last looked at ") and h.scope.endswith(SCOPE_END)
     page = tmp_path_factory.mktemp("page") / "page.html"
@@ -218,13 +240,12 @@ def test_the_user_s_screens_say_what_rb_looks_at(rec, tmp_path_factory):
     async def drawn():
         app = RBApp(Path.cwd())
         async with app.run_test(size=(140, 40)) as pilot:
-            await pilot.pause(0.3)
-            scope = app.screen.query_one("#scope")
-            return scope.display, str(scope.content)
+            return await _home_and_a(app, pilot)
 
     minute = re.compile(r"\d{4}-\d\d-\d\d \d\d:\d\d UTC")                      # a look on opening may tick a minute on
-    shown, content = asyncio.run(drawn())
-    assert shown and minute.sub("<time>", content) == minute.sub("<time>", f"[{DIM}]{h.scope}[/{DIM}]")
+    shown, content, whole = asyncio.run(drawn())
+    assert shown and re.search(r"as of \d\d:\d\d UTC  r", content), content
+    assert [minute.sub("<time>", line) for line in whole] == [minute.sub("<time>", h.scope)]
 
 
 def test_each_git_move_keeps_the_paths_it_changed(rec):
@@ -253,11 +274,11 @@ def test_the_briefing_counts_what_was_found_and_a_session_is_told_it_once(rec):
     Path("outputs/int8_seed1.json").write_text('{"top1": 0.76}', encoding="utf-8")
     ctx = rec("context", agent="5e7a1c00-0001")
     assert ctx.rb_delta == [] and "- Found in the repository, not in the record (1)" in ctx.data["markdown"]
-    told = rec("show", "int8", agent="5e7a1c00-0001").rb_delta
+    told = rec("show", "--long", "int8", agent="5e7a1c00-0001").rb_delta
     assert [(d["code"], d["subject"]) for d in told] == [("unrecorded", "outputs/int8_seed1.json")]
-    assert rec("show", "int8", agent="5e7a1c00-0001").rb_delta == []                  # told once
-    rec("status", agent="5e7a1c00-0002")                                              # a count, no path: not told yet
-    assert [d["code"] for d in rec("show", "int8", agent="5e7a1c00-0002").rb_delta] == ["unrecorded"]
+    assert rec("show", "--long", "int8", agent="5e7a1c00-0001").rb_delta == []                  # told once
+    rec("status", "--full", agent="5e7a1c00-0002")                                              # a count, no path: not told yet
+    assert [d["code"] for d in rec("show", "--long", "int8", agent="5e7a1c00-0002").rb_delta] == ["unrecorded"]
 
 
 def test_a_quiet_command_counts_as_told_only_the_items_it_printed(rec):
@@ -268,10 +289,10 @@ def test_a_quiet_command_counts_as_told_only_the_items_it_printed(rec):
         rec("spec", "set", "int8", f"p{i}", str(i), "--source", f"configs/sweep.yaml#p{i}")
     _commit("the sweep's settings")
     Path("configs/sweep.yaml").write_text("".join(f"p{i}: {i}\n" for i in range(8)) + "# reread\n", encoding="utf-8")
-    st = rec("status", agent="5e7a1c00-0003").data
+    st = rec("status", "--full", agent="5e7a1c00-0003").data
     changed = [i["subject"] for i in st["open"] if i["code"] == "source_changed"]
     assert len(changed) == 8
-    told = rec("show", "int8", agent="5e7a1c00-0003").rb_delta
+    told = rec("show", "--long", "int8", agent="5e7a1c00-0003").rb_delta
     assert sorted(d["subject"] for d in told if d["code"] == "source_changed") == sorted(changed[6:])
 
 
@@ -285,14 +306,14 @@ def test_a_session_leaving_a_found_result_out_never_clears_the_user_s_count(rec,
     monkeypatch.setenv("CLAUDECODE", "1")
     monkeypatch.setenv("RB_SESSION", "5e7a1c00-0006")
     state(agent="claude-code").dismiss(found.key, why="a scratch file")
-    assert rec("show", "int8", agent="5e7a1c00-0006").rb_delta == []                                 # its own briefing
-    assert [d["code"] for d in rec("show", "int8", agent="5e7a1c00-0007").rb_delta] == ["unrecorded"]
-    assert rec("status").data["found_unrecorded"] == 1 and len(home().found) == 1                   # the user's count
-    assert rec("status", agent="5e7a1c00-0006").data["found_unrecorded"] == 1
+    assert rec("show", "--long", "int8", agent="5e7a1c00-0006").rb_delta == []                                 # its own briefing
+    assert [d["code"] for d in rec("show", "--long", "int8", agent="5e7a1c00-0007").rb_delta] == ["unrecorded"]
+    assert rec("status", "--full").data["found_unrecorded"] == 1 and len(home().found) == 1                   # the user's count
+    assert rec("status", "--full", agent="5e7a1c00-0006").data["found_unrecorded"] == 1
     for name in ("CLAUDECODE", "RB_SESSION", "RB_MODEL"):
         monkeypatch.delenv(name, raising=False)
     state().dismiss(found.key, why="not a run")
-    assert rec("status").data["found_unrecorded"] == 0 and home().found == []
+    assert rec("status", "--full").data["found_unrecorded"] == 0 and home().found == []
 
 
 # ---------------------------------------------------------------- what changed that nothing in the record cites
@@ -303,13 +324,13 @@ def test_a_changed_file_nothing_cites_is_listed_by_path_with_the_commit_it_chang
     Path("run_metadata.json").write_text('{"rebuild_path": "historical"}', encoding="utf-8")   # metadata git never holds
     with Path(".git/info/exclude").open("a", encoding="utf-8") as exclude:
         exclude.write("run_metadata.json\n")
-    rec("status")                                                          # rb's first look: the commit it sees is the start
+    rec("status", "--full")                                                          # rb's first look: the commit it sees is the start
     base = _git("rev-parse", "HEAD")
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: cosine\nlr: 0.1\n", encoding="utf-8")
     Path("configs/calibration.json").write_text('{"rebuild_path": "historical", "recovered": true}', encoding="utf-8")
     head = _commit("adamw, and the calibration's provenance")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
-    st = rec("status").data
+    st = rec("status", "--full").data
     said = [u["said"] for u in st["uncited_changes"]]
     assert head != base and said == [
         f"configs/calibration.json: new since {base[:12]}; nothing in the record cites it",
@@ -319,7 +340,7 @@ def test_a_changed_file_nothing_cites_is_listed_by_path_with_the_commit_it_chang
     ]
     u = st["uncited_changes"][2]
     assert (u["path"], u["since"], u["committed"], u["new"]) == ("configs/train.yaml", base, True, False) and u["key"].startswith("changed:configs/train.yaml@")
-    text = rec("status", text=True)
+    text = rec("status", "--full", text=True)
     assert "Changed .json, .yaml or .toml files that nothing in the record cites (4): rb reconcile lists each by path" in text
     assert all(s not in text for s in said)                                 # one count line, no path on rb status
     listed = rec("reconcile", text=True)
@@ -330,14 +351,14 @@ def test_a_changed_file_nothing_cites_is_listed_by_path_with_the_commit_it_chang
 def test_a_file_the_record_cites_is_not_listed(rec):
     rec("spec", "set", "int8", "optim.lr", "0.1", "--source", "configs/train.yaml#lr")
     _commit("lr from the config")
-    rec("status")
+    rec("status", "--full")
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: cosine\nlr: 0.1\n", encoding="utf-8")
     _commit("adamw")
-    assert rec("status").data["uncited_changes"] == []
+    assert rec("status", "--full").data["uncited_changes"] == []
 
 
 def test_reconcile_apply_records_the_paths_it_saw_and_a_later_change_shows_again(rec):
-    rec("status")
+    rec("status", "--full")
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: cosine\nlr: 0.1\n", encoding="utf-8")
     _commit("adamw")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")     # and one not committed
@@ -347,42 +368,42 @@ def test_reconcile_apply_records_the_paths_it_saw_and_a_later_change_shows_again
     seen = line["detail"]["uncited_seen"]
     assert (seen["commit"], seen["count"], seen["cut"]) == (_git("rev-parse", "HEAD"), 2, False)
     assert [f["path"] for f in seen["files"]] == ["configs/eval.yaml", "configs/train.yaml"] and all(len(f["sha"]) == 16 for f in seen["files"])
-    assert rec("status").data["uncited_changes"] == []
-    assert "2 changed files recorded by path (configs/eval.yaml, configs/train.yaml)" in rec("status", text=True)
+    assert rec("status", "--full").data["uncited_changes"] == []
+    assert "2 changed files recorded by path (configs/eval.yaml, configs/train.yaml)" in rec("status", "--full", text=True)
     time.sleep(0.05)
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: step\nlr: 0.1\n", encoding="utf-8")
-    assert [u["path"] for u in rec("status").data["uncited_changes"]] == ["configs/train.yaml"]
+    assert [u["path"] for u in rec("status", "--full").data["uncited_changes"]] == ["configs/train.yaml"]
 
 
 def test_a_session_leaving_an_item_out_never_clears_the_user_s_count(rec, monkeypatch):
     """A session's word leaves a found item out of its own briefings alone: rb status counts it until the user leaves
     it out, and no screen says who left it out."""
-    rec("status")
+    rec("status", "--full")
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: cosine\nlr: 0.1\n", encoding="utf-8")
     _commit("adamw")
-    [item] = rec("status").data["uncited_changes"]
+    [item] = rec("status", "--full").data["uncited_changes"]
     monkeypatch.setenv("CLAUDECODE", "1")
     monkeypatch.setenv("RB_SESSION", "5e7a1c00-0004")
     state(agent="claude-code").dismiss(item["key"], why="a tooling change")
     assert rec("context", agent="5e7a1c00-0004").data["uncited_changes"] == []                       # its own briefing
-    assert rec("show", "int8", agent="5e7a1c00-0004").rb_delta == []
+    assert rec("show", "--long", "int8", agent="5e7a1c00-0004").rb_delta == []
     assert [u["path"] for u in rec("context", agent="5e7a1c00-0005").data["uncited_changes"]] == ["configs/train.yaml"]
-    assert [u["path"] for u in rec("status").data["uncited_changes"]] == ["configs/train.yaml"]      # the user's count
-    assert [u["path"] for u in rec("status", agent="5e7a1c00-0004").data["uncited_changes"]] == ["configs/train.yaml"]
+    assert [u["path"] for u in rec("status", "--full").data["uncited_changes"]] == ["configs/train.yaml"]      # the user's count
+    assert [u["path"] for u in rec("status", "--full", agent="5e7a1c00-0004").data["uncited_changes"]] == ["configs/train.yaml"]
     assert home().uncited == 1
-    text = rec("status", text=True)
+    text = rec("status", "--full", text=True)
     assert "(1): rb reconcile lists it" in text and "left out" not in text and "dismiss" not in text
     for name in ("CLAUDECODE", "RB_SESSION", "RB_MODEL"):
         monkeypatch.delenv(name, raising=False)
     state().dismiss(item["key"], why="not part of the study")
-    assert rec("status").data["uncited_changes"] == [] and home().uncited == 0
+    assert rec("status", "--full").data["uncited_changes"] == [] and home().uncited == 0
 
 
 def test_a_session_s_apply_records_the_paths_and_leaves_them_on_the_user_s_count(rec):
     """A session's rb reconcile --apply keeps the changed files' paths on the record and leaves them out of that
     session's own briefings and its own rb reconcile: the user's screens count them, and rb reconcile lists them to the
     user, until an apply in the user's own name. No screen says who recorded them."""
-    rec("status")
+    rec("status", "--full")
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: cosine\nlr: 0.1\n", encoding="utf-8")
     _commit("adamw")
     Path("run_meta.json").write_text('{"rebuild_path": "historical"}', encoding="utf-8")
@@ -394,16 +415,16 @@ def test_a_session_s_apply_records_the_paths_and_leaves_them_on_the_user_s_count
     assert rec("context", agent="5e7a1c00-0008").data["uncited_changes"] == []                       # its own briefing
     again = rec("reconcile", agent="5e7a1c00-0008")
     assert again.data["uncited_changes"] == [] and "rb reconcile --apply" not in again.next
-    assert not [d for d in rec("show", "int8", agent="5e7a1c00-0008").rb_delta if d["code"] == "uncited_change"]
+    assert not [d for d in rec("show", "--long", "int8", agent="5e7a1c00-0008").rb_delta if d["code"] == "uncited_change"]
     assert [u["path"] for u in rec("context", agent="5e7a1c00-0009").data["uncited_changes"]] == ["configs/train.yaml", "run_meta.json"]
-    assert [u["path"] for u in rec("status").data["uncited_changes"]] == ["configs/train.yaml", "run_meta.json"]   # the user's
+    assert [u["path"] for u in rec("status", "--full").data["uncited_changes"]] == ["configs/train.yaml", "run_meta.json"]   # the user's
     assert home().uncited == 2
     listed = rec("reconcile", text=True)
     assert "  run_meta.json: new since " in listed and "rb reconcile --apply keeps this in the record: 2 changed files to record by path." in listed
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: random\n", encoding="utf-8")
     assert rec("reconcile", "--apply", agent="5e7a1c00-0008").data["applied"]["line"] == "1 changed file recorded by path (configs/eval.yaml)"
-    assert [u["path"] for u in rec("status").data["uncited_changes"]] == ["configs/eval.yaml", "configs/train.yaml", "run_meta.json"]
-    text = rec("status", text=True)
+    assert [u["path"] for u in rec("status", "--full").data["uncited_changes"]] == ["configs/eval.yaml", "configs/train.yaml", "run_meta.json"]
+    text = rec("status", "--full", text=True)
     # the check command names the record's folder, which is this test's tmp folder: rb's own words never name a session
     # in the form rb prints it, slashed on every OS (sys::slashed), which git and both Windows shells take
     folder = str(Path.cwd().resolve()).replace("\\", "/")
@@ -411,14 +432,14 @@ def test_a_session_s_apply_records_the_paths_and_leaves_them_on_the_user_s_count
     words = text.replace(folder, "<the record's folder>")
     assert "cites (3): rb reconcile lists each by path" in words and "5e7a1c00" not in words and "session" not in words
     rec("reconcile", "--apply")                                                                       # the user's own
-    assert rec("status").data["uncited_changes"] == [] and home().uncited == 0
+    assert rec("status", "--full").data["uncited_changes"] == [] and home().uncited == 0
 
 
 def test_the_user_s_screens_carry_the_count_and_the_scope_line(rec, tmp_path_factory):
-    rec("status")
+    rec("status", "--full")
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: cosine\nlr: 0.1\n", encoding="utf-8")
     _commit("adamw")
-    rec("status")
+    rec("status", "--full")
     h = home()
     assert h.uncited == 1 and h.uncited_line == "Changed .json, .yaml or .toml files that nothing in the record cites (1): rb reconcile lists it by path."
     assert h.scope.startswith(looks_at() + " It last looked at ")
@@ -451,12 +472,12 @@ def test_a_file_a_run_named_that_is_here_with_other_bytes_reads_changed_not_miss
     Path("outputs/int8_seed1.json").write_text('{"top1": 0.76}', encoding="utf-8")
     rec("run", "add", "int8", "--from", "outputs/int8_seed1.json")
     Path("outputs/int8_seed1.json").write_text('{"top1": 0.76, "note": "rewritten"}', encoding="utf-8")
-    [exp] = rec("status").data["experiments"]
+    [exp] = rec("status", "--full").data["experiments"]
     [files] = [r for r in exp["rerun"] if r["what"] == "files"]
     assert files["state"] == "changed" and files["detail"] == "no file the runs named is here unchanged; changed since recorded: outputs/int8_seed1.json"
-    assert "files changed" in rec("status", text=True) and "files missing" not in rec("status", text=True)
+    assert "files changed" in rec("status", "--full", text=True) and "files missing" not in rec("status", "--full", text=True)
     Path("outputs/int8_seed1.json").unlink()
-    [exp] = rec("status").data["experiments"]
+    [exp] = rec("status", "--full").data["experiments"]
     assert [r["state"] for r in exp["rerun"] if r["what"] == "files"] == ["missing"]
 
 
@@ -470,23 +491,24 @@ def test_the_exact_code_only_where_rb_s_journal_watched_the_command(rec):
     rec("journal", "run", "--", sys.executable, "-c", script, text=True)
     env = rec("reconcile", "--apply")
     [rid] = [r.split(":")[0] for r in env.data["recorded"]]
-    shown = rec("show", rid, text=True)
+    shown = rec("show", "--long", rid, text=True)
     # the run reconcile records from the watched command names the code that command started with (E2)
     assert "  The code when the run started: git tree " in shown and "exact code" not in shown.lower(), shown
     # numbers rb's journal watched a command print were not typed in
-    assert "typed in" not in rec("status", text=True) and "typed in" not in rec("show", "c1", text=True)
+    assert "typed in" not in rec("status", "--full", text=True) and "typed in" not in rec("show", "--long", "c1", text=True)
 
 
 def test_absence_is_said_of_the_record(rec, tmp_path_factory):
     rec("experiment", "add", "INT8 with per-channel scales", "--id", "int8pc", "--hypothesis", "per-channel scales close the gap")
-    st = rec("status").data
+    st = rec("status", "--full").data
     assert any(i["code"] == "planned" and i["what"].startswith("nothing in the record tests int8pc yet") for i in st["open"])
     [f] = st["findings"]
     assert f["says"]["timing"] == "declared; no evidence recorded yet"
     page = tmp_path_factory.mktemp("page") / "page.html"
     rec("page", "--out", str(page))
     html = page.read_text(encoding="utf-8")
-    assert "no recorded run reads this comparison" in html and "nothing has measured" not in html
+    # no glossary line defines "not tested" (Nov 12 20:35 +08): the rule says it has no results yet
+    assert "No results yet." in html and "no recorded run reads this comparison" not in html and "nothing has measured" not in html
 
 
 def test_an_item_merged_with_another_keeps_its_own_code_and_words(rec):
@@ -504,7 +526,7 @@ def test_an_item_merged_with_another_keeps_its_own_code_and_words(rec):
     Path("results/int8_run/metrics.json").write_text('{"top1": 0.758}', encoding="utf-8")
     Path("results/fp32_run").mkdir()
     Path("results/fp32_run/README.md").write_text("# FP32 run\n", encoding="utf-8")
-    env = rec("status")
+    env = rec("status", "--full")
     items = {i["code"]: i for i in env.data["open"] if i["code"] in ("reindex", "unindexed_folder")}
     assert items["reindex"]["subject"] == "int8_run" and items["reindex"]["what"] == "int8_run: results/int8_run/ changed since it was indexed (metrics.json changed)"
     assert items["unindexed_folder"]["subject"] == "results/fp32_run/" and items["unindexed_folder"]["what"] == "results/fp32_run/ holds results no recorded experiment reads yet"
@@ -514,33 +536,32 @@ def test_an_item_merged_with_another_keeps_its_own_code_and_words(rec):
 def test_the_screen_draws_the_count_and_the_scope_line(rec):
     from rabbit_brain.tui import DIM, RBApp
 
-    rec("status")
+    rec("status", "--full")
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: cosine\nlr: 0.1\n", encoding="utf-8")
     _commit("adamw")
-    rec("status")
+    rec("status", "--full")
     h = home()
 
     async def drawn():
         app = RBApp(Path.cwd())
         async with app.run_test(size=(140, 40)) as pilot:
-            await pilot.pause(0.3)
-            scope = app.screen.query_one("#scope")
-            return scope.display, str(scope.content)
+            return await _home_and_a(app, pilot)
 
-    shown, content = asyncio.run(drawn())
-    assert shown and content.startswith(f"[{DIM}]{h.uncited_line}[/{DIM}]\n[{DIM}]rb looks in ")
+    shown, content, whole = asyncio.run(drawn())
+    assert shown and re.search(r"as of \d\d:\d\d UTC  r", content), content
+    assert whole[0] == h.uncited_line and whole[1].startswith("rb looks in ")
 
 
 # ---------------------------------------------------------------- what changed, counted from where the count starts
 
 def _said(rec) -> list:
-    return [u["said"] for u in rec("status").data["uncited_changes"]]
+    return [u["said"] for u in rec("status", "--full").data["uncited_changes"]]
 
 
 def test_a_new_untracked_config_in_a_subfolder_is_listed(rec):
     """Git lists new files it does not track: a new config one folder down, and new metadata in a folder git shows
     whole, are listed as new, not committed."""
-    rec("status")
+    rec("status", "--full")
     base = _git("rev-parse", "HEAD")
     Path("configs/eval_v2.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
     Path("configs/recovery").mkdir()
@@ -555,7 +576,7 @@ def test_a_new_untracked_config_in_a_subfolder_is_listed(rec):
 def test_a_change_with_an_old_file_time_is_listed(rec):
     """A copy that keeps the file's old time (cp -p, rsync -a, tar) still counts: what git says changed, and a file rb
     sees appear after it last looked, whatever its time says."""
-    rec("status")
+    rec("status", "--full")
     base = _git("rev-parse", "HEAD")
     old = time.time() - 30 * 86400
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
@@ -570,11 +591,11 @@ def test_a_change_with_an_old_file_time_is_listed(rec):
 
 def test_a_file_back_to_what_it_was_where_the_count_starts_is_not_listed(rec):
     """A branch left, or a commit reverted: a file the same as at the commit the count starts at is no change."""
-    rec("status")
+    rec("status", "--full")
     _git("checkout", "-qb", "seed")
     Path("configs/train.yaml").write_text("optimizer: sgd\nschedule: cosine\nlr: 0.2\n", encoding="utf-8")
     _commit("lr 0.2")
-    rec("status")
+    rec("status", "--full")
     _git("checkout", "-q", "-")
     assert _said(rec) == []
     Path("configs/train.yaml").write_text("optimizer: sgd\nschedule: step\nlr: 0.1\n", encoding="utf-8")
@@ -587,7 +608,7 @@ def test_a_file_back_to_what_it_was_where_the_count_starts_is_not_listed(rec):
 def test_a_tracked_config_at_the_top_edited_after_rb_first_looked_is_changed_not_new(rec):
     Path("params.yaml").write_text("seed: 0\n", encoding="utf-8")
     base = _commit("params")
-    rec("status")
+    rec("status", "--full")
     Path("params.yaml").write_text("seed: 1\n", encoding="utf-8")
     Path("configs/quant.yaml").write_text("bits: 8\n", encoding="utf-8")
     _commit("seed 1, and the quantizer's bits")
@@ -598,7 +619,7 @@ def test_a_tracked_config_at_the_top_edited_after_rb_first_looked_is_changed_not
 
 
 def test_a_config_gone_is_listed_as_gone(rec):
-    rec("status")
+    rec("status", "--full")
     base = _git("rev-parse", "HEAD")
     _git("rm", "-q", "configs/eval.yaml")
     _commit("no eval config")
@@ -608,7 +629,7 @@ def test_a_config_gone_is_listed_as_gone(rec):
 def test_files_recorded_by_path_stay_recorded_once_committed_unchanged(rec):
     """rb reconcile --apply records each by its path and bytes: a commit of the same bytes changes nothing, a later
     edit shows again."""
-    rec("status")
+    rec("status", "--full")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
     Path("run_meta.json").write_text('{"rebuild_path": "historical"}', encoding="utf-8")
     assert "2 changed files recorded by path (configs/eval.yaml, run_meta.json)" in rec("reconcile", "--apply").data["applied"]["line"]
@@ -677,7 +698,7 @@ def test_a_clone_without_the_commit_the_last_apply_saw_counts_from_the_newest_co
     """A squash merge leaves the commit the last rb reconcile --apply saw out of a fresh clone: there the count starts
     at the newest commit before that apply, so a config change committed after it is listed, and what the apply recorded
     is not."""
-    rec("status")
+    rec("status", "--full")
     main_branch = _git("rev-parse", "--abbrev-ref", "HEAD")
     _git("checkout", "-qb", "feature")
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: cosine\nlr: 0.1\n", encoding="utf-8")
@@ -700,13 +721,13 @@ def test_a_clone_without_the_commit_the_last_apply_saw_counts_from_the_newest_co
     assert env.data["uncited_from_head"] is None
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: step\nlr: 0.1\n", encoding="utf-8")
     _commit("step schedule")
-    assert [u["path"] for u in rec("status").data["uncited_changes"]] == ["configs/eval.yaml", "configs/train.yaml"]
+    assert [u["path"] for u in rec("status", "--full").data["uncited_changes"]] == ["configs/eval.yaml", "configs/train.yaml"]
 
 
 def test_a_clone_with_no_commit_before_the_last_apply_says_the_count_starts_at_head(rec, tmp_path_factory, monkeypatch):
     """Where a clone holds neither the commit the last apply saw nor any commit before it, the count starts at HEAD,
     and rb reconcile says so, listed or not."""
-    rec("status")
+    rec("status", "--full")
     Path("configs/train.yaml").write_text("optimizer: adamw\nschedule: cosine\nlr: 0.1\n", encoding="utf-8")
     _commit("adamw")
     applied = _git("rev-parse", "HEAD")
@@ -731,29 +752,29 @@ def test_a_clone_with_no_commit_before_the_last_apply_says_the_count_starts_at_h
 def test_more_changed_files_than_the_cap_are_said_as_more_and_an_apply_records_the_first_thousand(rec):
     """Past the cap, the count says "or more" on every read, the cap line stays, and an apply that records only some
     leaves the count's start where it was, so the rest still show."""
-    rec("status")
+    rec("status", "--full")
     ann = Path("data/annotations")
     ann.mkdir(parents=True)
     for i in range(4010):
         (ann / f"val_{i:05d}.json").write_text('{"label": "cat"}', encoding="utf-8")
     _commit("annotations")
     for _ in range(2):
-        st = rec("status").data
+        st = rec("status", "--full").data
         assert st["scope"]["cap_hit"] is True and len(st["uncited_changes"]) == 4000
-    text = rec("status", text=True)
+    text = rec("status", "--full", text=True)
     assert "cites (4000 or more): rb reconcile lists each by path" in text and "That look stopped at 4000 files" in text
     listed = rec("reconcile", text=True)
     assert "cites (4000 or more):" in listed and "  and 3900 more: rb reconcile --json lists every one" in listed
     assert "the first 1000 of 4000 changed files to record by path" in listed
     applied = rec("reconcile", "--apply").data["applied"]
     assert applied["line"].startswith("1000 of 4000 changed files recorded by path") and applied["uncited_seen"]["cut"] is True
-    st = rec("status").data                                      # the first 4000 git listed, less the 1000 recorded
+    st = rec("status", "--full").data                                      # the first 4000 git listed, less the 1000 recorded
     assert len(st["uncited_changes"]) == 3000 and st["scope"]["cap_hit"] is True
     assert "4000 or more paths changed since" in rec("journal", text=True)
 
 
 def test_rb_s_own_files_lockfiles_ci_editor_and_vendored_configs_are_left_out(rec):
-    rec("status")
+    rec("status", "--full")
     left_out = {
         ".github/workflows/ci.yml": "on: push\n", ".gitlab-ci.yml": "test: {}\n", ".vscode/settings.json": "{}", ".mcp.json": "{}",
         ".claude/skills/rb/config.json": "{}", "package-lock.json": "{}", "pnpm-lock.yaml": "lockfileVersion: 6\n", "conda-lock.yml": "x: 1\n",
@@ -783,7 +804,7 @@ def test_rb_s_own_files_lockfiles_ci_editor_and_vendored_configs_are_left_out(re
         Path(rel).write_text('{"n": 3}' if rel.endswith(".json") else "n: 3\n", encoding="utf-8")
     _git("add", "-A", "-f")
     _commit("tooling, a dependency, a results folder and the eval config")
-    st = rec("status").data
+    st = rec("status", "--full").data
     assert [u["path"] for u in st["uncited_changes"]] == [
         "analysis/ci/top1_bootstrap.json", "analysis/dist/top1_hist.json", "configs/clock.json", "configs/eval.yaml", "configs/resblock.yaml",
         "data/build/shards.yaml", "data/target/labels.json", "models/residual_block.yaml"]
@@ -793,7 +814,7 @@ def test_rb_s_own_files_lockfiles_ci_editor_and_vendored_configs_are_left_out(re
 def test_a_lockfile_with_numbers_is_not_found_as_a_result(rec):
     Path("package-lock.json").write_text('{"lockfileVersion": 3}', encoding="utf-8")
     Path("conda-lock.yml").write_text("version: 1\n", encoding="utf-8")
-    st = rec("status").data
+    st = rec("status", "--full").data
     assert st["found_unrecorded"] == 0
     assert not any("lock" in u for u in rec("reconcile").data["unplaced"])
 
@@ -804,13 +825,13 @@ def test_a_read_takes_a_file_s_numbers_from_the_look_that_hashed_it(rec):
     Path("outputs").mkdir()
     result = Path("outputs/int8_seed1.json")
     result.write_text('{"top1": 0.76}', encoding="utf-8")
-    assert rec("status").data["found_unrecorded"] == 1
+    assert rec("status", "--full").data["found_unrecorded"] == 1
     st_path = Path(".git/rb/journal/main/state.json")
     st = json.loads(st_path.read_text(encoding="utf-8"))
     assert st["files"]["outputs/int8_seed1.json"]["n"] == {"top1": 0.76}
     del st["files"]["outputs/int8_seed1.json"]["n"]                       # as an earlier rb kept it
     st_path.write_text(json.dumps(st), encoding="utf-8")
-    assert rec("status").data["found_unrecorded"] == 1
+    assert rec("status", "--full").data["found_unrecorded"] == 1
     assert json.loads(st_path.read_text(encoding="utf-8"))["files"]["outputs/int8_seed1.json"]["n"] == {"top1": 0.76}
     result.chmod(0)
     try:
@@ -822,7 +843,7 @@ def test_a_read_takes_a_file_s_numbers_from_the_look_that_hashed_it(rec):
         result.chmod(0o644)
     # more numbers than a look keeps: marked so, never read again by a look, and read by a read that needs them
     Path("outputs/per_class.json").write_text(json.dumps({f"class_{i:03d}": i / 1000 for i in range(300)}), encoding="utf-8")
-    assert rec("status").data["found_unrecorded"] == 2
+    assert rec("status", "--full").data["found_unrecorded"] == 2
     meta = json.loads(st_path.read_text(encoding="utf-8"))["files"]["outputs/per_class.json"]
     assert "n" in meta and meta["n"] is None
     assert any(u.startswith("outputs/per_class.json holds numbers nothing declares (class_000") for u in rec("reconcile").data["unplaced"])
@@ -832,7 +853,7 @@ def test_a_read_takes_a_file_s_numbers_from_the_look_that_hashed_it(rec):
 def test_rb_context_asks_git_where_the_repository_is_once(rec, tmp_path_factory, monkeypatch):
     """Each git process costs every read: the look rb context makes before it reads asks git where the repository is
     once, the question the journal's own place already asked, and never again for the repository's top."""
-    rec("status")
+    rec("status", "--full")
     wrap = tmp_path_factory.mktemp("gitwrap")
     calls = wrap / "calls.txt"
     (wrap / "git").write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> "{calls}"\nexec "{shutil.which("git")}" "$@"\n', encoding="utf-8")
@@ -848,19 +869,19 @@ def test_rb_context_asks_git_where_the_repository_is_once(rec, tmp_path_factory,
 def test_a_result_rb_lists_as_found_where_results_land_is_not_counted_again(rec):
     """A file in a folder where results land that rb lists as found is not a changed file too; one at the top that holds
     numbers nothing declares is both, and rb status says how many it counted twice."""
-    rec("status")
+    rec("status", "--full")
     Path("outputs").mkdir()
     Path("outputs/fp32_eval.json").write_text('{"top5": 0.93, "latency_ms": 4.1}', encoding="utf-8")
     Path("outputs/fp32_meta.json").write_text('{"host": "a100"}', encoding="utf-8")
     Path("run_metadata.json").write_text('{"recovery_attempts": 1}', encoding="utf-8")
-    st = rec("status").data
+    st = rec("status", "--full").data
     assert st["found_unrecorded"] == 2
     assert [u["path"] for u in st["uncited_changes"]] == ["outputs/fp32_meta.json", "run_metadata.json"]
-    assert "Changed .json, .yaml or .toml files that nothing in the record cites (2; 1 also counted above): rb reconcile lists each by path" in rec("status", text=True)
+    assert "Changed .json, .yaml or .toml files that nothing in the record cites (2; 1 also counted above): rb reconcile lists each by path" in rec("status", "--full", text=True)
 
 
 def test_a_folder_a_resource_names_cites_the_files_in_it(rec):
-    rec("status")
+    rec("status", "--full")
     Path("data/annotations").mkdir(parents=True)
     Path("data/annotations/val_0001.json").write_text('{"label": "cat"}', encoding="utf-8")
     _commit("annotations")
@@ -873,9 +894,9 @@ def test_a_folder_a_resource_names_cites_the_files_in_it(rec):
 
 def test_a_config_edited_again_in_the_working_tree_is_journaled(rec):
     """A file git lists as changed, edited again: the next look journals it, and rb journal scan says so."""
-    rec("status")
+    rec("status", "--full")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
-    rec("status")
+    rec("status", "--full")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\nselection: second pass\n", encoding="utf-8")
     line = rec("journal", "scan", text=True)
     assert line.startswith("0 new, 1 changed, 0 gone") and "git moved" not in line
@@ -897,7 +918,7 @@ def test_a_working_tree_change_is_not_called_a_git_move(rec):
 def test_an_empty_journal_says_when_rb_last_looked_and_outside_git_says_nothing_of_git(rec):
     _leave_git()
     Path("README.md").unlink()                                   # nothing where rb looks: a look writes nothing down
-    rec("status")
+    rec("status", "--full")
     text = rec("journal", text=True)
     assert text.startswith("The journal is empty here: rb last looked at ") and "has not looked" not in text
     assert rec("journal", "scan", text=True).startswith("No file where rb looks changed since its last look.\n")
@@ -905,22 +926,22 @@ def test_an_empty_journal_says_when_rb_last_looked_and_outside_git_says_nothing_
 
 def test_new_bytes_behind_an_old_file_time_and_size_show_again(rec):
     """A file left out, rewritten to the same size with its time put back: its bytes moved, so it is listed again."""
-    rec("status")
+    rec("status", "--full")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
-    [item] = rec("status").data["uncited_changes"]
+    [item] = rec("status", "--full").data["uncited_changes"]
     state().dismiss(item["key"], why="a local tweak")
-    assert rec("status").data["uncited_changes"] == []
+    assert rec("status", "--full").data["uncited_changes"] == []
     st = os.stat("configs/eval.yaml")
     time.sleep(0.05)
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: zoomed\n", encoding="utf-8")   # the same size
     os.utime("configs/eval.yaml", ns=(st.st_atime_ns, st.st_mtime_ns))
-    assert [u["path"] for u in rec("status").data["uncited_changes"]] == ["configs/eval.yaml"]
+    assert [u["path"] for u in rec("status", "--full").data["uncited_changes"]] == ["configs/eval.yaml"]
 
 
 def test_the_git_state_keeps_the_shape_an_earlier_rb_compares(rec):
     """The tree's changes are kept apart, so the git state an earlier rb compares reads no move on a dirty tree."""
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
-    rec("status")
+    rec("status", "--full")
     st = json.loads(Path(".git/rb/journal/main/state.json").read_text(encoding="utf-8"))
     assert sorted(st["git"]) == ["branch", "commit", "dirty"] and st["git"]["dirty"] is True
     assert st["tree"]["paths"] == [{"path": "configs/eval.yaml", "change": "modified"}]
@@ -929,9 +950,9 @@ def test_the_git_state_keeps_the_shape_an_earlier_rb_compares(rec):
 # ---------------------------------------------------------------- who leaves an item out
 
 def test_a_word_rb_cannot_tell_the_writer_of_is_refused_and_clears_nothing(rec, monkeypatch):
-    rec("status")
+    rec("status", "--full")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
-    [item] = rec("status").data["uncited_changes"]
+    [item] = rec("status", "--full").data["uncited_changes"]
     opened = state()
     monkeypatch.setenv("CODEX_THREAD_ID", "5e7a1c00-0011")
     monkeypatch.setenv("RB_ACTOR", "codex")                      # a name rb cannot read as a writer
@@ -939,16 +960,16 @@ def test_a_word_rb_cannot_tell_the_writer_of_is_refused_and_clears_nothing(rec, 
         opened.dismiss(item["key"], why="tooling")
     monkeypatch.delenv("CODEX_THREAD_ID")
     monkeypatch.delenv("RB_ACTOR")
-    assert [u["path"] for u in rec("status").data["uncited_changes"]] == ["configs/eval.yaml"]
+    assert [u["path"] for u in rec("status", "--full").data["uncited_changes"]] == ["configs/eval.yaml"]
     st = json.loads(Path(".git/rb/journal/main/state.json").read_text(encoding="utf-8"))
     assert item["key"] not in st.get("dismissed", {})
 
 
 def test_rb_journal_lists_only_the_user_s_word_by_path(rec, monkeypatch):
-    rec("status")
+    rec("status", "--full")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
     Path("configs/train.yaml").write_text("optimizer: sgd\nschedule: step\nlr: 0.1\n", encoding="utf-8")
-    eval_, train = rec("status").data["uncited_changes"]
+    eval_, train = rec("status", "--full").data["uncited_changes"]
     monkeypatch.setenv("CLAUDECODE", "1")
     monkeypatch.setenv("RB_SESSION", "5e7a1c00-0012")
     state(agent="claude-code").dismiss(eval_["key"], why="not research")
@@ -964,17 +985,17 @@ def test_rb_journal_lists_only_the_user_s_word_by_path(rec, monkeypatch):
     assert 'left out configs/train.yaml: "a scratch schedule"' in text and "not research" not in text and "hidden" not in text
     assert 'left out outputs/int8_seed1.json: "a smoke test"' in text
     assert sum(e["op"] == "dismiss" for e in rec("journal").data["entries"]) == 3
-    assert [u["path"] for u in rec("status").data["uncited_changes"]] == ["configs/eval.yaml"]
+    assert [u["path"] for u in rec("status", "--full").data["uncited_changes"]] == ["configs/eval.yaml"]
 
 
 def test_the_sdk_lists_the_changed_files_and_the_user_leaves_one_out(rec):
-    rec("status")
+    rec("status", "--full")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
-    rec("status")
+    rec("status", "--full")
     [u] = state().uncited_changes()
     assert u["path"] == "configs/eval.yaml" and u["said"].startswith("configs/eval.yaml: changed since ")
     state().dismiss(u["key"], why="not part of the study")
-    assert rec("status").data["uncited_changes"] == [] and state().uncited_changes() == []
+    assert rec("status", "--full").data["uncited_changes"] == [] and state().uncited_changes() == []
 
 
 # ---------------------------------------------------------------- what a session has been told
@@ -984,8 +1005,8 @@ def test_a_quiet_command_does_not_tell_writes_it_did_not_print(rec):
     session's next command."""
     rec("context", agent="5e7a1c00-0021")
     rec("metric", "add", "top5", "--maximize")
-    rec("status", agent="5e7a1c00-0021")
-    told = rec("show", "int8", agent="5e7a1c00-0021").rb_delta
+    rec("status", "--full", agent="5e7a1c00-0021")
+    told = rec("show", "--long", "int8", agent="5e7a1c00-0021").rb_delta
     assert [(d["kind"], d["code"], d["subject"]) for d in told] == [("write", "add", "top5")]
 
 
@@ -997,27 +1018,27 @@ def test_writes_past_what_the_briefing_prints_are_told_later(rec):
     # Recent activity shows the last twelve; the repository's evidence may name the files git lists, which tell nothing
     recent = md.split("## Recent activity", 1)[1].split("\n## ", 1)[0]
     assert "extra14" in recent and "extra00" not in recent
-    told = rec("show", "int8", agent="5e7a1c00-0022").rb_delta
+    told = rec("show", "--long", "int8", agent="5e7a1c00-0022").rb_delta
     assert [d["subject"] for d in told] == ["extra00", "extra01", "extra02"]
 
 
 def test_what_a_command_cannot_fit_is_told_by_the_next(rec):
     """More than twelve facts at once: the rest are told by the session's next command, not marked as told."""
-    rec("show", "int8", agent="5e7a1c00-0023")
+    rec("show", "--long", "int8", agent="5e7a1c00-0023")
     for i in range(16):
         rec("metric", "add", f"extra{i:02d}", "--maximize")
-    first = rec("show", "int8", agent="5e7a1c00-0023")
+    first = rec("show", "--long", "int8", agent="5e7a1c00-0023")
     assert len(first.rb_delta) == 13 and first.rb_delta[-1]["text"] == "and 4 more, which the session's next command tells"
     assert first.rb_delta[-1]["do"] == "rb log"
-    second = rec("show", "int8", agent="5e7a1c00-0023").rb_delta
+    second = rec("show", "--long", "int8", agent="5e7a1c00-0023").rb_delta
     assert [d["subject"] for d in second] == [f"extra{i:02d}" for i in range(12, 16)]
-    assert rec("show", "int8", agent="5e7a1c00-0023").rb_delta == []
+    assert rec("show", "--long", "int8", agent="5e7a1c00-0023").rb_delta == []
 
 
 def test_many_changed_files_are_told_as_a_few_and_a_count_after_the_user_s_writes(rec):
     """Fifty changed files nothing cites never keep the user's call from a session: its next command tells the user's
     writes first, then five of the files by path and the rest on one line, once."""
-    rec("status")
+    rec("status", "--full")
     ann = Path("data/ann")
     ann.mkdir(parents=True)
     for i in range(50):
@@ -1025,16 +1046,16 @@ def test_many_changed_files_are_told_as_a_few_and_a_count_after_the_user_s_write
     rec("context", agent="5e7a1c00-0026")
     rec("decide", "int8", "park", "-m", "the calibration set is being rebuilt")
     rec("note", "add", "calibration rebuilt from the train split", "-e", "int8")
-    told = rec("show", "int8", agent="5e7a1c00-0026").rb_delta
+    told = rec("show", "--long", "int8", agent="5e7a1c00-0026").rb_delta
     assert [d["kind"] for d in told[:2]] == ["write", "write"] and [d["code"] for d in told[:2]] == ["decide", "note"]
     named = [d for d in told if d["code"] == "uncited_change"]
     assert [d["subject"] for d in named] == [f"data/ann/img_{i:04d}.json" for i in range(5)] and all(d.get("counted") for d in named)
     [more] = [d for d in told if d["code"] == "uncited_more"]
     assert (more["text"], more["count"], more["do"], more.get("counted")) == ("and 45 more changed .json, .yaml or .toml files that nothing in the record cites", 45, "rb reconcile", True)
     assert len(told) == 8 and not [d for d in told if d["kind"] == "more"]
-    shown = rec("show", "int8", agent="5e7a1c00-0026", text=True)
+    shown = rec("show", "--long", "int8", agent="5e7a1c00-0026", text=True)
     assert "uncited" not in shown and "data/ann" not in shown                                        # told once
-    text = rec("show", "int8", agent="5e7a1c00-0027", text=True)                                   # another session
+    text = rec("show", "--long", "int8", agent="5e7a1c00-0027", text=True)                                   # another session
     assert "  - and 45 more changed .json, .yaml or .toml files that nothing in the record cites   (rb reconcile)" in text
 
 
@@ -1042,11 +1063,11 @@ def test_what_the_briefing_counted_is_named_under_its_own_heading(rec):
     Path("outputs").mkdir()
     Path("outputs/int8_seed1.json").write_text('{"top1": 0.76}', encoding="utf-8")
     rec("context", agent="5e7a1c00-0024")
-    env = rec("show", "int8", agent="5e7a1c00-0024")
+    env = rec("show", "--long", "int8", agent="5e7a1c00-0024")
     assert [d.get("counted") for d in env.rb_delta] == [True]
-    text = rec("status", agent="5e7a1c00-0025", text=True)         # a quiet first look for another session
+    text = rec("status", "--full", agent="5e7a1c00-0025", text=True)         # a quiet first look for another session
     assert "Since this session last looked" not in text
-    shown = rec("show", "int8", agent="5e7a1c00-0025", text=True)
+    shown = rec("show", "--long", "int8", agent="5e7a1c00-0025", text=True)
     assert "\nCounted before, named now:\n  - outputs/int8_seed1.json: results landed and are not in the record" in shown
     assert "Since this session last looked" not in shown
 
@@ -1054,14 +1075,16 @@ def test_what_the_briefing_counted_is_named_under_its_own_heading(rec):
 # ---------------------------------------------------------------- the user's screen
 
 def test_rb_ui_keeps_the_catalogue_on_a_short_screen(rec):
-    """On an 80 by 24 terminal the two quiet lines take one line each, in rb's short words, and the catalogue keeps its
-    rows; on a tall one they are whole."""
+    """On an 80 by 24 terminal the two quiet lines take one line each, in rb's short words, and the catalogue is one key
+    away (R22): t brings it whole over the story, every row with its counts whole, and the key line names t; on a tall
+    one the quiet lines take one line each too, so the Overview keeps its rows, and their whole words are one key away
+    (a)."""
     from rabbit_brain.tui import RBApp
 
-    rec("status")
+    rec("status", "--full")
     Path("configs/eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
     _commit("resize")
-    rec("status")
+    rec("status", "--full")
     h = home()
     assert h.uncited_short == "Changed .json/.yaml/.toml files the record does not cite (1): rb reconcile"
     assert h.scope_short.startswith("rb last looked at ") and h.scope_short.endswith(" UTC; rb status says where it looks.")
@@ -1071,20 +1094,43 @@ def test_rb_ui_keeps_the_catalogue_on_a_short_screen(rec):
         async with app.run_test(size=size) as pilot:
             await pilot.pause(0.3)
             scope, tree = app.screen.query_one("#scope"), app.screen.query_one("#tree-list")
-            return scope.region.height, tree.region.height, str(scope.render())
+            # no sentence under the panes (TUI-PARITY G3): the last look is `as of` on the About strip
+            got = (scope.region.height, tree.region.height, app.screen.query_one("#about").render().plain)
+            if size[0] >= 120:
+                return got
+            keys = {"t": "research"} if "Research  t" in app.screen.query_one("#tabrow").render().plain else {}
+            await pilot.press("t")
+            for _ in range(50):
+                await pilot.pause(0.1)
+                if tree.region.height and tree.option_count:
+                    break
+            rows = [tree.get_option_at_index(i).prompt.plain for i in range(tree.option_count)]
+            # each question's and experiment's row a title line and a line of marks or its chip (TUI-PARITY A7)
+            refs = app.screen._object_refs
+            kinds = {r.id: r.kind for r in home().tree}
+            opts = [tree.get_option_at_index(i) for i in range(tree.option_count)]
+            whole = all(len(o.prompt.plain.split("\n")) == 2 for o in opts if kinds.get(refs.get(o.id)) in ("question", "experiment"))
+            return got[0], (tree.region.height >= tree.option_count and whole and keys.get("t") == "research"), got[2]
 
     lines, rows, said = asyncio.run(drawn((80, 24)))
     # the screen looks again as it opens, maybe a minute after the read above: its time is its own
     stamp = re.compile(r"rb last looked at \d{4}-\d\d-\d\d \d\d:\d\d UTC")
-    assert lines == 2 and rows >= 2 and [stamp.sub("@", x) for x in said.splitlines()] == [h.uncited_short, stamp.sub("@", h.scope_short)], said
+    assert lines == 0 and rows is True and re.search(r"as of \d\d:\d\d UTC", said), said
     lines, _, said = asyncio.run(drawn((140, 40)))
-    assert lines > 2 and said.replace("\n", " ").startswith(h.uncited_line)
+    assert lines == 0 and re.search(r"as of \d\d:\d\d UTC", said), said
+
+    async def whole():
+        app = RBApp(Path.cwd())
+        async with app.run_test(size=(140, 40)) as pilot:
+            return (await _home_and_a(app, pilot))[2]
+
+    assert [stamp.sub("@", x) for x in asyncio.run(whole())][0] == h.uncited_line
 
 
 def test_rb_ui_s_observed_lines_leave_out_what_rb_leaves_out_of_what_changed(rec):
     """Lockfiles, CI configs and rb's own page change beside the results: rb ui's observed lines name the results
     alone, and rb journal still lists every file it saw."""
-    rec("status")
+    rec("status", "--full")
     Path("outputs").mkdir()
     Path("outputs/int8_seed1.json").write_text('{"top1": 0.76}', encoding="utf-8")
     for rel, body in {"package-lock.json": "{}", "uv.lock": "version = 1\n", "azure-pipelines.yml": "trigger: [main]\n"}.items():
@@ -1103,22 +1149,22 @@ def test_rb_ui_says_when_it_last_looked_after_a_look_that_found_nothing(rec, mon
     from rabbit_brain.tui import RBApp
 
     monkeypatch.setenv("RB_TEST_NOW", "2026-10-14T03:00:00.000+00:00")
-    rec("status")
+    rec("status", "--full")
 
     async def drawn():
         app = RBApp(Path.cwd())
         async with app.run_test(size=(140, 40)) as pilot:
             await pilot.pause(0.3)
-            before = str(app.screen.query_one("#scope").render())
+            before = app.screen.query_one("#about").render().plain
             monkeypatch.setenv("RB_TEST_NOW", "2026-10-14T04:00:00.000+00:00")
             app.screen._tick = 4
             app.screen._poll()                     # every 10 s: a look, which finds nothing new
             await pilot.pause(0.3)
-            return before, str(app.screen.query_one("#scope").render())
+            return before, app.screen.query_one("#about").render().plain
 
     before, after = asyncio.run(drawn())
-    assert "It last looked at 2026-10-14 03:00 UTC." in before.replace("\n", " ")
-    assert "It last looked at 2026-10-14 04:00 UTC." in after.replace("\n", " ")
+    # `as of` on the About strip says when rb last looked, and moves with a look that found nothing (TUI-PARITY Q2)
+    assert "as of 03:00 UTC  r" in before and "as of 04:00 UTC  r" in after, (before, after)
 
 
 # ---------------------------------------------------------------- words scoped to what rb recorded or watched
@@ -1137,11 +1183,11 @@ def test_a_run_no_watched_command_made_says_git_tree_not_the_exact_code(rec):
     Path("outputs").mkdir()
     Path("outputs/int8_seed1.json").write_text('{"top1": 0.76}', encoding="utf-8")
     rid = rec("run", "add", "int8", "--from", "outputs/int8_seed1.json").data["object"]["id"]
-    shown = rec("show", rid, text=True)
+    shown = rec("show", "--long", rid, text=True)
     assert "the exact code" not in shown.lower() and "  The code when it was recorded, after the run: git tree " in shown, shown
     head, tree = _git("rev-parse", "HEAD"), _git("rev-parse", "HEAD^{tree}")
     rid = rec("run", "add", "int8", "top1=0.77", "--commit", head, "--tree", tree).data["object"]["id"]
-    shown = rec("show", rid, text=True)
+    shown = rec("show", "--long", rid, text=True)
     assert f"  code that made it: {head[:12]} (as given), git tree {tree[:12]} (git diff " in shown and "exact" not in shown, shown
 
 

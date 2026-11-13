@@ -40,7 +40,7 @@ def relate(record, *extra, orientation="same"):
 
 
 def reading(record):
-    return record("show", "c1")["relations"][0]
+    return record("show", "--long", "c1")["relations"][0]
 
 
 def test_reversal_needs_both_sides_and_keeps_point_uncertainty(record):
@@ -81,17 +81,17 @@ def test_a_question_call_tracks_related_evidence_outside_its_direct_scope(record
     decision = record("decide", "q1", "continue", "--why", "Continue to another seed")["object"]
     assert set(decision["basis"]) == {"c1"}
     assert decision["inquiry_basis"]["relations"][0]["target"] == "c2"
-    assert not any(i["code"] == "decision_outdated" for i in record("status")["open"])
+    assert not any(i["code"] == "decision_outdated" for i in record("status", "--full")["open"])
     record("run", "add", "e2", "new.loss=4", "old.loss=2")
-    assert any(i["code"] == "decision_outdated" and i["subject"] == "q1" for i in record("status")["open"])
+    assert any(i["code"] == "decision_outdated" and i["subject"] == "q1" for i in record("status", "--full")["open"])
 
 
 def test_either_endpoint_exposes_one_relationship(record):
     relate(record)
     record("criterion", "file", "c1", "q1", "--remove", "--why", "Use the second endpoint")
     record("criterion", "file", "c2", "q1", "--why", "Use the second endpoint")
-    assert len(record("show", "c2")["relations"]) == 1
-    inquiry = record("show", "q1")["inquiry"]
+    assert len(record("show", "--long", "c2")["relations"]) == 1
+    inquiry = record("show", "--long", "q1")["inquiry"]
     assert len(inquiry["relations"]) == 1 and inquiry["relations"][0]["source"] == "c1"
 
 
@@ -101,9 +101,9 @@ def test_frozen_relation_keeps_history_and_retracting_evidence_blocks_it(record)
     relate(record, "--amend", "--words", "Check both sides.")
     record("retract", "c2", "--why", "The second comparison was invalid")
     assert reading(record)["outcome"] == "integrity"
-    record("status", "--fail-on", "integrity", exit_code=1)
+    record("status", "--full", "--fail-on", "integrity", exit_code=1)
     record("criterion", "relate", "c1", "reverses", "c2", "--remove", "--amend", "--why", "Withdraw the comparison")
-    relation = record("show", "c1")["object"]["relations"][0]
+    relation = record("show", "--long", "c1")["object"]["relations"][0]
     assert relation["words"] == "Check both sides." and relation["retracted"]["why"] == "Withdraw the comparison"
 
 
@@ -148,7 +148,7 @@ def test_a_changed_arm_resolution_is_an_integrity_problem_not_a_status_crash(rec
     row = reading(record)
     assert row["outcome"] == "integrity"
     assert any(p["code"] == "relation_scope_invalid" for p in row["integrity"])
-    assert any(i["code"] == "finding_relation_invalid" for i in record("status")["open"])
+    assert any(i["code"] == "finding_relation_invalid" for i in record("status", "--full")["open"])
 
 
 def test_same_relation_is_a_noop_and_sdk_uses_the_same_write(record):
@@ -176,7 +176,7 @@ def test_the_sdk_reads_the_relation_the_command_line_and_mcp_answer_with(record)
         assert server.close() == 0
     declared = answer["result"]["structuredContent"]["data"]["relation"]
     [row] = state.relations("c1")
-    assert row == declared == record("show", "c2")["relations"][0] and row["outcome"] == "observed_reversal"
+    assert row == declared == record("show", "--long", "c2")["relations"][0] and row["outcome"] == "observed_reversal"
     assert state.criterion("c2").relations() == [row] and row["declaration"]["via"] == "mcp"
     assert relate(record)["relation"] == row                            # the command line's answer, the same reading
     withdrawn = state.relate_criterion("c1", "reverses", "c2", why="taken back", remove=True)
@@ -265,22 +265,22 @@ def test_retracting_an_experiment_says_what_rests_on_its_criteria_and_gives_the_
     record("criterion", "relate", "c3", "reverses", "c1", "--orientation", "same", "--why", "the third against the first")
     record("run", "add", "e1", "new.loss=2", "old.loss=1")
     record("run", "add", "e2", "new.loss=1", "old.loss=2")
-    record("status", "--fail-on", "integrity")
+    record("status", "--full", "--fail-on", "integrity")
     rested = record("retract", "e2", "--why", "the longer budget leaked its evaluation set")["rested_on"]
     assert "criterion c2 is linked to question q1" in rested
     assert "criterion c1 reverses criterion c2" in rested and "criterion c3 reverses criterion c1" in rested
-    items = record("status")["open"]
+    items = record("status", "--full")["open"]
     [relation] = [i for i in items if i["code"] == "finding_relation_invalid"]
     assert relation["subject"] == "c1"
     assert relation["do"] == 'rb criterion relate c1 reverses c2 --remove --why "<why the relation no longer holds>"'
     gone = {i["subject"]: i["do"] for i in items if i["code"] == "experiment_retracted"}
     assert gone == {c: f'rb retract {c} --why "<its experiment was retracted>"' for c in ("c2", "c3")}
     assert not [i for i in items if i["who"] == "agent" and i["subject"] in ("c2", "c3") and i["code"] != "experiment_retracted"]
-    record("status", "--fail-on", "integrity", exit_code=1)
+    record("status", "--full", "--fail-on", "integrity", exit_code=1)
     record("criterion", "relate", "c1", "reverses", "c2", "--remove", "--why", "e2 was taken back")
     for c in ("c2", "c3"):
         record("retract", c, "--why", "its experiment was retracted")
-    record("status", "--fail-on", "integrity")
+    record("status", "--full", "--fail-on", "integrity")
 
 
 def test_a_relation_that_cannot_be_read_gives_the_repair_its_problem_calls_for(record, capsys, monkeypatch):
@@ -289,23 +289,23 @@ def test_a_relation_that_cannot_be_read_gives_the_repair_its_problem_calls_for(r
     monkeypatch.setenv("RB_ACTOR", "human:ana")
     relate(record)
     record("spec", "set", "e2", "width", "--design-factor")
-    [item] = [i for i in record("status")["open"] if i["code"] == "finding_relation_invalid"]
+    [item] = [i for i in record("status", "--full")["open"] if i["code"] == "finding_relation_invalid"]
     assert "the comparison scope changed after its alignment was declared" in item["what"]
     assert item["do"] == ('rb criterion relate c1 reverses c2 --orientation "<same or opposite>" '
                           '--why "<why this alignment holds for the scopes as they are>"')
     record("criterion", "relate", "c1", "reverses", "c2", "--orientation", "same", "--why", "the scopes as they are now")
-    assert not [i for i in record("status")["open"] if i["code"] == "finding_relation_invalid"]
+    assert not [i for i in record("status", "--full")["open"] if i["code"] == "finding_relation_invalid"]
     record("freeze", "e1", "--why", "lock the rule")
     record("retract", "c2", "--why", "the longer budget was misconfigured")
-    [item] = [i for i in record("status")["open"] if i["code"] == "finding_relation_invalid"]
+    [item] = [i for i in record("status", "--full")["open"] if i["code"] == "finding_relation_invalid"]
     assert item["what"] == "c1 reverses c2: retracted: the longer budget was misconfigured (c2)"
     assert item["do"] == 'rb criterion relate c1 reverses c2 --remove --why "<why the relation no longer holds>" --amend'
-    assert main(["show", "c1"]) == 0
+    assert main(["show", "--long", "c1"]) == 0
     assert ("c1 reverses c2: The reversal cannot be read until its evidence or declared alignment is repaired. "
             "Integrity: retracted: the longer budget was misconfigured (c2).") in capsys.readouterr().out
-    record("status", "--fail-on", "integrity", exit_code=1)
+    record("status", "--full", "--fail-on", "integrity", exit_code=1)
     record("criterion", "relate", "c1", "reverses", "c2", "--remove", "--why", "c2 was taken back", "--amend")
-    record("status", "--fail-on", "integrity")
+    record("status", "--full", "--fail-on", "integrity")
 
 
 def test_a_pair_declared_from_both_sides_reads_once_with_both_declarations(record, capsys, monkeypatch):
@@ -319,7 +319,7 @@ def test_a_pair_declared_from_both_sides_reads_once_with_both_declarations(recor
     monkeypatch.setenv("AI_AGENT", "claude-code")
     record("criterion", "relate", "c2", "reverses", "c1", "--orientation", "same", "--why", "the same pair from the longer budget")
     monkeypatch.delenv("AI_AGENT")
-    inquiry = record("show", "q1")["inquiry"]
+    inquiry = record("show", "--long", "q1")["inquiry"]
     [reading] = inquiry["relations"]
     assert (reading["source"], reading["target"], reading["outcome"]) == ("c1", "c2", "observed_reversal")
     assert [(d["criterion"], d["declared_by"]) for d in reading["declarations"]] == [("c1", "human:ana"), ("c2", "agent:claude-code")]
@@ -327,17 +327,17 @@ def test_a_pair_declared_from_both_sides_reads_once_with_both_declarations(recor
     line = "c1 reverses c2, and c2 reverses c1 (declared from both sides): The measured direction reverses; repeatability remains uncertain."
     assert line in inquiry["summary"]
     for subject in ("q1", "c2"):
-        assert main(["show", subject]) == 0
+        assert main(["show", "--long", subject]) == 0
         assert capsys.readouterr().out.count("reverses c") == 2  # one line, naming the pair both ways
     page = record.root / "pair.html"
     record("page", "--out", str(page))
     assert "1 declared comparison" in page.read_text(encoding="utf-8")
     record("decide", "q1", "investigate", "--why", "check the reversal again")
-    [stored] = record("status")["decisions"][-1]["inquiry_basis"]["relations"]
+    [stored] = record("status", "--full")["decisions"][-1]["inquiry_basis"]["relations"]
     assert "declarations" not in stored and stored["declaration"]["declared_by"] == "human:ana"
-    assert not any(i["code"] == "decision_outdated" for i in record("status")["open"])
+    assert not any(i["code"] == "decision_outdated" for i in record("status", "--full")["open"])
     # a declaration back whose scope changed reads apart, so its problem is not hidden by the other's reading
     record("spec", "set", "e1", "width", "--design-factor")
     record("criterion", "relate", "c1", "reverses", "c2", "--orientation", "same", "--why", "the scopes as they are now")
-    readings = record("show", "q1")["inquiry"]["relations"]
+    readings = record("show", "--long", "q1")["inquiry"]["relations"]
     assert len(readings) == 2 and [len(r["declarations"]) for r in readings] == [1, 1]

@@ -55,7 +55,7 @@ def test_numbers_typed_with_no_time_are_given_again_with_their_per_run_values(rb
     code, out = rb("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6", "--set", "seed=1", text=True)
     hint = "rb run add int8 <the same numbers and per-run values> --produced-at <when> --replaces "
     assert code == 0 and hint in " ".join(out.split()), out
-    late = [i for i in rb("status").data["open"] if i["code"] == "timing_unknown"]
+    late = [i for i in rb("status", "--full").data["open"] if i["code"] == "timing_unknown"]
     assert late and late[0]["do"].startswith(hint), late
 
 
@@ -85,7 +85,7 @@ def test_your_call_puts_the_newest_first_and_keeps_rb_status_s_order_where_they_
     rb("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.2")
     at("12:00:08")
     rb("run", "add", "calib", "c1024.top1=75.9", "c512.top1=75.4")
-    waiting = lambda: [i["subject"] for i in rb("status").data["open"] if i["who"] == "human"]
+    waiting = lambda: [i["subject"] for i in rb("status", "--full").data["open"] if i["who"] == "human"]
     assert waiting() == ["c-top1", "c-calib"]
     assert called("tie.html") == ["c-top1", "c-calib"]
     at("12:02:10")

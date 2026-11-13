@@ -91,7 +91,7 @@ def test_no_read_prints_who_made_a_write(rec, reader):
     """rb status, rb context, rb log, rb compare, rb journal, rb doctor and rb show of every record, in text and in
     every sentence --json carries, read the same for the user and in each agent's session (with its rb_delta)."""
     who = READERS[reader]
-    reads = [("status",), ("context",), ("log", "-n", "500"), ("compare", "e1"), ("journal",), ("doctor",)]
+    reads = [("status", "--full"), ("context",), ("log", "-n", "500"), ("compare", "e1"), ("journal",), ("doctor",)]
     reads += [("show", i) for i in (every_id(rec) if reader == "the user" else ["c2", "q2", rec.ids["run_claude"], rec.ids["investigating"]])]
     leaks = []
     for argv in reads:
@@ -164,7 +164,7 @@ def test_a_call_keeps_its_verb_its_date_and_its_reason(rec):
     c1, c2 = (rec.json(Writers.HUMAN, "show", c)["data"]["finding"]["says"]["review"] for c in ("c1", "c2"))
     day = {d: rec.json(Writers.HUMAN, "show", rec.ids[d])["data"]["object"]["at"][:10] for d in ("accepted", "investigating")}
     assert (c1, c2) == (f"accepted {day['accepted']}: within budget", f"investigating since {day['investigating']} · note: one more seed")
-    status = rec.rb(Writers.HUMAN, "status")
+    status = rec.rb(Writers.HUMAN, "status", "--full")
     assert f'c2 · investigating since {day["investigating"]} · note: one more seed' in status
     assert "c4 (primary: e2 gains) was retracted · note: the rule read the wrong arm · not confirmed" in status
     assert f"  {AGENT_BRANCHES[1]} at {rec.git('rev-parse', AGENT_BRANCHES[1])[:12]}: 1 note on e1 (Wide against base)" in status
@@ -212,7 +212,7 @@ def test_a_clone_reads_with_no_writer(rec, tmp_path):
     fork = Writers(tmp_path / "fork")
     links = fork.json(Writers.HUMAN, "show", "c2")["data"]["object"]["question_links"]
     assert {(l["declared_by"], l["session"]) for l in links} >= {("agent:claude-code", CLAUDE_CODE["CLAUDE_CODE_SESSION_ID"])}
-    leaks = [(argv, found) for argv in (("status",), ("context",), ("show", "c2"), ("show", "q2")) for found in marks_in_text(fork.rb(Writers.HUMAN, *argv))]
+    leaks = [(argv, found) for argv in (("status", "--full"), ("context",), ("show", "c2"), ("show", "q2")) for found in marks_in_text(fork.rb(Writers.HUMAN, *argv))]
     assert not leaks, leaks
 
 
@@ -250,8 +250,9 @@ def test_the_sentences_the_screens_draw_name_no_writer(rec, monkeypatch):
     # the label, then rb's reading of its criterion, then its mark where a session wrote it: never a writer's slot
     old = r'aria-describedby="g-recorded-interpretation">(Your reading|A recorded reading|The recorded reading|Recorded interpretation)</span>(<span> · its (?:rule|criterion): [^<]+</span>)?(<span> · not confirmed</span>)?</'
     # design pass 1: the label is the note's term, then its words, then rb's sentence on its rule
-    new = r'aria-describedby="g-note-on-a-question"><span class="k">(Note|A note, not confirmed): </span></span>(<a class="ans"[^>]*>)?<span class="au">[^<]+</span>(</a>)?\. <span class="hs">[^<]+</span></'
-    assert re.search(old, html) or re.search(new, html)
+    # no glossary (Nov 12 20:35 +08): the note's label is its words, with no hover that defines it
+    new = r'<span class="k">(Note|A note, not confirmed): </span>(<a class="ans"[^>]*>)?<span class="au">[^<]+</span>(</a>)?\. <span class="hs">[^<]+</span></'
+    assert not re.search(old, html) and re.search(new, html) and "aria-describedby=\"g-" not in html
     assert "interpretation · </div>" not in html and "</a> · </p>" not in html and "Recorded interpretation</span><span> · </span>" not in html
 
 
@@ -300,9 +301,9 @@ def test_the_same_words_from_the_user_and_a_session_read_as_two_one_not_confirme
     links = cli(capsys, "show", "c2")["object"]["question_links"]
     assert [l["declared_by"] for l in links] == ["agent:claude-code"]
     [q1] = [q for q in cli(capsys, "status")["questions"] if q["id"] == "q1"]
-    said = [line for line in q1["inquiry"]["summary"] if line.startswith("Recorded interpretation")]
-    assert [line.split(".", 1)[0] for line in said] == ["Recorded interpretation: declared when met: 'the wide layer is no worse'",
-                                                        "Recorded interpretation: declared when met, not confirmed: 'the wide layer is no worse'"], said
+    said = [line for line in q1["inquiry"]["summary"] if line.startswith(("Note:", "Notes:"))]
+    assert [line.split(".", 1)[0] for line in said] == ["Note: declared when met: 'the wide layer is no worse'",
+                                                        "Note: declared when met, not confirmed: 'the wide layer is no worse'"], said
     [brief] = [b for b in home().briefs if b.id == "q1"]
     assert [(g["text"], g["criteria"], g["confirmed"], g["author"]) for g in brief.overview["interpretations"]] == [
         ("the wide layer is no worse", ["c1"], True, ""), ("the wide layer is no worse", ["c2"], False, "")]

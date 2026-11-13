@@ -80,7 +80,7 @@ def add_now(root: Path, top1: str, env: dict = None) -> dict:
 
 
 def attached(root: Path, run: str) -> dict:
-    return rb(root, "show", run)["data"]["object"]["receipt"]["attached"]
+    return rb(root, "show", "--long", run)["data"]["object"]["receipt"]["attached"]
 
 
 def add(root: Path, top1: str, env: dict = None) -> dict:
@@ -134,10 +134,10 @@ def test_files_left_out_make_the_code_part_kept_each_named(home):
     # the tracked file is in the kept tree as its commit holds it
     assert git(root, "cat-file", "-p", f"{a['tree']}:data.bin") == "1"
     # part kept is kept: the code row is partial, never missing
-    row = next(r for r in rb(root, "show", "int8")["data"]["rerunnability"] if r["what"] == "code")
+    row = next(r for r in rb(root, "show", "--long", "int8")["data"]["rerunnability"] if r["what"] == "code")
     assert row["state"] == "partial" and "part of the code kept" in row["detail"], row
     # Reproduce rebuilds the kept tree under the line that says what it lacks, never as the run's whole code
-    shown = subprocess.run([*command(), "show", "int8"], cwd=root, env=environment(), capture_output=True, text=True).stdout
+    shown = subprocess.run([*command(), "show", "--long", "int8"], cwd=root, env=environment(), capture_output=True, text=True).stdout
     # a page gives counts and reasons, and names none of the files (E3's page form)
     page = root / "p.html"
     subprocess.run([*command(), "page", "--out", str(page)], cwd=root, env=environment(), check=True, capture_output=True)
@@ -218,7 +218,7 @@ def test_a_head_git_cannot_read_is_no_first_commit(home, act):
     said = {"fail": "rb kept no code for this run: rb could not read git (fatal: index file corrupt).",
             "sleep": "rb kept no code for this run: git did not answer in 1 s."}[act]
     assert said in out["data"]["warnings"], out["data"]["warnings"]
-    row = next(r for r in rb(root, "show", "int8")["data"]["rerunnability"] if r["what"] == "code")
+    row = next(r for r in rb(root, "show", "--long", "int8")["data"]["rerunnability"] if r["what"] == "code")
     assert row["state"] == "missing" and "outside git" not in row["detail"] and "no code kept for 1 run" in row["detail"], row
     r = subprocess.run([*command(), "journal", "run", "--", "true"], cwd=root, env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
@@ -253,9 +253,9 @@ def test_a_tree_no_ref_keeps_is_never_said_kept(home):
     assert a["kept"] == "whole" and a["tree"], a
     assert subprocess.run([GIT, "rev-parse", "--verify", "-q", f"refs/rb/snapshots/{a['tree']}"], cwd=root, capture_output=True).returncode != 0
     words = f"git tree {a['tree'][:12]} is in this repository, but no ref keeps it, so git gc may remove it"
-    shown = subprocess.run([*command(), "show", run], cwd=root, env=environment(), capture_output=True, text=True).stdout
+    shown = subprocess.run([*command(), "show", "--long", run], cwd=root, env=environment(), capture_output=True, text=True).stdout
     assert f": {words}." in shown and f"{a['tree'][:12]}. git tree" not in shown, shown
-    row = next(r for r in rb(root, "show", "int8")["data"]["rerunnability"] if r["what"] == "code")
+    row = next(r for r in rb(root, "show", "--long", "int8")["data"]["rerunnability"] if r["what"] == "code")
     assert row["state"] == "partial" and words in row["detail"] and "kept as git trees" in row["detail"], row
 
 
@@ -270,5 +270,5 @@ def test_an_earlier_receipt_s_one_unnamed_file_is_said_as_one(home):
     text = "\n".join(l + ("\n" + l[:len(l) - len(l.lstrip())] + "left_out: 1" if l.strip().startswith("tree:") else "") for l in text.splitlines()) + "\n"
     path.write_text(text, encoding="utf-8")
     rb(root, "doctor", "--adopt", "--why", "an earlier rb's receipt")
-    shown = subprocess.run([*command(), "show", run], cwd=root, env=environment(), capture_output=True, text=True).stdout
+    shown = subprocess.run([*command(), "show", "--long", run], cwd=root, env=environment(), capture_output=True, text=True).stdout
     assert "1 file was left out of it; this record does not name it." in shown, shown

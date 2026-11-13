@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -188,11 +189,11 @@ def test_a_found_item_shows_without_a_record_write(placed):
     (rec.root / "configs" / "eval.yaml").write_text("dataset: imagenet-val\n", encoding="utf-8")
     rec.git("add", "configs")
     rec.git("commit", "-qm", "the eval config")
-    rec.rb("status")                                                    # rb looks: the commit it sees is the start
+    rec.rb("status", "--full")                                                    # rb looks: the commit it sees is the start
     before, record = answer(server.url + "/digest.json")[1]["key"], answer(server.url + "/state.json")[1]["digest"]
     (rec.root / "configs" / "eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
     rec.git("commit", "-qam", "resize")
-    rec.rb("status")                                                    # rb looks again, in the terminal
+    rec.rb("status", "--full")                                                    # rb looks again, in the terminal
     st = answer(server.url + "/state.json")[1]
     assert st["home"]["uncited"] == 1 and st["digest"] == record        # found, and no record write
     after = answer(server.url + "/digest.json")[1]["key"]
@@ -200,7 +201,7 @@ def test_a_found_item_shows_without_a_record_write(placed):
     # and a results file nobody recorded, which rb proposes as a run
     (rec.root / "out").mkdir()
     (rec.root / "out" / "metrics.json").write_text('{"fp32.top1": 0.763, "int8.top1": 0.759}\n', encoding="utf-8")
-    rec.rb("status")
+    rec.rb("status", "--full")
     st = answer(server.url + "/state.json")[1]
     assert [f["title"] for f in st["home"]["found"]] == ["Record metrics.json on e1"] and st["digest"] == record, (st["home"]["found"], st["home"]["unplaced"])
     assert answer(server.url + "/digest.json")[1]["key"] not in (before, after)
@@ -216,12 +217,12 @@ def test_a_reading_that_moves_without_a_write_moves_the_key(placed):
     rec.git("add", "configs")
     rec.git("commit", "-qm", "the train config")
     rec.rb("spec", "set", "e1", "optim.lr", "--source", "configs/train.yaml#optim.lr")
-    rec.rb("status")
+    rec.rb("status", "--full")
     before, record = answer(server.url + "/digest.json")[1]["key"], answer(server.url + "/state.json")[1]["digest"]
     assert answer(server.url + "/digest.json")[1]["key"] == before
     (rec.root / "configs" / "train.yaml").write_text("optim:\n  lr: 0.0003\n", encoding="utf-8")
     rec.git("commit", "-qam", "a higher lr")
-    rec.rb("status")
+    rec.rb("status", "--full")
     after = answer(server.url + "/digest.json")[1]["key"]
     assert after != before and answer(server.url + "/state.json")[1]["digest"] == record
     assert answer(server.url + "/digest.json")[1]["key"] == after
@@ -238,7 +239,7 @@ def test_a_source_rewritten_within_the_clocks_resolution_still_moves_the_key(pla
     rec.git("add", "configs")
     rec.git("commit", "-qm", "the train config")
     rec.rb("spec", "set", "e1", "optim.lr", "--source", "configs/train.yaml#optim.lr")
-    rec.rb("status")
+    rec.rb("status", "--full")
     before = answer(server.url + "/digest.json")[1]["key"]
     assert answer(server.url + "/digest.json")[1]["key"] == before
     was = cfg.stat()
@@ -258,7 +259,7 @@ def test_the_digest_route_looks_on_its_cadence(placed):
     (rec.root / "configs" / "eval.yaml").write_text("dataset: imagenet-val\n", encoding="utf-8")
     rec.git("add", "configs")
     rec.git("commit", "-qm", "the eval config")
-    rec.rb("status")
+    rec.rb("status", "--full")
     before = answer(server.url + "/digest.json")[1]["key"]              # its look, now
     (rec.root / "configs" / "eval.yaml").write_text("dataset: imagenet-val\ncrop: resize\n", encoding="utf-8")
     rec.git("commit", "-qam", "resize")
@@ -446,6 +447,28 @@ def test_the_devtools_port_is_read_once_its_line_is_whole(tmp_path):
     assert _devtools_port(f) == 9222
 
 
+def chromes_on(profile: Path) -> list:
+    """The processes whose command line names `profile`: the Chromes running on it, whoever started them."""
+    mark, me = str(profile), os.getpid()
+    if sys.platform == "win32":
+        quoted = mark.replace("'", "''")
+        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                            f"Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -and $_.CommandLine.Contains('{quoted}') }} | "
+                            "ForEach-Object { $_.ProcessId }"], capture_output=True, text=True, timeout=60)
+        pids = [int(x) for x in r.stdout.split() if x.isdigit()]
+    elif os.path.isdir("/proc/self"):
+        pids = []
+        for d in os.listdir("/proc"):
+            if d.isdigit():
+                with contextlib.suppress(OSError):
+                    if mark in Path(f"/proc/{d}/cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace"):
+                        pids.append(int(d))
+    else:
+        r = subprocess.run(["ps", "-axww", "-o", "pid=,command="], capture_output=True, text=True, timeout=60)
+        pids = [int(line.split(None, 1)[0]) for line in r.stdout.splitlines() if mark in line]
+    return [p for p in pids if p != me]
+
+
 class Chrome:
     """Headless Chrome with one page, driven over the DevTools protocol: `js` evaluates in the page (awaiting a
     promise), `type` types as a keyboard does into what has focus, `wait` waits for an expression to hold. Every
@@ -461,21 +484,33 @@ class Chrome:
         if sys.platform.startswith("linux"):
             args.append("--no-sandbox")       # a container's Chrome has no user namespaces; the pages are rb's own, on loopback
         env = dict(os.environ) if sys.platform == "win32" else {**os.environ, "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"), "XDG_CACHE_HOME": str(home / ".cache")}
-        self.proc = subprocess.Popen([*args, "about:blank"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+        self.profile, self.port, self.ws = profile, None, None
+        said = folder / "chrome.txt"
+        with open(said, "wb") as err:
+            self.proc = subprocess.Popen([*args, "about:blank"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err, env=env)
+        # Chrome's first process may exit 0 at once, having handed its start to another that keeps running on this
+        # profile (Windows' chrome.exe does): the port that one writes is waited for whatever the first does, and only
+        # an exit other than 0 fails at once, with what it said
         deadline = time.monotonic() + 60
         port = None
         while port is None:
             port = _devtools_port(profile / "DevToolsActivePort")
             if port is None:
-                assert self.proc.poll() is None and time.monotonic() < deadline, f"Chrome did not start (exit {self.proc.poll()})"
+                failed = self.proc.poll() not in (None, 0)
+                if failed or time.monotonic() > deadline:
+                    self.close()
+                    pytest.fail(f"Chrome did not start (exit {self.proc.poll()}): {said.read_text(errors='replace')[-2000:]}")
                 time.sleep(0.05)
+        self.port = port
         while True:
             with contextlib.suppress(OSError, ValueError):
                 with _OPENER.open(f"http://127.0.0.1:{port}/json/list", timeout=10) as r:
                     pages = [t for t in json.load(r) if t.get("type") == "page"]
                 if pages:
                     break
-            assert time.monotonic() < deadline, "Chrome opened no page"
+            if time.monotonic() > deadline:
+                self.close()
+                pytest.fail("Chrome opened no page")
             time.sleep(0.05)
         self.ws, self.n, self.thrown = _Socket(pages[0]["webSocketDebuggerUrl"]), 0, []
         self.send("Page.enable")
@@ -515,13 +550,52 @@ class Chrome:
         return bool(self.js(expression))
 
     def close(self) -> None:
-        self.ws.close()
-        self.proc.terminate()
+        """Ends every Chrome this one caused: the browser that answers on its port is asked to close, the process it
+        started is stopped, and any process still running on its profile (one the first handed its start to) too."""
+        if self.ws is not None:
+            self.ws.close()
+        with contextlib.suppress(Exception):
+            assert self.port is not None
+            with _OPENER.open(f"http://127.0.0.1:{self.port}/json/version", timeout=5) as r:
+                browser = _Socket(json.load(r)["webSocketDebuggerUrl"])
+            browser.send(json.dumps({"id": 1, "method": "Browser.close"}))
+            browser.close()
+        if self.proc.poll() is None:
+            self.proc.terminate()
         try:
             self.proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             self.proc.kill()
             self.proc.wait()
+        deadline = time.monotonic() + 10
+        while (left := chromes_on(self.profile)) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        for pid in left:
+            with contextlib.suppress(OSError):
+                os.kill(pid, signal.SIGKILL if hasattr(signal, "SIGKILL") else signal.SIGTERM)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the stand-in launcher is a POSIX script")
+def test_a_chrome_that_hands_its_start_on_is_waited_for_and_stopped_and_one_that_fails_says_why(tmp_path, monkeypatch):
+    """The Windows proof's "Chrome did not start (exit 0)", which left Chromes running: a launcher that starts Chrome on
+    the profile and exits 0 at once is waited for, the Chrome it started is used, and closing stops it; a launcher that
+    fails says its exit and what it printed, and leaves nothing running."""
+    real = chrome_path()
+    launcher = tmp_path / "chrome"
+    launcher.write_text(f'#!/bin/sh\n"{real}" "$@" >/dev/null 2>&1 &\nexit 0\n', encoding="utf-8")
+    launcher.chmod(0o755)
+    monkeypatch.setenv("RB_CHROME", str(launcher))
+    browser = Chrome(tmp_path / "c1")
+    try:
+        assert browser.proc.poll() == 0 and browser.js("1 + 1") == 2
+        assert chromes_on(browser.profile), "the Chrome the launcher handed its start to runs on the profile"
+    finally:
+        browser.close()
+    assert chromes_on(tmp_path / "c1" / "profile") == []
+    launcher.write_text("#!/bin/sh\necho 'no display for ana' >&2\nexit 3\n", encoding="utf-8")
+    with pytest.raises(pytest.fail.Exception, match=r"exit 3\): no display for ana"):
+        Chrome(tmp_path / "c2")
+    assert chromes_on(tmp_path / "c2" / "profile") == []
 
 
 @pytest.fixture
@@ -678,12 +752,6 @@ class Front:
         """The digest polls the page asked since `since`: (when it asked, when rb answered), in order."""
         return sorted((a, b) for p, a, b in list(self.timed) if p == "/digest.json" and a >= since)
 
-    def gaps(self, since: float = 0.0) -> list:
-        """The page's own waits between polls since `since`: from rb's answer to one poll to the page's next ask. A slow
-        runner's answers take longer; the page's wait is the same."""
-        ps = self.polls(since)
-        return [nxt[0] - cur[1] for cur, nxt in zip(ps, ps[1:])]
-
     def close(self) -> None:
         self.server.shutdown()
         self.server.server_close()
@@ -700,7 +768,62 @@ def front(placed):
 
 def opened(chrome: Chrome, url: str) -> None:
     chrome.goto(url)
-    assert chrome.wait("!!window.rbLive && !!document.querySelector('#insp .ibody')", 30), chrome.thrown
+    assert chrome.wait("!!window.rbLive && !!document.querySelector('#insp .ibody')", SLOW), chrome.thrown
+
+
+# The page's own pace, kept as it happens: each wait it sets before its next poll (its setTimeout(poll, ms)), each
+# request it makes and each answer, in order. A check of how often the page polls reads the waits it asked for, never
+# the clock, so a slow runner, whose answers take longer, is held to the same schedule. `speed` runs those waits that
+# many times faster (the waits kept are those the page asked for), so a minute of the page's waits takes seconds.
+# pacedThen(k, fn) runs fn in a task of its own once the page has set k more waits, before its next poll can start.
+PACE = r"""
+(() => {
+  const speed = %s, set = window.setTimeout.bind(window), ask = window.fetch.bind(window), log = window.paced = [], then = [];
+  const waits = () => log.filter(e => e[0] === 'wait').length;
+  window.pacedThen = (k, fn) => { then.push([waits() + k, fn]); };
+  window.setTimeout = function (fn, ms, ...rest) {
+    if (typeof fn !== 'function' || fn.name !== 'poll') return set(fn, ms, ...rest);
+    log.push(['wait', Number(ms) || 0, document.hidden]);
+    const id = set(fn, (Number(ms) || 0) / speed);
+    for (const t of then.splice(0)) if (waits() >= t[0]) set(t[1], 0); else then.push(t);
+    return id;
+  };
+  window.fetch = function (url, ...rest) {
+    const u = String(url);
+    log.push(['ask', u]);
+    return ask(url, ...rest).then(r => { log.push(['answer', u, r.status]); return r; });
+  };
+})();
+"""
+
+
+def paced(chrome: Chrome, speed: float = 1) -> None:
+    """Keep the page's pace (PACE) from the next page it loads, its waits run `speed` times faster."""
+    chrome.send("Page.addScriptToEvaluateOnNewDocument", source=PACE % speed)
+
+
+def waits_after(log: list, since: int = 0) -> list:
+    """The waits the page set from `since` in its log: (ms, hidden, the status of the digest's last answer before it)."""
+    out, status = [], None
+    for i, e in enumerate(log):
+        if e[0] == "answer" and e[1].startswith("/digest.json"):
+            status = e[2]
+        elif e[0] == "wait" and i >= since:
+            out.append((e[1], e[2], status))
+    return out
+
+
+def one_poll_per_wait(log: list) -> bool:
+    """Each digest the page asked for came after a wait it set, one ask to a wait: the page polls on its waits alone."""
+    asks = 0
+    for e in log:
+        if e[0] == "wait":
+            asks = 0
+        elif e[0] == "ask" and e[1].startswith("/digest.json"):
+            asks += 1
+            if asks > 1:
+                return False
+    return True
 
 
 def until(holds, timeout: float, why=None) -> None:
@@ -711,7 +834,6 @@ def until(holds, timeout: float, why=None) -> None:
         time.sleep(0.1)
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="a time limit a slow Windows runner misses: Windows is a preview (issue #2)", strict=False)
 def test_a_terminal_write_keeps_what_you_had_open(front, chrome):
     """A run recorded in the terminal shows within one poll, and the page keeps what was open: a fold, the card in the
     inspector and a fold inside it, the action chosen and the reason being typed (still in focus, the caret where it
@@ -735,8 +857,11 @@ def test_a_terminal_write_keeps_what_you_had_open(front, chrome):
     asked = f.count("/")
     rec.rb("run", "add", "e1", "fp32.top1=0.764", "int8.top1=0.760")
     written = time.monotonic()
-    assert chrome.wait(f"document.querySelectorAll('#main details.nd').length === {runs + 1}", POLL + 4), (f.asked[-6:], chrome.thrown)
-    assert time.monotonic() - written <= POLL + 3 and f.count("/") == asked + 1
+    assert chrome.wait(f"document.querySelectorAll('#main details.nd').length === {runs + 1}", SLOW), (f.asked[-6:], chrome.thrown)
+    # within one poll, counted in the page's polls and not in seconds: the first digest it asks for after the write (or
+    # one in flight as it was made) moves the key, and the page fetches itself once
+    fetched = min(a for p, a, _ in list(f.timed) if p == "/" and a >= written)
+    assert len([a for a, _ in f.polls(written) if a < fetched]) <= 1 and f.count("/") == asked + 1, (f.polls(written), fetched, f.asked[-6:])
     kept = chrome.js("(() => { const i = document.querySelector('#insp input.why');"
                      " return {fold: document.querySelector('details[data-fold=\"run:" + rec.run_main + "\"]').open,"
                      " card: document.querySelector('#insp .ibody > .card').dataset.id, inner: document.querySelector('#insp details[data-fold]').open,"
@@ -760,9 +885,9 @@ def test_a_poll_never_counts(front, chrome):
     render asks once, and a card opened once more. A write fetches the page once, and no poll after it again."""
     rec, server, f = front
     opened(chrome, f.url + "/")
-    until(lambda: f.count("/telemetry/inspected") == 1, 10, lambda: f.asked)
+    until(lambda: f.count("/telemetry/inspected") == 1, SLOW, lambda: f.asked)
     polls = f.count("/digest.json")
-    until(lambda: f.count("/digest.json") >= polls + 2, 2 * POLL + 4, lambda: f.asked)
+    until(lambda: f.count("/digest.json") >= polls + 2, SLOW, lambda: f.asked)
     pages = f.count("/")
     rec.rb("run", "add", "e1", "fp32.top1=0.764", "int8.top1=0.760")
     # waits on what the page did, polls not seconds, so a slow runner's answers hold it to the same check: the fetch
@@ -776,7 +901,7 @@ def test_a_poll_never_counts(front, chrome):
     assert f.count("/") == pages + 1, f.asked
     assert f.count("/telemetry/inspected") == 1, f.asked
     chrome.js("document.querySelector('[data-go=\"call-c1\"]').click()")
-    until(lambda: f.count("/telemetry/inspected") == 2, 10, lambda: f.asked)
+    until(lambda: f.count("/telemetry/inspected") == 2, SLOW, lambda: f.asked)
     assert [s for p, s in f.asked if p.startswith("/telemetry/inspected")] == [200, 200]
     assert chrome.thrown == []
 
@@ -798,7 +923,7 @@ def test_a_place_switch_swaps_nav_title_and_count(front, chrome):
     there = chrome.js(shown)
     assert there == ["another study", "another study", f"Runs {len(st['home']['runs'])}", str(len(st['home']['calls']))] and there != here
     polls = f.count("/digest.json")
-    until(lambda: f.count("/digest.json") > polls, POLL + 4, lambda: f.asked)
+    until(lambda: f.count("/digest.json") > polls, SLOW, lambda: f.asked)
     assert [p for p, _ in f.asked if p.startswith("/digest.json")][-1] == "/digest.json" + exp_s
     # a place rb does not list now is not shown, the page stays as it was, and rb's words go to whoever says them
     chrome.js("window.failedSaid = []; document.addEventListener('rb:failed', e => failedSaid.push(e.detail))")
@@ -813,7 +938,7 @@ def test_the_scope_line_moves_in_place(front, chrome):
     opened(chrome, f.url + "/")
     chrome.js("document.querySelector('[data-live=\"scope\"]').textContent = 'an older line'")
     pages = f.count("/")
-    assert chrome.wait("document.querySelector('[data-live=\"scope\"]').textContent.startsWith('rb looks in ')", POLL + 4), f.asked
+    assert chrome.wait("document.querySelector('[data-live=\"scope\"]').textContent.startsWith('rb looks in ')", SLOW), f.asked
     assert f.count("/") == pages
 
 
@@ -821,30 +946,35 @@ def test_the_page_polls_less_while_hidden_or_unanswered(front, chrome):
     """Every 5 s while the page is in view; while it is hidden, or while rb open does not answer, each wait twice the
     last (10 s, 20 s, up to a minute); shown again, it asks at once and every 5 s again."""
     rec, server, f = front
+    # read on the waits the page sets, poll by poll, never on the clock: a slow runner's answers take longer, the page's
+    # waits are the same. They run ten times faster here; the waits kept are those the page asked for.
+    paced(chrome, speed=10)
     opened(chrome, f.url + "/")
-    polls = lambda: f.count("/digest.json")
-    until(lambda: polls() >= 1, POLL + 4, lambda: f.asked)
+    log = lambda: chrome.js("paced")
+    until(lambda: len(waits_after(log())) >= 2, SLOW, log)
+    assert [w[:2] for w in waits_after(log())[:2]] == [(POLL * 1000, False)] * 2, log()           # in view: every 5 s
     hide = ("v => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => v});"
             " Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => v ? 'hidden' : 'visible'});"
             " document.dispatchEvent(new Event('visibilitychange')); }")
-    # each check is of the page's own waits (from rb's answer to the page's next ask), and each wait is for polls the page
-    # made, so a slow runner, whose answers take longer, is held to the same schedule
-    chrome.js(f"({hide})(true)")
-    hidden = time.monotonic()
-    until(lambda: len(f.polls(hidden)) >= 3, SLOW, lambda: f.asked)
-    gaps = f.gaps(hidden)
-    assert gaps[0] >= 2 * POLL - 0.5 and gaps[1] >= 4 * POLL - 0.5, (gaps, f.asked)   # 10 s, then 20 s: never 5 s each
-    shown = time.monotonic()           # the third poll is answered, and the page waits 40 s now: nothing in flight
-    chrome.js(f"({hide})(false)")
-    until(lambda: len(f.polls(shown)) >= 1, SLOW, lambda: f.asked)
-    assert f.polls(shown)[0][0] - shown < 2, (f.polls(shown), f.asked)              # shown: at once
-    until(lambda: len(f.polls(shown)) >= 3, SLOW, lambda: f.asked)
-    assert all(POLL - 0.5 <= g < 2 * POLL - 0.5 for g in f.gaps(shown)[:2]), (f.gaps(shown), f.asked)   # and every 5 s
+    # hidden for three of the page's waits, then shown again in a task of its own before its next poll can start
+    hidden = chrome.js(f"(() => {{ const h = {hide}; h(true); pacedThen(3, () => {{ window.shownAt = paced.length; h(false); }});"
+                       " return paced.length; })()")
+    until(lambda: chrome.js("window.shownAt") is not None, SLOW, log)
+    assert waits_after(log(), hidden)[:3] == [(2 * POLL * 1000, True, 200), (4 * POLL * 1000, True, 200), (8 * POLL * 1000, True, 200)], log()
+    shown = chrome.js("window.shownAt")
+    until(lambda: len(waits_after(log(), shown)) >= 3, SLOW, log)
+    # shown: at once (a wait of 0, set as it is shown, before any other poll), then every 5 s
+    assert log()[shown] == ["wait", 0, False], log()[shown:]
+    assert [w[:2] for w in waits_after(log(), shown)[:3]] == [(0, False), (POLL * 1000, False), (POLL * 1000, False)], log()[shown:]
     chrome.js("window.failedSaid = []; document.addEventListener('rb:failed', e => failedSaid.push(e.detail.error))")
     f.down = True
-    down = time.monotonic()
-    until(lambda: len(f.polls(down)) >= 3, SLOW, lambda: f.asked)
-    gaps = f.gaps(down)
-    assert gaps[0] >= 2 * POLL - 0.5 and gaps[1] >= 4 * POLL - 0.5, (gaps, f.asked)   # unanswered: 10 s, then 20 s
+    down = len(log())
+    unanswered = lambda: [w for w in waits_after(log(), down) if w[2] == 503]
+    until(lambda: len(unanswered()) >= 3, SLOW, log)
+    assert [w[:2] for w in unanswered()[:3]] == [(2 * POLL * 1000, False), (4 * POLL * 1000, False), (8 * POLL * 1000, False)], log()[down:]
     assert set(chrome.js("failedSaid")) == {"rb open is not answering"}
+    # one poll to each wait, and every poll the page kept reached rb open
+    assert one_poll_per_wait(log()), log()
+    asked = lambda: sum(1 for e in log() if e[0] == "answer" and e[1].startswith("/digest.json"))
+    until(lambda: f.count("/digest.json") == asked(), SLOW, lambda: (f.count("/digest.json"), log()))
     assert chrome.thrown == []

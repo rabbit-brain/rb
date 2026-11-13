@@ -52,10 +52,11 @@ def _plain(text: str) -> str:
 
 
 # rb's rule phrases as the screens say them (strings.rs plain_word, plain words passes 1 and 2)
-_PLAIN = {"criterion met": "rule met", "criterion not met": "rule not met", "criterion undetermined": "can't tell yet",
+# closed form (owner, Nov 13 2026): the pages say a rule holds, does not hold, is not settled, has no range yet
+_PLAIN = {"criterion met": "rule holds", "criterion not met": "rule does not hold", "criterion undetermined": "not settled",
           "criterion untested": "not tested", "untested": "not tested", "estimate meets criterion": "estimate meets the rule",
-          "recorded values meet criterion": "recorded values meet the rule", "point only": "no interval",
-          "gate undetermined": "gate, can't tell yet", "gate untested": "gate not tested"}
+          "recorded values meet criterion": "recorded values meet the rule", "point only": "no range yet",
+          "gate undetermined": "gate, not settled", "gate untested": "gate not tested"}
 
 
 def _plain_words(headline: str) -> str:
@@ -83,13 +84,27 @@ def _verdict_agrees(text: str, f: dict) -> int:
              "criterion untested": "Not tested", "gate untested": "Not tested"}
     assert lead in words, f"a lead the page's pin does not know: {lead!r}"
     word = words[lead]
-    card = _plain(text.split(f'id="c-{f["criterion"]}"', 1)[1].split('<p class="str">', 1)[1].split("</p>", 1)[0])
-    assert card.startswith(word), (word, card)
+    section = text.split(f'id="c-{f["criterion"]}"', 1)[1].split('<div class="card', 1)[0]
+    # a card that draws its reading with a mark (met or missed soundly) says its state as the mark, beside rb's number,
+    # and no sentence repeats it; any other card says it in its sentence, led by the state word
+    drawn = '<p class="str">' not in section
+    if drawn:
+        vs = section.split('<div class="vs">', 1)[1].split("</div>", 1)[0]
+        mark = re.search(r'<span class="vmk (ok|no|est)" role="img" aria-label="([^"]+)">', vs)
+        # a rule met on its estimate alone is named as rb's headline names it, in no state's colour
+        # closed form (owner, Nov 13 2026): the mark is said in the page's words ("holds", "estimate meets the rule")
+        page_word = {"Met": "Holds", "Not met": "Does not hold"}.get(word, word)
+        assert mark and (mark.group(2) in ("estimate meets the rule", "reproduced on the estimate", "recorded values meet the rule", "reproduced on the recorded values") if mark.group(1) == "est" else mark.group(2)[:1].upper() + mark.group(2)[1:] == page_word), (word, vs)
+        assert (mark.group(1) in ("ok", "est")) == (word in ("Met", "Reproduced")), (word, vs)
+        card = _plain(vs.split('<a class="rbn"', 1)[1].split("</a>", 1)[0].split(">", 1)[1])
+    else:
+        card = _plain(section.split('<p class="str">', 1)[1].split("</p>", 1)[0])
+        assert card.startswith(word), (word, card)
     # and the result axis through the verdict: an interval where rb has one, "(no interval yet)" where it has none
     result = f["result"]
     interval = re.search(r"\([+-]?[\d.,]+\S* to [+-]?[\d.,]+\S*\)", card)
     if result == "point_only":
-        assert "(no interval yet)" in card or "(no interval across design cells)" in card, (result, card)
+        assert drawn or "(no interval yet)" in card or "(no interval across design cells)" in card, (result, card)
         assert not interval, (result, card)
     elif result == "untested":
         assert not interval and "(no interval" not in card, (result, card)
@@ -106,8 +121,12 @@ def _verdict_agrees(text: str, f: dict) -> int:
         assert estimate and _within_its_digits(estimate.group(0), abs(c["estimate"])), (c["estimate"], card)
         # and a difference's direction, the word after its size (review should 3): "0.28 higher" on +0.28, never "lower"
         if c.get("reference"):
-            way = re.search(r"\b(higher|lower)\b", card[estimate.end():])
-            assert way and way.group(1) == ("higher" if c["estimate"] > 0 else "lower"), (c["estimate"], card)
+            # drawn, rb's number carries its sign; said, the word after its size does
+            if drawn:
+                assert card[estimate.start() - 1:estimate.start()] == ("+" if c["estimate"] > 0 else "-"), (c["estimate"], card)
+            else:
+                way = re.search(r"\b(higher|lower)\b", card[estimate.end():])
+                assert way and way.group(1) == ("higher" if c["estimate"] > 0 else "lower"), (c["estimate"], card)
             # and the grid's cell that opens this rule says the card's own digits (FIX5): never rb compare's 0.1567
             # beside a card's 0.16
             cells = [_plain(m) for m in re.findall(r'<span class="gd"><a [^>]*href="#cr?-' + re.escape(f["criterion"]) + r'"[^>]*>(.*?)</a>', text, flags=re.S)]
@@ -137,7 +156,12 @@ def test_the_page_agrees_with_the_computed_state(repo, capsys, monkeypatch):
     code, env = repo("page")
     plain = _plain(Path(env.data["path"]).read_text(encoding="utf-8"))
     assert code == 0 and "accepted" not in _said(Path(env.data["path"]).read_text(encoding="utf-8"))
-    assert f"Proposed, not made (1)accept e1 · note: the run holdsconfirm in your own terminal:rb confirm {proposed['id']}" in plain
+    # closed form (owner, Nov 13 2026): the line, then a button that copies a prompt for their agent, never the command
+    page = Path(env.data["path"]).read_text(encoding="utf-8")
+    waits = page.split('id="to-confirm"', 1)[1].split("</details>", 1)[0]
+    assert "Proposed, not made (1)accept e1 · note: the run holds" in _plain(waits) and "rb confirm" not in waits, waits
+    assert "confirm in your own terminal" not in plain and 'class="ibtn ico cpprompt' in waits
+    assert html_mod.escape("In this repository, use Rabbit Brain to show me what waits for my confirmation on e1, and how I confirm it.", quote=True) in waits
     assert repo("confirm", proposed["id"])[0] == 0
     code, env = repo("page")
     assert code == 0
@@ -156,36 +180,43 @@ def test_the_page_agrees_with_the_computed_state(repo, capsys, monkeypatch):
     assert "does the page tell the truth" in plain and "it cannot lie by construction" in plain
     # the call, once on its question's view, with no writer, its reason the session's note
     question = _plain(text.split('id="q-q1"', 1)[1].split('<article', 1)[0])
-    assert re.search(r"accepted \d{4}-\d{2}-\d{2} · note: the run holds e1", question), question
+    # closed form (owner, Nov 13 2026): the call's line is one link to what it is on, with no trailing id chip
+    assert re.search(r"accepted \d{4}-\d{2}-\d{2} · note: the run holds(?! e1)", question), question
     # c2 misses its rule and nobody has decided on it: the call rb status lists for the user waits on you
     assert [i["code"] for i in st["open"] if i["who"] == "human"] == ["undecided"]
     c2 = next(f for f in st["findings"] if f["criterion"] == "c2")
     # the call itself, once, by what it asks, with the command of each call rb offers on it
     assert "Your call (1)" in plain and plain.count(f"Review this result") >= 1
     row = text.split('data-fold="call-c2:row"', 1)[1].split("</details>", 1)[0]
-    assert '<p class="lab">Review this result</p>' in row and c2["statement"] in _plain(text.split('id="queue"', 1)[1].split("</section>", 1)[0])
+    assert '<p class="lab">Review this result</p>' in row and c2["statement"] in _plain(text.split('id="decisions"', 1)[1].split("</ul>", 1)[0])
     assert "Record a call" in plain
     for action in ("accept", "reject", "investigate"):
         assert f'<pre class="cmd">{html_mod.escape(f"rb decide c2 {action} --why {chr(39)}‹why›{chr(39)}", quote=True)}</pre>' in row, action
     assert "rb approve" not in plain
-    assert "rb status is right" in plain
+    assert "rb status is right" not in plain   # About no longer holds "How to read this record" (Nov 12 20:35 +08)
     assert "\u2014" not in text                     # no em dashes, anywhere
     # Guarantee 29, as test_export.py SMALL_PAGE. Raised from 210,000 to 212,000 on the orchestrator's call of Oct 27,
     # 20:00 +08 (FIX8): the Rerun panel's commands and A's script. The last raise before launch: what adds to the
     # small page from here cuts as much as it adds.
-    assert env.data["bytes"] < 212_000
-    # The glosses exist once each.
-    assert plain.count("each rule is read on axes") == 1
-    assert plain.count("Each run keeps when its output was produced and when it was recorded") == 1
+    assert env.data["bytes"] < 225_000          # raised with test_export.py SMALL_PAGE (cf-2, closed form's measured growth)
+    # No line explains a view or how to read the record (no glossary, show instead, Nov 12 20:35 +08).
+    assert plain.count("each rule is read on axes") == 0
+    assert plain.count("Each run keeps when its output was produced and when it was recorded") == 0
     assert 'id="x-e1"' in text and 'href="#x-e1"' in text  # the map links to the card, inertly
-    assert "Experiment · accepted · 1 run" in plain
+    # closed form (owner, Nov 13 2026): the experiment's header is a row of chips (its state opens why, its runs its runs),
+    # said whole to a screen reader
+    assert 'aria-label="Experiment · accepted · 1 run"' in text and "Experiment✓accepted1 run" in plain
+    assert '<a class="fch fch-use" href="#x-e1:runs">1 run</a>' in text
     # the call made, rb status lists no call for the user and the page has nothing waiting on you
     assert repo("decide", "c2", "reject", "-m", "0.1 was never the bar")[0] == 0
     assert [i for i in state().status()["open"] if i["who"] == "human"] == []
     code, env = repo("page")
     text = Path(env.data["path"]).read_text(encoding="utf-8")
-    # Your call says it holds none, wherever the page names it, and no call is listed anywhere
-    assert code == 0 and set(re.findall(r"Your call \((\d+)\)", _plain(text))) == {"0"} and 'class="callrow"' not in text and 'id="call-' not in text
+    # Your call counts what still waits, a design to confirm alone (the rulings of Nov 12 07:15 +08: a confirmation is
+    # your call too), wherever the page names it, and no call is listed anywhere
+    waits = repo("status")[1].data["overview"]["decisions"]
+    assert all(d["kind"] == "confirm" for d in waits)
+    assert code == 0 and set(re.findall(r"Your call \((\d+)\)", _plain(text))) == {str(len(waits))} and 'class="callrow"' not in text and 'id="call-' not in text
     # with three runs rb gives an interval, and each verdict says it (FIX3)
     for top1 in ("0.78", "0.8"):
         assert repo("run", "add", "e1", f"top1={top1}", "loss=0.4")[0] == 0
@@ -230,7 +261,8 @@ def test_a_rule_met_on_evidence_with_a_problem_is_never_green(repo):
         assert repo("run", "add", "e1", f"top1={top1}", "loss=0.4")[0] == 0
     for top1 in ("0.8", "0.82", "0.84"):
         assert repo("run", "add", "e2", f"top1={top1}")[0] == 0
-    words = {"c1": "rule met", "g1": "gate met", "c3": "rule met"}
+    # closed form (owner, Nov 13 2026): the pages say a rule holds
+    words = {"c1": "rule holds", "g1": "gate holds", "c3": "rule holds"}
     # the finding cards (C's nodes.rs) say their verdict once (FIX2); a card is green ("crit is-good") only when sound
 
     def drawn() -> dict:
@@ -269,15 +301,16 @@ def test_a_rule_met_on_evidence_with_a_problem_is_never_green(repo):
 
     # a gate met is neutral (D4): no colour on its finding and in a count, the list's dim on its bar, never good
     # (a question's line is its card's: "Rules: 2 met", the gate's count the list's dim, plain words pass 3)
+    # closed form (owner, Nov 13 2026): the counts say "hold" and "does not hold"
     good = {"findings": {**dict.fromkeys(words, "good"), "g1": ""}, "bars": {**dict.fromkeys(words, "good"), "g1": "mute"},
-            "does the page tell the truth": {"2 met": "good", "1 not met": "bad", "1 gate met": "mute"},
-            "the experiment": {"1 rule met": "good", "1 rule not met": "bad", "1 gate met": ""},
-            "does it hold up": {"1 met": "good"}, "the follow-up": {"1 rule met": "good"}}
+            "does the page tell the truth": {"2 hold": "good", "1 does not hold": "bad", "1 gate holds": "mute"},
+            "the experiment": {"1 rule holds": "good", "1 rule does not hold": "bad", "1 gate holds": ""},
+            "does it hold up": {"1 holds": "good"}, "the follow-up": {"1 rule holds": "good"}}
     assert drawn() == good
     Path("configs/train.yaml").write_text("optim:\n  lr: 0.002\n", encoding="utf-8")
     assert drawn() == {**good, "findings": {**good["findings"], "c3": ""}, "bars": {**good["bars"], "c3": "mute"},
-                       "does the page tell the truth": {"2 met": "mute", "1 not met": "bad", "1 gate met": "mute"},
-                       "does it hold up": {"1 met": "mute"}, "the follow-up": {"1 rule met": ""}}
+                       "does the page tell the truth": {"2 hold": "mute", "1 does not hold": "bad", "1 gate holds": "mute"},
+                       "does it hold up": {"1 holds": "mute"}, "the follow-up": {"1 rule holds": ""}}
 
 
 def test_the_page_leaves_the_users_words_out(repo, capsys, monkeypatch):
@@ -301,9 +334,11 @@ def test_the_page_leaves_the_users_words_out(repo, capsys, monkeypatch):
     # the call, with its reason the session's note, on its question's view and on its experiment's
     question = _plain(text.split('id="q-q1"', 1)[1].split("<article", 1)[0])
     # the call's line first, what it is on trailing (design pass 1, P3)
-    assert f"accepted {decided['at'][:10]} · note: two runs above the bar e1" in question
+    # closed form (owner, Nov 13 2026): the call's line is one link to what it is on, with no trailing id chip
+    assert f"accepted {decided['at'][:10]} · note: two runs above the bar" in question
     record = text.split('id="x-e1"', 1)[1].split("</article>", 1)[0]
-    assert f"<dt>decision</dt><dd><span>accepted {decided['at'][:10]} · note: </span><span class=\"au\">two runs above the bar</span>" in record
+    # closed form (owner, Nov 13 2026): the decision's line is a link to its field card
+    assert f"<dt>decision</dt><dd><a href=\"#k-e1\"><span>accepted {decided['at'][:10]} · note: </span><span class=\"au\">two runs above the bar</span>" in record
     assert "your words" not in plain and "accept e1 for me" not in plain and "say so if it slips" not in text
     assert text.count("<script>") == 1  # only the fixed navigation script, never authored markup
     assert "under grant" not in plain
@@ -317,9 +352,11 @@ def test_a_level_says_what_it_is_when_pointed_at(repo, capsys):
     code, env = repo("page")
     assert code == 0
     text = Path(env.data["path"]).read_text(encoding="utf-8")
-    assert re.search(r'<span class="term" data-hint="one arm on its own, with its interval, so neither better nor worse"[^>]*>measured</span>', text)
-    stand = text.split('id="c-c1"', 1)[1].split('<p class="str">', 1)[1].split("</p>", 1)[0]
-    assert stand.count(">measured<") == 0          # what the reading is is never its state (plain words pass 4)
+    assert "data-hint" not in text and "neither better nor worse" not in text
+    # what the reading is is never its state (plain words pass 4): neither its sentence nor its drawn mark says measured
+    card = text.split('id="c-c1"', 1)[1].split('<div class="card', 1)[0]
+    stand = card.split('<p class="str">', 1)[1].split("</p>", 1)[0] if '<p class="str">' in card else card.split('<div class="vs">', 1)[1].split("</div>", 1)[0]
+    assert stand.count(">measured<") == 0 and 'aria-label="measured"' not in stand, stand
 
 
 def test_a_rule_met_only_on_its_estimate_is_never_drawn_green(repo, capsys):
@@ -337,15 +374,17 @@ def test_a_rule_met_only_on_its_estimate_is_never_drawn_green(repo, capsys):
     def finding(text: str, cid: str) -> str:
         return text.split(f'id="c-{cid}"', 1)[1].split('<div class="card', 1)[0]
 
-    # the finding cards (C's nodes.rs) say their verdict once (FIX2): a rule met on its estimate alone says its interval
-    # does not show it yet, and its card is never green; a rule met across its interval is
+    # the finding cards (C's nodes.rs) say their verdict once (FIX2), as the mark beside rb's drawn number, with no
+    # sentence repeating it: a rule met on its estimate alone has a check in no state's colour, named as rb's headline
+    # names it, and its card is never green; a rule met across its interval is green, its check its verdict
     def met(cid: str) -> bool:
         card = finding_card(cid)
-        return card.startswith('<div class="card crit is-good"') and "<p class=\"str\">Met: " in card and "does not show it yet" not in card
+        # closed form (owner, Nov 13 2026): the mark names the rule's state in the pages' words, "holds"
+        return card.startswith('<div class="card crit is-good"') and '<span class="vmk ok" role="img" aria-label="holds">' in card and "<p class=\"str\">" not in card and "does not show it yet" not in card
 
     def dim(cid: str) -> bool:
         card = finding_card(cid)
-        return not card.startswith('<div class="card crit is-good"') and "<p class=\"str\">Met: " in card and "its interval does not show it yet" in card
+        return not card.startswith('<div class="card crit is-good"') and '<span class="vmk est" role="img"' in card and "<p class=\"str\">" not in card
 
     def tallied(text: str) -> None:
         # the count of met rules is green only when every rule it counts is: here c1 is met on its estimate alone, so
@@ -354,16 +393,18 @@ def test_a_rule_met_only_on_its_estimate_is_never_drawn_green(repo, capsys):
         # (the question's line links its count where a readings group holds it: a link, never green)
         # (each tally led by what it counts: "Rules: 2 met", plain words pass 3)
         # and the rules of it met on the estimate alone are said with it (a tally never hides a reading's outcome)
-        said = re.findall(r'<(?:span|a)((?: [\w-]+="[^"]*")*)>2 (?:rules )?met(?:, [^<]*on the estimate alone)?</', text)
+        # (Rules' tally is a row of filter chips, rec-2: a button, never green either)
+        # closed form (owner, Nov 13 2026): the pages say "2 hold", "2 rules hold"
+        said = re.findall(r'<(?:span|a|button)((?: [\w-]+="[^"]*")*)>2 (?:rules )?hold(?:, [^<]*on the estimate alone)?</', text)
         assert len(said) >= 4 and not [a for a in said if "good" in a], said
-        assert re.search(r'class="sw mute"[^>]*>2 met[,<]', text) and not re.search(r'class="sw good"[^>]*>2 met[,<]', text)
+        assert re.search(r'class="sw mute"[^>]*>2 hold[,<]', text) and not re.search(r'class="sw good"[^>]*>2 hold[,<]', text)
         row = text.split('<div class="srow" data-go="x-e1">', 1)[1].split("</div></div>", 1)[0]
-        assert re.search(r'<span class="tl"><span class="k">Rules: </span><span>2 rules met, [^<]*on the estimate alone</span>', row), row
+        assert re.search(r'<span class="tl"><span class="k">Rules: </span><span>2 rules hold, [^<]*on the estimate alone</span>', row), row
 
     text = page()
     finding_card = lambda cid: text[text[:text.index(f'id="c-{cid}"')].rindex("<div"):].split('<div class="card', 2)[1].join(['<div class="card', ""])
     assert dim("c1") and dim("c3")
-    assert not re.search(r'class="sw good" href="#c-\w+:rule">(?:criterion|rule) met<', text)
+    assert not re.search(r'class="sw good" href="#c-\w+:rule">(?:criterion|rule) (?:met|holds)<', text)
     tallied(text)
     for top1 in ("0.62", "0.95"):
         assert repo("run", "add", "e1", f"top1={top1}", "loss=0.4")[0] == 0
@@ -403,7 +444,9 @@ def test_the_page_is_one_self_contained_file_written_where_asked(repo, capsys, t
     assert low.count("<script>") == 1 and "<script src=" not in low
     script = text.split("<script>", 1)[1].split("</script>", 1)[0]
     assert "fetch(" not in script and "xmlhttprequest" not in script.lower()
-    assert "http://" not in low and "https://" not in low
+    # an inline SVG icon's namespace (a name, never fetched) is the one address the page may hold
+    unfetched = low.replace("xmlns=%22http://www.w3.org/2000/svg%22", "")
+    assert "http://" not in unfetched and "https://" not in unfetched
     assert text.startswith("<!doctype html>")
     code2, env2 = repo("page", "--out", str(out))        # regenerating is idempotent apart from the clock
     assert code2 == 0
@@ -419,7 +462,7 @@ def test_views_keep_the_overview_small_and_deep_links_open_only_the_needed_evide
     page = Path(env.data["path"])
     text = page.read_text(encoding="utf-8")
     overview = text.split('<div class="sec" id="sec-overview">', 1)[1].split('<div class="sec" id="sec-research">', 1)[0]
-    assert 'id="queue"' in overview and 'href="#q-q1"' in overview
+    assert 'id="decisions"' in overview and 'href="#q-q1"' in overview
     assert '<table' not in overview and "by record times" not in overview
     assert "it cannot lie by construction" not in overview      # the experiment's hypothesis is its view's, not the Overview's
     views = re.findall(r'<section class="view"[^>]*\bid="([^"]+)"', text)
@@ -517,7 +560,7 @@ def test_expanded_comparison_keeps_same_variant_scopes_and_fixed_design_cells(re
     plain = _plain(text)
     assert "subject where loops=8" in plain and "reference where loops=6" in plain
     assert finding.data["finding"]["says"]["units"] in plain
-    assert "Fixed design cells" in plain and "Within-cell units" in plain
+    assert "Fixed design cells" not in plain and "Within-cell units" in plain   # the label is off the screen; the cells are drawn
     assert "width 512" in plain and "width 768" in plain
     overview = text.split('<div class="sec" id="sec-overview">', 1)[1].split('<div class="sec" id="sec-research">', 1)[0]
     assert "Within-cell units" not in overview
@@ -537,7 +580,8 @@ def test_declared_comparison_leads_overview_and_its_authored_parts_are_earned(re
     summary = rel.data["relation"]["summary"]
     _, page = repo("page")
     text = Path(page.data["path"]).read_text(encoding="utf-8")
-    overview = text.split('<div class="sec" id="sec-overview">', 1)[1].split('<div class="sec" id="sec-research">', 1)[0]
+    # the question's card leads with the computed comparison: on Research since UX5 round 1, where the cards are
+    overview = re.search(r'<section class="stand[^"]*" id="rs-budgets".*?</section>', text, re.S).group(0)
     assert summary in _plain(overview) and "1 declared comparison" in overview
     assert words not in _plain(overview)
     findings = text.split('<div class="nodes">', 1)[1]
@@ -657,7 +701,7 @@ def test_no_page_runs_past_the_screen_at_390_px(tmp_path, monkeypatch):
     # the export form, as rb sync sends it: it names the hub's script (data-shell) and runs none of its own, so the
     # hub's tiers below run one copy of script.js
     assert 'data-shell="sha256:' in exported and "<script>" not in exported and "<script " not in exported.replace('<script type="application/json"', "")
-    script = (Path(__file__).resolve().parent.parent / "rust" / "src" / "shell" / "assets" / "script.js").read_text(encoding="utf-8")
+    script = (Path(__file__).resolve().parent.parent / "rust" / "src" / "shell" / "assets" / "script.min.js").read_text(encoding="utf-8")
     for viewer in ("owner", "reader"):
         for clone in (True, False):
             metas = f'<meta name="rb-viewer" content="{viewer}">' + ('<meta name="rb-clone" content="https://pages.example.org/int8/bundle.zip">' if clone else "")

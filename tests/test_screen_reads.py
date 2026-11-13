@@ -63,24 +63,34 @@ def test_the_screen_reads_what_rb_found_its_card_and_a_records_card(repo):
 
 
 def test_the_modal_says_what_a_yes_records_and_no_id(repo):
-    """y on what rb found asks for a note and says what it records, a run, through the rb run add anyone would type:
-    who it is recorded as is rb's to decide (the user, at their own terminal), and the screen names no one."""
-    from rabbit_brain.tui import YES_RECORDS, HomeScreen, RBApp, Reason
+    """What rb found opens its small panel from its Files row (TUI-PARITY M23): it shows what the file becomes, `→ a run
+    of e1`, and no sentence and no one's name; y asks for a note, and escape records nothing."""
+    from rabbit_brain.tui import HomeScreen, RBApp
+    from rabbit_brain.tui_panels import FoundPanel
 
     assert home().weak_identity is None       # git identity set: no warning
     _found_one()
+    said = {}
 
     async def drive():
         app = RBApp(Path.cwd())
         async with app.run_test(size=(110, 32)) as pilot:
-            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and getattr(app.focused, "id", None) == "calls")
-            await pilot.press("y")                              # y at home acts on the highlighted call
-            await until(pilot, lambda: isinstance(app.screen, Reason))
-            assert isinstance(app.screen, Reason)
-            assert app.screen.sub == YES_RECORDS == "recorded as a run, with this note, through the same rb run add anyone would type"
+            await until(pilot, lambda: isinstance(app.screen, HomeScreen) and bool(app.screen._asks))
+            s = app.screen
+            await pilot.press("f")
+            await pilot.pause(0.6)
+            fl = s.query_one("#files-list")
+            fl.focus()
+            fl.highlighted = next(i for i in range(fl.option_count) if (fl.get_option_at_index(i).id or "").startswith("found:"))
+            await pilot.press("enter")
+            await until(pilot, lambda: isinstance(app.screen, FoundPanel))
+            await pilot.press("y")
+            await pilot.pause(0.3)
+            said["text"] = "\n".join(str(w.render()) for w in app.screen.query("Static"))
             await pilot.press("escape")
 
     asyncio.run(drive())
+    assert "→ a run of e1" in said["text"] and "rb run add" not in said["text"] and "human:" not in said["text"], said
     assert len(state().records("run", live=True)) == 1                  # escape records nothing
 
 

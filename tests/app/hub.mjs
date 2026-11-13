@@ -16,7 +16,8 @@ const j = x => JSON.stringify(x);
 // the record's title as the page's <title> says it, and the visible elements outside the working view and the
 // inspector that say it
 const TWICE = `(() => {
-  const t = (document.querySelector('#overview h1') || {}).textContent || '';
+  // (the record's title: the Overview's data-title, since its h1 is the question there, UX5 1.2)
+  const t = (document.querySelector('#overview') || { dataset: {} }).dataset.title || '';
   const vis = e => e.checkVisibility() && e.getBoundingClientRect().height > 0;
   const said = Array.from(document.querySelectorAll('body *')).filter(e => !e.closest('main, aside, script, style, title') && e.children.length === 0 && vis(e) && t && e.textContent.trim() && t.includes(e.textContent.trim()) && e.textContent.trim().length > 12);
   const bar = document.querySelector('header.top');
@@ -54,7 +55,7 @@ await run(async () => {
   check(`hub: About is in the navigator and opens its view [1440]`, !!about && onAbout === 'about', j({ about: about && about.text, onAbout }));
   }
   await open(p, a.url, 390); await sleep(200);
-  const nav = await p.clickEl(`Array.from(document.querySelectorAll('#nav a[href^="#"], #nav summary, #nav button')).find(e => e.checkVisibility() && e.getAttribute('href') !== '#overview')`); await sleep(300);
+  const nav = await p.clickEl(`Array.from(document.querySelectorAll('#nav a[href^="#"], #nav summary, #nav button:not(.fclose)')).find(e => e.checkVisibility() && e.getAttribute('href') !== '#overview')`); await sleep(300);
   // under 1280 the hub's slim bar says the view's name alone (R's one bar): the page's own bar shows nothing else
   const after = await p.ev(`(() => { const t = document.querySelector('header.top'), v = document.querySelector('main .view.on') || {};
     return { view: v.id, crumb: (v.dataset && v.dataset.crumb) || '', bar: t && t.checkVisibility() ? t.innerText.replace(/\\s+/g, ' ').trim() : '' }; })()`);

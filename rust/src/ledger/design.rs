@@ -390,11 +390,9 @@ impl Design {
         if by.is_empty() {
             return String::new();
         }
-        // a gate whose confirmation git took out (N3) reads as neither a session's nor confirmed: its experiment's
-        // lines say the take-out, and rb doctor --restore gives the confirmer back
-        if key == "gate" && !self.taken.is_empty() {
-            return String::new();
-        }
+        // a gate whose design's confirmation git took out (N3) reads as the record on disk has it, a session's that
+        // waits (MP-1111-0952's F3): its line keeps "· not confirmed" and offers no command while the take-out stands,
+        // and rb doctor --restore gives the confirmer back
         let a_session = |waits: bool| if waits && theirs(by) && !self.session.is_empty() { Some(self.session.clone()) } else { None };
         match (key, &self.confirmed) {
             ("gate", Some((_, confirmer))) if !theirs(by) && self.covers_gate() => confirmer.clone(),
@@ -2147,6 +2145,54 @@ impl Ledger {
         out.extend(d.change_lines());
         // what is left of the record's words, ids and roles among them, shows as it is held, never acted on
         Ok(out.iter().map(|l| visible(l)).collect())
+    }
+
+    /// The listing of a design as rows (TUI-PARITY M21, section 6): its variants, each setting with its value as rb
+    /// confirm says it and the file its source names, each criterion with its statement; and `lines`, rb confirm's own
+    /// lines for it (`design_said`), which rb ui draws whole, wrapped and never cut, and confirms by the design's own
+    /// command, so it confirms exactly what it listed.
+    pub fn design_items(&self, exp: &Experiment) -> Res<Value> {
+        let variants: Vec<String> = exp.live_variants().iter().map(|v| v.name.clone()).collect();
+        let settings: Vec<Value> = exp
+            .all_settings()
+            .into_iter()
+            .map(|(full, s)| {
+                let file = s.source.as_ref().and_then(|src| src.path.clone().or_else(|| src.url.clone())).unwrap_or_default();
+                crate::obj! {"name" => visible(&full), "value" => visible(&setting_value(s)), "file" => visible(&file)}
+            })
+            .collect();
+        let checks: Vec<Value> = self
+            .criteria_of(&exp.id)?
+            .iter()
+            .filter(|c| c.retracted.is_none())
+            .map(|c| crate::obj! {"id" => c.id.clone(), "statement" => visible(&c.statement)})
+            .collect();
+        // every other part the confirmation covers (its questions, hypothesis or purpose, why, gate, freeze, amendments,
+        // what changed since the user confirmed it), as rb confirm lists it: label and value, so nothing it confirms hides
+        let d = self.pending_designs()?.into_iter().find(|(e, _)| e.id == exp.id).map(|(_, d)| d);
+        let mut parts: Vec<Value> = Vec::new();
+        // rb confirm's own lines for it, whole and in its order: what rb ui draws, so the hash `c` confirms by covers
+        // nothing the listing leaves out (each rule's metric, threshold, role and question link, the variants' roles, a
+        // source in full)
+        let said = match &d {
+            Some(d) => self.design_said(exp, d)?,
+            None => Vec::new(),
+        };
+        if d.is_some() {
+            for line in said.clone() {
+                if line.starts_with("setting ") || line.starts_with("criterion ") || line.starts_with("variants: ") || line == "no variants" {
+                    continue;
+                }
+                let (label, value) = match line.split_once(": ") {
+                    Some((l, v)) if !l.contains(' ') || l.starts_with("amended ") => (l.to_string(), v.to_string()),
+                    _ => (String::new(), line.clone()),
+                };
+                parts.push(crate::obj! {"label" => label, "value" => value});
+            }
+        }
+        let varies = exp.varies.join(", ");
+        Ok(crate::obj! {"variants" => Value::list_of_str(variants), "varies" => visible(&varies), "settings" => Value::List(settings),
+            "checks" => Value::List(checks), "parts" => Value::List(parts), "lines" => Value::list_of_str(said)})
     }
 
     /// Who an experiment's why reads as written by on a screen: whoever last wrote the why, as the lines that say so

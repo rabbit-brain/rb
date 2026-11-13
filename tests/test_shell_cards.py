@@ -49,23 +49,24 @@ def test_every_object_has_its_card_once(record, surface):
 
 
 def test_a_finding_card_keeps_its_levels(record):
-    """c1's card, in OVERVIEW-V2's levels: Understand (its standing), then Examine (reading, declared criterion, what it
-    rests on and what rests on it, in that order and unfolded), then "Source details", folded, every receipt row rb
-    gives drawn inside it. c2, which a call waits on, ends in Decide."""
+    """c1's card, in its levels: Understand (its title and its parts as tabs), then Examine (Result, Rule, Runs, Used by
+    and Source, in that order), Source ending in "How rb worked it out", folded, every receipt row rb gives drawn inside
+    it. c2, which a call waits on, ends in Decide."""
     page = drawn_or_pending(record, "page", "owner", "R1")
     start = page.index(' id="c-c1"')
-    end = page.index("</details></div>", start)
+    end = page.index("</details></section>", start)
     c1 = page[start:end]
-    marks = ['data-level="understand"', 'class="stand"', 'data-level="examine"', 'id="c-c1:reading"', 'id="c-c1:rule"', 'id="c-c1:runs"',
-             'id="c-c1:impact"', '<details class="fold lv src" data-level="trace" data-fold="c-c1:source"><summary>Source details</summary>']
+    marks = ['data-level="understand"', '<nav class="secnav tabs"', 'data-level="examine"', 'id="c-c1:reading"', 'id="c-c1:rule"', 'id="c-c1:runs"',
+             'id="c-c1:impact"', 'id="c-c1:source"', '<details class="fold how" data-fold="c-c1:how"><summary>How rb worked it out</summary>',
+             'id="c-c1:receipts"']
     at = [c1.index(m) for m in marks]
     assert at == sorted(at), dict(zip(marks, at))
-    assert "<details" not in c1[:at[-1]]
+    assert "<details" not in c1[:at[-2]] and 'data-level="trace"' not in c1
     c2 = page[page.index(' id="c-c2"'):]
     c2 = c2[:c2.index('<div class="card')] if '<div class="card' in c2 else c2
-    assert c2.index('data-level="trace"') < c2.index('data-level="decide" id="c-c2:decide"'), "Decide comes after Source details"
+    assert c2.index('id="c-c2:source"') < c2.index('data-level="decide" id="c-c2:decide"'), "Decide comes after Source"
     doc = example("owner")
-    text = said(html.unescape(re.sub(r"<[^>]+>", "", page[start:page.index("</div>", end + 10)])))
+    text = said(html.unescape(re.sub(r"<[^>]+>", "", page[start:page.index('<div class="card', end)])))
     for row in doc["findings"]["c1"]["receipt_rows"]:
         assert said(row[1]) in text, row
 
@@ -76,8 +77,9 @@ PLAIN = {"criterion met": "rule met", "criterion not met": "rule not met", "crit
 
 
 # the state word a rule's verdict leads with (nodes.rs verdict), by rb's state
-STATE_WORD = {"meets": "Met", "gate met": "Met", "misses": "Not met", "gate missed": "Not met", "reproduced": "Reproduced",
-              "not reproduced": "Not reproduced", "undetermined": "Can't tell yet", "gate undetermined": "Can't tell yet",
+# closed form (owner, Nov 13 2026): the pages say a rule holds, does not hold or is not settled
+STATE_WORD = {"meets": "Holds", "gate met": "Holds", "misses": "Does not hold", "gate missed": "Does not hold", "reproduced": "Reproduced",
+              "not reproduced": "Not reproduced", "undetermined": "Not settled", "gate undetermined": "Not settled",
               "untested": "Not tested", "gate untested": "Not tested"}
 
 
@@ -87,20 +89,39 @@ def said_count(text: str, phrase: str) -> int:
     return len(re.findall(pat, text.lower()))
 
 
+def rbs_count(tree, el, phrase: str, quoted=()) -> int:
+    """said_count over a card's text in rb's voice: closed form (owner, Nov 13 2026) says a rule "holds", a word a
+    statement may hold in its own words ("int8 holds top1 ..."), so the author's text (class "au") is not counted, nor
+    a line the card quotes as given (`quoted`: the call it rests on, "accepted 2026-10-14: holds on all three seeds")."""
+    authors = [e for e in tree.all(el) if isinstance(e, dict) and "au" in e["attrs"].get("class", "").split()]
+    return (said_count(said(tree.text(el)), phrase) - sum(said_count(said(tree.text(a)), phrase) for a in authors)
+            - sum(said_count(said(q), phrase) for q in quoted if q))
+
+
 @pytest.mark.parametrize("surface", ["page", "export"])
 def test_a_rule_card_says_its_verdict_once(record, surface):
-    """A rule's card says its verdict once, under its title (FIX2): its state phrase is said once in the card's text,
-    no state words follow the verdict, checks are a row of The rule as written, and its call box says no state."""
+    """A rule's card says its verdict once: drawn with a mark (met or missed), the mark beside rb's number names its
+    state and no words say it; otherwise its state phrase is said once in the card's text (FIX2). No state words follow
+    the verdict, checks are a row of rb's working under Source (never the Rule part), and its call box says no state."""
     tree = Tree(drawn_or_pending(record, surface, "owner", "R1"))
     doc = example("owner")
     for cid, f in doc["findings"].items():
         el = card(tree, f"c-{cid}")
         text = said(tree.text(el))
         word = STATE_WORD[f["state"]]
-        assert said_count(text, word) == 1, (cid, word, text)
+        marks = select(tree, f"#c-{cid} span.vmk")
+        if marks:
+            est = "est" in marks[0]["attrs"].get("class", "")
+            assert len(marks) == 1 and (marks[0]["attrs"].get("aria-label", "") in ("estimate meets criterion", "reproduced on the estimate", "recorded values meet criterion", "reproduced on the recorded values") if est else marks[0]["attrs"].get("aria-label", "").lower() == word.lower()), (cid, word, marks)
+            assert rbs_count(tree, el, word, [(f.get("rests_on") or {}).get("call")]) == 0 and not select(tree, f"#c-{cid} p.str"), (cid, word, text)
+        else:
+            assert rbs_count(tree, el, word, [(f.get("rests_on") or {}).get("call")]) == 1, (cid, word, text)
         assert not select(tree, f"#c-{cid} p.sti"), cid
         rule = tree.by_id(f"c-{cid}:rule")
-        assert not f["says"].get("integrity") or "checks" in said(tree.text(rule)), cid
+        assert "checks" not in said(tree.text(rule)), cid
+        how = select(tree, f"#c-{cid} details.how")
+        # closed form (owner, Nov 13 2026): the row of rb's checks is labelled "what rb checked"
+        assert not f["says"].get("integrity") or (how and "what rb checked" in said(tree.text(how[0]))), cid
         for part in [p for p in [tree.by_id(f"c-{cid}:decide")] if p is not None]:
             for w in set(STATE_WORD.values()):
                 assert said_count(said(tree.text(part)), w) == 0, (cid, w, said(tree.text(part)))
@@ -115,8 +136,14 @@ def test_numbers_and_standing_drill(record):
     for cid, f in doc["findings"].items():
         if f["reading"]["estimate_text"]:
             assert any(f["reading"]["estimate_text"] in t for h, t in links if h == f"#c-{cid}:runs"), cid
-        # the verdict leads with the rule's state word, once (FIX2); its numbers drill (above)
-        assert said(tree.text(select(tree, f"#c-{cid} p.str")[0])).startswith(STATE_WORD[f["state"]] + ":"), cid
+        # the verdict leads with the rule's state word, once (FIX2), or is the mark beside rb's drawn number, which
+        # names it; its numbers drill (above)
+        stand = select(tree, f"#c-{cid} p.str")
+        if stand:
+            assert said(tree.text(stand[0])).startswith(STATE_WORD[f["state"]] + ":"), cid
+        else:
+            [mark] = select(tree, f"#c-{cid} span.vmk")
+            assert (mark["attrs"].get("aria-label", "") in ("estimate meets criterion", "reproduced on the estimate", "recorded values meet criterion", "reproduced on the recorded values")) if "est" in mark["attrs"].get("class", "") else mark["attrs"].get("aria-label", "").lower() == STATE_WORD[f["state"]].lower(), (cid, mark)
         for o in f["observations"]:
             # the value as the card says it (two decimals, more where two would read alike; DESIGN-PASS-1 P5), rb's own
             # digits on hover, drilling to the run
@@ -179,9 +206,16 @@ def test_an_export_offers_no_control(record):
         assert ("rb decide" in text) == (viewer != "reader"), viewer
         assert ("Your call" in text) == (viewer == "owner"), viewer
         assert ("Still open" in text) == (viewer == "reader"), viewer
-    # with no viewer named the whole export, cards and views, holds no button or field: the composer is the owner's
+    # with no viewer named the whole export, cards and views, holds no button or field that acts: the composer is the
+    # owner's. What only changes what is shown or copies a hash is no action: Decisions' filter chips, the sha256 copy
+    def acts(e) -> bool:
+        a = e["attrs"]
+        cls = a.get("class", "").split()
+        # what only shows, filters or copies (rec-2: Rules' filter chips, the commit's copy, the Files tree's filter and
+        # its close) is no action either
+        return not ((a.get("data-filter") and "dchip" in cls) or a.get("data-act") == "copy-text" or {"rflt", "gcopy", "ffilter", "fclose"} & set(cls))
     whole = as_viewer(page, "none")
-    assert not {"button", "input"} & {e["tag"] for e in whole.all()}
+    assert not [e["attrs"] for e in whole.all() if e["tag"] in ("button", "input") and acts(e)]
     # with no viewer named the export is as it was: the composer is drawn for the owner alone
     for m in re.finditer(r'<(?:div|button|input)[^>]*class="(?:seg|composer)"[^>]*>', page):
         assert 'data-vw="owner"' in m.group(0), m.group(0)
@@ -265,7 +299,7 @@ await send('Page.navigate', { url: 'file://' + file });
 await new Promise(r => setTimeout(r, 1500));
 await send('Emulation.setEmulatedMedia', { media: 'print' });
 const res = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
-  const rx = [...document.querySelectorAll('.card details.src > dl.rx')];
+  const rx = [...document.querySelectorAll('.card details.src > dl.rx, .card details.how > dl.rx')];
   const shown = rx.filter(e => e.checkVisibility());
   const seg = [...document.querySelectorAll('.card .seg, .card .composer')].filter(e => e.checkVisibility());
   // every fold of a card's Trace level (Source details, Reproduce this run) prints its first part, though closed
@@ -491,14 +525,28 @@ const res = await send('Runtime.evaluate', { returnByValue: true, expression: `(
   const card = [...document.querySelectorAll('.ibody .card.crit')].find(e => e.checkVisibility());
   if (!card) return { error: 'no criterion card in the inspector' };
   const levels = [...card.querySelectorAll('[data-level]')].map(e => e.dataset.level);
-  const src = card.querySelector('details[data-level="trace"]');
+  const src = card.querySelector('details.fold.how');
   const dl = src && src.querySelector('dl.rx');
   const ex = card.querySelector('[data-level="examine"]');
   const dec = card.querySelector('[data-level="decide"]');
   return { cid: ${JSON.stringify(cid)}, levels, src_open: src ? src.open : null, src_summary: src ? src.querySelector('summary').textContent : '',
            receipts_shown: dl ? dl.checkVisibility() : null, examine_shown: !!ex && ex.checkVisibility(),
-           decide: !!dec, decide_shown: !!dec && dec.checkVisibility() };
+           decide: !!dec, decide_shown: !!dec && dec.checkVisibility(),
+           decide_tab: !!card.querySelector('[role="tablist"] a[role="tab"][href$=":decide"]') };
 })()` });
+// the Decide tab, picked: its part shows, and the Result's does not
+await send('Runtime.evaluate', { expression: `(() => {
+  const card = [...document.querySelectorAll('.ibody .card.crit')].find(e => e.checkVisibility());
+  const t = card && card.querySelector('[role="tablist"] a[role="tab"][href$=":decide"]'); if (t) t.click();
+})()` });
+await new Promise(r => setTimeout(r, 300));
+const picked = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+  const card = [...document.querySelectorAll('.ibody .card.crit')].find(e => e.checkVisibility());
+  const dec = card && card.querySelector('[data-level="decide"]');
+  const res = card && card.querySelector('section.part[data-id$=":reading"]');
+  return { decide_picked: !!dec && dec.checkVisibility(), result_hidden: !!res && !res.checkVisibility() };
+})()` });
+Object.assign(res.result.result.value || {}, picked.result.result.value || {});
 if (shot) {
   const fs = await import('node:fs');
   let img = await send('Page.captureScreenshot', { format: 'png' });
@@ -506,7 +554,7 @@ if (shot) {
   // and its lower levels: Source details, shut, and Decide
   await send('Runtime.evaluate', { expression: `(() => {
     const card = [...document.querySelectorAll('.ibody .card.crit')].find(e => e.checkVisibility());
-    const src = card && card.querySelector('details[data-level="trace"]'); if (src) src.scrollIntoView({ block: 'start' });
+    const src = card && card.querySelector('details.fold.how'); if (src) src.scrollIntoView({ block: 'start' });
   })()` });
   await new Promise(r => setTimeout(r, 300));
   img = await send('Page.captureScreenshot', { format: 'png' });
@@ -520,8 +568,9 @@ ws.close(); proc.kill();
 @pytest.mark.parametrize("width", [390, 1280])
 @pytest.mark.parametrize("scheme", ["light", "dark"])
 def test_a_card_in_the_inspector_shows_its_levels(request, tmp_path, width, scheme):
-    """A criterion card a call waits on, in the inspector (OVERVIEW-V2): Understand, Examine, then Source details shut
-    (its receipts one click down, never opened for the reader), then Decide, showing."""
+    """A criterion card a call waits on, in the inspector: Understand, Examine, then Decide, its parts as tabs; Source's
+    "How rb worked it out" shut (its receipts one click down, never opened for the reader); the Result shows first,
+    and the Decide tab, picked, shows Decide in its place."""
     needs("M0", "R1")
     chrome = shutil.which("google-chrome") or shutil.which("chromium") or os.environ.get("RB_TEST_CHROME")
     node = shutil.which("node")
@@ -541,10 +590,11 @@ def test_a_card_in_the_inspector_shows_its_levels(request, tmp_path, width, sche
     assert out.returncode == 0, out.stderr
     seen = json.loads(out.stdout.strip().splitlines()[-1])
     assert "error" not in seen, seen
-    assert seen["levels"][:3] == ["understand", "examine", "trace"], seen
-    assert seen["src_summary"] == "Source details" and seen["src_open"] is False and seen["receipts_shown"] is False, seen
+    assert seen["levels"][:2] == ["understand", "examine"] and seen["levels"][-1] == "decide" and "trace" not in seen["levels"], seen
+    assert seen["src_summary"] == "How rb worked it out" and seen["src_open"] is False and seen["receipts_shown"] is False, seen
     assert seen["examine_shown"], seen
-    assert seen["decide"] and seen["decide_shown"] and seen["levels"][-1] == "decide", seen
+    assert seen["decide"] and seen["decide_tab"] and not seen["decide_shown"], seen
+    assert seen["decide_picked"] and seen["result_hidden"], seen
 
 
 # A card of rb open's page in the inspector, at a width and a colour scheme, with its folds opened as a reader opens
@@ -634,17 +684,12 @@ def test_a_past_versions_cards_offer_no_command(request, tmp_path, monkeypatch, 
         assert seen["boxes"] == 0 and not any(c in seen["text"] for c in ("get_data.py", "quantize.py", "train.py", "rb decide")), seen
 
 
-def _glossary_id(term: str) -> str:
-    """strings.rs glossary_id: g-, the term in lower case, each run of other characters one hyphen."""
-    return "g-" + "-".join(w for w in re.split(r"[^a-z0-9]+", term.lower()) if w)
-
-
 @pytest.mark.parametrize("surface", ["page", "export"])
 def test_every_term_chip_on_a_real_page_carries_its_hover(int8_demo, tmp_path, surface):
-    """Plain words pass 2, on the INT8 demo's real rb page and rb export: every kind chip on a card that names a word
-    the page's glossary holds ("rule") carries rb's line for it on hover, described by its glossary entry, as does every
-    term a card draws; and rb's rule phrases on a card's standing line, rule row, call and figure read in the screens'
-    words (rule met, rule not met, can't tell yet, not tested), never criterion, criteria, untested or undetermined."""
+    """No glossary, show instead (Nov 12 20:35 +08), on the INT8 demo's real rb page and rb export: no kind chip or term
+    on a card carries a hover that defines it; and rb's rule phrases on a card's standing line, rule row, call and figure
+    read in the screens' words (rule met, rule not met, can't tell yet, not tested), never criterion, criteria, untested
+    or undetermined."""
     needs("M0", "R1")
     from rbtest import command
     if surface == "page":
@@ -657,23 +702,10 @@ def test_every_term_chip_on_a_real_page_carries_its_hover(int8_demo, tmp_path, s
                        encoding="utf-8", stdin=subprocess.DEVNULL, timeout=600)
     assert r.returncode == 0, r.stderr
     page = out.read_text(encoding="utf-8")
-    ids = set(re.findall(r' id="(g-[^"]+)"', page))
-    assert "g-rule" in ids, "the glossary holds rule"
     cards = _cards(page)
     chips = re.findall(r'<span class="kind">(.*?)</span>(?=<span class="(?:id|lab)"|</div>|<span class="dim)', cards)
-    named = [c for c in chips if _glossary_id(html.unescape(re.sub(r"<[^>]+>", "", c))) in ids]
-    assert len([c for c in named if re.sub(r"<[^>]+>", "", c) == "rule"]) >= 6, chips
-    # a term's line is written once a page (its first use), and its later uses name the glossary entry the script reads
-    bare = [c for c in named if not re.search(r'class="term"(?: data-hint="[^"]+")? aria-describedby="g-', c)]
-    assert not bare, f"chips with no hover: {bare[:5]}"
-    hinted = re.findall(r' data-hint="[^"]*" aria-describedby="(g-[^"]+)"', page)
-    assert len(hinted) == len(set(hinted)), "each term's line once a page"
-    # the hover is said once a card: "rule" on its chip, not again on its rule row
-    for c in re.findall(r'<div class="card crit[^"]*" id="c-[^"]+"', cards):
-        one = cards.split(c, 1)[1].split('<div class="card ', 1)[0]
-        assert one.count('aria-describedby="g-rule"') == 1, c
-    for hint, described in re.findall(r'<span class="term" data-hint="([^"]*)" aria-describedby="([^"]*)"', cards):
-        assert hint and described in ids, (hint, described)
+    assert len([c for c in chips if c == "rule"]) >= 6, chips
+    assert not re.findall(r' id="(g-[^"]+)"', page) and "data-hint" not in page and 'class="term"' not in page
     old = re.compile(r"\b(criterion|criteria|untested|undetermined)\b", re.I)
     said = re.findall(r'<p class="stand">(.*?)</p>', cards) + re.findall(r'<p class="reads">(.*?)</p>', cards)
     said += [dd.split('<span class="r2">')[0] for dd in re.findall(r'<dt>rule</dt><dd>(.*?)</dd>', cards)]

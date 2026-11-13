@@ -127,7 +127,9 @@ def states_in(lines: list, names: dict) -> dict:
 # is read. The repository's own lines (how git holds the record's files, what rb found when it checked them) say the
 # checkout, which a checkout changes by itself: they are read too, and are the one thing left out, by their keys.
 VOLATILE = re.compile(r"(^|_)(at|sha256|hash|digest|stamp|seconds|elapsed|port|url|href|checked_at|made_at|when|since|ago|last_looked|looked)$")
-CHECKOUT = {"place", "places", "repository", "checkout", "rb_delta", "scope", "page_says", "in_git", "evidence", "page_evidence", "record_files"}
+# (`files`, the files the record names with their marks, says the checkout's files: a checkout of the record moves
+# them with the record's own)
+CHECKOUT = {"place", "places", "repository", "checkout", "rb_delta", "scope", "page_says", "in_git", "evidence", "page_evidence", "record_files", "files"}
 # the lines that say how git holds the record's own files, which git's checkout changes by itself
 CHECKOUT_LINE = re.compile(r"record files?\b|all record files committed|rb checked the record with git|check it yourself|git -C .* status|^(- )?Not committed:")
 # lines that say no reading: the next commands, the log's own lines (Recent activity), and a label over the lines below
@@ -137,6 +139,12 @@ LABEL_LINE = re.compile(r"^(Next: |- T \w|experiment context: |On every \S+ crit
 AGGREGATE = {"counts", "witness", "record_start", "results", "tally", "tally_on_estimate", "history", "facts"}
 # the keys rb show's data and a card say what git took out of the record, or under it, before anything else
 TOOK_KEYS = {".taken_out", ".taken_under"}
+# who wrote a record, which a take-out of another write never empties (MP-1111-0952's F3: gate_by)
+WHO = {"by", "gate_by", "declared_by", "created_by", "set_by", "actor", "actor_via", "via", "session", "agent", "confirmed_by", "answered_by"}
+# a document's own top, which says what git took out of the whole record and nothing of any one line under it
+DOCUMENT = {"", ".home"}
+# the lists of items a document holds, each item of which says what git took out under it, as rb status's do (F1)
+ITEMS = (".home.open_items", ".home.unfiled.open_items", ".home.calls", ".open_items", ".unfiled.open_items", ".calls")
 IDENT = ("id", "criterion", "code", "address", "part", "name", "key", "path", "subject", "kind")
 
 
@@ -234,10 +242,44 @@ class PageText(HTMLParser):
                 frame[1] = t
 
 
-def page_units(path: Path) -> list:
+def page_units(path) -> list:
+    """A page's blocks, from its file or from its text (rb open's /, as it serves it)."""
     p = PageText()
-    p.feed(path.read_text(encoding="utf-8"))
+    p.feed(path.read_text(encoding="utf-8") if isinstance(path, Path) else path)
     return p.out
+
+
+# the lines that each stand for one thing a reader acts on (f13j item 1, MP-1111-0952's F1 to F3): an item under Also
+# open, a Your call line, a gate line. Each says the take-out itself, never by a line above it.
+FOCUS_HEAD = re.compile(r"^(Also open in the record|Your call \(\d+\)$)")
+GATE_HEAD = ("if it holds", "if not")
+GATE_LINE = re.compile(r"\b(if it holds|if not): ")
+
+
+def focus(blocks: list, ids) -> list:
+    """The page's lines that each stand for one thing: an item under Also open and a Your call line, each a row that
+    ends with its subject's chip (an id rb show takes, or a folder), and a gate's branch, under its "if it holds" or
+    "if not". Counts, commands and labels over a group say no one thing."""
+    ids = set(ids)
+    out = []
+    for b, heads in blocks:
+        words = b.split()
+        row = len(words) > 1 and (words[-1] in ids or words[-1].endswith("/")) and any(FOCUS_HEAD.search(h) for h in heads)
+        if row or (heads and heads[-1] in GATE_HEAD and b not in GATE_HEAD):
+            out.append(b)
+    return out
+
+
+def items_of(home: dict) -> list:
+    """rb open's items as its document holds them, each by its code and subject: those under Also open and the calls
+    that wait on the user."""
+    out = []
+    for g in (home.get("open_items") or []) + [{"items": (home.get("unfiled") or {}).get("open_items") or []}]:
+        for i in g.get("items") or []:
+            out.append((f"{i.get('code')} {i.get('subject')}", i.get("what") or "", marked(i.get("what")) or marked(i.get("taken_out"))))
+    for c in home.get("calls") or []:
+        out.append((f"call {c.get('subject')}", c.get("text") or "", marked(c.get("text")) or marked(c.get("taken_out"))))
+    return out
 
 
 # every kind of record rb show takes, as `rb schema ir` names the kinds, and where each kind that is no record of its
@@ -256,7 +298,7 @@ def record_ids(root: Path) -> list:
            if isinstance(o, dict) and o.get("id")}
     ids |= {f["criterion"] for f in st.get("findings") or [] if isinstance(f, dict) and f.get("criterion")}
     for e in st.get("experiments") or []:
-        o = rb(root, "show", e["id"], js=True)["data"].get("object") or {}
+        o = rb(root, "show", "--long", e["id"], js=True)["data"].get("object") or {}
         ids |= {f"{e['id']}/{x['name']}" for x in o.get("settings") or []}
         for v in o.get("variants") or []:
             ids |= {f"{e['id']}/{v['name']}.{x['name']}" for x in v.get("settings") or []}
@@ -272,18 +314,20 @@ def surfaces(root: Path, ids: list, names: dict) -> dict:
     from rbtest import home as ui_home, object_card
     out: dict = {}
     for i in ids:
-        r = rb(root, "show", i, js=True)
+        r = rb(root, "show", "--long", i, js=True)
         # a finding's lines sit under its rule, which names what git took out of what it reads (f13g)
         took = [("(its finding says what git took out)", [])] if marked((r.get("data") or {}).get("finding", {}).get("says")) else []
-        out[f"rb show {i}"] = ("text", [(l, a + [t for t, _ in took]) for l, a in text_units(rb(root, "show", i), head=True)])
+        out[f"rb show {i}"] = ("text", [(l, a + [t for t, _ in took]) for l, a in text_units(rb(root, "show", "--long", i), head=True)])
         out[f"rb show {i} --json"] = ("json", json_units(r.get("data"), "", {}))
         try:
             out[f"rb ui's card {i}"] = ("json", json_units(object_card(i, root), "", {}))
         except KeyError:
             pass
-    for name in ("status", "context"):
-        # their text is drawn from their data, read unit by unit below; the text is read for each subject's state
-        text = rb(root, name)
+    for argv in (("status",), ("status", "--full"), ("context",)):
+        # their text is drawn from their data, read unit by unit below; the text is read for each subject's state: rb
+        # status's dashboard (UX5 1.6) and its long form alike
+        name = " ".join(argv)
+        text = rb(root, *argv)
         out[f"rb {name}"] = ("text", [(f"{sid}: " + " ".join(sorted(w)), []) for sid, w in states_in(text.splitlines(), names).items()])
         # and each line, with the lines it sits under: one that names a record whose rb show names what git took out
         # of it or under it must say so too (unsaid's `touched`)
@@ -303,21 +347,41 @@ def surfaces(root: Path, ids: list, names: dict) -> dict:
     p = root.parent / f"{root.name}-page.html"
     rb(root, "page", "--out", str(p))
     out["the page"] = ("text", [(f"{sid}: " + " ".join(sorted(w)), []) for sid, w in states_in(page_lines(p), names).items()])
+    # and line by line where a line stands for one thing (f13j item 1): each item under Also open, each Your call
+    # line, each gate line
+    out["the page's lines"] = ("focus", focus(page_units(p), ids))
     p.unlink()
     server = Open(root)
     try:
-        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(server.url + "/state.json", timeout=60) as resp:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(server.url + "/state.json", timeout=60) as resp:
             doc = json.loads(resp.read().decode("utf-8"))
+        with opener.open(server.url + "/", timeout=60) as resp:
+            out["rb open's lines"] = ("focus", focus(page_units(resp.read().decode("utf-8")), ids))
     finally:
         server.close()
     out["rb open /state.json"] = ("json", json_units(doc, "", {}))
+    out["rb open's items"] = ("items", items_of(doc.get("home") or {}))
+    out["rb status's items"] = ("items", [(f"{i.get('code')} {i.get('subject')}", i.get("what") or "", marked(i.get("what")) or marked(i.get("taken_out")))
+                                          for i in rb(root, "status", js=True)["data"].get("open") or []])
+    # each gate line of rb show and rb status, as its own line says it
+    gates = [l for i in ids for l, _ in out[f"rb show {i}"][1] if GATE_LINE.search(l.split(" / ")[0])]
+    gates += [l for l, _ in out["rb status lines"][1] if GATE_LINE.search(l)]
+    out["gate lines"] = ("focus", [l.split(" / ")[0] for l in gates])
     out["rb ui's home"] = ("json", json_units(ui_home(root), "", {}))
     return out
 
 
 def marked(x) -> bool:
-    t = json.dumps(x, ensure_ascii=False).lower() if not isinstance(x, str) else x.lower()
-    return any(m in t for m in MARKS)
+    """Whether a value names the take-out or reads undetermined: its texts, never its keys' names (a key named
+    taken_out names nothing while its value is empty), and a set taken_out or taken_under flag (f13j item 1)."""
+    if isinstance(x, str):
+        return any(m in x.lower() for m in MARKS)
+    if isinstance(x, dict):
+        return any(marked(v) or (k.split(".")[-1].startswith(("taken_out", "taken_under")) and v not in (None, False, 0, "", [], {})) for k, v in x.items())
+    if isinstance(x, (list, tuple)):
+        return any(marked(v) for v in x)
+    return False
 
 
 def touched(after: dict, ids: list) -> set:
@@ -330,7 +394,7 @@ def touched(after: dict, ids: list) -> set:
     return out
 
 
-def unsaid(before: dict, after: dict, ids: list = ()) -> list:
+def unsaid(before: dict, after: dict, ids: list = (), zero: dict = None) -> list:
     """Each unit that reads otherwise after the take-out, or newly, and names it neither itself nor in what it sits
     under (a JSON object's parents, a line's less indented lines, rb show's first line, a page's blocks' heads), nor
     reads undetermined."""
@@ -359,20 +423,60 @@ def unsaid(before: dict, after: dict, ids: list = ()) -> list:
                     continue
                 bad.append(f"{surface}: new line: {line[:240]}")
             continue
-        whole = surface.startswith(("rb show", "rb ui's card")) and (any(marked(now[k]) for k in now if k.count(".") == 1 and k.split("[")[0] in TOOK_KEYS)
-                                                                    or marked((now.get(".facts") or [""])[0]) or marked((now.get("", {}) or {}).get("taken_under", ""))
-                                                                    or marked(now.get(".finding.says")))
+        if form == "focus":
+            # a line that stands for one thing (f13j item 1): one that reads neither as with the write nor as before it
+            # names the take-out on its own line, never only on a line above it (F3's gate line under its standing)
+            for then in (was, (zero or {}).get(surface, (form, was))[1]):
+                had = Counter(then)
+                seen_f: Counter = Counter()
+                for line in now:
+                    seen_f[line] += 1
+                    if seen_f[line] <= had[line] or marked(line) or CHECKOUT_LINE.search(line):
+                        continue
+                    bad.append(f"{surface}: a line for one thing, unmarked: {line[:240]}")
+            continue
+        if form == "items":
+            if surface == "rb status's items":
+                continue
+            # each item rb status's items mark is marked here too (F1: Also open on rb open). A call's text is rb
+            # status's own sentence; its line on the page and rb open is read under "Your call" (focus above).
+            marks = {k for k, _, m in after["rb status's items"][1] if m}
+            for k, what, m in now:
+                if not m and k in marks:
+                    bad.append(f"{surface}: rb status marks it, this does not: {k}: {what[:200]}")
+            continue
+        shown = surface.startswith(("rb show", "rb ui's card"))
+        whole = shown and (any(marked(now[k]) for k in now if k.count(".") == 1 and k.split("[")[0] in TOOK_KEYS)
+                           or marked((now.get(".facts") or [""])[0]) or marked((now.get("", {}) or {}).get("taken_under", ""))
+                           or marked(now.get(".finding.says")))
+        # a record's own view names what git took out of it or under it at its top; a document's top (rb status's, rb
+        # context's, rb open's home) names what git took out of the whole record, which says nothing of any one line
         for key, val in now.items():
-            if whole or was.get(key) == val or marked(val) or CHECKOUT_LINE.search(json.dumps(val, ensure_ascii=False)):
+            w = was.get(key)
+            if w == val or CHECKOUT_LINE.search(json.dumps(val, ensure_ascii=False)):
                 continue
             if any(part.split("[")[0] in AGGREGATE or part.split("[")[0].endswith("_count") for part in key.split(".")):
                 continue
-            if key == ".gate" and isinstance(val, dict) and val.get("integrity"):
-                continue    # every gate fails closed while a write stands taken out: test_every_gate_fails_closed
-            parents = [key[:n] for n, c in enumerate(key) if c in ".[" and key[:n] in now]
-            if any(marked(now[k]) for k in parents) or marked(now.get("", "")):
+            # a group's head over its items: said by its items, each of which says what git took out under it
+            under_it = [now[k] for k in now if k.startswith(key + ".items[") and k.endswith("]") and k.count("[") == key.count("[") + 1]
+            if under_it and all(marked(u) for u in under_it):
                 continue
-            bad.append(f"{surface} {key}: was {json.dumps(was.get(key), ensure_ascii=False)[:200]} · now {json.dumps(val, ensure_ascii=False)[:200]}")
+            if key.endswith(".gate") and key.count(".") <= 2 and isinstance(val, dict) and val.get("integrity"):
+                continue    # every gate fails closed while a write stands taken out: test_every_gate_fails_closed
+            parents = [key[:n] for n, c in enumerate(key) if c in ".[" and key[:n] in now and (shown or key[:n] not in DOCUMENT or not key.startswith(ITEMS))]
+            under = any(marked(now[k]) for k in parents) or (shown and marked(now.get("", "")))
+            # each value apart: one that names the take-out says it; any other is said by its row (its own values, the
+            # objects it sits in), but for who wrote it, which a take-out never empties (F3's gate_by)
+            pairs = [(k, (w or {}).get(k) if isinstance(w, dict) else None, v) for k, v in val.items()] if isinstance(val, dict) else [(None, w, val)]
+            for k, wv, v in pairs:
+                if wv == v or (isinstance(v, str) and marked(v)) or k == "n":
+                    continue
+                if k in WHO and wv not in (None, "") and v in (None, ""):
+                    bad.append(f"{surface} {key}.{k}: who wrote it emptied: was {json.dumps(wv)} · now {json.dumps(v)}")
+                    continue
+                if whole or under or (isinstance(val, dict) and marked(val)):
+                    continue
+                bad.append(f"{surface} {key}{'.' + k if k else ''}: was {json.dumps(wv, ensure_ascii=False)[:200]} · now {json.dumps(v, ensure_ascii=False)[:200]}")
     return bad
 
 
@@ -549,6 +653,9 @@ def test_no_line_reads_as_if_the_write_git_took_out_was_never_made(home, case):
     if setup:
         git(root, "add", "-A")
         git(root, "commit", "-qm", "the call")
+    # as it read before the write: a line for one thing that reads as neither, after the take-out, names it
+    zero_ids = record_ids(root)
+    zero = {k: v for k, v in surfaces(root, zero_ids, {}).items() if v[0] == "focus"}
     write(root, made)
     st = rb(root, "status", js=True)["data"]
     ids = record_ids(root)
@@ -557,11 +664,11 @@ def test_no_line_reads_as_if_the_write_git_took_out_was_never_made(home, case):
     git(root, "checkout", "--", ".")
     assert rb(root, "status", js=True)["data"].get("taken_out"), case
     after = surfaces(root, ids, names)
-    bad = unsaid(before, after, ids)
+    bad = unsaid(before, after, ids, zero)
     assert not bad, "\n".join([case, *bad])
     # and every gate fails closed, whatever it read before
     for gate in GATES:
-        assert subprocess.run([*command(), "status", "--fail-on", gate], cwd=root, env=environment(), capture_output=True).returncode == 1, (case, gate)
+        assert subprocess.run([*command(), "status", "--full", "--fail-on", gate], cwd=root, env=environment(), capture_output=True).returncode == 1, (case, gate)
 
 
 def test_the_gate_s_miss_stays_with_its_own_line_while_the_call_that_settled_it_is_taken_out(home):
@@ -581,7 +688,7 @@ def test_the_gate_s_miss_stays_with_its_own_line_while_the_call_that_settled_it_
     assert gate and f"a write to {d}" in gate[0]["what"] and "taken out of the record by git" in gate[0]["what"], data["open"]
     e = next(e for e in data["experiments"] if e["id"] == "int8")
     assert e["state"] == "undetermined" and e["state_said"] == "a write to a call on it taken out by git", e
-    assert "parked" not in rb(root, "show", "int8").splitlines()[0]
+    assert "parked" not in rb(root, "show", "--long", "int8").splitlines()[0]
     rb(root, "doctor", "--restore")
     data = rb(root, "status", js=True)["data"]
     assert "gate_missed" in {i["code"] for i in data["open"]} and next(e for e in data["experiments"] if e["id"] == "int8")["state"] == "open"
@@ -603,19 +710,33 @@ def test_a_call_whose_retraction_git_took_out_reads_undetermined_never_in_force(
     data = rb(root, "status", js=True)["data"]
     row = next(x for x in data["experiments" if subject == "int8" else "questions"] if x["id"] == subject)
     assert (row["state"], row["state_said"]) == ("undetermined", said), row
-    shown = rb(root, "show", subject).splitlines()
+    shown = rb(root, "show", "--long", subject).splitlines()
     head = next(l for l in shown if l.startswith(("Experiment int8", "Question q1")))
     assert said in head and "stopped" not in head, head
     assert shown[0].startswith(f"1 write to a decision under it was taken out of the record by git: {d}."), shown[0]
-    assert said in rb(root, "status") and said in rb(root, "context")
+    assert said in rb(root, "status", "--full") and said in rb(root, "context")
     dec = next(x for x in data["decisions"] if x["id"] == d)
     assert dec["taken_out"].startswith("a write to it was taken out of the record by git"), dec
     p = home / "p.html"
     rb(root, "page", "--out", str(p))
     names = {subject: {subject, "INT8 against FP32" if subject == "int8" else "Does INT8 cost accuracy?"}}
-    assert states_in(page_lines(p), names)[subject] == {"(taken out)"}, states_in(page_lines(p), names)
+    if subject == "int8":
+        assert states_in(page_lines(p), names)[subject] == {"(taken out)"}, states_in(page_lines(p), names)
+    else:
+        # closed form (owner, Nov 13 2026): a question's lines no longer end with its id chip, so its state is read in
+        # the blocks that are the question's own (its card on Research, and its view's title, state and reason), each
+        # line said as the question's
+        page = p.read_text(encoding="utf-8")
+        card = re.search(r'<section class="stand" id="rs-q1".*?</section>', page, re.S).group(0)
+        view = re.search(r'<article class="view obj" id="q-q1".*?<p class="roll" id="q-q1:why">.*?</p>', page, re.S).group(0)
+        own = []
+        for block in (card, view):
+            bp = home / "block.html"
+            bp.write_text(block, encoding="utf-8")
+            own += ["Does INT8 cost accuracy? " + l for l in page_lines(bp) if l.strip()]
+        assert states_in(own, names)[subject] == {"(taken out)"}, own
     rb(root, "doctor", "--restore")
-    head = rb(root, "show", subject).splitlines()[0]
+    head = rb(root, "show", "--long", subject).splitlines()[0]
     assert head.startswith(("Experiment int8", "Question q1")) and head.count("open") == 1, head
 
 
@@ -637,7 +758,7 @@ def test_with_every_run_taken_out_the_experiments_lists_and_the_question_say_so_
         rb(root, "run", "add", "int8", f"int8.top1=75.{n}", f"fp32.top1=76.{n}", "--set", f"seed={n}", js=True)
     git(root, "checkout", "--", ".")
     said = "3 runs taken out by git"
-    q = rb(root, "show", "q-acc")
+    q = rb(root, "show", "--long", "q-acc")
     assert f"  experiment int8 has {said}: " in q and "untested: experiment int8" not in q, q
     p = home / "s1.html"
     rb(root, "page", "--out", str(p))
@@ -675,7 +796,7 @@ def test_a_result_with_no_direction_because_git_took_its_metric_out_says_so(home
     git(root, "commit", "-qm", "the runs")
     rb(root, "metric", "add", "loss", "--minimize", "--alias", "ce", js=True)
     git(root, "checkout", "--", ".")
-    f = rb(root, "show", "c1", js=True)["data"]["finding"]
+    f = rb(root, "show", "--long", "c1", js=True)["data"]["finding"]
     assert f["result"] == "higher" and f["rule_outcome"] == "undetermined", f
     assert f["says"]["result"] == "higher: the catalogue's entry for loss, which gives its direction, was taken out of the record by git", f["says"]
 
@@ -697,7 +818,7 @@ def test_a_confirmation_git_took_out_never_offers_the_call_to_be_confirmed_again
     assert d not in {p.get("decision") or p.get("id") for p in data["pending"]}, data["pending"]
     e = next(e for e in data["experiments"] if e["id"] == "int8")
     assert e["state"] == "undetermined" and "taken out by git" in e["state_said"], e
-    assert f"confirm: rb confirm {d}" not in rb(root, "status")
+    assert f"confirm: rb confirm {d}" not in rb(root, "status", "--full")
     rb(root, "doctor", "--restore")
     e = next(e for e in rb(root, "status", js=True)["data"]["experiments"] if e["id"] == "int8")
     assert e["state"] == "stopped", e
@@ -725,11 +846,11 @@ def test_the_reproduce_line_reads_a_resource_whose_retraction_git_took_out_as_un
     root = base(home)
     rb(root, "retract", "holdout", "--why", "leaked")
     git(root, "checkout", "--", ".")
-    row = next(r for r in rb(root, "show", "int8", js=True)["data"]["rerunnability"] if r.get("resource") == "holdout")
+    row = next(r for r in rb(root, "show", "--long", "int8", js=True)["data"]["rerunnability"] if r.get("resource") == "holdout")
     assert row["state"] == "unknown" and "taken out of the record by git" in row["detail"], row
-    assert "eval (holdout) unknown" in rb(root, "status")
+    assert "eval (holdout) unknown" in rb(root, "status", "--full")
     rb(root, "doctor", "--restore")
-    row = next(r for r in rb(root, "show", "int8", js=True)["data"]["rerunnability"] if r.get("resource") == "holdout")
+    row = next(r for r in rb(root, "show", "--long", "int8", js=True)["data"]["rerunnability"] if r.get("resource") == "holdout")
     assert row["state"] == "missing" and "retracted (leaked)" in row["detail"], row
 
 
@@ -740,11 +861,17 @@ def test_a_setting_whose_reject_git_took_out_names_it_and_offers_no_vouch(home):
     root = base(home)
     d = rb(root, "decide", "int8/cuda", "reject", "--why", "not the cluster's image", js=True)["data"]["object"]["id"]
     git(root, "checkout", "--", ".")
-    shown = rb(root, "show", "int8/cuda").splitlines()
+    shown = rb(root, "show", "--long", "int8/cuda").splitlines()
     assert shown[0].startswith("a write it may rest on was taken out of the record by git") and d in shown[0], shown
     assert shown[1] == "int8/cuda = 12.1 · undetermined: a call on it taken out by git", shown
     item = next(i for i in rb(root, "status", js=True)["data"]["open"] if i.get("subject") == "int8/cuda")
     assert item["do"] == "rb doctor --restore" and "vouch" not in item["do"] and "taken out of the record by git" in item["what"], item
+    # and the page counts it as a setting, never as a rule (the f13j review)
+    p = home / "p.html"
+    rb(root, "page", "--out", str(p))
+    assert "criterion undetermined" not in p.read_text(encoding="utf-8") and "1 undetermined" in p.read_text(encoding="utf-8")
+    # and rb status's experiment row counts it, as its data does (MP-1111-1200's L1): never in no count
+    assert "settings 0 verified · 3 provisional · 0 unknown · 1 undetermined · 1 per-run" in rb(root, "status", "--full"), rb(root, "status", "--full")
     rb(root, "doctor", "--restore")
     codes = {(i["code"], i.get("subject")) for i in rb(root, "status", js=True)["data"]["open"]}
     assert ("rejected_setting", "int8/cuda") in codes, codes
@@ -760,19 +887,19 @@ def test_a_design_s_confirmation_git_took_out_is_named_restored_and_counted(home
     git(root, "add", "-A")
     git(root, "commit", "-qm", "a session's gate")
     rb(root, "confirm", key)
-    assert rb(root, "show", "int8", js=True)["data"]["design"]["standing"] == "confirmed"
+    assert rb(root, "show", "--long", "int8", js=True)["data"]["design"]["standing"] == "confirmed"
     git(root, "checkout", "--", ".")
     data = rb(root, "status", js=True)["data"]
     assert data["taken_out"]["records"] == [{"kind": "experiment", "id": "int8"}], data["taken_out"]
     assert "int8" not in {d["experiment"] for d in data["designs_pending"]} and not data["gates_pending"], data["designs_pending"]
-    assert any(l.startswith("A write to experiment int8 was taken out of the record by git") for l in rb(root, "show", "int8").splitlines()[:2])
+    assert any(l.startswith("A write to experiment int8 was taken out of the record by git") for l in rb(root, "show", "--long", "int8").splitlines()[:2])
     for gate in GATES:
-        assert subprocess.run([*command(), "status", "--fail-on", gate], cwd=root, env=environment(), capture_output=True).returncode == 1, gate
+        assert subprocess.run([*command(), "status", "--full", "--fail-on", gate], cwd=root, env=environment(), capture_output=True).returncode == 1, gate
     again = rb(root, "confirm", key, js=True)
     assert not again["ok"] and "rb doctor --restore puts it back" in again["errors"][0]["fix"], again
     rb(root, "doctor", "--restore")
     data = rb(root, "status", js=True)["data"]
-    assert not data.get("taken_out") and rb(root, "show", "int8", js=True)["data"]["design"]["standing"] == "confirmed"
+    assert not data.get("taken_out") and rb(root, "show", "--long", "int8", js=True)["data"]["design"]["standing"] == "confirmed"
     lines = [json.loads(l) for l in (root / ".rb" / "log.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
     assert sum(1 for l in lines if l.get("op") == "gate" and (l.get("detail") or {}).get("owned")) == 1
 
@@ -803,6 +930,125 @@ def test_a_state_resting_on_a_call_git_took_out_reads_as_one_sentence_never_as_a
     git(root, "commit", "-qm", "stopped")
     rb(root, "retract", d, "--why", "not after all")
     git(root, "checkout", "--", ".")
-    text = rb(root, "status")
+    text = rb(root, "status", "--full")
     assert '"INT8 against FP32" reads undetermined: a write to a call on it taken out by git' in text, text
     assert "call: a write to a call on it" not in text
+
+
+def open_home(root: Path) -> tuple:
+    """rb open's /state.json and its / as it serves them."""
+    server = Open(root)
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(server.url + "/state.json", timeout=60) as resp:
+            doc = json.loads(resp.read().decode("utf-8"))
+        with opener.open(server.url + "/", timeout=60) as resp:
+            page = resp.read().decode("utf-8")
+    finally:
+        server.close()
+    return doc, page
+
+
+@pytest.mark.parametrize("action,how", [("reject", "checkout"), ("accept", "checkout"), ("reject", "stash")])
+def test_also_open_on_the_page_and_rb_open_says_what_git_took_out(home, action, how):
+    """MP-1111-0952's F1, widened by MP-1111-1200's S2: a setting's reject or vouch taken out by git. On a page and on
+    rb open, its item under Also open reads undetermined, never "not checked against a source", and every item there
+    that rb status's items mark says the take-out too. Fails on 0bd65e6."""
+    root = base(home)
+    rb(root, "decide", "int8/cuda", action, "--why", "the cluster's image")
+    git(root, *(("checkout", "--", ".") if how == "checkout" else ("stash", "-q", "-u")))
+    took = "taken out of the record by git" if how == "checkout" else "in git's stash"
+    marks = {(i["code"], i["subject"]) for i in rb(root, "status", js=True)["data"]["open"] if i.get("taken_out")}
+    assert ("provisional", "int8/cuda") in marks, marks
+    doc, served = open_home(root)
+    items = [i for g in doc["home"]["open_items"] for i in g["items"]] + doc["home"]["unfiled"]["open_items"]
+    for i in items:
+        if (i["code"], i["subject"]) in marks:
+            assert took in i["what"] and i.get("taken_out"), i
+    cuda = next(i for i in items if i["subject"] == "int8/cuda")
+    assert cuda["what"] == f"cuda in int8: undetermined · {cuda['taken_out']}" and cuda["what"].count(took) == 1, cuda
+    p = home / "p.html"
+    rb(root, "page", "--out", str(p))
+    for page in (p.read_text(encoding="utf-8"), served):
+        rows = [b for b, heads in page_units(page) if any(h.startswith("Also open in the record") for h in heads) and b.split()[-1] in {m[1] for m in marks}]
+        assert rows and all(took in b and "taken out by git" not in b.replace(took, "") for b in rows), rows
+        assert not any("not checked against a source" in b for b in rows if b.endswith("int8/cuda")), rows
+
+
+@pytest.mark.parametrize("how", ["the call", "its confirmation"])
+def test_your_call_line_of_a_missed_gate_says_its_settling_call_was_taken_out(home, how, monkeypatch):
+    """MP-1111-0952's F2, widened by MP-1111-1200's S1: a park settles the missed gate g1; git takes out the park itself
+    (kk.sh parkd) or the confirmation that made a session's park the user's (confirm). The Your call line on a page and
+    on rb open says the call that settles it was taken out, as rb status does. Fails on 0bd65e6."""
+    root = base(home)
+    if how == "the call":
+        rb(root, "decide", "int8", "park", "--why", "later", "--revisit", "soon")
+    else:
+        d = rb(root, "decide", "int8", "park", "--why", "later", js=True, agent=True)["data"]["object"]["id"]
+        git(root, "add", "-A")
+        git(root, "commit", "-qm", "proposed")
+        rb(root, "confirm", d)
+    assert "gate_missed" not in {i["code"] for i in rb(root, "status", js=True)["data"]["open"]}
+    git(root, "checkout", "--", ".")
+    git(root, "clean", "-qfd", "-e", ".rb/cache")      # as kk.sh does: the park's own file goes too
+    gate = next(i for i in rb(root, "status", js=True)["data"]["open"] if i["code"] == "gate_missed")
+    assert "the call that settles it was taken out of the record by git" in gate["what"] and gate["taken_out"], gate
+    doc, served = open_home(root)
+    assert any("the call that settles it was taken out" in c["reason"]["also"] for c in doc["home"]["calls"]), doc["home"]["calls"]
+    p = home / "p.html"
+    rb(root, "page", "--out", str(p))
+    for page in (p.read_text(encoding="utf-8"), served):
+        # closed form (owner, Nov 13 2026): Your call's count is a link of its own, so the heading's first text is
+        # "Your call" and its "(n)" follows in the link
+        rows = [b for b, heads in page_units(page) if any(re.match(r"Your call( \(\d+\))?$", h) for h in heads) and b.startswith("Gate missed")]
+        assert rows and all("the call that settles it was taken out of the record by git" in b for b in rows), rows
+
+
+def test_a_session_s_gate_keeps_its_mark_once_its_design_s_confirmation_is_taken_out(home):
+    """MP-1111-0952's F3 with MP-1111-1200's S3 (dg.sh): a session sets the gate, the user confirms the design, and git
+    takes the confirmation out. The gate line keeps "· not confirmed" and says why on rb show, rb status and the page,
+    offers no command, and gate_by keeps the session's writer. Fails on 0bd65e6 (gate_by "", no mark)."""
+    root = base(home)
+    rb(root, "experiment", "gate", "int8", "--if-holds", "ship INT8", "--if-not", "keep FP32", agent=True)
+    session = next(e for e in rb(root, "status", js=True)["data"]["experiments"] if e["id"] == "int8")["gate_by"]
+    assert session.startswith("agent:"), session
+    key = confirm_key(root, "int8")
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "gate")
+    rb(root, "confirm", key)
+    git(root, "checkout", "--", ".")
+    said = "· not confirmed: its design's confirmation was taken out of the record by git"
+    for js in (rb(root, "status", js=True)["data"]["experiments"], rb(root, "context", js=True)["data"]["state"]["experiments"]):
+        assert next(e for e in js if e["id"] == "int8")["gate_by"] == session
+    for text in (rb(root, "show", "--long", "int8"), rb(root, "status", "--full")):
+        line = next(l for l in text.splitlines() if "keep FP32" in l)
+        assert said in line and "rb confirm" not in line, line
+    p = home / "p.html"
+    rb(root, "page", "--out", str(p))
+    gate = [b for b, heads in page_units(p) if heads and heads[-1] in GATE_HEAD and b not in GATE_HEAD]
+    assert any(said[2:] in b for b in gate), gate
+    assert said in next(l for l in rb(root, "context").splitlines() if "keep FP32" in l)
+    rb(root, "doctor", "--restore")
+    line = next(l for l in rb(root, "show", "--long", "int8").splitlines() if "keep FP32" in l)
+    assert "not confirmed" not in line, line
+    assert next(e for e in rb(root, "status", js=True)["data"]["experiments"] if e["id"] == "int8")["gate_by"] == "human:ana"
+
+
+def test_what_git_took_out_marks_only_what_may_rest_on_it(home):
+    """MP-1111-0952's F4: a reject on int8/cuda taken out says nothing of int8/lr, which never rests on it; and a design's
+    confirmation taken out, which rb doctor --restore puts back without clearing an item, leaves the item's own command."""
+    root = base(home)
+    rb(root, "decide", "int8/cuda", "reject", "--why", "not the cluster's image")
+    git(root, "checkout", "--", ".")
+    assert "taken out" not in rb(root, "show", "--long", "int8/lr").splitlines()[0]
+    assert "taken out" in rb(root, "show", "--long", "int8/cuda").splitlines()[0]
+    rb(root, "doctor", "--restore")
+    rb(root, "experiment", "gate", "int8", "--if-holds", "ship INT8", agent=True)
+    key = confirm_key(root, "int8")
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "gate")
+    late = next(i for i in rb(root, "status", js=True)["data"]["open"] if i["code"] == "late")
+    rb(root, "confirm", key)
+    git(root, "checkout", "--", ".")
+    now = next(i for i in rb(root, "status", js=True)["data"]["open"] if i["code"] == "late")
+    assert now["do"] == late["do"] and now.get("taken_out"), (late, now)

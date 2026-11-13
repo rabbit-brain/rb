@@ -202,7 +202,7 @@ def test_a_result_found_in_the_checkout_is_recorded_from_there_whatever_director
     assert [f.run_in for f in rabbit_brain.open(wt).found()[0]] == [slashed(repo)]
     rb(capsys, "reconcile", "--apply")
     [run] = rb(capsys, "status").data["runs"]
-    shown = rb(capsys, "show", run["id"]).data["object"]
+    shown = rb(capsys, "show", "--long", run["id"]).data["object"]
     assert shown["metrics"] == {"int8.top1": 0.761, "fp32.top1": 0.77} and [f["path"] for f in shown["files"]] == ["out/metrics.json"]
     assert "worktree" not in shown["receipt"]["attached"] and shown["receipt"]["attached"]["branch"] == "main"
 
@@ -224,7 +224,7 @@ def test_rb_status_says_once_where_a_finding_s_runs_were_recorded(repo, capsys, 
     for where in (wt, repo):
         monkeypatch.chdir(where)
         assert [f["observed"] for f in rb(capsys, "status").data["findings"]] == [note]
-        main(["status"])
+        main(["status", "--full"])
         assert capsys.readouterr().out.count(note) == 1
 
 
@@ -274,7 +274,7 @@ def test_a_reading_whose_runs_ran_other_code_says_which_from_the_receipts(repo, 
     note = f"1 of 2 runs ran other code: exp-b · {listed_path('exp-b')} at {at}"
     [f] = rb(capsys, "status").data["findings"]
     assert f["other_code"] == note and f["observed"].startswith("1 of 2 runs was recorded in exp-b · ")
-    main(["status"])
+    main(["status", "--full"])
     out = capsys.readouterr().out
     assert out.count(f"          · {note}\n") == 1 and out.index(f["observed"]) < out.index(note)
     server = Open(repo)
@@ -348,7 +348,7 @@ def test_a_run_made_before_it_was_recorded_is_never_said_to_run_other_code(repo,
     assert receipt(repo, earlier)["attached"]["dirty"] is True                  # the recording checkout's changed code
     [f] = rb(capsys, "status").data["findings"]
     assert f["other_code"] == "" and f["observed"].startswith("2 of 3 runs were recorded elsewhere: 1 in exp-b · ")
-    main(["status"])
+    main(["status", "--full"])
     assert "other code" not in capsys.readouterr().out
 
 
@@ -532,7 +532,7 @@ def test_what_the_runs_wrote_is_not_code(repo, capsys, monkeypatch):
     assert made["attached"]["dirty"] is True and made["produced"]["commit"] and "tree" not in made["produced"]    # eval.log
     [f] = rb(capsys, "status").data["findings"]
     assert f["other_code"] == "" and f["observed"].startswith("2 of 3 runs were recorded elsewhere: 1 in exp-b · ")
-    main(["status"])
+    main(["status", "--full"])
     assert "other code" not in capsys.readouterr().out
     server = Open(repo)
     try:
@@ -596,7 +596,7 @@ def test_a_single_checkout_keeps_what_it_kept_before(repo, capsys):
     dirty = rb(capsys, "run", "add", "e1", "fp32.top1=0.762", "int8.top1=0.759").data["object"]["id"]
     assert set(receipt(repo, dirty)["attached"]) == {"commit", "branch", "dirty", "diff_sha256", "untracked", "tree", "captured", "kept"}
     assert "worktree" not in log_line(repo, "record", dirty) and "checkout" not in rb(capsys, "status").data
-    main(["status"])
+    main(["status", "--full"])
     assert "This worktree" not in capsys.readouterr().out
 
 
@@ -650,7 +650,7 @@ def test_rb_s_reads_of_the_repository_take_no_file_of_a_worktree_nested_in_it(re
     main(["compile", "."])
     text = capsys.readouterr().out
     assert "results/main/metrics.json" in text and "wt-b/" not in text and "results/main-wt/" not in text
-    main(["status"])
+    main(["status", "--full"])
     assert "wt-b/" not in capsys.readouterr().out
     read = json.dumps(rb(capsys, "reconcile").data["repository"])
     assert "results/main/" in read and "wt-b/" not in read and "main-wt" not in read
@@ -679,7 +679,7 @@ def test_a_submodule_moved_on_is_a_repository_of_its_own_not_a_large_file(repo, 
     run_id = rb(capsys, "run", "add", "e1", "fp32.top1=0.761", "int8.top1=0.758").data["object"]["id"]
     att = receipt(repo, run_id)["attached"]
     assert att["dirty"] is True and att["nested"] == 1 and "left_out" not in att
-    main(["show", run_id])
+    main(["show", "--long", run_id])
     text = capsys.readouterr().out
     assert "over 10 MB" not in text and "1 nested repository is not in it." in text
 
@@ -692,14 +692,14 @@ def test_a_tree_is_said_to_be_kept_only_where_git_has_it(repo, capsys, tmp_path_
     git("checkout", "--", "train.py")
     git("add", "-A")
     git("commit", "-qm", "the run")
-    main(["show", run_id])
+    main(["show", "--long", run_id])
     here = capsys.readouterr().out
     assert "kept in this repository under refs/rb/snapshots/." in here and "See the changes: git diff" in here
     clone = tmp_path_factory.mktemp("elsewhere") / "clone"
     git("clone", "-q", "--no-local", str(repo), str(clone))
     os.chdir(clone)
     try:
-        main(["show", run_id])
+        main(["show", "--long", run_id])
         there = capsys.readouterr().out
     finally:
         os.chdir(repo)
@@ -733,7 +733,7 @@ def test_a_nested_worktree_says_once_that_it_writes_to_the_checkout_s_record(rep
     line = (f"This worktree (exp-b · {listed[wt]}) has no record of its own: rb writes to the record in main · {listed[repo]}, "
             "and each run keeps this worktree's code.")
     monkeypatch.chdir(wt)
-    for argv in (["status"], ["context"]):
+    for argv in (["status", "--full"], ["context"]):
         main(argv)
         assert capsys.readouterr().out.count(line) == 1, argv
     checkout = rb(capsys, "status").data["checkout"]
@@ -1042,7 +1042,7 @@ def test_no_linked_worktree_s_path_reaches_a_page(repo, capsys, monkeypatch, tmp
     place = ".worktrees/wide-sweep"
     # the record and --json keep the path as it is
     assert [f["path"] for f in receipt_files(repo, by_file)] == [f"{place}/out/config.yaml", f"{place}/out/metrics.json"]
-    shown = rb(capsys, "show", by_file).data["object"]
+    shown = rb(capsys, "show", "--long", by_file).data["object"]
     assert any(f["path"].startswith(place) for f in shown["files"])
     out = tmp_path_factory.mktemp("pages")
     pages = {}
@@ -1071,7 +1071,8 @@ def test_no_linked_worktree_s_path_reaches_a_page(repo, capsys, monkeypatch, tmp
         # a path in monospace, the rest of the row in the UI font (DESIGN-PASS-1 target 7)
         assert '<dd><span class="mono">out/metrics.json</span> (in another worktree) · sha256' in pages[name], name
         assert '<dt>row</dt><dd>read from <span class="mono">results.db</span> (in another worktree), table evals' in pages[name], name
-        assert "local:out/config.yaml (in another worktree) · " in pages[name], name
+        # a resource's local copy is the owner's own screen's: a page names none (getit.rs)
+        assert "out/config.yaml (in another worktree) · " not in pages[name] and "copy here: out/config.yaml" not in pages[name], name
         assert "CALLS.md:3 (in another worktree): &quot;we keep INT8 at eight bits&quot;" in pages[name], name
     assert "not here: out/config.yaml (in another worktree), out/metrics.json (in another worktree)" in pages["bundle"]
     assert f"{place}/out/metrics.json" in state                    # the user's own screen keeps the path as it is
@@ -1109,8 +1110,8 @@ def test_rb_open_and_rb_ui_name_a_file_in_a_linked_worktree_by_its_path_inside_i
     assert f"paths as recorded: {place}/out/config.yaml, {place}/out/metrics.json" in card["facts"]
     assert any(f.startswith("row: read from results.db, table evals") for f in row_card["facts"]) and f"path as recorded: {place}/results.db" in row_card["facts"]
     [res] = state["home"]["resources"]
-    assert res["where"][0].startswith(f"local:{place}/out/config.yaml · ") and res["where_short"][0].startswith(f"local:out/config.yaml (in {short}) · ")
-    assert any(f.startswith(f"local: out/config.yaml (in {short}) · ") for f in resource["facts"])
+    assert res["where"][0].endswith(f"{place}/out/config.yaml") and res["where_short"][0].endswith(f"out/config.yaml (in {short})")
+    assert any(f.endswith(f"out/config.yaml (in {short})") for f in resource["facts"])
     assert f"path as recorded: {place}/out/config.yaml" in resource["facts"]
     [waits] = state["home"]["pending"]
     assert f'CALLS.md:3 (in {short}): "we keep INT8 at eight bits"' in waits["text"]
@@ -1122,8 +1123,8 @@ def test_rb_open_and_rb_ui_name_a_file_in_a_linked_worktree_by_its_path_inside_i
     said = json.dumps(state)
     assert "(in another worktree)" not in said and f"{place}/out/metrics.json" in said
     # rb's text and --json keep the whole path
-    assert any(f["path"] == f"{place}/out/metrics.json" for f in rb(capsys, "show", by_file).data["object"]["files"])
-    assert main(["show", by_file]) == 0 and f"{place}/out/metrics.json" in capsys.readouterr().out
+    assert any(f["path"] == f"{place}/out/metrics.json" for f in rb(capsys, "show", "--long", by_file).data["object"]["files"])
+    assert main(["show", "--long", by_file]) == 0 and f"{place}/out/metrics.json" in capsys.readouterr().out
 
 
 def receipt_files(repo: Path, run_id: str) -> list:

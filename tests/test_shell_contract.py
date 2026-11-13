@@ -31,7 +31,7 @@ shape_py = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(shape_py)
 
 
-CONTRACT = "rb-shell-view/1.18"   # a minor bump adds fields only (section 1.8), so a document of an earlier minor still meets it
+CONTRACT = "rb-shell-view/1.22"   # a minor bump adds fields only (section 1.8), so a document of an earlier minor still meets it
 
 
 def same_major(contract) -> bool:
@@ -454,16 +454,16 @@ def values(doc, spec: str) -> list:
 VIEWS = {
     "frame": (None, "R1", ["project.title", "at", "rb_version"]),
     "nav": ("nav", "R1", ["questions[*].text", "experiments[*].short_title"]),
-    "overview": ("overview", "R1", ["home.latest.head", "home.scope", "home.uncited_line", "home.found[*].title",
-                                    "pending.rows[*].text", "home.open_line", "home.notes[*].text", "questions[*].text",
-                                    "home.standing[*].line", "home.standing[*].state_word",
-                                    "home.standing[*].tallies[*].label", "home.integrity.parts[*].line", "home.integrity.affects",
-                                    "home.queue[*].title", "home.queue[*].detail",
-                                    # WITNESS: the record's line counts what was recorded afterwards; rb status's
-                                    # own line (home.began, "Kept with rb since <day>. ...") is drawn nowhere, its fact is the line's
-                                    "home.witness.runs.afterwards", "home.witness.calls.afterwards"]),
-    "overview-sitting": ("overview", "H2", ["history.sittings[0].head"]),
-    "overview-recent": ("overview", "H2", ["history.sittings[0].lines[*].sentence"]),
+    # UX5 round 1: the Overview draws the question, its strip, what it rests on and the decisions (overview.rs); what it
+    # held before is one click away, at the head of History, and the standing cards on Research
+    "overview": ("overview", "R1", ["overview.question.text", "overview.strip.groups[*].label", "overview.rests[*].text",
+                                    "overview.decisions[*].title"]),
+    "about-record": ("history", "R1", ["home.scope", "home.uncited_line", "home.found[*].title", "home.notes[*].text", "home.integrity.parts[*].line",
+                                       "home.integrity.affects",
+                                       # WITNESS: the record's line counts what was recorded afterwards; rb status's
+                                       # own line (home.began, "Kept with rb since <day>. ...") is drawn nowhere, its fact is the line's
+                                       "home.witness.runs.afterwards", "home.witness.calls.afterwards"]),
+    "research-cards": ("research", "R3", ["home.standing[*].line", "home.standing[*].state_word", "home.standing[*].tallies[*].label"]),
     "your-call": ("your-call", "R1", ["home.quiet", "calls[*].title", "calls[*].reason.label", "calls[*].reason.detail", "calls[*].actions[*].line",
                                       "home.waiting_line"]),
     "open-items": ("open-items", "R1", ["open_items[*].head", "unfiled.open_items[*].what"]),
@@ -472,10 +472,11 @@ VIEWS = {
                                 "findings.c1.units_line", "findings.c2.rule_detail", "questions[0].next_step", "made_calls[*].line",
                                 "questions[0].overview.interpretations[*].text"]),
     "criteria": ("criteria", "R3", ["findings.*.statement"]),
-    "experiments": ("experiments", "R4", ["experiments[*].short_title", "experiments[*].design.standing"]),
+    # what waits for a confirmation, folded after the experiments (UX5 1.3), never under Your call (AGENTS.md)
+    "experiments": ("experiments", "R4", ["experiments[*].short_title", "experiments[*].design.standing", "pending.rows[*].text"]),
     "experiment": ("x-e1", "R4", ["experiments[0].who_line", "experiments[0].hypothesis", "experiments[0].reproduce.ready_line", "runs.runs1.label"]),
     "runs": ("runs", "R4", ["runs.*.produced"]),
-    "resources": ("resources", "R4", ["resources.*.name", "resources.*.role", "resources.*.availability"]),
+    "resources": ("resources", "R4", ["resources.*.name", "resources.*.role", "resources.*.get.text"]),
     "history": ("history", "R4", ["history.log[*].sentence"]),
     "history-sittings": ("history", "H2", ["history.summary", "history.sittings[*].head", "history.sittings[*].lines[*].sentence",
                                            "history.sittings[*].lines[*].why"]),
@@ -531,6 +532,32 @@ def test_model_tiers_differ_only_as_listed(request, tmp_path):
                               encoding="utf-8", check=True).stdout
     assert owner == json.loads(expected)
     assert live.get("tier") == "live"
+
+
+def test_a_resource_with_a_token_in_its_address_meets_the_contract_on_both_tiers(request, tmp_path):
+    """The INT8 demo holds no address with a credential or a token in it, so it alone cannot show `get` keeping one
+    shape: with one added, every resource's `get` has the same keys, `public` among them, on the Live and Owner tiers."""
+    needs("M0")
+    import shutil
+    root = tmp_path / "demo"
+    shutil.copytree(int8_root(request), root, symlinks=True)
+    url = "https://user:pw@example.org/d.tar?X-Amz-Signature=abc"
+    r = rb(root, "resource", "add", "tokds", "--type", "dataset", "--name", "held-out images behind a signed address", "--url", url,
+           RB_ACTOR="human:ana")
+    assert r.returncode == 0, r.stderr + r.stdout
+    for tier in ("live", "owner"):
+        doc = model_document(root, tier, tmp_path)
+        problems = shape_problems(doc, shape(), phases=merged())[0]
+        assert not problems, (tier, problems[:20])
+        gets = {k: v["get"] for k, v in doc["resources"].items()}
+        assert all(set(g) == {"kind", "href", "text", "public"} for g in gets.values()), (tier, gets)
+        assert all(g["public"] is True for k, g in gets.items() if k != "tokds"), (tier, gets)
+        assert gets["imagenet-val"]["kind"] == "url", (tier, gets)
+        # the owner's own screen keeps the address and says it is not public; a page anyone may be sent gives none
+        want = {"kind": "url", "href": url, "text": url, "public": False} if tier == "live" else {"kind": "none", "href": "", "text": "", "public": True}
+        assert gets["tokds"] == want, (tier, gets["tokds"])
+        if tier == "owner":
+            assert "user:pw" not in json.dumps(doc) and "X-Amz" not in json.dumps(doc)
 
 
 # ---------------------------------------------------------------- R: the renderer

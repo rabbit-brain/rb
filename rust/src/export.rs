@@ -375,6 +375,11 @@ pub fn repo_info(led: &Ledger, building: &[&Path]) -> Option<Dict> {
         }
     }
     d.insert("changed".into(), Value::list_of_str(changed_paths(&led.root, &carried)));
+    // the hub's git chips (owner, Nov 13 2026), additive: the branch HEAD names ("" on a detached HEAD) and the record
+    // files git's status lists, by their paths from the repository's top
+    let co = crate::checkout::Checkout::of_page(&led.root);
+    d.insert("branch".into(), Value::Str(co.branch.clone().unwrap_or_default()));
+    d.insert("record_uncommitted".into(), Value::list_of_str(co.record_uncommitted()));
     Some(d)
 }
 
@@ -796,19 +801,23 @@ fn bundle_into(led: &Ledger, tmp: &Path, dest: &Path, clone_to: Option<&str>, no
     // a bundle has no git to show what made a merged record: rb's copies of what it was merged from travel with it
     let merges = led.merges_rested_on()?;
     inside.keep_merges(&merges)?;
+    // a bundle anyone may read names no local path outside the repository (another machine's, with its user's name in
+    // it), and no address with a credential or a token in it: in its record, and in rb's copies of what git merged
+    leave_local_paths(&tmp.join("record").join(DIR))?;
     // the bundle's page names a file in a worktree nested here as this record's page does
     // its citations quote the checkout's files, as the plain export does: the bundle's copy has no git to read them at
-    let page = crate::view::with_page_trees(crate::view::page_trees_of(led), || shell_page(&inside, clone_to, repo.as_ref(), Some(led)))?;
+    // the files a reader gets with the code are those the exporting checkout's HEAD holds: the copy has no git
+    let page = crate::getit::with_repository(&led.root, || crate::view::with_page_trees(crate::view::page_trees_of(led), || shell_page(&inside, clone_to, repo.as_ref(), Some(led))))?;
     crate::sys::go_on()?;
     std::fs::write(tmp.join("page.html"), page).map_err(|e| io_err(e, &tmp.join("page.html")))?;
     let mut left_behind: Vec<Value> = Vec::new();
     for r in inside.live::<Resource>()? {
-        let av = Value::Dict(inside.availability(&r));
+        let av = Value::Dict(crate::getit::with_repository(&led.root, || inside.availability(&r)));
         let state = av.get("state").map(py_str).unwrap_or_default();
         if state != "present" {
             let here = led.availability(&led.load::<Resource>(&r.id)?).get("state").map(py_str).unwrap_or_default();
             left_behind.push(crate::obj! {
-                "id" => r.id.clone(), "name" => r.name.clone(), "state" => state, "here" => here,
+                "id" => r.id.clone(), "name" => r.name.clone(), "state" => state, "here" => here, "said" => av.get("said").map(py_str).unwrap_or_default(),
                 "how" => av.get("how").filter(|h| h.truthy()).map(py_str).unwrap_or_default()
             });
         }
@@ -856,6 +865,100 @@ fn bundle_into(led: &Ledger, tmp: &Path, dest: &Path, clone_to: Option<&str>, no
     }
     unnamed(led, no_repo, &mut said);
     Ok((said, parts))
+}
+
+/// Takes out of a bundle's copy of the record (`dir`, its `.rb/`) every resource location that is a local path outside
+/// the repository or an address with a credential or a token in it (getit::private_place: `/home/<name>/...`,
+/// `/Users/<name>/...`, `C:\\Users\\<name>\\...`, a host's share, `https://ana:pw@...`, `...?token=`), and such a
+/// recorded `url`; in the resource files and in rb's copies of the versions git merged them from (merges.json). So the
+/// copy still reads as rb wrote it, every hash of a version it changed is said as the new version's, in the log and in
+/// merges.json, and a locate line's `ref` that named such a place says none. The record in the repository is not
+/// touched. The ids of the resources it changed.
+pub fn leave_local_paths(dir: &Path) -> Res<Vec<String>> {
+    // the hash rb logs is of the record's fields, its format and kind left out
+    let sha = |d: &Dict| {
+        let mut form = d.clone();
+        form.shift_remove("rb");
+        form.shift_remove("kind");
+        crate::rbyaml::content_sha(&Value::Dict(form)).map_err(|e| RBError::msg("E_WRITE_FAILED", e.0))
+    };
+    let mut moved: Vec<(String, String)> = Vec::new(); // (sha before, sha after)
+    let mut ids: Vec<String> = Vec::new();
+    let folder = dir.join("resources");
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&folder).map(|r| r.filter_map(|e| e.ok().map(|e| e.path())).collect()).unwrap_or_default();
+    files.sort();
+    for f in files.iter().filter(|f| f.extension().map_or(false, |x| x == "yaml")) {
+        let Ok(text) = std::fs::read_to_string(f) else { continue };
+        let Ok(doc) = crate::rbyaml::load(&text, &f.to_string_lossy()) else { continue };
+        let Value::Dict(data) = doc.data.clone() else { continue };
+        let Some(clean) = crate::getit::without_private_places(&data) else { continue };
+        moved.push((sha(&data)?, sha(&clean)?));
+        let out = crate::rbyaml::dumps(&Value::Dict(clean), Some(&doc.comments)).map_err(|e| RBError::msg("E_WRITE_FAILED", e.0))?;
+        std::fs::write(f, out).map_err(|e| io_err(e, f))?;
+        let name = f.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        ids.push(name.trim_end_matches(".yaml").to_string());
+    }
+    // rb's copies of what git merged: each version of a resource that names such a place, under its new hash
+    let merges = dir.join(KEPT_MERGES);
+    let mut merged_text = None;
+    if let Ok(text) = std::fs::read_to_string(&merges) {
+        if let Ok(Value::Dict(mut m)) = pyjson::loads(&text) {
+            let resources: Vec<String> = m.get("records").and_then(Value::as_list).cloned().unwrap_or_default().iter()
+                .filter(|r| r.get_str("kind") == Some("resource"))
+                .flat_map(|r| r.get("merges").and_then(Value::as_list).cloned().unwrap_or_default())
+                .flat_map(|x| ["sha256", "base", "ours", "theirs"].iter().filter_map(|k| x.get_str(k).map(str::to_string)).collect::<Vec<_>>())
+                .collect();
+            if let Some(Value::Dict(forms)) = m.get_mut("forms") {
+                let mut renamed = Dict::new();
+                for (k, v) in forms.iter() {
+                    match v {
+                        Value::Dict(f) if resources.contains(k) => match crate::getit::without_private_places(f) {
+                            Some(clean) => {
+                                let new = crate::rbyaml::content_sha(&Value::Dict(clean.clone())).map_err(|e| RBError::msg("E_WRITE_FAILED", e.0))?;
+                                moved.push((k.clone(), new.clone()));
+                                renamed.insert(new, Value::Dict(clean));
+                            }
+                            None => {
+                                renamed.insert(k.clone(), v.clone());
+                            }
+                        },
+                        _ => {
+                            renamed.insert(k.clone(), v.clone());
+                        }
+                    }
+                }
+                *forms = renamed;
+            }
+            merged_text = Some(pyjson::dumps_with(&Value::Dict(m), &pyjson::Dumps::indent(1)).unwrap_or_default() + "\n");
+        }
+    }
+    if moved.is_empty() {
+        return Ok(ids);
+    }
+    let rename = |t: &str| moved.iter().fold(t.to_string(), |t, (a, b)| t.replace(a.as_str(), b.as_str()));
+    if let Some(t) = merged_text {
+        std::fs::write(&merges, rename(&t)).map_err(|e| io_err(e, &merges))?;
+    }
+    let logp = dir.join("log.jsonl");
+    let text = std::fs::read_to_string(&logp).map_err(|e| io_err(e, &logp))?;
+    let mut out = String::with_capacity(text.len());
+    for line in text.split_inclusive('\n') {
+        let line = rename(line);
+        let Ok(Value::Dict(mut row)) = pyjson::loads(line.trim_end_matches(['\n', '\r'])) else {
+            out.push_str(&line);
+            continue;
+        };
+        let resource = row.get_str("kind") == Some("resource");
+        match row.get_mut("detail") {
+            Some(Value::Dict(d)) if resource && d.get_str("ref").map_or(false, |r| crate::getit::private_place(d.get_str("provider").unwrap_or(""), r)) => {
+                d.insert("ref".into(), Value::Str(String::new()));
+                out.push_str(&pyjson::jsonl_line(&Value::Dict(row)));
+            }
+            _ => out.push_str(&line),
+        }
+    }
+    std::fs::write(&logp, out).map_err(|e| io_err(e, &logp))?;
+    Ok(ids)
 }
 
 /// The page alone in `tmp`, as rb page writes it, with a README saying so and a manifest hashing both: no record, no
@@ -969,7 +1072,7 @@ pub fn is_rb_page(path: &Path) -> bool {
 
 /// The script rb page inlines: the export names it by its sha256 on its <html> (data-shell), so a host that serves rb's
 /// own script by that name can draw a hosted page's three panes while the page itself runs nothing.
-const SHELL_SCRIPT: &str = include_str!("shell/assets/script.js");
+const SHELL_SCRIPT: &str = include_str!("shell/assets/script.min.js");
 
 /// The shell's page of `led` as rb export writes it: its Export document, with the
 /// address a reader clones from when the export is published with one, drawn, then made what the hub serves.
@@ -997,6 +1100,27 @@ fn shell_page(led: &Ledger, clone_to: Option<&str>, repo: Option<&Dict>, cites_f
             let minute = d.get("at").and_then(Value::as_str).unwrap_or("").to_string();
             d.insert("checkout".into(), crate::checkout::Checkout::of_page(&from.root).page_value_at(&minute));
         }
+        // the Files tree (owner, Nov 13 2026): the files the record names as the checkout says of them, and each one the
+        // bundle carries (a file its checks read) whole, from the bundle's own copy, which is what readers download
+        let citations = doc.get("citations").cloned();
+        let mut files = crate::files::of(from, citations.as_ref(), false)?;
+        let trees = crate::view::page_trees_of(from);
+        if let Value::List(fs) = &mut files {
+            fs.retain(|f| f.get("path").and_then(Value::as_str).map_or(true, |p| !trees.iter().any(|t| p.starts_with(&format!("{t}/")))));
+            for f in fs.iter_mut() {
+                let path = f.get("path").and_then(Value::as_str).unwrap_or("").to_string();
+                let first = path.split('/').next().unwrap_or("");
+                let ignored = f.get("git").and_then(Value::as_str) == Some("ignored");
+                if first != DIR && !ignored && led.root.join(&path).is_file() {
+                    if let Some(f) = f.as_dict_mut() {
+                        f.insert("body".into(), crate::files::whole(&led.root, &path, ""));
+                    }
+                }
+            }
+        }
+        if let Some(d) = doc.as_dict_mut() {
+            d.insert("files".into(), files);
+        }
     }
     let mut doc = published(doc, clone_to, given);
     // published at an address, a fork names the published project it was cloned from, and Reproduce the code the
@@ -1018,7 +1142,14 @@ fn shell_page(led: &Ledger, clone_to: Option<&str>, repo: Option<&Dict>, cites_f
             }
         }
     }
-    for_the_hub(&crate::shell::render(&doc, crate::shell::Surface::Export)?)
+    // the field cards a page holds (fields.rs), drawn from the record as the document is, the evidence worked out in the
+    // checkout the bundle came from; none for a document given whole (RB_TEST_SHELL_MODEL), which no record backs
+    let cards = match (cites_from, given) {
+        (_, true) => crate::shell::fields::Cards::default(),
+        (Some(from), false) => crate::ledger::evidence::drawn_from(&from.root, || crate::shell::fields::of(led, &doc, crate::shell::Surface::Export))?,
+        (None, false) => crate::shell::fields::of(led, &doc, crate::shell::Surface::Export)?,
+    };
+    for_the_hub(&crate::shell::render_with(&doc, crate::shell::Surface::Export, cards)?)
 }
 
 /// An Export document as it goes out: `reproduce_url` is the address a reader clones from when the export is published

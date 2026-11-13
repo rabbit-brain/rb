@@ -76,12 +76,12 @@ def test_an_untested_each_rule_beside_an_analysis_is_told_a_run(rb):
     rb("spec", "set", "e1", "seed", "--per-run")
     rb("analysis", "add", "e1", "--compare", "wide:top1=0.83[0.80,0.86]", "--method", "bootstrap over images", "--unit", "image", "--units", "200")
     rb("criterion", "add", "every seed above 0.7", "-e", "e1", "--metric", "wide.top1", "--at-least", "0.7", "--each", "--id", "c1")
-    items = [i for i in rb("status").data["open"] if i["subject"] == "c1" and i["code"] == "untested"]
-    assert items, rb("status").data["open"]
+    items = [i for i in rb("status", "--full").data["open"] if i["subject"] == "c1" and i["code"] == "untested"]
+    assert items, rb("status", "--full").data["open"]
     for i in items:
         assert "rb analysis add" not in i["do"], i
         assert i["do"].startswith("rb run add e1"), i
-    code, out = rb("status", text=True)
+    code, out = rb("status", "--full", text=True)
     assert "rb analysis add e1" not in out, out
 
 

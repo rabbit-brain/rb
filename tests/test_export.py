@@ -177,7 +177,7 @@ def test_a_file_read_at_a_commit_or_a_runs_directory_travels_as_the_check_reads_
         [inside] = state(bundle / "record").status()["experiments"]
         assert inside["settings_count"] == here["settings_count"]
         page = (bundle / "page.html").read_text(encoding="utf-8")
-        assert "settings: 3 verified" in page and "no longer states it" not in page
+        assert "settings: 3 checked" in page and "no longer states it" not in page
 
 
 def test_the_manifest_hashes_every_file_and_catches_a_changed_byte(repo, capsys):
@@ -815,14 +815,31 @@ def test_an_rb_output_the_user_added_to_is_not_written_over(repo, capsys):
 # Raised from 200,000 to 210,000 on the orchestrator's call of Oct 25, 21:55 +08 (design pass 1): the your view and
 # reader's view pass and the citations pass (each cited line drawn in its Source view) put the small page at 203-205 KB.
 # Raised from 210,000 to 212,000 on the orchestrator's call of Oct 27, 20:00 +08 (FIX8).
-SMALL_PAGE = 212_000                       # bytes: the small record's page, as test_page.py holds rb page's
+SMALL_PAGE = 225_000                       # bytes: the small record's page, as test_page.py holds rb page's
 # The raw budget is 2.2 MB for now (decided Oct 21, 00:50 +08, on MP-1020-21's proposal 1); it goes back toward 1.8 MB
 # when R and C take SHELL-SPEC 932's saving (the question link's why on each row of an interpretation group) at R7.
 # Raised to 2.3 MB on the orchestrator's call of Oct 24, 13:50 +08: plain words lengthen rb's sentences by design.
 # Measuring both raw caps with a stated margin, with SHELL-SPEC 932's saving, stays R's task.
 # Raised to 2.4 MB raw and 185,000 gzip on the orchestrator's call of Oct 25, 16:00 +08: the your view and reader's view
 # pass (each viewer's wording marked) and the citations pass (every cited line drawn in its Source view) add both.
-SCALE_RAW, SCALE_GZIP = 2_400_000, 185_000  # bytes: the scale record's page (SHELL-SPEC section 14), gzip at level 9
+SCALE_RAW, SCALE_GZIP = 2_520_000, 196_000  # bytes: the scale record's page (SHELL-SPEC section 14), gzip at level 9
+# Raised from 2.40 MB in rec-2 (Nov 13 2026, orchestrator's rule of 08:30 +08: trim first, then raise by the feature's
+# measured growth): measured in the torch venv, mnav-1b's page is 2,393,953 bytes; rec-2's parts 1 to 3 (the Files tree
+# under Record, the header's git chips, About's strip, a file's card with its lines), after their trims (glyph type
+# icons, no aria-hidden on empty icons, rb open's chip rules in open.css), are 2,402,811 to 2,403,680 over three
+# records: about 9.7 KB, the new cap leaving mnav-1b's room and 900 bytes for L's resource markup. With parts 5 to 8 (notes
+# as one line, the grader badge, settings' words, the design chip, counts as links) the page measured 2,406,005 raw and
+# 185,823 gzip at gate RA6: the gzip cap rises from 185,000 to 187,000, and the small record's page (SMALL_PAGE) from
+# 212,000 to 217,000 (measured 213,490 here and 215,931 in test_page.py's record), each by the parts' measured growth. In the torch venv the same page measured 2,416,305 to 2,421,684 raw (gates RA6 and
+# after it): SCALE_RAW rises to 2,425,000. Most of parts 5-8's growth is the notes as one line (each note's opening
+# clause beside its whole text, which a page keeps whole in one element) on the scale record's 317 notes.
+# Raised again in cf-2 (closed form, owner Nov 13 2026: every value and label opens its source), by the same rule: in
+# the torch venv the page measured 2,520,711 raw with every value a link; after the trims (a rule's state word inside
+# its row's one link in each run's Counts toward, not a link of its own) 2,502,368 raw and 194,746 gzip, about 81 KB
+# over rec-2's 2,421,684; with the last rows linked (open items, calls, Next step words) 2,511,922 and 194,995.
+# SCALE_RAW rises to 2,520,000 and SCALE_GZIP to 196,000. Most of it is the links themselves:
+# the rows that open each rule (about 1,800 on this record), each time's link to its write (394), the rows' data-go.
+# The small record's page (SMALL_PAGE) measured 222,393 with them (217,000 before): it rises to 225,000.
 # rb open's / is 2.4 MB for now (decided Oct 22, 17:55 +08, on MP-1022-1334's proposal 2): the pointer guide and 4b take
 # it past 2.3 MB. R's script squeeze after Oct 24 (SHELL-SPEC 932's saving, script.js squeezed) brings it back down.
 # Raised to 2.45 MB on the orchestrator's call of Oct 25, 21:55 +08 (design pass 1: your view and reader's view, and
@@ -831,7 +848,9 @@ SCALE_RAW, SCALE_GZIP = 2_400_000, 185_000  # bytes: the scale record's page (SH
 # bytes (0.8.3) to 2,462,542, from each run card's own code step and its "your checkout" line (the design's Reproduce
 # this run), commits at 12 hex and "with changes outside the record not committed" in place of "uncommitted changes";
 # a run card points at the glossary line rather than repeating it, which saved 33 KB.
-OPEN_RAW = 2_480_000                       # bytes: rb open's / on the scale record
+# Raised to 2.54 MB in cf-2 (closed form, owner Nov 13 2026), by the same rule as SCALE_RAW: rb open's / measured
+# 2,530,292 in the torch venv with every value and label a link to its source.
+OPEN_RAW = 2_540_000                       # bytes: rb open's / on the scale record
 OPEN_TIMES_STATUS = 3.5                    # rb open's / on the scale record, against rb status --json there: about 2.5 on
                                            # a quiet box, 3.04 once under load (MP-1030-03); twice as slow reads about 5
 
@@ -1066,7 +1085,7 @@ def test_the_shell_export_is_what_the_hub_serves(shell_record):
     assert on_page, error
     scripts = re.findall(r"<script>(.*?)</script>", on_page, flags=re.S)
     # until the shell's script is written (A1), rb page inlines none, and the export names those empty bytes
-    shell_script = (Path(__file__).parent.parent / "rust" / "src" / "shell" / "assets" / "script.js").read_text(encoding="utf-8")
+    shell_script = (Path(__file__).parent.parent / "rust" / "src" / "shell" / "assets" / "script.min.js").read_text(encoding="utf-8")
     assert len(scripts) == (1 if shell_script.strip() else 0), on_page[:300]
     named = re.findall(r'<html\b[^>]*\sdata-shell="([^"]*)"', page)
     assert named == ["sha256:" + hashlib.sha256((scripts[0] if scripts else shell_script).encode("utf-8")).hexdigest()], page[:300]
@@ -1212,7 +1231,7 @@ def test_size_budget(request, tmp_path):
     env = {**scale.env, "RB_TEST_SHELL": "1"}
 
     def status():
-        r = subprocess.run([*command(), "status", "--json"], cwd=scale.root, env=env, capture_output=True, stdin=subprocess.DEVNULL, timeout=600)
+        r = subprocess.run([*command(), "status", "--full", "--json"], cwd=scale.root, env=env, capture_output=True, stdin=subprocess.DEVNULL, timeout=600)
         assert r.returncode in (0, 1), r.stderr[-500:]
     said = tmp_path / "open.txt"
     with open(said, "wb") as err:

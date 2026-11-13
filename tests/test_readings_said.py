@@ -59,13 +59,13 @@ def test_numbers_typed_with_no_time_have_an_unknown_time(rb):
     crit = rb("criterion", "add", "INT8 keeps top-1 within a point", "-e", "int8", "--metric", "change.top1", "--at-least", "-1").data["object"]["id"]
     code, out = rb("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6", text=True)
     assert "when is unknown: the numbers were typed in" in out
-    run = rb("status").data["runs"][0]["id"]
-    shown = rb("show", run)
+    run = rb("status", "--full").data["runs"][0]["id"]
+    shown = rb("show", "--long", run)
     assert shown.data["object"]["produced_basis"] == "unknown" and shown.data["made_before_recorded"] is True
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["timing"] == "unknown"
     assert "declared before" not in f["says"]["timing"]
-    code, out = rb("status", text=True)
+    code, out = rb("status", "--full", text=True)
     assert "recorded afterwards" in out
 
 
@@ -73,7 +73,7 @@ def test_a_typed_run_with_a_time_given_reads_as_before(rb):
     rb("experiment", "add", "INT8 against FP32", "--id", "int8", "--purpose", "the table", "--baseline", "fp32", "--candidate", "int8")
     crit = rb("criterion", "add", "INT8 keeps top-1 within a point", "-e", "int8", "--metric", "change.top1", "--at-least", "-1").data["object"]["id"]
     rb("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6", "--produced-at", "2030-01-01T00:00:00Z")
-    assert rb("show", crit).data["finding"]["timing"] == "before"
+    assert rb("show", "--long", crit).data["finding"]["timing"] == "before"
 
 
 def test_an_unpaired_reading_counts_both_arms_units_produced_before_it(rb):
@@ -83,7 +83,7 @@ def test_an_unpaired_reading_counts_both_arms_units_produced_before_it(rb):
     rb("run", "add", "int8", "top1=75.6", "--variant", "int8", "--set", "seed=2", "--produced-at", "2026-01-02T00:00:00Z")
     crit = rb("criterion", "add", "INT8 keeps top-1 within a point", "-e", "int8", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
               "--at-least", "-1").data["object"]["id"]
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["comparison"]["method"].startswith("unpaired")
     assert "both units were produced before it was declared" in f["says"]["timing"], f["says"]["timing"]
 
@@ -96,9 +96,9 @@ def test_a_metrics_file_committed_after_its_run_is_still_its_own_output(rb):
     rb("experiment", "add", "INT8 against FP32", "--id", "int8", "--purpose", "the runs", "--baseline", "fp32", "--candidate", "int8")
     code, out = rb("run", "add", "int8", "--from", "results/r1/metrics.json", "--produced-at", "2026-05-01T10:00:00Z", text=True)
     assert "not the run's own output" not in out
-    run = rb("status").data["runs"][0]["id"]
-    assert rb("show", run).data["file_written_after"] is None
-    status = rb("status")
+    run = rb("status", "--full").data["runs"][0]["id"]
+    assert rb("show", "--long", run).data["file_written_after"] is None
+    status = rb("status", "--full")
     assert not any(i["code"] == "file_written_after" for i in status.data["open"])
 
 
@@ -107,7 +107,7 @@ def test_no_hint_offers_to_type_a_number_in(rb):
     env = rb("criterion", "add", "The paper's 75.6 top-1", "-e", "int8", "--metric", "int8.top1", "--equals", "75.6", "--tolerance", "0.05")
     assert not any("=<value>" in n and "top1" in n for n in env.next)
     assert not any("--command" in n for n in env.next)
-    status = rb("status")
+    status = rb("status", "--full")
     for item in status.data["open"]:
         assert "top1=<value>" not in item.get("do", ""), item
         assert '--command "..."' not in item.get("do", ""), item
@@ -149,7 +149,7 @@ def test_a_cited_value_on_a_per_run_setting_is_compared_with_the_runs(rb):
     crit = rb("criterion", "add", "The paper's 75.6 top-1", "-e", "int8", "--metric", "int8.top1", "--equals", "75.6", "--tolerance", "0.05",
               "--source", "paper.md", "--quote", "reports 75.6 top-1", "--locator", "line 1").data["object"]["id"]
     rb("run", "add", "int8", "int8.top1=75.1", "fp32.top1=76.0", "--set", "images=10000", "--produced-at", "2030-01-01T00:00:00Z")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     codes = [p["code"] for p in f["integrity"]]
     assert "not_comparable" in codes, f["integrity"]
     assert any("images 10000 in the runs it reads vs 50000 in the cited source" in p["text"] for p in f["integrity"])
@@ -160,11 +160,11 @@ def test_typed_numbers_of_unknown_time_point_at_recording_them_again_with_the_ti
     rb("experiment", "add", "INT8 against FP32", "--id", "int8", "--purpose", "the table", "--baseline", "fp32", "--candidate", "int8")
     rb("criterion", "add", "INT8 keeps top-1 within a point", "-e", "int8", "--metric", "change.top1", "--at-least", "-1", "--id", "c1")
     run = rb("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6").data["object"]["id"]
-    [item] = [i for i in rb("status").data["open"] if i["code"] == "timing_unknown"]
+    [item] = [i for i in rb("status", "--full").data["open"] if i["code"] == "timing_unknown"]
     assert f"--produced-at <when> --replaces {run}" in item["do"]
     again = rb("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6", "--produced-at", "2030-01-01T00:00:00Z", "--replaces", run, "--why", "the time it ran")
     assert again.data["object"]["id"] != run
-    assert rb("show", "c1").data["finding"]["timing"] == "before"
+    assert rb("show", "--long", "c1").data["finding"]["timing"] == "before"
 
 
 def test_a_hand_retraction_that_reads_like_a_replacement_still_counts_as_retracted(rb):
@@ -204,10 +204,10 @@ def test_typed_runs_an_earlier_rb_wrote_read_as_of_unknown_time(tmp_path, monkey
     assert timings and set(timings.values()) == {"unknown"}, timings
     assert data["witness"]["runs"]["afterwards"] == len(runs)
 
-    code = main(["show", "c1"], typed=True)
+    code = main(["show", "--long", "c1"], typed=True)
     out = capsys.readouterr().out
     assert "order unknown" in out and "declared before the evidence" not in out
-    code = main(["show", runs[0]["id"]], typed=True)
+    code = main(["show", "--long", runs[0]["id"]], typed=True)
     assert "produced: when is unknown" in capsys.readouterr().out
 
     # the reading changed, not the files
@@ -225,13 +225,13 @@ def test_a_cited_difference_of_means_over_unequal_seeds_is_not_said_not_reproduc
               "--source", "paper.md", "--quote", "by -0.5 points", "--locator", "line 1").data["object"]["id"]
     for variant, seed, top1 in [("fp32", 1, 76.0), ("fp32", 2, 76.2), ("fp32", 3, 76.4), ("int8", 1, 75.5), ("int8", 2, 75.9)]:
         rb("run", "add", "int8", f"top1={top1}", "--variant", variant, "--set", f"seed={seed}", "--produced-at", "2030-01-01T00:00:00Z")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["rule_outcome"] == "undetermined", f["says"]
     assert "not reproduced" not in json.dumps(f["says"])
     [problem] = [p for p in f["integrity"] if p["code"] == "not_comparable"]
     assert "paired reading reads only the 2 seeds both arms ran and leaves out " in problem["text"], problem["text"]
     assert "means over all their seeds (int8 over 2, fp32 over 3), which is -0.5 here" in problem["text"], problem["text"]
-    code, out = rb("show", crit, text=True)
+    code, out = rb("show", "--long", crit, text=True)
     assert "not reproduced" not in out and "not comparable" in out
 
 
@@ -244,7 +244,7 @@ def test_a_cited_difference_where_every_seed_pairs_is_read_as_before(rb):
               "--source", "paper.md", "--quote", "by -0.5 points", "--locator", "line 1").data["object"]["id"]
     for variant, seed, top1 in [("fp32", 1, 76.0), ("fp32", 2, 76.2), ("int8", 1, 75.5), ("int8", 2, 75.7)]:
         rb("run", "add", "int8", f"top1={top1}", "--variant", variant, "--set", f"seed={seed}", "--produced-at", "2030-01-01T00:00:00Z")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["rule_outcome"] == "meets" and not [p for p in f["integrity"] if p["code"] == "not_comparable"], f
 
 
@@ -255,7 +255,7 @@ def test_one_run_outside_a_rules_selectors_is_said_in_the_singular(rb):
               "--where", "batch=64").data["object"]["id"]
     for batch in (64, 32):
         rb("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.6", "--set", f"batch={batch}", "--produced-at", "2030-01-01T00:00:00Z")
-    notes = {c["code"]: c["text"] for c in rb("show", crit).data["finding"]["caveats"]}
+    notes = {c["code"]: c["text"] for c in rb("show", "--long", crit).data["finding"]["caveats"]}
     assert notes["run_scope"].startswith("1 run outside this criterion's per-run selectors is not read: run"), notes["run_scope"]
     # the run it leaves out is named, with its value of what the rule selects by (round 5)
     assert notes["run_scope"].endswith(" (batch=32)"), notes["run_scope"]
@@ -278,7 +278,7 @@ def typed(rb, *numbers: str, **per_run) -> str:
 
 
 def not_comparable(rb, crit: str) -> str:
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["rule_outcome"] == "undetermined" and "not reproduced" not in json.dumps(f["says"]), f["says"]
     [problem] = [p for p in f["integrity"] if p["code"] == "not_comparable"]
     return problem["text"]
@@ -329,7 +329,7 @@ def test_the_arms_means_average_a_units_cases_as_rbs_reading_does(rb):
     typed(rb, "top1=76.0", "--variant", "fp32", "--repeats", first, seed=3)
     typed(rb, "top1=77.2", "--variant", "fp32", "--again", "--why", "a second execution", seed=3)
     # the paired -0.4 and the means' -0.6 both miss -0.5 ± 0.05: the rule is judged, with the means said beside it
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["rule_outcome"] == "misses" and not [p for p in f["integrity"] if p["code"] == "not_comparable"]
     [said] = [c["text"] for c in f["caveats"] if c["code"] == "cited_differs"]
     assert "(int8 over 2, fp32 over 3), which is -0.6 here" in said
@@ -354,8 +354,8 @@ def test_a_cited_value_is_said_only_on_a_rule_that_cites_a_number(rb):
                "--source", "paper.md", "--quote", "reports 75.6 top-1", "--locator", "line 1").data["object"]["id"]
     own = rb("criterion", "add", "INT8 keeps top-1 within a point", "-e", "int8", "--metric", "change.top1", "--at-least", "-1").data["object"]["id"]
     rb("run", "add", "int8", "int8.top1=75.1", "fp32.top1=76.0", "--set", "images=10000", "--produced-at", "2030-01-01T00:00:00Z")
-    assert any(p["code"] == "not_comparable" for p in rb("show", cited).data["finding"]["integrity"])
-    f = rb("show", own).data["finding"]
+    assert any(p["code"] == "not_comparable" for p in rb("show", "--long", cited).data["finding"]["integrity"])
+    f = rb("show", "--long", own).data["finding"]
     assert not any(c["code"] == "cited_differs" for c in f["caveats"]) and not f["integrity"], f
 
 
@@ -384,7 +384,7 @@ def test_a_direction_cited_by_its_words_compares_nothing_and_reads_as_its_rule_s
               "--source", "notes.md", "--quote", "INT8 is worse than FP32 on every set").data["object"]["id"]
     for variant, seed, top1 in [("fp32", 1, 76.0), ("fp32", 2, 76.2), ("fp32", 3, 76.4), ("int8", 1, 75.5), ("int8", 2, 75.9)]:
         rb("run", "add", "int8", f"top1={top1}", "--variant", variant, "--set", f"seed={seed}", "--produced-at", "2030-01-01T00:00:00Z")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["rule_outcome"] == "meets" and not [p for p in f["integrity"] if p["code"] == "not_comparable"], f
 
 
@@ -396,7 +396,7 @@ def test_a_cited_number_both_readings_meet_is_judged_with_the_difference_said_be
               "--source", "paper.md", "--quote", "by -0.45 points", "--locator", "line 1").data["object"]["id"]
     for variant, seed, top1 in [("fp32", 1, 76.0), ("fp32", 2, 76.2), ("fp32", 3, 76.4), ("int8", 1, 75.5), ("int8", 2, 75.9)]:
         rb("run", "add", "int8", f"top1={top1}", "--variant", variant, "--set", f"seed={seed}", "--produced-at", "2030-01-01T00:00:00Z")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["rule_outcome"] == "meets" and not [p for p in f["integrity"] if p["code"] == "not_comparable"], f
     assert [c for c in f["caveats"] if c["code"] == "cited_differs"]
 
@@ -411,5 +411,5 @@ def test_a_zero_the_cited_words_state_is_a_number_the_reading_can_miss(rb):
               "--source", "paper.md", "--quote", "at least 0 points").data["object"]["id"]
     for variant, seed, top1 in [("fp32", 1, 76.0), ("fp32", 2, 76.0), ("fp32", 3, 90.0), ("int8", 1, 77.0), ("int8", 2, 77.0)]:
         rb("run", "add", "int8", f"top1={top1}", "--variant", variant, "--set", f"seed={seed}", "--produced-at", "2030-01-01T00:00:00Z")
-    f = rb("show", crit).data["finding"]
+    f = rb("show", "--long", crit).data["finding"]
     assert f["rule_outcome"] == "undetermined" and [p for p in f["integrity"] if p["code"] == "not_comparable"], f["says"]

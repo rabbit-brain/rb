@@ -79,7 +79,7 @@ def test_one_list_of_where_rb_looks_for_every_surface(rb):
     for folder in ("runs/a", "experiments/b", "out/c"):
         Path(folder).mkdir(parents=True)
         Path(f"{folder}/metrics.json").write_text('{"val_loss": 0.97}', encoding="utf-8")
-    st = rb("status")
+    st = rb("status", "--full")
     assert st.data["scope"]["folders"] == USUAL
     assert st.data["repository"]["unindexed"] == ["out/c/"]
     rec = rb("reconcile")
@@ -114,7 +114,7 @@ def readme_layout(rb, seeds=(1, 2, 3)) -> None:
 
 
 def experiments(rb) -> list:
-    return [e["id"] for e in rb("status").data["experiments"]]
+    return [e["id"] for e in rb("status", "--full").data["experiments"]]
 
 
 def test_the_readmes_own_layout_reads_its_results_folders_and_suggests_no_apply(rb):
@@ -122,7 +122,7 @@ def test_the_readmes_own_layout_reads_its_results_folders_and_suggests_no_apply(
     rb reconcile --apply, which added one empty experiment per seed. The runs were recorded from those folders: each is
     read by int8, nothing is unindexed, and nothing rb suggests adds an experiment."""
     readme_layout(rb)
-    st = rb("status")
+    st = rb("status", "--full")
     assert st.data["repository"]["unindexed"] == [] and not any(i["code"] == "unindexed_folder" for i in st.data["open"])
     assert not any("--apply" in n for n in st.next)
     assert not any("--apply" in n for n in rb("context").next)
@@ -138,7 +138,7 @@ def test_a_new_number_in_a_folder_a_run_read_is_another_run_of_its_experiment(rb
     the run's own config beside the file states, with that config, so the rb reconcile --apply its Next names records
     it (it recorded nothing and said the line needs --set seed=<value>)."""
     readme_layout(rb)
-    rb("status")                                                             # rb looks: what lands after it is new
+    rb("status", "--full")                                                             # rb looks: what lands after it is new
     Path("out/seed1/rerun.json").write_text(json.dumps({"fp32": {"val_loss": 0.962}, "int8": {"val_loss": 0.988}}), encoding="utf-8")
     rec = rb("reconcile")
     argv = ["run", "add", "int8", "--from", "out/seed1/rerun.json", "--set", "seed=1", "--config", "out/seed1/config.yaml"]
@@ -146,7 +146,7 @@ def test_a_new_number_in_a_folder_a_run_read_is_another_run_of_its_experiment(rb
     assert rec.next[0] == "rb reconcile --apply"                            # all it would do is that rb run add
     applied = rb("reconcile", "--apply")
     assert applied.data["not_recorded"] == [] and len(applied.data["recorded"]) == 1 and experiments(rb) == ["int8"]
-    assert rb("status").data["found_unrecorded"] == 0 and rb("reconcile").next == []
+    assert rb("status", "--full").data["found_unrecorded"] == 0 and rb("reconcile").next == []
 
 
 def test_older_files_beside_a_runs_file_are_the_work_before_the_record(rb):
@@ -177,7 +177,7 @@ def test_older_files_beside_a_runs_file_are_the_work_before_the_record(rb):
     for n in (1, 2, 3):
         rb("run", "add", "int8", "--from", f"results/seed{n}/metrics.json", "--config", f"results/seed{n}/config.yaml", "--set", f"seed={n}",
            "--produced-at", "2026-09-01", agent="s-start")
-    reading = lambda: rb("status").data["findings"][0]["says"]["rule"]  # noqa: E731
+    reading = lambda: rb("status", "--full").data["findings"][0]["says"]["rule"]  # noqa: E731
     before = reading()
     assert before.startswith("criterion met"), before
     for env in (rb("reconcile"), rb("reconcile", agent="s-start")):
@@ -186,7 +186,7 @@ def test_older_files_beside_a_runs_file_are_the_work_before_the_record(rb):
     assert ("results/seed3/metrics_epoch3.json was there when rb first looked here, in results/seed3/, which int8 reads, so rb cannot tell it "
             "from the work before the record and proposes no run of it: rb run add int8 --from results/seed3/metrics_epoch3.json --set seed=3 "
             "--config results/seed3/config.yaml records it, if it is one") in unplaced, unplaced
-    assert not any("--apply" in n for n in rb("status").next + rb("context").next)
+    assert not any("--apply" in n for n in rb("status", "--full").next + rb("context").next)
     assert rb("reconcile", "--apply").data["recorded"] == [] and reading() == before
     base = _git("rev-parse", "--abbrev-ref", "HEAD")
     _git("checkout", "-qb", "rerun")                                         # a seed rerun committed on a branch, and checked out
@@ -195,7 +195,7 @@ def test_older_files_beside_a_runs_file_are_the_work_before_the_record(rb):
     _git("add", "results")                                                   # the record stays out of git, in the checkout
     _git("commit", "-qm", "seed 2 again")
     _git("checkout", "-q", base)
-    rb("status")
+    rb("status", "--full")
     _git("checkout", "-q", "rerun")
     assert rb("reconcile").data["found"] == [] and any(u.startswith("results/seed2/rerun.json came with a checkout, pull or merge, in results/seed2/") for u in rb("reconcile").data["unplaced"])
     Path("results/seed1/rerun.json").write_text(json.dumps({"fp32": {"val_loss": 0.961}, "int8": {"val_loss": 0.99}}), encoding="utf-8")
@@ -208,7 +208,7 @@ def test_a_results_file_written_and_committed_here_is_a_new_run(rb):
     it, even where the move was a commit made in this checkout of the result just written. A commit made here brings
     nothing: its file was written here, after rb's first look, and is proposed as a new run."""
     readme_layout(rb)
-    rb("status")
+    rb("status", "--full")
     Path("out/seed1/rerun.json").write_text(json.dumps({"fp32": {"val_loss": 0.962}, "int8": {"val_loss": 0.988}}), encoding="utf-8")
     _git("add", "out")
     _git("commit", "-qm", "the three seeds and a rerun of seed 1")
@@ -268,7 +268,7 @@ def test_older_results_moved_copied_or_put_back_by_git_are_never_new_runs(rb):
     new run, added to git or not."""
     import shutil
     _under_way(rb)
-    reading = lambda: rb("status").data["findings"][0]["says"]["rule"]  # noqa: E731
+    reading = lambda: rb("status", "--full").data["findings"][0]["says"]["rule"]  # noqa: E731
     before = reading()
     shutil.move("results/sweep-1", "results/sweep-1-lr01")
     shutil.copytree("results/sweep-2", "results/sweep-2-copy")               # cp -Rp: the times come too
@@ -292,7 +292,7 @@ def test_older_results_moved_copied_or_put_back_by_git_are_never_new_runs(rb):
     # changed since that run (EVIDENCE.md E5), never proposed as a run to average in with it
     for seed in (2, 3):
         assert any(u.startswith(f"results/seed{seed}/metrics.json changed since run ") and "rb does not propose it as a run" in u for u in unplaced), unplaced
-    [older] = [i for i in rb("status").data["open"] if i["code"] == "unindexed_folder"]
+    [older] = [i for i in rb("status", "--full").data["open"] if i["code"] == "unindexed_folder"]
     assert older["later"] and sorted(older["folders"]) == ["results/sweep-1-lr01/", "results/sweep-2-copy/", "results/sweep-2/"], older
     assert rb("reconcile", "--apply").data["recorded"] == [] and reading() == before
     # a result written now, added to git before rb looks, then committed: new bytes, and a run
@@ -329,7 +329,7 @@ def test_a_result_rb_saw_land_is_still_a_new_run_after_a_stash_and_a_look(rb):
     rb("journal", "scan")
     _git("stash", "pop", "-q")
     assert found() == runs, rb("reconcile").data["unplaced"]
-    said = rb("status", text=True)
+    said = rb("status", "--full", text=True)
     assert "rb reconcile lists them, with the rb run add for each of the 2 runs; 3 results files were there when rb first looked here" in said, said
     # a file there at rb's first look, gone for a look and written back
     epoch3 = Path("results/seed3/metrics_epoch3.json")
@@ -385,7 +385,7 @@ def test_an_untracked_config_there_before_the_record_is_no_change_after_a_stash_
     local = Path("configs/local.yaml")
     local.write_text("data:\n  batch_size: 128\n", encoding="utf-8")
     rb("init", "INT8 ResNet-50")
-    said = lambda: [u["said"] for u in rb("status").data["uncited_changes"]]  # noqa: E731
+    said = lambda: [u["said"] for u in rb("status", "--full").data["uncited_changes"]]  # noqa: E731
     assert said() == []
     for _ in range(2):
         _git("stash", "push", "-q", "-u", "--", "configs/local.yaml")
@@ -443,15 +443,15 @@ def test_status_counts_older_files_by_why_rb_cannot_tell_them_new(rb):
     _git("add", "out")
     _git("commit", "-qm", "seed 1 at epoch 5")
     _git("checkout", "-q", base)
-    rb("status")
+    rb("status", "--full")
     _git("merge", "-q", "epoch5")
     said = "Found in the repository, not in the record (1): 1 results file came with a checkout, pull or merge, which rb reconcile lists and proposes no run of"
-    assert said in rb("status", text=True)
+    assert said in rb("status", "--full", text=True)
     Path("out/seed2/eval_old.json").write_text(json.dumps({"fp32": {"val_loss": 0.959}, "int8": {"val_loss": 0.984}}), encoding="utf-8")
     old = time.time() - 2 * 86400
     os.utime("out/seed2/eval_old.json", (old, old))
     said = "Found in the repository, not in the record (2): 2 results files rb cannot tell from the work before the record, which rb reconcile lists and proposes no run of"
-    assert said in rb("status", text=True)
+    assert said in rb("status", "--full", text=True)
 
 
 def test_under_a_fixed_clock_a_file_written_after_rb_init_is_still_a_new_run(rb, monkeypatch):
@@ -492,10 +492,10 @@ def test_a_status_of_one_experiment_offers_no_apply_that_would_add_another(rb):
     Path("results/int8_run/metrics.json").write_text('{"top1": 0.760}', encoding="utf-8")
     rb("reconcile", "--apply")
     Path("results/int8_run/metrics.json").write_text('{"top1": 0.758}', encoding="utf-8")
-    assert [i["do"] for i in rb("status", "int8_run").data["open"] if i["code"] == "reindex"] == ["rb reconcile --apply"]
+    assert [i["do"] for i in rb("status", "--full", "int8_run").data["open"] if i["code"] == "reindex"] == ["rb reconcile --apply"]
     Path("results/fp32_run").mkdir()
     Path("results/fp32_run/README.md").write_text("# FP32 run\n", encoding="utf-8")
-    st = rb("status", "int8_run")
+    st = rb("status", "--full", "int8_run")
     assert [i["do"] for i in st.data["open"] if i["code"] == "reindex"] == ["rb reconcile"] and "rb reconcile --apply" not in st.next
 
 
@@ -515,14 +515,14 @@ def test_a_seed_evaluated_without_the_journal_is_proposed_as_its_run(rb):
     Path("out/seed5/metrics.json").write_text(json.dumps({"fp32": {"val_loss": 0.959}, "int8": {"val_loss": 0.986}}), encoding="utf-8")
     Path("out/seed5/config.yaml").write_text("seed: 5\noptim:\n  lr: 0.1\ndata:\n  dataset: imagenet\n", encoding="utf-8")
     readme_layout(rb)
-    rb("status")                                                             # the README's rb status: rb looks
+    rb("status", "--full")                                                             # the README's rb status: rb looks
     Path("out/seed5/metrics.json").touch()                                   # the same bytes, a new time
     seed_files(4)
     rec = rb("reconcile")
     assert [f["argv"] for f in rec.data["found"]] == [["run", "add", "int8", "--from", "out/seed4/metrics.json", "--set", "seed=4", "--config", "out/seed4/config.yaml"]]
     assert rec.next[0] == "rb reconcile --apply"
     applied = rb("reconcile", "--apply")
-    assert len(applied.data["recorded"]) == 1 and applied.data["not_recorded"] == [] and len(rb("status").data["runs"]) == 4
+    assert len(applied.data["recorded"]) == 1 and applied.data["not_recorded"] == [] and len(rb("status", "--full").data["runs"]) == 4
     assert rb("reconcile").data["found"] == []                              # out/seed5/ and out/seed9/ are the start protocol's
     import shutil
     copy = Path.cwd().parent / f"{Path.cwd().name}-copy"
@@ -542,7 +542,7 @@ def test_what_rb_init_writes_is_in_its_first_look(rb):
     _git("commit", "-qm", "the agents' instructions")
     rb("init", "INT8 ResNet-50", "--yes")
     assert "rb's section" in Path("AGENTS.md").read_text(encoding="utf-8") or "rabbit-brain" in Path("AGENTS.md").read_text(encoding="utf-8")
-    rb("status")
+    rb("status", "--full")
     files = [(e["change"], e["path"]) for e in rb("journal", "-n", "100").data["entries"] if e.get("op") == "file"]
     assert files == [("new", "AGENTS.md")], files
 
@@ -611,7 +611,7 @@ def test_a_watched_command_that_writes_a_new_seed_folder_is_a_run_never_an_exper
     assert "experiments to add" not in rb("reconcile", text=True)
     applied = rb("reconcile", "--apply")
     assert applied.data["applied"]["added"] == [] and applied.data["not_recorded"] == [] and len(applied.data["recorded"]) == 1
-    st = rb("status")
+    st = rb("status", "--full")
     assert experiments(rb) == ["int8"] and st.data["repository"]["unindexed"] == [] and st.data["found_unrecorded"] == 0
 
 
@@ -655,7 +655,7 @@ def test_a_watched_command_wrote_only_what_changed_while_it_ran(rb):
     rb("metric", "add", "val_loss", "--unit", "nats", "--minimize")
     rb("criterion", "add", "INT8 adds at most 0.05 validation loss", "-e", "int8", "-q", "q-imagenet", "--metric", "change.val_loss", "--at-most", "0.05")
     rb("run", "add", "int8", "--from", "results/sweep-1/metrics.json", "--produced-at", "unknown")
-    rb("status")
+    rb("status", "--full")
     Path("results/sweep-1/rerun.json").write_text(json.dumps({"fp32": {"val_loss": 0.962}, "int8": {"val_loss": 0.981}}), encoding="utf-8")
     rb("journal", "run", "--", sys.executable, "eval.py", "--seed", "4")
     [ran] = journal_runs(rb)
@@ -667,7 +667,7 @@ def test_a_watched_command_wrote_only_what_changed_while_it_ran(rb):
     assert "--commit" not in found["results/sweep-1/rerun.json"]["argv"] and not any("written by" in f for f in found["results/sweep-1/rerun.json"]["facts"])
     text = rb("reconcile", "--apply", text=True)
     assert "Kept in the record: 2 runs recorded." in text and "Runs recorded from the repository (2):" in text, text
-    assert len(rb("status").data["runs"]) == 3 and rb("reconcile").data["found"] == []
+    assert len(rb("status", "--full").data["runs"]) == 3 and rb("reconcile").data["found"] == []
 
 
 def test_past_the_walks_cap_a_command_wrote_only_its_own_files(rb):
@@ -706,7 +706,7 @@ def test_past_the_walks_cap_a_command_wrote_only_its_own_files(rb):
     rb("metric", "add", "val_loss", "--unit", "nats", "--minimize")
     rb("criterion", "add", "INT8 adds at most 0.05 validation loss", "-e", "int8", "--metric", "change.val_loss", "--at-most", "0.05")
     rb("run", "add", "int8", "--from", "results/sweep-0001/metrics.json", "--produced-at", "unknown")
-    assert rb("status").data["scope"]["cap_hit"]
+    assert rb("status", "--full").data["scope"]["cap_hit"]
     gone = lambda: [e["path"] for e in rb("journal", "-n", "100000").data["entries"] if e.get("change") == "gone"]  # noqa: E731
     rb("journal", "run", "--", sys.executable, "-c", "import os; os.makedirs('out/aab', exist_ok=True); open('out/aab/note.txt', 'w').write('x')")
     assert journal_runs(rb)[-1]["wrote"] == ["out/aab/note.txt"] and gone() == []
@@ -719,7 +719,7 @@ def test_past_the_walks_cap_a_command_wrote_only_its_own_files(rb):
     assert journal_runs(rb)[-1]["wrote"] == ["out/seed3/metrics.json"], journal_runs(rb)[-1]["wrote"]
     assert [f["path"] for f in rb("reconcile").data["found"]] == ["out/seed3/metrics.json"]
     applied = rb("reconcile", "--apply")
-    assert len(applied.data["recorded"]) == 1 and "out/seed3/metrics.json" in applied.data["recorded"][0] and len(rb("status").data["runs"]) == 2
+    assert len(applied.data["recorded"]) == 1 and "out/seed3/metrics.json" in applied.data["recorded"][0] and len(rb("status", "--full").data["runs"]) == 2
 
 
 def test_below_the_cap_a_file_a_command_copied_with_its_time_is_what_it_wrote(rb):
@@ -733,7 +733,7 @@ def test_below_the_cap_a_file_a_command_copied_with_its_time_is_what_it_wrote(rb
     Path("archive/metrics.json").write_text(json.dumps({"fp32": {"val_loss": 0.95}, "int8": {"val_loss": 0.97}}), encoding="utf-8")
     os.utime("archive/metrics.json", (old, old))
     rb("init", "INT8 ResNet-50")
-    assert not rb("status").data["scope"]["cap_hit"]
+    assert not rb("status", "--full").data["scope"]["cap_hit"]
     copy = "import os, shutil; os.makedirs('out/seed5'); shutil.copy2('archive/metrics.json', 'out/seed5/metrics.json')"
     rb("journal", "run", "--", sys.executable, "-c", copy)
     assert journal_runs(rb)[-1]["wrote"] == ["out/seed5/metrics.json"], journal_runs(rb)[-1]["wrote"]
@@ -753,7 +753,7 @@ def test_a_run_whose_per_run_value_nothing_gives_is_never_applied(rb):
     assert line.startswith("What `") and line.endswith("--set seed=<value>") and " is a run of int8, which declares seed per-run, and its command line does not give it: rb run add int8 " in line, line
     applied = rb("reconcile", "--apply")
     assert applied.data["recorded"] == [] and applied.data["not_recorded"] == []
-    assert not any("--apply" in n for n in rb("status").next)
+    assert not any("--apply" in n for n in rb("status", "--full").next)
 
 
 def test_a_runs_config_is_read_with_its_run_and_never_listed_as_numbers(rb):
@@ -767,7 +767,7 @@ def test_a_runs_config_is_read_with_its_run_and_never_listed_as_numbers(rb):
     rb("run", "add", "int8", "--from", "logs/seed2/metrics.json", "--set", "seed=2", "--config", "logs/seed2/config.yaml")
     rec = rb("reconcile")
     assert not any("logs/seed2" in u for u in rec.data["unplaced"]) and rec.data["found"] == []
-    assert rb("status").data["found_unrecorded"] == 0
+    assert rb("status", "--full").data["found_unrecorded"] == 0
     write_eval(config=True)
     rb("journal", "run", "--", sys.executable, "eval.py", "--seed", "3")
     rec = rb("reconcile")
@@ -792,7 +792,7 @@ def test_a_proposed_runs_seed_is_its_own_or_none(rb):
     recorded run read it with the values it states; the line gives a value only to the one results file its command
     wrote; a config and a line that disagree give neither; a config that states nothing the spec declares is none."""
     readme_layout(rb, seeds=(1,))
-    rb("status")
+    rb("status", "--full")
     found = lambda: rb("reconcile").data["found"]  # noqa: E731
     # a shared base config beside each seed's metrics, with the seed none of them ran with
     Path("out/sweep").mkdir()
@@ -919,7 +919,7 @@ def test_a_watched_lines_seed_is_read_in_each_form_and_a_configs_at_any_depth(rb
     gives it where it states it; only --seed 4 and a top-level seed: were tried. Each form is read, a seed under a
     nested key of the run's own config is read, and a line whose seed is inside a quoted sh -c gives none."""
     readme_layout(rb, seeds=(1,))
-    rb("status")
+    rb("status", "--full")
     Path("printonly.py").write_text(
         "import json, sys\n"
         "seed = next((a.split('=')[1] for a in sys.argv if a.startswith('seed=') or a.startswith('--seed=')), '0')\n"
@@ -952,15 +952,15 @@ def test_a_run_that_needs_its_seed_is_counted_as_one(rb):
     assert line == ("out/summary.json is a run of int8, which declares seed per-run, and no config of its own beside it gives it, and no watched "
                     "command wrote it: rb run add int8 --from out/summary.json --set seed=<value>"), line
     said = "Found in the repository, not in the record (1): 1 run of int8 needs its seed, which rb reconcile gives the line for"
-    assert said in rb("status", text=True) and f"- {said}" in rb("context", text=True)
-    st = rb("status")
+    assert said in rb("status", "--full", text=True) and f"- {said}" in rb("context", text=True)
+    st = rb("status", "--full")
     assert st.data["found_needs"] == [{"what": "out/summary.json", "experiment": "int8", "names": ["seed"]}]
     Path("report.py").write_text("import json\nprint(json.dumps({'metrics': {'fp32.val_loss': 0.959, 'int8.val_loss': 0.991}}))\n", encoding="utf-8")
     rb("journal", "run", "--", sys.executable, "report.py")
     seed_files(4)
     said = ("Found in the repository, not in the record (3): rb reconcile lists them, with the rb run add for the one run; 2 runs of int8 need "
             "their seed, which rb reconcile gives the lines for")
-    assert said in rb("status", text=True), rb("status", text=True)
+    assert said in rb("status", "--full", text=True), rb("status", "--full", text=True)
     assert [n["what"] for n in rb("context").data["found_needs"]] == ["out/summary.json", shlex.join([sys.executable, "report.py"])]
 
 
@@ -1016,7 +1016,7 @@ def test_a_watched_sweeps_own_seed_folders_are_its_runs(rb):
     assert ran["unnamed"] == ["out/seed9/metrics.json"], ran
     found = rb("reconcile").data["found"]
     assert sorted(f["argv"][4:8] for f in found) == [[f"out/seed{s}/metrics.json", "--set", f"seed={s}", "--config"] for s in (5, 6, 7)], found
-    assert "1 file was written while a watched command ran, which nothing ties to it" in rb("status", text=True)
+    assert "1 file was written while a watched command ran, which nothing ties to it" in rb("status", "--full", text=True)
 
 
 def test_the_tour_ends_with_its_results_folders_read_and_no_apply_suggested(rb):
@@ -1025,7 +1025,7 @@ def test_the_tour_ends_with_its_results_folders_read_and_no_apply_suggested(rb):
     assert "rb reconcile --apply" not in out
     import os
     os.chdir("rb-tour")
-    st = rb("status")
+    st = rb("status", "--full")
     assert st.data["repository"]["unindexed"] == [] and not any("reconcile" in n for n in st.next)
     assert rb("reconcile", "--apply").data["applied"]["added"] == [] and experiments(rb) == ["drop"]
 
@@ -1041,7 +1041,7 @@ def test_apply_makes_an_experiment_only_of_a_folder_with_a_report(rb):
     Path("results/calibration").mkdir(parents=True)
     Path("results/calibration/README.md").write_text("# INT8 calibration\n\n## Results\n\n512 images calibrate INT8 within 0.01 of FP32.\n", encoding="utf-8")
     Path("results/calibration/metrics.json").write_text('{"val_loss": 0.97}', encoding="utf-8")
-    st = rb("status")
+    st = rb("status", "--full")
     [item] = [i for i in st.data["open"] if i["code"] == "unindexed_folder"]
     assert item["do"] == "rb reconcile" and len(item["folders"]) == 41 and len(st.data["repository"]["unindexed"]) == 41
     assert item["what"] == "41 results folders hold results no recorded experiment reads yet: outputs/run00/, outputs/run01/, outputs/run02/ and 38 more"
@@ -1080,7 +1080,7 @@ def test_work_from_before_the_record_leads_to_the_start_protocol_until_it_starts
        agent="s-start")
     for n in (1, 2, 3):
         rb("run", "add", "int8", f"fp32.val_loss={0.96 + n / 1000}", f"int8.val_loss={0.98 + n / 1000}", agent="s-start")
-    st = rb("status")
+    st = rb("status", "--full")
     [item] = [i for i in st.data["open"] if i["code"] == "unindexed_folder"]
     assert item["do"] == "rb reconcile" and item["later"] and item["what"].startswith("60 results folders hold results written before the record began, which no recorded experiment reads yet: ")
     for env in (st, rb("context"), rb("status", agent="s-later"), rb("context", agent="s-later")):
@@ -1131,7 +1131,8 @@ def test_a_folder_a_watched_run_writes_after_the_start_protocol_is_an_item_of_it
         said = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "status", "arguments": {}}})["result"]
     finally:
         server.close()
-    assert len(said["content"][0]["text"]) < 30_000
+    # 30,000 before round 14; the status tool's data carries the Overview's view model since (UX5 1.1), about 1 KB here
+    assert len(said["content"][0]["text"]) < 31_500
     assert [len(i["folders"]) for i in said["structuredContent"]["data"]["open"] if i["code"] == "unindexed_folder"] == [1, 60]
 
 
@@ -1180,9 +1181,9 @@ def test_a_call_waiting_on_the_user_leads_their_next_line(rb):
 def test_a_title_that_is_its_id_is_said_once(rb):
     """rb status's first line read `<name> · <name>` where the project's title and id are the same."""
     rb("init", "int8-resnet-50")
-    assert rb("status", text=True).splitlines()[0] == "int8-resnet-50"
+    assert rb("status", "--full", text=True).splitlines()[0] == "int8-resnet-50"
     rb("project", "title", "INT8 ResNet-50", "--why", "the theme, as the paper titles it")
-    assert rb("status", text=True).splitlines()[0] == "INT8 ResNet-50 · int8-resnet-50"
+    assert rb("status", "--full", text=True).splitlines()[0] == "INT8 ResNet-50 · int8-resnet-50"
 
 
 # ---------------------------------------------------------------- long lists: the first ones, and a count of the rest
@@ -1194,12 +1195,12 @@ def test_thousands_of_results_folders_are_counted_on_one_short_line(rb):
     for n in range(3000):
         Path(f"outputs/r{n:04d}").mkdir(parents=True)
         Path(f"outputs/r{n:04d}/metrics.json").write_text('{"val_loss": 0.97}', encoding="utf-8")
-    text = rb("status", text=True)
+    text = rb("status", "--full", text=True)
     assert "3000 results folders hold results no recorded experiment reads yet: outputs/r0000/, outputs/r0001/, outputs/r0002/ and 2997 more" in text
     assert max(map(len, text.splitlines())) < 600 and len(text.splitlines()) < 40, text
     briefing = rb("context", text=True)
     assert len(briefing.splitlines()) < 120 and len(briefing) < 12_000
-    st = rb("status")
+    st = rb("status", "--full")
     [item] = [i for i in st.data["open"] if i["code"] == "unindexed_folder"]
     assert len(item["folders"]) == 3000 == len(st.data["repository"]["unindexed"])
 
@@ -1217,7 +1218,7 @@ def test_a_long_record_is_listed_in_part_with_a_count_of_the_rest(rb):
            "--metric", "top1", "--at-least", "0.75")
     for s in range(12):
         rb("run", "add", "cal00", f"top1={0.760 + s / 1000}")
-    text = rb("status", text=True)
+    text = rb("status", "--full", text=True)
     assert "  ... and 17 more lines of its reading: rb show q-imagenet reads it whole\n" in text
     assert "  ... and 2 more criteria: rb show <id> reads one, and rb status --json lists every one\n" in text
     assert "  ... and 2 more experiments: rb show <id> reads one, and rb status --json lists every one\n" in text
@@ -1225,7 +1226,7 @@ def test_a_long_record_is_listed_in_part_with_a_count_of_the_rest(rb):
     briefing = rb("context", text=True)
     assert "- 2 earlier runs are not listed here: rb show cal00 lists every one\n" in briefing
     assert "2 more experiments, less recently written to, are not shown here: " in briefing
-    st = rb("status")
+    st = rb("status", "--full")
     assert (len(st.data["experiments"]), len(st.data["findings"]), len(st.data["runs"])) == (22, 22, 12)
 
 

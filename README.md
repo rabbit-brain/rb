@@ -45,7 +45,7 @@ Finish with `rb status` exactly as printed, what you recorded, what rb says need
 
 ## What rb shows you
 
-rb works out each rule's result from the run files every time you ask. Here is `rb show` on the INT8 example further down:
+rb works out each rule's result from the run files every time you ask. Here is `rb show <id> --long` on the INT8 example further down:
 
 ```
 Criterion cviuxxm on int8 (primary, own): INT8 adds at most 0.05 validation loss

@@ -149,7 +149,7 @@ def test_a_merge_that_brings_a_unit_to_the_arms_it_separates_reads_as_an_integri
     [problem] = [p for p in finding(record)["integrity"] if p["code"] == "unit_separates_arms"]
     assert problem["text"] == "population.unit is loops, the setting that separates its two arms (loops=8 against loops=6), so each arm is one unit"
     assert finding(record)["rule_outcome"] == ("meets" if not rule else "undetermined")
-    status = record("status")
+    status = record("status", "--full")
     [item] = [i for i in status["open"] if i["subject"] == "c"]
     assert (item["code"], item["who"]) == ("unit_separates_arms", "agent") and item["do"].startswith("rb spec set e population.unit <setting>")
     assert status["gate"]["integrity"] and not [i for i in status["open"] if i["code"] in ("edited_outside_rb", "merged_outside_rb")]
@@ -719,7 +719,7 @@ def test_an_ordering_in_every_design_cell_is_a_sign_rule_rb_computes_and_points_
         run(record, width, 1, new)
     criterion_cmd = ("criterion", "add", "new beats old at every width", "-e", "e", "--metric", "error", "--subject", "new", "--reference", "old")
     record(*criterion_cmd, "--better", "--id", "c-better")
-    [item] = [i for i in record("status")["open"] if i["subject"] == "c-better" and i["code"] == "no_interval"]
+    [item] = [i for i in record("status", "--full")["open"] if i["subject"] == "c-better" and i["code"] == "no_interval"]
     assert "--at-most 0 --each" in item["do"] and "interval from 3" not in item["do"], item
     (record.root / "paper.md").write_text("# Paper\n\nThe new model beats the old one at every width.\n", encoding="utf-8")
     code = main([*criterion_cmd, "--at-most", "0", "--each", "--id", "c-each", "--why", "paper.md:3", "--json"])

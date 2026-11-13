@@ -31,28 +31,32 @@ pub fn sittings(doc: &Value, held: &dyn Fn(&str) -> bool) -> String {
                 days.push(day);
                 raw_log(doc, day, held)
             };
-            format!("<li class=\"sit\">{}{raw}{}</li>", head(s), lines(doc, s, usize::MAX, held))
+            // the sitting's head opens its day's raw log, where the page holds it
+            let head = match raw_anchor(doc, day, held) {
+                Some(i) => format!("<p class=\"sith\"><a href=\"#log-{i}\">{}</a></p>", esc(text(s, "head"))),
+                None => head(s),
+            };
+            format!("<li class=\"sit\">{head}{raw}{}</li>", lines(doc, s, usize::MAX, held))
         })
         .collect();
     // where one sitting holds every change, its head already counts them: the summary would say it twice
     let summary = text(doc, "history.summary");
-    let summary = if summary.is_empty() || sits.len() == 1 { String::new() } else { format!("<p class=\"dim sm hsum\">{}</p>", esc(summary)) };
+    // the count opens every sitting (owner, Nov 13 2026: counts click)
+    let summary = if summary.is_empty() || sits.len() == 1 { String::new() } else { format!("<p class=\"hsum\"><a class=\"fch fch-use\" href=\"#history\" data-open-all>{}</a></p>", esc(summary)) };
     format!("{summary}<ol class=\"sits\">{body}</ol>")
 }
 
 /// The one link of a day to its rows of the raw log: the newest row the page holds of that day; nothing where it holds
 /// none (a page with no log rows, a time rb cannot read).
-fn raw_log(doc: &Value, day: &str, held: &dyn Fn(&str) -> bool) -> String {
+fn raw_anchor(doc: &Value, day: &str, held: &dyn Fn(&str) -> bool) -> Option<i64> {
     if day.is_empty() {
-        return String::new();
+        return None;
     }
-    let newest = list(doc, "history.log")
-        .iter()
-        .filter(|e| day_of(text(e, "at")) == day)
-        .filter_map(|e| count(e, "log_index"))
-        .filter(|i| held(&format!("log-{i}")))
-        .max();
-    match newest {
+    list(doc, "history.log").iter().filter(|e| day_of(text(e, "at")) == day).filter_map(|e| count(e, "log_index")).filter(|i| held(&format!("log-{i}"))).max()
+}
+
+fn raw_log(doc: &Value, day: &str, held: &dyn Fn(&str) -> bool) -> String {
+    match raw_anchor(doc, day, held) {
         Some(i) => format!("<p class=\"sm hraw\"><a class=\"rawl\" href=\"#log-{i}\" aria-label=\"{RAW_LOG} of {}\">{RAW_LOG}</a></p>", esc(day)),
         None => String::new(),
     }
@@ -133,11 +137,16 @@ fn lines(doc: &Value, s: &Value, max: usize, held: &dyn Fn(&str) -> bool) -> Str
 fn line(doc: &Value, l: &Value, day: &str, held: &dyn Fn(&str) -> bool) -> String {
     let refs: Vec<&str> = list(l, "refs").iter().filter_map(Value::as_str).collect();
     // the time is a number, in the screen's own type; only an id is set in monospace
-    let mut out = format!(
-        "<li class=\"hev\"><span class=\"ht\">{}</span><div class=\"hs\"><span class=\"hsen\">{}</span>",
-        esc(&span(text(l, "first"), text(l, "last"), day)),
-        linked(doc, text(l, "sentence"), &refs, held)
-    );
+    // the time opens the write it tells in the raw log (closed form: times open their event), the newest the page holds
+    let (first, last) = (text(l, "first"), text(l, "last"));
+    let when = esc(&span(first, last, day));
+    let entry = count(l, "log_index").filter(|i| held(&format!("log-{i}")));
+    let (when, go) = match entry {
+        Some(i) => (format!("<a class=\"ht\" href=\"#log-{i}\">{when}</a>"), format!(" data-go=\"log-{i}\"")),
+        None => (format!("<span class=\"ht\">{when}</span>"), String::new()),
+    };
+    // the whole line opens its write in the raw log; the records it names open their own
+    let mut out = format!("<li class=\"hev\"{go}>{when}<div class=\"hs\"><span class=\"hsen\">{}</span>", linked(doc, text(l, "sentence"), &refs, held));
     let why = text(l, "why");
     if !why.is_empty() {
         out.push_str(&format!("<span class=\"why\"><span class=\"sr\"> \u{b7} </span>why: <span class=\"au\">{}</span></span>", esc(why)));
@@ -706,7 +715,7 @@ mod tests {
         );
         let html = sittings(&d, &all);
         assert_eq!(html.matches("<li class=\"sit\">").count(), 1, "{html}");
-        assert_eq!(html.matches("<li class=\"hev\">").count(), 2, "{html}");
+        assert_eq!(html.matches("<li class=\"hev\"").count(), 2, "{html}");
         assert!(!html.contains("in the log"), "{html}");
         assert!(said(&recent(&d, &all)).contains("locked e2"));
         // sittings that hold no object draw no list; a float count past what a whole number holds exactly is no count
@@ -760,7 +769,7 @@ mod tests {
         let page = said(&html);
         assert!(page.starts_with("Recent calls and changes 2026-10-19, 09:25 to 09:40 UTC · 5 changes · no calls made"), "{page}");
         assert!(page.ends_with("Every change, newest first \u{2192}"), "{page}");
-        assert_eq!(html.matches("<li class=\"hev\">").count(), 4);
+        assert_eq!(html.matches("<li class=\"hev\"").count(), 4);
         assert!(!page.contains("in the log"), "the Overview's lines carry no log count: {page}");
         assert!(!page.contains("amended e1 after locking it: hypothesis"), "an older sitting stays in History: {page}");
         // a sitting of more lines shows its newest four
@@ -768,7 +777,7 @@ mod tests {
         let mut d6 = d.clone();
         d6.as_dict_mut().unwrap().insert("history".into(), crate::obj! {"sittings" => Value::List(vec![six.clone()])});
         let html = recent(&d6, &all);
-        assert_eq!(html.matches("<li class=\"hev\">").count(), RECENT_LINES);
+        assert_eq!(html.matches("<li class=\"hev\"").count(), RECENT_LINES);
         let newest = list(&six, "lines").last().unwrap();
         assert!(said(&html).contains(&said(text(newest, "sentence"))));
     }
@@ -796,8 +805,9 @@ mod tests {
         let html = sittings(&d, &|id| id.starts_with("log-"));
         assert_eq!(html.matches(">Raw log</a>").count(), 2, "{html}");
         let at = |s: &str| html.find(s).unwrap_or_else(|| panic!("{s} not in {html}"));
-        assert!(at("newest</p>") < at("href=\"#log-4\"") && at("href=\"#log-4\"") < at("earlier that day"), "{html}");
-        assert!(at("the day before</p>") < at("href=\"#log-1\""), "{html}");
+        // a sitting's head opens its day's raw log too (closed form)
+        assert!(at("<a href=\"#log-4\">newest</a></p>") < at("class=\"rawl\" href=\"#log-4\"") && at("class=\"rawl\" href=\"#log-4\"") < at("earlier that day"), "{html}");
+        assert!(at("<a href=\"#log-1\">the day before</a></p>") < at("class=\"rawl\" href=\"#log-1\""), "{html}");
         assert!(html.contains("aria-label=\"Raw log of 2026-10-20\""), "{html}");
         assert!(!said(&html).contains("in the log") && !said(&html).contains("writes"), "{html}");
         assert!(said(&html).starts_with("5 changes recorded"), "several sittings: the summary counts them all: {html}");
@@ -815,7 +825,7 @@ mod tests {
         let d = one_line("{\"first\": \"2026-10-19 09:35 UTC\", \"n\": 1, \"sentence\": \"Locked e1\"}");
         let html = sittings(&d, &all);
         assert!(!html.contains("hsum") && !said(&html).contains("1 write in the log"), "{html}");
-        assert!(sittings(&example(), &all).contains("<p class=\"dim sm hsum\">52 changes recorded</p>"));
+        assert!(sittings(&example(), &all).contains("<p class=\"hsum\"><a class=\"fch fch-use\" href=\"#history\" data-open-all>52 changes recorded</a></p>"));
     }
 
     #[test]

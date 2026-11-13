@@ -17,11 +17,15 @@
   // who looks: the hub's <meta name="rb-viewer"> says "owner" (the working view) or "reader" (the record to read, every
   // warning and open item, no action, rb command or Copy). With no meta the page is as it was. Read here, else once
   // more when the document is in
-  const viewer = () => { const m = document.querySelector('meta[name="rb-viewer"]'), v = m && (m.getAttribute('content') || '').trim(); return v === 'owner' || v === 'reader' ? v : null; };
+  // a viewer the page does not know reads as the reader, as shell.css reads the meta
+  const viewer = () => { const m = document.querySelector('meta[name="rb-viewer"]'), v = m && (m.getAttribute('content') || '').trim().toLowerCase(); return !m ? null : v === 'owner' ? 'owner' : 'reader'; };
   // what a reader is not shown: what makes a call and what holds an rb command (`rbcmd`), never the warnings and open
   // items around them; a recipe stays as text. Until the app marks them every command box is held back
   const READER_CSS = 'html[data-viewer="reader"] :is(.rbcmd, .decide, [data-level="decide"], .queue li:has(a[href]:not(.qbtn)) .qbtn, .composer, .seg, input.why, .cp, .cprow, .keys):not(:is(#rerun, .rrx) *) { display: none !important; }' +
-    ' html[data-viewer="reader"]:not(.ready) :is(.cmdbox, pre.cmd):not(:is(#rerun, .rrx) *) { display: none !important; }';
+    ' html[data-viewer="reader"]:not(.ready) :is(.cmdbox, pre.cmd):not(:is(#rerun, .rrx) *) { display: none !important; }' +
+    // Reader's view shows the record's state, never the owner's actions (the UX lead, Nov 13 2026): no list of calls,
+    // no pin to it, no link into it, nothing that waits for a confirmation
+    ' html[data-viewer="reader"] :is(#nav li.yc, .qrail .calls-in, .qrail .callh, .qrail .callh + p, a.callk, #to-confirm, .sec:has(> #to-confirm), .waitblk, p.wlink, a[href="#to-confirm"], a[href="#your-call"]:not(#nav *)) { display: none !important; }';
   function setViewer(v) {
     VIEWER = v;
     if (!v) return;
@@ -74,15 +78,13 @@
 
   function init() {
     main = byId('main');
-    // a page writes each term's line once: its later uses take it from the glossary entry they name (rb open writes
-    // every use's, and leaves a run card's checkout term to enhanceAll)
-    if (!byId('rb-live')) $$('.term[aria-describedby]:not([data-hint])').forEach(t => { const g = byId(t.getAttribute('aria-describedby')); if (g) t.dataset.hint = g.textContent; });
     if (!VIEWER) setViewer(viewer());
     ownWords(document);
     keepStore();
     if (!INHUB && (INHUB = inHub())) H.classList.add('hosted');
     if (INHUB) foldTop();
     addControls();
+    foldMore();
     rerunInit();
     buildInspector();
     sayTheme();
@@ -98,7 +100,7 @@
     // rb open's live module drew the record anew: the new parts get their buttons and composers, and the app stands
     // where it stood (view, row, the inspector's stack; a card gone says so), moving no focus or scroll
     document.addEventListener('rb:swapped', e => {
-      ownWords(document); enhanceAll(byId('nav')); enhanceAll(main);
+      ownWords(document); foldMore(); enhanceAll(byId('nav')); enhanceAll(main);
       const kept = inspectorHeld();
       const now = id => { const bare = id.replace(/^\?/, ''); return byId(bare) ? bare : '?' + bare; };
       apply({ c: st.c, s: st.s.map(now), f: st.f && byId(st.f) ? st.f : null }, { quiet: true });
@@ -109,7 +111,8 @@
       if (rerunHash()) return;
       if (rerunDlg && rerunDlg.open) rerunDlg.close();
       if (placeMoved()) { showPlace(e.state && e.state.c ? e.state : null); return; }
-      if (e.state && e.state.c) { apply(e.state, { scroll: true, focus: true, kept: e.state.c === st.c }); return; }
+      // P12: Back on the same view keeps its scroll
+      if (e.state && e.state.c) { const k = e.state.c === st.c, y = e.state.y, to = () => { if (k && y >= 0) main.scrollTop = y; }; apply(e.state, { scroll: true, focus: true, kept: k }); to(); requestAnimationFrame(to); return; }
       // an address typed or set by hand arrives here first, with no state: resolve it and write its state, so the
       // hashchange that follows finds it already applied
       const s = fromHash(true);
@@ -257,7 +260,8 @@
         if (h) h.after(line); else ov.prepend(line);
       }
       // said as when the page was made, since the line's other time is when the record changed
-      const s = document.createElement('span'); s.className = 'stamp';
+      // it opens About's strip, as the bar's stamp does (closed form)
+      const s = document.createElement('a'); s.className = 'stamp'; s.href = '#in-git';
       s.textContent = 'made ' + stamp.textContent;
       if (line.childNodes.length) line.append(document.createTextNode(' \u00b7 '));
       line.append(s);
@@ -285,6 +289,105 @@
     foot.append(t, k);
   }
 
+  // under 600 About, the theme and ? fold into one "..." button at the bar's right (inside the hub, the tab row's), which
+  // opens a small menu with the three; from 600 the button is hidden and the three stand where they stood. Run again
+  // after rb open's live module draws the bar anew
+  function foldMore() {
+    const about = $('a.abt');
+    if (!about || about.closest('.ctls')) return;
+    const box = about.parentElement, g = document.createElement('span'), wrap = document.createElement('span'), m = document.createElement('button');
+    g.className = 'ctls'; g.id = 'ctls';
+    wrap.className = 'morebox';
+    m.type = 'button'; m.className = 'ctl ico more'; m.dataset.more = '';
+    m.setAttribute('aria-label', 'More'); m.setAttribute('aria-haspopup', 'true'); m.setAttribute('aria-expanded', 'false'); m.setAttribute('aria-controls', 'ctls');
+    m.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="13" cy="8" r="1.5" fill="currentColor"/></svg>';
+    box.insertBefore(wrap, about);
+    $$(':scope > .ctl', box).forEach(c => g.append(c));
+    // the Files tree under Record, which the row leaves out under 960, is one more item there: it opens as a sheet
+    if ($('#nav li.fls')) {
+      const f = document.createElement('button'); f.type = 'button'; f.className = 'ctl ftab'; f.textContent = 'Files';
+      f.addEventListener('click', () => document.dispatchEvent(new CustomEvent('rb:files', { detail: { focus: true } })));
+      g.append(f);
+    }
+    wrap.append(m, g);
+  }
+  const moreBtn = () => $('button[data-more]');
+  function moreOpen(open, focus) {
+    const m = moreBtn();
+    if (!m) return;
+    m.setAttribute('aria-expanded', String(open));
+    if (open) { const f = $('#ctls .ctl'); if (f && focus) f.focus({ preventScroll: true }); }
+    else if (focus) m.focus({ preventScroll: true });
+  }
+  const moreShown = () => { const m = moreBtn(); return !!m && m.getAttribute('aria-expanded') === 'true'; };
+  // a click anywhere but the menu closes it; About and ? close it as they act, the theme keeps it open to cycle again
+  document.addEventListener('click', e => {
+    const m = moreBtn();
+    if (!m) return;
+    const t = e.target.closest ? e.target : null;
+    if (t && t.closest('button[data-more]')) { e.preventDefault(); moreOpen(!moreShown(), true); return; }
+    if (!moreShown()) return;
+    if (t && t.closest('#ctls') && t.closest('[data-theme]')) return;
+    moreOpen(false, false);
+  }, true);
+  // what waits on the Overview (the UX lead's Still open, Nov 13 2026): a kind's chip shows its rows alone, the same
+  // chip again shows them all
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('button[data-filter]');
+    if (!b) return;
+    e.preventDefault();
+    const box = b.closest('.dfil'), list = box && box.nextElementSibling;
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    $$('button[data-filter]', box).forEach(x => x.setAttribute('aria-pressed', String(x === b && on)));
+    if (list) $$(':scope > li', list).forEach(li => { li.hidden = on && li.dataset.kind !== b.dataset.filter; });
+  }, true);
+  // resting on a row (about 300 ms, where a mouse points) or reaching it by key shows a small card of its result: the
+  // rule card's drawing and chips; moving away, leaving it or Escape hides it
+  let pv = null, pvAt = null, pvTimer = 0;
+  function previewHide() { clearTimeout(pvTimer); if (pv) pv.hidden = true; if (pvAt) pvAt.removeAttribute('aria-describedby'); pvAt = null; }
+  function previewShow(a) {
+    const card = byId(a.dataset.preview);
+    if (!card) return;
+    const parts = ['.vs', '.figw', 'ul.chips'].map(q => $(q, card)).filter(Boolean);
+    if (!parts.length) return;
+    if (!pv) { pv = document.createElement('div'); pv.className = 'pv'; pv.setAttribute('role', 'tooltip'); pv.id = 'rb-preview'; document.body.appendChild(pv); }
+    pv.textContent = '';
+    parts.forEach(x => { const k = x.cloneNode(true); stripIds(k); $$('a[href]', k).forEach(l => { l.removeAttribute('href'); l.tabIndex = -1; }); pv.appendChild(k); });
+    pv.hidden = false;
+    const r = a.getBoundingClientRect(), W = document.documentElement.clientWidth, H = window.innerHeight, w = Math.min(420, W - 16);
+    pv.style.width = w + 'px';
+    const h = pv.offsetHeight, left = Math.max(8, Math.min(r.left + 24, W - w - 8));
+    pv.style.left = left + 'px';
+    pv.style.top = (r.bottom + 6 + h <= H - 8 ? r.bottom + 6 : Math.max(8, r.top - 6 - h)) + 'px';
+    a.setAttribute('aria-describedby', pv.id);
+    pvAt = a;
+  }
+  // a mouse's pointer, never a finger's tap
+  document.addEventListener('pointerover', e => {
+    const a = e.target.closest && e.target.closest('a.drow[data-preview]');
+    if (!a || a === pvAt || e.pointerType !== 'mouse' || !a.dataset.preview) return;
+    clearTimeout(pvTimer);
+    pvTimer = setTimeout(() => previewShow(a), 300);
+  });
+  document.addEventListener('pointerout', e => {
+    const a = e.target.closest && e.target.closest('a.drow[data-preview]');
+    if (!a || (e.relatedTarget && a.contains(e.relatedTarget))) return;
+    if (document.activeElement !== a) previewHide(); else clearTimeout(pvTimer);
+  });
+  document.addEventListener('focusin', e => {
+    const a = e.target.closest && e.target.closest('a.drow[data-preview]');
+    if (a && a.dataset.preview && a.matches(':focus-visible')) previewShow(a); else if (pvAt && !a) previewHide();
+  });
+  document.addEventListener('focusout', e => { if (pvAt && e.target === pvAt) previewHide(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && pv && !pv.hidden) { e.stopPropagation(); e.preventDefault(); previewHide(); } }, true);
+  document.addEventListener('click', e => { if (pv && !pv.hidden && e.target.closest && e.target.closest('a.drow')) previewHide(); }, true);
+  window.addEventListener('scroll', () => { if (pv && !pv.hidden) previewHide(); }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !moreShown()) return;
+    e.stopPropagation(); e.preventDefault();
+    moreOpen(false, true);
+  }, true);
+
   // with nothing picked, a column inspector is a slim rail; its sentence stays for a screen reader, at the corner
   const RAIL_CSS = '@media screen and (min-width: ' + FROM + 'px) {' +
     ' html.app.irail body { grid-template-columns: var(--navw) minmax(0, 1fr) 14px; }' +
@@ -292,10 +395,6 @@
     ' html.app.irail aside.insp > .ibar { display: none; }' +
     ' html.app.irail aside.insp > .ibody { position: fixed; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }' +
     (FROM < 1280 ? '@media screen and (min-width: ' + FROM + 'px) and (max-width: 1279px) { html.app.irail body { grid-template-columns: minmax(0, 1fr) 14px; } }' : '') +
-    // a term's hint takes no clicks
-    ' .term::after { pointer-events: none; }' +
-    // closed while hovered: no hover hint until the pointer leaves
-    ' .term[data-hush]::after { content: none !important; }' +
     // on a touch width a call's choices say no key letter, and the composed line wraps whole in its box
     ' @media (max-width: 639px), (hover: none) and (pointer: coarse) { html.app .seg kbd { display: none; } }' +
     ' @media (max-width: 639px) { html.app .composer .cmd { white-space: pre-wrap; overflow-wrap: anywhere; } }';
@@ -304,10 +403,10 @@
     aside.className = 'insp'; aside.id = 'insp'; aside.setAttribute('aria-label', 'Inspector');
     aside.innerHTML =
       '<div class="ibar">' +
-      '<button type="button" class="ibtn back" data-act="back" aria-label="Back" title="Back">‹</button>' +
+      '<button type="button" class="ibtn ico back" data-act="back" aria-label="Back" title="Back"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8H3M7.5 3.5 3 8l4.5 4.5"/></svg></button>' +
       '<nav class="crumbs" aria-label="Inspector path"></nav><span class="bact"></span>' +
-      '<button type="button" class="ibtn" data-act="link" title="Copy a link to this card">Link</button>' +
-      '<button type="button" class="ibtn" data-act="close" aria-label="Close" title="Close  Esc">✕</button>' +
+      '<button type="button" class="ibtn ico" data-act="link" aria-label="Copy a link to this card" title="Copy a link to this card"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 9.2a2.8 2.8 0 0 0 4 0l2.2-2.2a2.8 2.8 0 0 0-4-4L8 4"/><path d="M9.2 6.8a2.8 2.8 0 0 0-4 0L3 9a2.8 2.8 0 0 0 4 4l1-1"/></svg></button>' +
+      '<button type="button" class="ibtn ico" data-act="close" aria-label="Close" title="Close  Esc"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
       '</div><div class="ibody"></div>';
     main.after(aside);
     // the slim rail's rules travel with the script that sets its class, so every page the script runs on folds an
@@ -376,6 +475,13 @@
   // address arriving cold, which opens a card over the view it belongs to
   function resolve(id, fromInsp, fresh, typed) {
     id = id.replace(/^#+/, '');
+    // a reader is taken to the state an owner's list is about: a call's card to its rule's card, the lists to the
+    // Overview
+    if (VIEWER === 'reader') {
+      const m = id.match(/^call-(.+)$/);
+      if (m) id = byId('c-' + m[1]) ? 'c-' + m[1] : 'overview';
+      else if (id === 'your-call' || id === 'to-confirm') id = 'overview';
+    }
     const old = oldAnchor(id);
     if (old && old.view) id = old.view;
     else if (old) {
@@ -436,6 +542,7 @@
     // the same place again (a row of the card already open) is no new step in history
     if (s.c === st.c && (s.f || null) === st.f && (s.s || []).join('\n') === st.s.join('\n')) { apply(s, Object.assign({ focus: true }, o || {})); return; }
     s.p = st.c === s.c ? st.s.slice() : null;
+    hist('replaceState', { ...history.state, y: main.scrollTop }, location.hash);
     hist('pushState', s, '#' + hashOf(s) + tail);
     apply(s, Object.assign({ focus: true }, o || {}));
   }
@@ -472,6 +579,7 @@
     const inRail = t.closest('[data-rail]') && WIDE.matches;
     if (!t.closest('.card') && !inRail) { openFolds(t); t.scrollIntoView({ block: 'start' }); flash(t); return; }
     const k = $('[data-id="' + esc(id) + '"]', ibody);
+    if (k && k.matches('[role="tabpanel"]')) return;
     if (k) { openFolds(k); k.scrollIntoView({ block: 'start' }); flash(k); }
   }
 
@@ -485,10 +593,20 @@
       if (h === id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
       a.classList.toggle('in', h === sec && h !== id);
     });
+    // on a phone the tab row scrolls sideways: the open tab is brought into its view, never left under Your call's pin
+    const row = $('#nav > ul'), on = row && $(':scope > li > a[aria-current="page"], :scope > li > a.in', row);
+    if (on && row.scrollWidth > row.clientWidth + 1) {
+      const yc = $(':scope > li.yc', row), r = row.getBoundingClientRect(), o = on.getBoundingClientRect();
+      const pin = yc && !yc.contains(on) && getComputedStyle(yc).position === 'sticky' ? yc.getBoundingClientRect().width : 0;
+      if (o.left < r.left) row.scrollLeft -= r.left - o.left + 8;
+      else if (o.right > r.right - pin) row.scrollLeft += o.right - (r.right - pin) + 8;
+    }
     // a view the top bar names (About) is marked there as the nav marks its own
     $$('header.top a[href^="#"]').filter(a => !a.closest('.where')).forEach(a => { if (a.getAttribute('href').slice(1) === id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     // the top bar names the view after the record's title
-    const vc = $('#top .vcrumb'); if (vc) named(vc, v.dataset.crumb || '', v.dataset.crumbOf);
+    // the view's name opens the view (closed form): a link, with no id beside it
+    // the view's name opens the view; its id stays off the bar (closed form)
+    const vc = $('#top .vcrumb'); if (vc) { vc.textContent = ''; if (v.dataset.crumb) { const l = document.createElement('a'); l.href = '#' + v.id; l.textContent = v.dataset.crumb; vc.append(l); } }
     // away from the place rb open started on, live, the title names the place shown first (the scope bar says it)
     const bar = $('#scope .bar');
     document.title = (bar && bar.dataset.title || '') + (v.dataset.title || document.title);
@@ -560,7 +678,7 @@
       // back at the root: focus returns to what opened the card while it is on screen, else to the row of the card just
       // closed (after the browser's Back and Forward the opener is gone), else the view's heading takes it
       // (a queue's button names its card by its link: a live reload drew it again, so the opener is a copy now)
-      const row = was && $$('main [data-for="' + esc(was) + '"] > summary, main [data-for="' + esc(was) + '"], main [data-go="' + esc(was) + '"] a[href], main a[data-decide="' + esc(was) + '"], main .queue a[href="#' + esc(was) + '"]')
+      const row = was && $$('main [data-for="' + esc(was) + '"] > summary, main [data-for="' + esc(was) + '"], main [data-go="' + esc(was) + '"] a[href], main a[data-decide="' + esc(was) + '"], main :is(.queue,[data-queue]) a[href="#' + esc(was) + '"]')
         .find(x => !x.closest('.card') && x.offsetParent !== null && x.matches('summary, a[href], button, [tabindex]'));
       if (opener && document.contains(opener) && opener.offsetParent !== null) rooted = opener;
       else if (row) rooted = row;
@@ -603,7 +721,12 @@
       aside.addEventListener('transitionend', again, { once: true });
       setTimeout(again, 250);
     }
-  }
+  }  // a link opened cold under the sheet width: once the page has loaded, where the browser left focus anywhere but in the
+  // sheet (issue #1), it goes to the card's title
+  window.addEventListener('load', () => {
+    if (H.classList.contains('sheet') && st.s.length && !aside.contains(document.activeElement)) focusTop();
+  });
+
 
   function rootFor(c) {
     const src = rootSource(c);
@@ -616,6 +739,8 @@
       $$('details.rc', k).forEach(d => { d.open = true; });
       const v = byId(c);
       wrap.dataset.rootname = src.dataset.rootname || (src.classList.contains('card') ? (v.dataset.crumb + ' · ' + (src.dataset.crumb || '')) : '');
+      // a reader is shown no list of calls: the rail is named by what it is on alone
+      if (VIEWER === 'reader') wrap.dataset.rootname = wrap.dataset.rootname.replace(/^Open calls · /, '');
       wrap.appendChild(k);
       enhanceAll(wrap);
     } else {
@@ -634,7 +759,71 @@
     stripIds(k);
     $$('details.rc', k).forEach(d => { d.open = true; });
     enhanceAll(k);
+    tabify(k);
     return k;
+  }
+
+  // a card's parts as tabs (the UX lead's card, Nov 13 2026): its row of parts becomes a tab list, one panel shown at a
+  // time, the first (Result) open unless the address names another; a click swaps the panel in place and keeps the
+  // part in the address (st.f), so Back returns to the tab before; the arrow keys, Home and End move between tabs. The
+  // document's own card stays whole, for print and a page read with no script
+  function tabify(k) {
+    const nav = $(':scope > .lv > nav.secnav.tabs', k);
+    if (!nav) return;
+    const tabs = $$(':scope > a[href^="#"]', nav).filter(a => !(VIEWER === 'reader' && a.matches('[data-vw]:not([data-vw~="reader"])')))
+      .map(a => ({ a, part: a.getAttribute('href').slice(1) })).map(t => Object.assign(t, { panel: $('[data-id="' + esc(t.part) + '"]', k) })).filter(t => t.panel);
+    if (tabs.length < 2) return;
+    k.classList.add('tabbed');
+    nav.setAttribute('role', 'tablist');
+    tabs.forEach(t => {
+      t.a.setAttribute('role', 'tab'); t.a.id = 'ct-' + t.part; t.panel.id = 'cp-' + t.part;
+      t.a.setAttribute('aria-controls', t.panel.id); t.panel.setAttribute('role', 'tabpanel'); t.panel.setAttribute('aria-labelledby', t.a.id);
+    });
+    // a part of the card no tab shows (a reader's Decide) is not shown either
+    $$(':scope > .lv > section.part, :scope > section.part', k).filter(p => !tabs.some(t => t.panel === p)).forEach(p => { p.hidden = true; });
+    const tabOf = part => {
+      if (!part) return null;
+      const el = $('[data-id="' + esc(part) + '"]', k);
+      return el ? tabs.find(t => t.panel === el || t.panel.contains(el)) || null : null;
+    };
+    const show = t => tabs.forEach(x => {
+      const on = x === t;
+      x.a.setAttribute('aria-selected', String(on)); x.a.tabIndex = on ? 0 : -1; x.panel.hidden = !on;
+    });
+    show(tabOf(st.f) || tabs[0]);
+    // to a tab by your act: the panel swaps where it is, and the address says the part (Result is the card's own)
+    const pick = (t, how) => {
+      show(t);
+      const f = t === tabs[0] ? null : t.part;
+      if ((st.f || null) === f) return;
+      const ns = { c: st.c, s: st.s.slice(), f };
+      if (how === 'push') {
+        hist('replaceState', { ...history.state, y: main.scrollTop }, location.hash);
+        hist('pushState', Object.assign({ p: st.s.slice() }, ns), '#' + hashOf(ns) + tail);
+      } else hist('replaceState', Object.assign({}, history.state || {}, ns), '#' + hashOf(ns) + tail);
+      st.f = f;
+    };
+    k.addEventListener('click', e => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target.closest && e.target.closest('a[href^="#"]');
+      if (!a || !k.contains(a)) return;
+      const t = tabs.find(x => x.a === a) || (!a.closest('[role="tablist"]') && tabs.find(x => x.part === a.getAttribute('href').slice(1)));
+      if (!t) return;
+      e.preventDefault();
+      pick(t, 'push');
+      if (!a.closest('[role="tablist"]')) t.a.focus({ preventScroll: true });
+    });
+    nav.addEventListener('keydown', e => {
+      const i = tabs.findIndex(x => x.a === document.activeElement);
+      if (i < 0) return;
+      const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+      if (j === undefined) return;
+      e.preventDefault(); e.stopPropagation();
+      const t = tabs[(j + tabs.length) % tabs.length];
+      pick(t, 'replace');
+      t.a.focus({ preventScroll: true });
+      t.a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
   }
 
   // another view's fold as a card: its summary the title, its content open
@@ -657,9 +846,18 @@
     const d = document.createElement('div');
     d.className = 'card missing';
     d.innerHTML = '<p class="tt dim"></p>';
-    d.firstChild.textContent = "nothing here is called '" + id + "'";
+    // rb open serves a field card, and a file's, when it is opened (its live module asks for it): nothing is said while
+    // it comes
+    const ask = /^(k|file)-/.test(id) && byId('rb-live');
+    d.firstChild.textContent = ask ? '' : "nothing here is called '" + id + "'";
+    if (ask) document.dispatchEvent(new CustomEvent('rb:want', { detail: { id } }));
     return d;
   }
+  // a card rb open served: the trail that waited for it opens it
+  document.addEventListener('rb:got', e => {
+    const q = '?' + e.detail.id;
+    if (st.s.includes(q)) apply({ c: st.c, s: st.s.map(x => x === q ? e.detail.id : x), f: st.f }, { focus: true });
+  });
 
   function stripIds(root) {
     if (root.id) { root.dataset.id = root.id; root.removeAttribute('id'); }
@@ -673,8 +871,10 @@
     crumbs.textContent = '';
     backBtn.hidden = !s.length; closeBtn.hidden = !s.length; linkBtn.hidden = !s.length;
     if (!s.length) {
-      const r = document.createElement('span');
+      // the inspector's name opens the view it names (closed form)
+      const r = document.createElement('a');
       r.className = 'rootname';
+      r.href = '#' + st.c;
       r.textContent = node.dataset.rootname || '';
       crumbs.appendChild(r);
       return;
@@ -686,10 +886,9 @@
     shown.forEach((it, i) => {
       if (i) { const sep = document.createElement('span'); sep.className = 'sep'; sep.textContent = '›'; sep.setAttribute('aria-hidden', 'true'); crumbs.appendChild(sep); }
       let el;
-      if (it.last) { el = document.createElement('span'); el.setAttribute('aria-current', 'location'); }
-      else if (it.gap) { el = document.createElement('span'); }
-      else { el = document.createElement('a'); el.href = '#' + (it.id || st.c); el.dataset.crumb = it.root ? 'root' : String(it.i); }
-      named(el, it.label, it.id0); el.title = it.label + (it.id0 ? ' ' + it.id0 : '');
+      if (it.gap) { el = document.createElement('span'); }
+      else { el = document.createElement('a'); el.href = '#' + (it.id || st.c); el.dataset.crumb = it.root ? 'root' : String(it.i); if (it.last) el.setAttribute('aria-current', 'location'); }
+      named(el, it.label); el.title = it.label;
       crumbs.appendChild(el);
     });
   }
@@ -713,31 +912,9 @@
   }
 
   // ---------- clicks: a link in the centre starts a trail, a link in the inspector extends it
-  // a term shown as the press began (the press can move focus to a link inside it)
-  let pressedShown = null;
-  document.addEventListener('pointerdown', e => { const t = e.target.closest && e.target.closest('.term[data-hint]'); pressedShown = t && t.dataset.shown ? t : null; }, true);
-  // a term's meaning closed, its hover hint too while hovered
-  function hush(term) {
-    term.blur();
-    if (!term.matches(':hover')) return;
-    term.dataset.hush = '1';
-    term.addEventListener('pointerleave', () => { delete term.dataset.hush; }, { once: true });
-  }
   function onClick(e) {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const t = e.target;
-    // a term shows its meaning in place on a click or tap and follows nothing; a second click, Esc or a click elsewhere
-    // closes it
-    const term = t.closest('.term[data-hint]');
-    if (term) {
-      e.preventDefault();
-      if (!term.matches('a[href], [tabindex]')) term.tabIndex = 0;
-      if (term.dataset.shown || pressedShown === term) { pressedShown = null; hush(term); return; }
-      term.dataset.shown = '1'; delete term.dataset.hush;
-      term.addEventListener('blur', () => { delete term.dataset.shown; }, { once: true });
-      term.focus({ preventScroll: true });
-      return;
-    }
     const btn = t.closest('button');
     if (btn) { onButton(btn, e); return; }
     if (t.closest('input, label')) return;
@@ -774,6 +951,8 @@
   let atDecide = false;
   function decide(a) {
     if (a.dataset.decide === undefined && !a.closest('[data-queue], .queue')) return null;
+    // a row of what waits on the Overview opens its card at Result: it is read before it is decided
+    if (a.matches('a.drow')) return null;
     const id = decode(a.getAttribute('href').slice(1)), el = byId(id);
     const card = el && (el.classList.contains('card') ? el : el.closest('.card'));
     if (!card) return null;
@@ -788,8 +967,8 @@
   function navigate(id, from) {
     const inInsp = !!(from && from.closest('aside'));
     const s = resolve(id, inInsp, false);
-    // a nav item changes the view and clears the trail
-    if (from && from.closest('#nav')) { s.s = []; s.f = null; }
+    // a nav item changes the view and clears the trail; a file in the Files tree opens its card over the view
+    if (from && from.closest('#nav') && !from.closest('li.fls')) { s.s = []; s.f = null; }
     // what Esc and close return focus to: the centre's link that opened a card; a view link leaves the heading to take it
     if (!inInsp) opener = s.s.length ? from : null;
     go(s);
@@ -811,6 +990,7 @@
       // a commit is copied as it is; a command with the line's end, ready to run
       if (src) copyText(src.textContent.replace(/\s+$/, '') + (src.classList.contains('sha') ? '' : '\n'), b, src);
     }
+    else if (act === 'copy-text') { e.preventDefault(); if (b.dataset.text) copyText(b.dataset.text, b); }
     else if (act === 'rerun-close') { e.preventDefault(); if (rerunDlg && rerunDlg.open) rerunDlg.close(); }
     else if (act === 'pick') { e.preventDefault(); choose(b.closest('.decide'), b.dataset.action); }
     else if (act === 'chip') { e.preventDefault(); b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); filter(b.closest('.view')); }
@@ -862,7 +1042,7 @@
     else fallback();
   }
 
-  // ---------- the parts the script adds: copy buttons, the call composer, hints, filters
+  // ---------- the parts the script adds: copy buttons, the call composer, filters
   // A command is copyable only when it is whole: never a line still holding a placeholder ('‹why›'), never a call's
   // listed lines (the composer copies the one chosen, with a reason), and in what waits for a confirmation only its
   // 'rb confirm' line.
@@ -910,10 +1090,6 @@
   }
   function enhanceAll(root) {
     sayChanged(root);
-    $$('.term[aria-describedby]', root).forEach(t => {
-      if (!t.dataset.hint) { const d = byId(t.getAttribute('aria-describedby')); if (d) t.dataset.hint = t.textContent.trim() + ' · ' + d.textContent.trim(); }
-      if (t.tagName !== 'A') t.tabIndex = 0;
-    });
     // a command box: its own Copy (rb draws it '.cmdbox[data-copybtn]', the prototype '.cmdbox')
     $$('.cmdbox', root).forEach(b => {
       if ($(':scope > .cp', b) || $(':scope > [data-copybtn]', b) || !copyable(b)) return;
@@ -940,6 +1116,9 @@
     if (noCmd()) $$('.keys', root).forEach(k => { k.hidden = true; });
     $$('.cmdbox, pre, code', root).forEach(c => { const t = ($('.cmd', c) || c).textContent.trim(); if (RBCMD.test(t)) (c.closest('.cmdbox') || c).classList.add('rbcmd'); });
     $$('.fchip', root).forEach(b => { b.dataset.act = 'chip'; });
+    // every row that opens its record is reached by key and named as a link: what it shows opens its source
+    // (a table's row keeps its row role: a table read aloud stays a table)
+    $$('[data-go]', root).forEach(r => { if (!r.hasAttribute('tabindex')) r.tabIndex = 0; if (r.tagName !== 'TR' && !r.hasAttribute('role')) r.setAttribute('role', 'link'); });
     $$('.decide', root).forEach(box => {
       const ul = $('.acts', box); if (ul) ul.classList.add('enh');
       // a choice shows its key only where a key makes it: a, r and i; a line of work's calls (park, stop, ...) have none
@@ -1008,13 +1187,13 @@
       return;
     }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // a row that opens its record (data-go) takes Enter and Space as a link does
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[data-go]')) { e.preventDefault(); navigate(e.target.dataset.go, e.target); return; }
     if (e.key === 'Escape') {
       if (helpBox && !helpBox.hidden) { closeHelp(); return; }
       // an open picker closes first, focus back on its button, before the inspector
       const pick = $('#where details.pick[open]');
       if (pick) { e.preventDefault(); pick.open = false; const b = $(':scope > summary', pick); if (b) b.focus({ preventScroll: true }); return; }
-      // Esc closes a term's meaning, not the inspector
-      if (e.target.closest && e.target.closest('.term[data-hint]')) { e.preventDefault(); hush(e.target.closest('.term')); return; }
       if (st.s.length) { e.preventDefault(); go({ c: st.c, s: [], f: null }); }
       return;
     }
@@ -1119,7 +1298,7 @@
     if (!helpBox) {
       helpBox = document.createElement('div');
       helpBox.className = 'help'; helpBox.setAttribute('role', 'dialog'); helpBox.setAttribute('aria-label', 'Keyboard');
-      helpBox.innerHTML = (byId('words') ? '<p class="hw"><a href="#words">What the words on this page mean →</a></p>' : '') + '<b>Keyboard</b><dl>' +
+      helpBox.innerHTML = '<b>Keyboard</b><dl>' +
         '<dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>back and forward through the inspector</dd><dt><kbd>Esc</kbd></dt><dd>' + ($('#where details.pick') ? 'close an open list in the bar, else the inspector' : 'close the inspector') + '; focus goes back to where it was</dd>' +
         // a reader's keys only read: no call to make and nothing to copy
         (VIEWER === 'reader'
@@ -1150,7 +1329,7 @@
     if (!helpBox.hidden) { closeHelp(); return; }
     helpBox.hidden = false;
     const kb = $('button[data-keys]'); if (kb) kb.setAttribute('aria-expanded', 'true');
-    // it opens on what the words mean, the question '?' is usually asked for
+    // it opens on its first control: no line of it says what words mean (no glossary, show instead)
     const first = $('a, input', helpBox); if (first) first.focus({ preventScroll: true });
   }
 
@@ -1285,8 +1464,10 @@
     helpBox.hidden = true;
     const kb = $('button[data-keys]');
     if (kb) kb.setAttribute('aria-expanded', 'false');
-    // focus goes back to the keys button, or into the card when a sheet holds the page under it
-    if (back) { if (kb && !kb.closest('[inert]')) kb.focus({ preventScroll: true }); else focusTop(); }
+    // focus goes back to the keys button (the "..." button where the menu folds it away), or into the card when a sheet
+    // holds the page under it
+    const to = kb && kb.checkVisibility() ? kb : moreBtn();
+    if (back) { if (to && !to.closest('[inert]')) to.focus({ preventScroll: true }); else focusTop(); }
   }
 })();
 
@@ -1342,10 +1523,11 @@
   // the Overview as a decision surface (OVERVIEW-V2): where each question stands, what weakens the evidence, what
   // needs the user's judgment, then the inspector; a part rb does not draw (no integrity line) is left out
   const onOv = q => { const v = view(), e = v && v.id === 'overview' && $(q, v); return shown(e) ? e : null; };
-  const queue = () => { const q = onOv('#queue') || onOv('[data-queue], ul.queue, ol.queue'); if (!q) return null; const s = q.closest('section'); return s && s !== view() && shown(s) ? s : q; };
+  // a reader is shown no rows: the line that says how many results are not decided is what stands in their place
+  const queue = () => { const q = onOv('#queue') || onOv('[data-queue], ul.queue, ol.queue') || onOv('p.dstate'); if (!q) return null; const s = q.closest('section'); return s && s !== view() && shown(s) ? s : q; };
   // the standing cards (one per top-level question), as one part
   const standing = () => {
-    const w = onOv('#standing'); if (w) return w;
+    const w = onOv('#standing') || onOv('.ovstrip'); if (w) return w;
     const v = view(), all = v && v.id === 'overview' ? $$('section.stand', v).filter(shown) : [];
     if (all.length < 2) return all[0] || null;
     return { getBoundingClientRect: () => { const a = all[0].getBoundingClientRect(), b = all[all.length - 1].getBoundingClientRect(); return { left: Math.min(a.left, b.left), top: a.top, right: Math.max(a.right, b.right), bottom: b.bottom, width: Math.max(a.right, b.right) - Math.min(a.left, b.left), height: b.bottom - a.top }; },
@@ -1356,8 +1538,8 @@
       text: 'Each question the record asks, where it stands now and why. Its rule counts open the rules behind them.' },
     { spot: () => onOv('#integrity'), title: 'How far to trust it',
       text: 'What limits the whole body of evidence, with its numbers. Read the result of every rule with it in mind.' },
-    { spot: queue, title: () => READER() ? 'Still open' : 'Needs your judgment',
-      text: () => READER() ? 'What rb cannot settle on its own. Each row opens its item in the inspector, to read.'
+    { spot: queue, title: () => READER() ? 'Still open' : $('#decisions') ? 'Decisions' : 'Needs your judgment',
+      text: () => READER() ? 'What rb cannot settle on its own: how many results no call is made on yet.'
         : 'What rb cannot settle and you can. Each button opens it in the inspector, ready for your call.' },
     Object.assign({}, STEPS[2]),
   ];
@@ -1520,19 +1702,20 @@
         if (s.open && mine) { mine = null; if (i < steps.length - 1) { i++; draw(true); } else end(); return; }
         end(); return;
       }
-      const W = document.documentElement.clientWidth, Hh = window.innerHeight, m = 8;
+      // on a phone the screen's bottom 72 px are the hub's (its "Try it yourself" pill): the tooltip stays above them
+      const W = document.documentElement.clientWidth, Hh = window.innerHeight, m = 8, mb = W < 600 ? 72 : m;
       const clip = r => { const l = Math.min(Math.max(r.left, 0), W), t = Math.min(Math.max(r.top, 0), Hh); return { l, t, r: Math.max(Math.min(r.right, W), l), b: Math.max(Math.min(r.bottom, Hh), t) }; };
       const at = clip(el.getBoundingClientRect());
       const keep = [at];
       const hd = !H.classList.contains('sheet') && !el.isHead && head(view());
       if (hd) keep.push(clip(hd.getBoundingClientRect()));
       const bw = box.offsetWidth, bh = box.offsetHeight;
-      const x = v => Math.max(m, Math.min(v, W - bw - m)), y = v => Math.max(m, Math.min(v, Hh - bh - m));
+      const x = v => Math.max(m, Math.min(v, W - bw - m)), y = v => Math.max(m, Math.min(v, Hh - bh - mb));
       const over = (l, t) => keep.reduce((n, k) => n + Math.max(0, Math.min(l + bw, k.r) - Math.max(l, k.l)) * Math.max(0, Math.min(t + bh, k.b) - Math.max(t, k.t)), 0);
       const tries = [[x(at.l), at.b + m], [x(at.l), at.t - m - bh]];
       if (W >= 640) tries.push([at.r + m, y(at.t)], [at.l - m - bw, y(at.t)]);
-      for (let t = m; t <= Hh - bh - m; t += 8) for (const l of [at.r + m, at.l - m - bw, x(at.l), m, W - bw - m]) tries.push([l, t]);
-      const fits = ([l, t]) => l >= m - 0.5 && t >= m - 0.5 && l + bw <= W - m + 0.5 && t + bh <= Hh - m + 0.5;
+      for (let t = m; t <= Hh - bh - mb; t += 8) for (const l of [at.r + m, at.l - m - bw, x(at.l), m, W - bw - m]) tries.push([l, t]);
+      const fits = ([l, t]) => l >= m - 0.5 && t >= m - 0.5 && l + bw <= W - m + 0.5 && t + bh <= Hh - mb + 0.5;
       const ok = tries.filter(fits);
       // of the places that cover neither, the nearest the part; where none does, the part is scrolled to the top of
       // the screen once, which makes room beside it; else the part's top, lit down to where the tooltip sits under it;
@@ -1542,9 +1725,9 @@
       let best = free.length ? free.reduce((a, b) => gap(b) < gap(a) ? b : a) : null;
       if (!best && !roomed) { roomed = true; el.scrollIntoView({ block: 'start' }); place(); return; }
       // a part taller than the screen has room for the tooltip under it: the spotlight lights what of it shows above
-      if (!best && Hh - bh - 2 * m - at.t >= 48) {
+      if (!best && Hh - bh - m - mb - at.t >= 48) {
         const was = at.b;
-        at.b = Math.min(at.b, Hh - bh - 2 * m);
+        at.b = Math.min(at.b, Hh - bh - m - mb);
         if (over(x(at.l), at.b + m) === 0) best = [x(at.l), at.b + m]; else at.b = was;
       }
       if (!best) best = (ok.length ? ok : [[x(at.l + m), y(at.b - bh - m)]]).reduce((a, b) => over(b[0], b[1]) < over(a[0], a[1]) ? b : a);
@@ -1581,4 +1764,144 @@
       }
     });
   }
+})();
+(() => {
+  // the Files tree under Record (owner, Nov 13 2026): "Files (n)" opens and closes it in place; the filter box keeps the
+  // files whose path holds what is typed, and their folders, open; a folder's path on a card opens the tree there
+  const N = () => document.getElementById('nav'), box = () => { const n = N(); return n && n.querySelector('li.fls'); };
+  let open = false, typed = '';
+  function show(on, focus) {
+    const li = box(); if (!li) return;
+    open = on; li.classList.toggle('open', on);
+    const t = li.querySelector('.ftog'); if (t) t.setAttribute('aria-expanded', on ? 'true' : 'false');
+    const f = li.querySelector('.ffilter');
+    if (on && focus && f) f.focus({ preventScroll: true });
+  }
+  function filter(q) {
+    typed = q; const li = box(); if (!li) return;
+    const w = q.trim().toLowerCase(); let any = false;
+    li.querySelectorAll('li.fr').forEach(r => { const hit = !w || (r.dataset.path || '').toLowerCase().includes(w); r.hidden = !hit; any = any || hit; });
+    Array.from(li.querySelectorAll('li.fdir')).reverse().forEach(d => { const hit = !!d.querySelector('li.fr:not([hidden])'); d.hidden = !hit; if (w && hit) d.firstElementChild.open = true; });
+    const none = li.querySelector('.fnone'); if (none) none.hidden = any;
+  }
+  function openAt(folder) {
+    show(true);
+    const d = N() && N().querySelector('li.fls details[data-folder="' + CSS.escape(folder) + '"]');
+    if (!d) return;
+    for (let p = d; p; p = p.parentElement && p.parentElement.closest('details')) p.open = true;
+    d.scrollIntoView({ block: 'nearest' });
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('.ftog, a[data-folder], .ftree .fclose');
+    if (!t || !box() || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (t.classList.contains('fclose')) show(false);
+    else if (t.classList.contains('ftog')) show(!open, !open); else openAt(t.dataset.folder);
+  }, true);
+  document.addEventListener('rb:files', e => { show(true, e.detail && e.detail.focus); const n = N(); if (n) n.scrollIntoView({ block: 'nearest' }); });
+  document.addEventListener('input', e => { if (e.target.classList && e.target.classList.contains('ffilter')) filter(e.target.value); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !(e.target.classList && e.target.classList.contains('ffilter'))) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    if (e.target.value) { e.target.value = ''; filter(''); return; }
+    show(false); const t = box() && box().querySelector('.ftog'); if (t && t.offsetParent) t.focus();
+  }, true);
+  // a file chosen in the sheet under 960 closes it, as a menu closes once its item is chosen
+  document.addEventListener('click', e => { if (open && e.target.closest && e.target.closest('li.fls li.fr a') && matchMedia('(max-width: 959px)').matches) show(false); });
+  // rb open redraws the navigator: the tree stays as it was, open, filtered
+  document.addEventListener('rb:swapped', () => { if (!open) return; show(true); const f = box() && box().querySelector('.ffilter'); if (f && typed) { f.value = typed; filter(typed); } });
+})();
+
+(() => {
+  // the header's git chips (owner, Nov 13 2026): copy the whole commit; the list of record files not committed closes on
+  // a click elsewhere and on Escape
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('.gcopy');
+    if (b) {
+      e.preventDefault();
+      const done = ok => { b.classList.toggle('done', ok); b.setAttribute('aria-label', ok ? 'Copied' : 'Copy the commit'); setTimeout(() => { b.classList.remove('done'); b.setAttribute('aria-label', 'Copy the commit'); }, 1500); };
+      const sha = b.dataset.sha || '';
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(sha).then(() => done(true), () => done(false));
+      else done(false);
+      return;
+    }
+    document.querySelectorAll('details.gunc[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; });
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const d = document.querySelector('details.gunc[open]');
+    if (d) { d.open = false; const s = d.querySelector('summary'); if (s) s.focus(); e.stopImmediatePropagation(); }
+  }, true);
+})();
+
+(() => {
+  // a key statement past three lines fades, and "more" shows it whole (owner, Nov 13 2026); measured on load and on
+  // every redraw, so one that fits keeps no button
+  function clamp() {
+    document.querySelectorAll('.kst').forEach(k => {
+      // one in a view not shown has no height yet: measured once it shows
+      if (k.dataset.measured || !k.getClientRects().length) return;
+      k.dataset.measured = '1';
+      k.classList.add('clamp');
+      if (k.scrollHeight <= k.clientHeight + 2) { k.classList.remove('clamp'); return; }
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'kmore'; b.textContent = 'more'; b.setAttribute('aria-expanded', 'false');
+      b.addEventListener('click', e => { e.preventDefault(); const open = k.classList.toggle('open'); b.textContent = open ? 'less' : 'more'; b.setAttribute('aria-expanded', open ? 'true' : 'false'); });
+      k.after(b);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', clamp); else clamp();
+  document.addEventListener('rb:swapped', clamp);
+  document.addEventListener('rb:card', clamp);
+  window.addEventListener('hashchange', () => setTimeout(clamp, 0));
+  window.addEventListener('popstate', () => setTimeout(clamp, 0));
+  // a view the navigator opens shows on its click: measured once it has drawn
+  document.addEventListener('click', () => requestAnimationFrame(clamp));
+})();
+
+(() => {
+  // the Rules view's chips filter its rows to a state; a second press, or All, shows every rule (owner, Nov 13 2026:
+  // counts click). A link elsewhere that names a state (data-rule) opens Rules filtered to it
+  // a reason that counts rules (data-ids) opens Rules showing those alone
+  function only(rule, outcome, ids) {
+    const box = document.getElementById('rule-filters');
+    if (!box) return;
+    const set = ids ? ids.split(' ') : null;
+    box.querySelectorAll('.rflt').forEach(b => b.setAttribute('aria-pressed', !outcome && !set && b.dataset.rule === rule ? 'true' : 'false'));
+    document.querySelectorAll('#criteria .krow[data-rule]').forEach(r => { r.hidden = set ? !set.includes(r.dataset.for) : outcome ? r.dataset.outcome !== outcome : !!rule && r.dataset.rule !== rule; });
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('#rule-filters .rflt');
+    if (b) { e.preventDefault(); only(b.getAttribute('aria-pressed') === 'true' ? '' : b.dataset.rule); return; }
+    const a = e.target.closest && e.target.closest('a[href="#criteria"][data-rule], a[href="#criteria"][data-outcome], a[href="#criteria"][data-ids]');
+    if (a) setTimeout(() => only(a.dataset.rule || '', a.dataset.outcome || '', a.dataset.ids || ''), 0);
+  });
+})();
+
+(() => {
+  // History's count of changes opens every sitting it counts
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('a[data-open-all]');
+    if (!a) return;
+    const v = a.closest('.view, section, article') || document;
+    setTimeout(() => v.querySelectorAll('details').forEach(d => { d.open = true; }), 0);
+  });
+})();
+
+(() => {
+  // a hover says what a thing is; keyboard focus says it too (closed form): the focused element's title, in a tip under it
+  let tip = null;
+  const hide = () => { if (tip) tip.hidden = true; };
+  document.addEventListener('focusin', e => {
+    // the focused element's own title, never an ancestor's
+    const el = e.target;
+    if (!el || !el.matches || !el.matches(':focus-visible') || !el.getAttribute('title')) { hide(); return; }
+    if (!tip) { tip = document.createElement('div'); tip.className = 'ftip'; tip.setAttribute('role', 'tooltip'); tip.id = 'rb-ftip'; document.body.appendChild(tip); }
+    tip.textContent = el.getAttribute('title');
+    const r = el.getBoundingClientRect();
+    tip.style.left = Math.max(4, Math.min(r.left, innerWidth - 330)) + 'px';
+    tip.style.top = (r.bottom + 4 + scrollY) + 'px';
+    tip.hidden = false;
+  });
+  document.addEventListener('focusout', hide);
 })();

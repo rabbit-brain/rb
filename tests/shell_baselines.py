@@ -49,6 +49,16 @@ def for_this_machine() -> dict:
     return next((b for m, b in BY_MACHINE.items() if m.split(" ")[0] == platform.system()), BASELINES)
 
 
+def to_hold(system: str = "") -> list:
+    """The figures a budget holds on `system` (this one by default): its own machines' where one was measured; on a
+    system none was (Windows), every measured machine's, and the budget takes the most lenient. The ratio of a read to
+    rb status depends on what the system charges for a process, a git call or a loopback request (GitHub's Windows
+    runner read /state.json at 1.057 times rb status, where Linux reads 0.89 and macOS 0.83), and a system never
+    measured has no figure of its own to hold."""
+    system = system or platform.system()
+    return [b for m, b in BY_MACHINE.items() if m.split(" ")[0] == system] or list(BY_MACHINE.values())
+
+
 def _five(read) -> dict:
     """One untimed read, then five timed: the median and max of their seconds, and of their bytes."""
     read()

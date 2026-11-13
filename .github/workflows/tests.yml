@@ -1,17 +1,96 @@
 name: tests
 
+# Two kinds of run. On every push to main, every pull request and every release tag, the release check: rb built on
+# Windows and macOS, then the tests of what differs there (the agents' session hooks in each shell, paths and line
+# endings, rb updating itself, the app runner and the browser checks that drive Chrome), in about 15 minutes from the
+# push. A tag goes on a commit whose release check passed (RELEASING.md). The full matrix (every suite, Linux on two
+# Pythons, Windows, and leaving rb on macOS and Windows; about 3 hours) runs after the tag, daily, and by hand.
 on:
   push:
     branches: [main]
+    tags: ["v[0-9]*"]
   pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# pytest -n auto: the suite in parallel, as it is checked before every merge; one test at a time it runs for hours
-# --reruns 2: a browser check that loses a race under that load gets two more tries, each marked R in the output
+# The release check's tests: each named for why it is there, and nothing a Linux run already proves alone.
+#   the session hooks, run in sh, PowerShell and cmd, and the instruction files rb writes beside them
+#   line endings rb keeps and writes, and paths as rb says them (places, worktrees, the home folder as ~)
+#   rb remove's round trip, which touches every file rb wrote
+#   rb updating itself through uv, where Windows keeps a running program's file
+#   the live view's timing checks and the home screen's budget, which a slow runner reads differently
+#   Chrome started by the harness and the app runner's deadlines over its process tree, the clipboard Copy prompt
+#   writes, and the inspector's rail settling (the checks GitHub's Windows and macOS runners have failed on); the rest
+#   of tests/app/ and the screenshot runner (half an hour together) run in the full matrix
+env:
+  RELEASE_CHECK_TESTS: >-
+    tests/test_session_hooks.py tests/test_skill.py tests/test_line_endings.py tests/test_places.py
+    tests/test_worktrees.py tests/test_remove.py
+    tests/test_surface.py::test_rb_installed_as_a_uv_tool_upgrades_itself_through_uv_and_a_screen_says_restart
+    tests/test_surface.py::test_an_upgrade_that_installs_nothing_newer_is_not_said_as_installed
+    tests/test_surface.py::test_rb_in_a_uv_tool_dir_of_any_name_upgrades_itself_through_uv
+    tests/test_shell_model.py::test_home_within_budget
+    tests/test_live.py::test_a_poll_never_counts tests/test_live.py::test_the_page_polls_less_while_hidden_or_unanswered
+    tests/test_live.py::test_a_terminal_write_keeps_what_you_had_open
+  RELEASE_CHECK_BROWSER: >-
+    tests/test_shell.py::test_the_app_runner_starts tests/test_shell.py::test_the_app_runner_stops_what_it_started_at_its_deadlines
+    tests/test_shell.py::test_a_chrome_whose_first_process_hands_its_start_on_is_used_and_stopped
+    tests/test_live.py::test_a_chrome_that_hands_its_start_on_is_waited_for_and_stopped_and_one_that_fails_says_why
+    tests/app/test_app.py::test_rerun_this_research_copies_its_prompt_by_real_clicks
+    tests/app/test_app.py::test_rerun_this_research_on_an_export_as_the_hub_serves_it
+    tests/app/test_app.py::test_an_empty_inspector_folds_to_a_slim_rail_on_every_page_the_script_runs
+
 jobs:
+  # The release check: Windows and macOS, about 15 minutes from the push (rb built in about 5 with the cache, then the
+  # platform tests in 3 to 5, the browser checks in 4 to 6; measured at -n 4 on a 16-core Linux box: 165 s and 229 s).
+  release-check:
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec  # stable branch, 2026-10-16
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
+        with:
+          workspaces: rust
+      - name: Install (builds the rb binary)
+        run: python -m pip install -e ".[dev]"
+      - name: What differs on this platform
+        timeout-minutes: 10
+        run: python -m pytest -q -n auto --reruns 2 $RELEASE_CHECK_TESTS
+      - name: The app runner and the browser checks drive Chrome over CDP (fail, never skip, without node 22 or Chrome)
+        timeout-minutes: 15
+        env:
+          RB_REQUIRE_BROWSER: "1"
+        run: python -m pytest -q -n auto --reruns 2 $RELEASE_CHECK_BROWSER
+
+  # The full matrix: after the tag, daily, and by hand.
   test:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -62,6 +141,7 @@ jobs:
   # is Linux's wording of a path and of a system error, and is held on Linux alone; PYTHONUTF8 has the tests' own
   # Python read and write UTF-8, as rb does everywhere.
   windows:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
     env:
       PYTHONUTF8: "1"
@@ -105,6 +185,7 @@ jobs:
   # the worktree tests, on macOS beside Linux, and on Windows, whose job above runs them in the whole suite too. A check
   # that needs a POSIX terminal or signal is skipped on Windows, and says why.
   leaving:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
       matrix:

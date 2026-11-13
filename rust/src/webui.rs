@@ -366,7 +366,34 @@ pub fn digest_payload(root: &Path, query: &str) -> Res<Result<Value, String>> {
 /// One card of what the query chose, as the shell draws it (`/o/<id>.html`), or rb's words for an id that names none.
 pub fn node_payload(root: &Path, id: &str, query: &str) -> Res<Result<String, String>> {
     let got = on_shown(root, query, |led, shown| {
+        // a field card (fields.rs), served when it is opened: rb open's page holds none, and it is drawn against the ids
+        // of what the page holds, never the whole document
+        if id.starts_with("k-") {
+            let ctx = shown.context();
+            // a past version offers no command to copy (guarantee 38), as its page does not
+            let past = shown.chosen.version.is_some();
+            return crate::view::for_a_screen(|| crate::view::at_place(ctx, || crate::view::as_past_version(past, || crate::shell::fields::one(led, &crate::shell::fields::index(led)?, id))));
+        }
         let doc = crate::shell::document(led, crate::shell::Surface::Open, Some(&shown.chosen))?;
+        // a file's card (owner, Nov 13 2026): only a file the Files tree lists, whole as the checkout shown holds it now;
+        // a past version quotes no line of a file (guarantee 38)
+        if let Some(path) = id.strip_prefix("file-") {
+            let Some(f) = doc.get("files").and_then(|fs| match fs {
+                Value::List(fs) => fs.iter().find(|f| f.get("path").and_then(Value::as_str) == Some(path)),
+                _ => None,
+            }) else {
+                return Ok(None);
+            };
+            let mut f = f.clone();
+            if shown.chosen.version.is_none() && f.get("git").and_then(Value::as_str) != Some("ignored") {
+                let committed = f.get("git").and_then(Value::as_str) == Some("committed");
+                let head = if committed { crate::sources::git(&led.root, &["rev-parse", "--verify", "-q", "HEAD"]).map(|h| h.trim().to_string()).unwrap_or_default() } else { String::new() };
+                if let Some(d) = f.as_dict_mut() {
+                    d.insert("body".into(), crate::files::whole(&led.root, path, &head));
+                }
+            }
+            return Ok(Some(crate::shell::nodes::file_card(&doc, crate::shell::Surface::Open, &f)));
+        }
         Ok(card_in(&crate::shell::nodes::all(&doc, crate::shell::Surface::Open), id))
     })?;
     Ok(got.and_then(|card| card.ok_or_else(|| format!("nothing here is called {}", pyjson::repr_str(id)))))

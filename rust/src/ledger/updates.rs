@@ -71,17 +71,27 @@ pub fn tool_env(exe: &Path) -> Option<(Install, PathBuf)> {
 }
 
 /// Whether `env` is rabbit-brain's own tool environment, and whose: a Python environment (its pyvenv.cfg) named
-/// rabbit-brain in uv's folder of tools or pipx's folder of environments, whose installer's mark names rabbit-brain.
+/// rabbit-brain in uv's folder of tools (one named `tools`, or `$UV_TOOL_DIR` whatever its name) or pipx's folder of
+/// environments, whose installer's mark names rabbit-brain.
 fn marked(env: &Path) -> Option<Install> {
+    marked_in(env, std::env::var_os("UV_TOOL_DIR").filter(|v| !v.is_empty()).map(PathBuf::from).as_deref())
+}
+
+fn marked_in(env: &Path, uv_tool_dir: Option<&Path>) -> Option<Install> {
     let name = |p: &Path| p.file_name().and_then(|n| n.to_str()).map(str::to_string);
     if name(env).as_deref() != Some("rabbit-brain") || !env.join("pyvenv.cfg").is_file() {
         return None;
     }
     let names_us = |file: &str| std::fs::read_to_string(env.join(file)).map_or(false, |t| t.contains("rabbit-brain") || t.contains("rabbit_brain"));
-    match env.parent().and_then(name).as_deref() {
-        Some("tools") if names_us("uv-receipt.toml") => Some(Install::Uv),
-        Some("venvs") if names_us("pipx_metadata.json") => Some(Install::Pipx),
-        _ => None,
+    let same = |a: &Path, b: &Path| a == b || matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)), (Ok(x), Ok(y)) if x == y);
+    let parent = env.parent()?;
+    let uv_dir = name(parent).as_deref() == Some("tools") || uv_tool_dir.map_or(false, |d| same(d, parent));
+    if uv_dir && names_us("uv-receipt.toml") {
+        Some(Install::Uv)
+    } else if name(parent).as_deref() == Some("venvs") && names_us("pipx_metadata.json") {
+        Some(Install::Pipx)
+    } else {
+        None
     }
 }
 
@@ -356,7 +366,43 @@ pub fn start_check() {
         return;
     }
     if let Ok(exe) = std::env::current_exe() {
-        crate::sys::spawn_detached(&exe, &[WORKER], &[("RB_UPDATE_WORKER", "1")]);
+        let program = exe.to_string_lossy().to_string();
+        let worker = if cfg!(windows) { worker_copy(&exe).unwrap_or_else(|| exe.clone()) } else { exe };
+        crate::sys::spawn_detached(&worker, &[WORKER], &[("RB_UPDATE_WORKER", "1"), (PROGRAM, &program)]);
+    }
+}
+
+/// The program the background check is for, named to the worker, which may run from a copy of it.
+const PROGRAM: &str = "RB_UPDATE_PROGRAM";
+
+/// A copy of the program for the background check to run from, in rb's settings folder: Windows keeps a running
+/// program's file from being replaced, so a worker that ran from the program itself would keep the installer from
+/// putting the new rb in its place. Copies an earlier check left are taken away first (one still running stays).
+fn worker_copy(exe: &Path) -> Option<PathBuf> {
+    let dir = path()?.parent()?.join("update-worker");
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for e in entries.flatten() {
+            let _ = std::fs::remove_file(e.path());
+        }
+    }
+    std::fs::create_dir_all(&dir).ok()?;
+    let copy = dir.join(format!("rb-{}.exe", std::process::id()));
+    std::fs::copy(exe, &copy).ok()?;
+    Some(copy)
+}
+
+/// On Windows, wait until no process runs the program at each path (the command that started this check, still ending,
+/// or another rb), so the installer can replace it: at most a minute, then go on and let the installer say.
+fn wait_until_free(paths: &[&Path]) {
+    if !cfg!(windows) {
+        return;
+    }
+    let until = std::time::Instant::now() + Duration::from_secs(60);
+    for p in paths {
+        // a running program's file opens for reading only
+        while p.is_file() && std::fs::OpenOptions::new().write(true).open(p).is_err() && std::time::Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(250));
+        }
     }
 }
 
@@ -437,8 +483,11 @@ pub fn work() -> i32 {
     if !newer(&latest, crate::version()) {
         return 0;
     }
-    let Ok(exe) = std::env::current_exe() else { return 0 };
+    // the program the check is for: the worker may run from a copy of it (start_check)
+    let Some(exe) = std::env::var_os(PROGRAM).filter(|p| !p.is_empty()).map(PathBuf::from).or_else(|| std::env::current_exe().ok()) else { return 0 };
     let Some((install, env)) = tool_env(&exe) else { return 0 };
+    let program = ["bin", "Scripts"].iter().map(|b| env.join(b).join(exe.file_name().unwrap_or_default())).find(|p| p.is_file());
+    wait_until_free(&[exe.as_path(), program.as_deref().unwrap_or(exe.as_path())]);
     // turned off while PyPI answered: the user's word holds, right up to the upgrade
     if !running_here(&read()) || !upgrade(install) {
         return 0;
@@ -588,6 +637,22 @@ mod tests {
         std::fs::write(project.join("uv-receipt.toml"), b"rabbit-brain").unwrap();
         std::fs::write(project.join(".venv/uv-receipt.toml"), b"rabbit-brain").unwrap();
         assert_eq!(install_of(&project.join(".venv/bin/rb")), Install::Pip);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_uv_tool_folder_uv_tool_dir_names_is_uvs_whatever_its_name() {
+        let root = std::env::temp_dir().join(format!("rb-uv-dir-{}-{:08x}", std::process::id(), crate::rng::os_randbits(32)));
+        let dir = root.join("uv-tools");
+        let env = dir.join("rabbit-brain");
+        std::fs::create_dir_all(env.join("bin")).unwrap();
+        std::fs::write(env.join("pyvenv.cfg"), b"home = /usr/bin\n").unwrap();
+        std::fs::write(env.join("uv-receipt.toml"), b"[tool]\nrequirements = [{ name = \"rabbit-brain\" }]\n").unwrap();
+        assert_eq!(marked_in(&env, None), None, "a folder not named tools, and not UV_TOOL_DIR");
+        assert_eq!(marked_in(&env, Some(&root.join("other"))), None, "UV_TOOL_DIR names another folder");
+        assert_eq!(marked_in(&env, Some(&dir)), Some(Install::Uv));
+        std::fs::create_dir_all(root.join("x")).unwrap();
+        assert_eq!(marked_in(&env, Some(&root.join("x").join("..").join("uv-tools"))), Some(Install::Uv), "the same folder, spelt otherwise");
         let _ = std::fs::remove_dir_all(&root);
     }
 

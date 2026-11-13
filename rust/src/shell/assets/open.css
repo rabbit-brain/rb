@@ -114,3 +114,12 @@ html:has(#withheld .withheld) pre.cmd { user-select: text; -webkit-user-select: 
   .where details.pick[data-pick="version"], .where ul.picks, .where .failed { display: none !important; }
   .where details.pick > summary::before, .where details.pick > summary::after { content: none !important; }
 }
+
+/* rb open: the Where and Version pickers drawn as that one chip, the branch then the commit */
+.where details.pick[data-pick="where"] > summary, .where details.pick[data-pick="version"] > summary { align-items: center; padding: 1px 8px; border: 1px solid var(--line); }
+.where details.pick[data-pick="where"] > summary { border-radius: 12px; gap: 5px; }
+.where details.pick[data-pick="where"]:has(+ details.pick[data-pick="version"]) > summary { border-radius: 12px 0 0 12px; border-right: 0; }
+.where details.pick[data-pick="version"] > summary { border-radius: 0 12px 12px 0; color: var(--dim); }
+.where details.pick > summary .lab.mono { font-size: 12px; }
+.where, html.app header.top .where { gap: 2px 0; align-items: center; }
+.where > .gitc { margin-left: 4px; }

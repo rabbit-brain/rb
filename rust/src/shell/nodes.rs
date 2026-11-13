@@ -51,11 +51,24 @@ pub fn all(doc: &Value, surface: Surface) -> String {
     for (key, c) in entries(doc, "citations") {
         out += &d.source(key, c);
     }
+    // a File card for each file the record names (UX5 1.4); rb open serves every file's when it is opened, whole
+    // (webui.rs node_payload), so its page holds none
+    if surface != Surface::Open {
+        for f in list(doc, "files").iter().filter(|f| at(f, "named").and_then(Value::as_bool).unwrap_or(false)) {
+            out += &d.file(f);
+        }
+    }
     out
 }
 
+/// A file's card, drawn for one file the document lists (`f`, which may carry its `body`): what rb open serves when a
+/// file is opened.
+pub fn file_card(doc: &Value, surface: Surface, f: &Value) -> String {
+    Doc::new(doc, surface).file(f)
+}
+
 /// One card of the document, whole, by its anchor (`c-c1`, `run-runs1`, `r-imagenet-val`, `a-a1`, `call-c2`,
-/// `q-q1:lim:0`, `q-q1:rd:criteria-met`, `x-e1:v:int8`), as `all` draws it on `surface`; a run past the cap is drawn
+/// `q-q1:rd:criteria-met`, `x-e1:v:int8`), as `all` draws it on `surface`; a run past the cap is drawn
 /// with its whole receipt, which is what rb open serves for it. None for an anchor the document has no card at.
 pub fn one(doc: &Value, surface: Surface, anchor: &str) -> Option<String> {
     let d = Doc::new(doc, surface);
@@ -73,7 +86,7 @@ pub fn one(doc: &Value, surface: Surface, anchor: &str) -> Option<String> {
         "q" => {
             let qid = id.split(':').next()?;
             let q = list(doc, "questions").iter().find(|q| s(q, "id") == qid)?;
-            cut(&(d.qualifications(q) + &d.reading_groups(q)), anchor)
+            cut(&d.reading_groups(q), anchor)
         }
         "x" => {
             let eid = id.split(':').next()?;
@@ -81,12 +94,13 @@ pub fn one(doc: &Value, surface: Surface, anchor: &str) -> Option<String> {
             cut(&d.variants(x), anchor)
         }
         "cite" => found("citations").map(|c| d.source(id, c)),
+        "file" => list(doc, "files").iter().find(|f| s(f, "path") == id).map(|f| d.file(f)),
         _ => None,
     }
 }
 
 /// One card by its kind and id: `criterion` (or `finding`), `run`, `resource`, `analysis` and `call` by the record's
-/// id; `source` (or `citation`) by its citation's key (`README.md:3`); `qualification`, `reading` and `variant` by their anchor's tail (`q1:lim:0`, `q1:rd:criteria-met`, `e1:v:int8`).
+/// id; `source` (or `citation`) by its citation's key (`README.md:3`); `reading` and `variant` by their anchor's tail (`q1:rd:criteria-met`, `e1:v:int8`).
 pub fn card(doc: &Value, kind: &str, id: &str, surface: Surface) -> Option<String> {
     let prefix = match kind {
         "criterion" | "finding" => "c",
@@ -94,9 +108,10 @@ pub fn card(doc: &Value, kind: &str, id: &str, surface: Surface) -> Option<Strin
         "resource" => "r",
         "analysis" => "a",
         "call" => "call",
-        "qualification" | "reading" => "q",
+        "reading" => "q",
         "variant" => "x",
         "source" | "citation" => "cite",
+        "file" => "file",
         _ => return None,
     };
     one(doc, surface, &format!("{prefix}-{id}"))
@@ -133,7 +148,7 @@ pub const RECEIPT_CAP: usize = 50;
 
 /// The runs past the cap: each experiment's runs but its newest RECEIPT_CAP, newest first by when recorded (`at`, rb's
 /// UTC time, which sorts as text), then by id.
-fn past_the_cap(doc: &Value) -> Vec<&str> {
+pub(crate) fn past_the_cap(doc: &Value) -> Vec<&str> {
     let mut by_x: Vec<(&str, Vec<(&str, &str)>)> = Vec::new();
     for (rid, r) in entries(doc, "runs") {
         let x = s(r, "experiment_id");
@@ -172,7 +187,7 @@ pub(crate) fn names_command(part: &str, cmd: &str) -> bool {
 }
 
 /// The document a card is drawn from, and where it is drawn.
-struct Doc<'a> {
+pub(crate) struct Doc<'a> {
     doc: &'a Value,
     surface: Surface,
     /// On rb open at a past version, the commands the document records (a step's, a run's, a resource's way to get it
@@ -183,7 +198,7 @@ struct Doc<'a> {
 }
 
 impl<'a> Doc<'a> {
-    fn new(doc: &'a Value, surface: Surface) -> Self {
+    pub(crate) fn new(doc: &'a Value, surface: Surface) -> Self {
         let past = (surface == Surface::Open && !s(doc, "places.place.version.sha").is_empty()).then(|| {
             fn walk(v: &Value, out: &mut Vec<String>) {
                 match v {
@@ -241,8 +256,189 @@ fn strs<'a>(v: &'a Value, key: &str) -> Vec<&'a str> {
 
 /// The notes as a list under a finding, in rb show's words (says.notes, the ids in them named by what they are).
 fn notes_list(f: &Value) -> String {
-    let items: String = strs(f, "says.notes").iter().map(|t| format!("<li>{}</li>", esc(t))).collect();
+    // each note opens the rule's working, where rb says how it reached it
+    let to = format!("{}:source", finding_anchor(s(f, "criterion_id")));
+    let items: String = strs(f, "says.notes").iter().map(|t| format!("<li>{}</li>", link(&to, &w::plainer(t)))).collect();
     if items.is_empty() { items } else { format!("<ul class=\"notes\">{items}</ul>") }
+}
+
+/// What a file's card says where the page holds only the lines the record cites (owner, Nov 13 2026).
+const FULL_FILE_STAYS: &str = "full file stays on your machine";
+
+/// A file's type icon (owner, Nov 13 2026), by its name: a config (yaml, json, toml), a document (md, txt), code (py),
+/// a log, a table (csv, tsv, jsonl, a database), else a file; a small glyph shell.css draws in the type's colour.
+pub(crate) fn file_icon(path: &str) -> String {
+    let name = path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase();
+    let ext = name.rsplit_once('.').map_or("", |(_, e)| e);
+    let kind = match ext {
+        "yaml" | "yml" | "json" | "toml" | "ini" | "cfg" => "cfg",
+        "md" | "txt" | "rst" | "tex" | "qmd" | "html" => "doc",
+        "py" | "rs" | "sh" | "js" | "ts" | "c" | "cpp" | "cu" | "h" | "ipynb" | "r" | "jl" => "code",
+        "log" | "out" | "err" => "log",
+        "csv" | "tsv" | "jsonl" | "ndjson" | "db" | "sqlite" | "parquet" => "tab",
+        _ => "file",
+    };
+    format!("<i class=\"fti fti-{kind}\"></i>")
+}
+
+/// A resource's type icon (owner, Nov 13 2026): a small glyph shell.css draws for a dataset, a checkpoint or model,
+/// code, an environment, an artifact; any other type, a plain mark.
+pub(crate) fn resource_icon(kind: &str) -> String {
+    let kind = match kind {
+        "dataset" | "checkpoint" | "model" | "code" | "environment" | "artifact" => kind,
+        _ => "other",
+    };
+    format!("<i class=\"rt rt-{kind}\"></i>")
+}
+
+/// `t` cut to at most `n` characters, with an ellipsis where it was cut (a chip's words; the whole is its title).
+fn clip(t: &str, n: usize) -> String {
+    if t.chars().count() <= n { t.to_string() } else { format!("{}\u{2026}", t.chars().take(n - 1).collect::<String>().trim_end()) }
+}
+
+/// A small line icon, drawn in the text's colour: a chip's (late, problem, unchecked, undecided, runs) and a working
+/// line's (pairing, scope, interval, setting, note).
+pub(crate) fn icon(kind: &str) -> String {
+    // drawn by shell.css (a mask per kind, defined once), so a page holding many cards stays within its size
+    let kind = match kind {
+        "late" | "problem" | "unchecked" | "setting" | "undecided" | "runs" | "pair" | "scope" | "interval" | "copy" => kind,
+        _ => "note",
+    };
+    // an empty element has no name a screen reader reads: no aria-hidden needed, and a page of many cards stays smaller
+    format!("<i class=\"ic ic-{kind}\"></i>")
+}
+
+/// A muted outline of what is missing, where it would sit (the UX lead's rule, Nov 13 2026), as the views draw it.
+fn empty_outline(kind: &str) -> String {
+    let inner = if kind == "table" { "<i class=\"gh\"></i><i></i><i></i><i></i>" } else { "<i class=\"gt\"></i><i></i><i class=\"gs\"></i>" };
+    format!("<div class=\"ghost g-{kind}\" aria-hidden=\"true\">{inner}</div>")
+}
+
+/// A working line's icon, by what rb's note says it is.
+fn note_icon(code_or_text: &str) -> &'static str {
+    let t = code_or_text;
+    if t.contains("provisional") || t.contains("not verified") || t.contains("unknown") {
+        "setting"
+    } else if t.starts_with("paired by") || t.contains("unpaired") {
+        "pair"
+    } else if t.contains("outside this criterion") || t.contains("not read") || t.contains("not counted") || t.contains("pooled") {
+        "scope"
+    } else if t.contains("interval") || t.contains("borderline") {
+        "interval"
+    } else {
+        "note"
+    }
+}
+
+/// Whether a rule card's Result draws the claim beside rb's number (`div.vs`): a band and one estimate. Its verdict
+/// sentence is left out only then, so a card across design cells, with no one estimate, keeps its sentence.
+fn vs_drawn(f: &Value) -> bool {
+    figure::claim(f).is_some() && !at(f, "reading").map_or("", |r| s(r, "estimate_text")).is_empty()
+}
+
+/// The mark beside rb's number on a drawn Result, by the rule's outcome: met, missed, or met on its estimate alone, which
+/// is never drawn as a clean pass (a check in no state's colour, named as rb's headline names it, "reproduced on the
+/// estimate", over the figure that shows how wide); none for a rule rb can't tell yet or one not tested.
+#[derive(PartialEq)]
+enum Mark {
+    Met,
+    OnEstimate,
+    Missed,
+}
+
+fn vs_mark(f: &Value) -> Option<Mark> {
+    match s(f, "state") {
+        "meets" | "reproduced" | "gate met" if at(f, "on_estimate").is_some_and(Value::truthy) => Some(Mark::OnEstimate),
+        "meets" | "reproduced" | "gate met" => Some(Mark::Met),
+        "misses" | "not reproduced" | "gate missed" => Some(Mark::Missed),
+        _ => None,
+    }
+}
+
+/// The badge for a per-run setting whose words differ across runs (owner, Nov 13 2026: the grader badge), as the
+/// experiment and a comparison that mixes them draw it: "2 checkers: answer_tag (6 runs) · last_number (3 runs)", then,
+/// on a comparison, how rb reads it: "arms differ" or "pooled". Its words are the record's: the setting's name and its
+/// values as recorded.
+/// Each count of runs links to `runs`, the list it counts (a card's Runs tab, an experiment's runs).
+pub(crate) fn mix_badges(v: &Value, runs: &str) -> String {
+    list(v, "mixes")
+        .iter()
+        .map(|m| {
+            let values = list(m, "values");
+            let said: Vec<String> = values
+                .iter()
+                .map(|x| format!("{} ({})", esc(s(x, "value")), link(runs, &plural(at(x, "runs").and_then(Value::as_i64).unwrap_or(0) as usize, "run", "runs"))))
+                .collect();
+            let how = match s(m, "how") {
+                "arms_differ" => " \u{b7} arms differ",
+                "pooled" => " \u{b7} pooled",
+                _ => "",
+            };
+            let name = s(m, "setting");
+            let head = format!("{} {}", values.len(), if name.ends_with('s') { name.to_string() } else { format!("{name}s") });
+            format!("<span class=\"mixb\" title=\"{}\"><b>{}</b> {}{how}</span>", esc(&format!("per-run setting {name}")), link(runs, &format!("{head}:")), said.join(" \u{b7} "))
+        })
+        .collect()
+}
+
+/// A resource's Next step on rb open: its words a prompt for their agent, with the button that copies it (closed form:
+/// an action is a prompt, never a command to type), as a question's Next step card says it.
+fn next_ask(prompt: &str) -> String {
+    format!(
+        "<section class=\"nextc\"><h3>{}</h3><p class=\"prompt\">{}</p><button type=\"button\" class=\"cpp\" data-act=\"copy-text\" data-text=\"{}\">{}</button></section>",
+        w::NEXT_STEP,
+        esc(prompt),
+        esc(prompt),
+        w::COPY_PROMPT
+    )
+}
+
+/// A local copy's line ("copy here: results/r014/model.pt") opening Files at the copy's folder, where a path in the
+/// checkout is listed; a path outside it stays words.
+fn copy_linked(said: &str) -> String {
+    match said.split_once(": ").map(|(_, p)| p.trim()) {
+        Some(p) if !p.starts_with('/') && !p.starts_with('~') && !p.contains("..") && !p.contains(':') => {
+            let folder = p.rsplit_once('/').map(|(d, _)| format!("{d}/")).unwrap_or_default();
+            format!("<a href=\"#files\" data-folder=\"{}\">{}</a>", esc(&folder), esc(said))
+        }
+        _ => esc(said),
+    }
+}
+
+/// A card's title opening its record's card (closed form: a name opens what it names), where the page holds one.
+fn titled(subject: &str, inner: &str) -> String {
+    // never a link around a link (a cite in the words keeps its own)
+    if !subject.is_empty() && super::fields::opens(subject) && !inner.contains("<a ") { format!("<a href=\"#{}\">{inner}</a>", esc(&super::fields::to(subject))) } else { inner.to_string() }
+}
+
+fn w_runs_label() -> &'static str {
+    "The runs it is drawn from"
+}
+
+/// The chips under a card's Result: each state the reading carries (`chips`, rb's few words, its whole sentence on
+/// hover), then what it rests on ("3 seeds from 6 runs"), which opens the Runs tab.
+fn chips(id: &str, f: &Value) -> String {
+    let mut out = String::new();
+    for c in list(f, "chips") {
+        let kind = s(c, "kind");
+        // rb's whole sentence is the working's, under Source's fold, where it names each run as the page does
+        // each state opens where rb works it out: written after its results the Rule tab's timing, a call that waits
+        // the Decide part, the rest the Source tab's working (closed form: states open how they were computed)
+        let to = match kind {
+            "late" => format!("{id}:rule"),
+            _ => format!("{id}:source"),
+        };
+        out += &format!("<li><a class=\"chip k-{}\" href=\"#{}\" title=\"{}\">{}<span>{}</span></a></li>", esc(kind), esc(&to), esc(s(c, "text")), icon(kind), esc(s(c, "text")));
+    }
+    let from = s(f, "units_line");
+    if !from.is_empty() {
+        out += &format!("<li><a class=\"chip k-runs\" href=\"#{}:runs\">{}<span>{}</span></a></li>", esc(id), icon("runs"), esc(from));
+    }
+    let mixes = mix_badges(f, &format!("{id}:runs"));
+    if !mixes.is_empty() {
+        out += &format!("<li>{mixes}</li>");
+    }
+    if out.is_empty() { out } else { format!("<ul class=\"chips\">{out}</ul>") }
 }
 
 /// The (id, object) pairs of a map of the document, in its order.
@@ -284,9 +480,57 @@ fn au(text: &str) -> String {
     format!("<span class=\"au\">{}</span>", esc(text))
 }
 
+
+/// A resource's one way to get it, as markup: a "Get it" link to its Hugging Face page or its address, its file in the
+/// repository linked to that file's card where the document holds one, else a "No download link" chip; then what it
+/// comes from (a citation, a licence) as one chip, never the way to get it. `live` adds, on the owner's own screen, the
+/// local copies and, where `past` is false, rb's ask for a download link: a Next step in words, a prompt for their
+/// agent, never a command to type (no screen asks anyone to type one). A past version draws no ask, and a page
+/// (a reader's view among them) draws neither.
+pub(crate) fn get_it(doc: &Value, id: &str, r: &Value, live: bool, past: bool) -> String {
+    let (kind, href, txt) = (s(r, "get.kind"), s(r, "get.href"), s(r, "get.text"));
+    let mut out = match kind {
+        "hf" | "url" if !href.is_empty() => {
+            format!("<a class=\"getit\" href=\"{}\" rel=\"noopener noreferrer\">{} <span class=\"mono\">{}</span></a>", esc(href), w::GET_IT, esc(txt))
+        }
+        "repo" if !txt.is_empty() => {
+            let held = list(doc, "files").iter().any(|f| s(f, "path") == txt);
+            let path = format!("<span class=\"mono\">{}</span>", esc(txt));
+            let path = if held { format!("<a href=\"#{}\">{path}</a>", esc(&file_anchor(txt))) } else { path };
+            format!("<span class=\"getit\">{} {path} {}</span>", w::GET_IT, w::IN_THE_REPOSITORY)
+        }
+        _ => format!("<span class=\"chip nolink\" tabindex=\"0\" title=\"{}\">{}</span>", w::TIP_NO_DOWNLOAD, w::NO_DOWNLOAD_LINK),
+    };
+    let cite = strs(r, "cite");
+    if !cite.is_empty() {
+        // what it comes from opens its source: the file it names where the page holds it, else the resource's own record
+        let file = cite.iter().map(|c| c.split(" \u{b7} ").next().unwrap_or(c)).find(|c| list(doc, "files").iter().any(|f| s(f, "path") == *c));
+        let to = file.map_or_else(|| format!("r-{id}:receipts"), file_anchor);
+        out += &format!(" <a class=\"chip cite\" href=\"#{}\">{}</a>", esc(&to), esc(&cite.join(" \u{b7} ")));
+    }
+    if live {
+        let copies: Vec<String> = list(r, "copies").iter().map(|c| s(c, "said").to_string()).filter(|c| !c.is_empty()).collect();
+        if !copies.is_empty() {
+            out += &format!("<p class=\"sm dim copies\">{}</p>", copies.iter().map(|c| copy_linked(c)).collect::<Vec<_>>().join(" \u{b7} "));
+        }
+        if !past && at(r, "asks").and_then(Value::as_bool) == Some(true) {
+            out += &format!(
+                "{}",
+                next_ask(&format!("In this repository, use Rabbit Brain to record where {id} can be downloaded: its URL or its Hugging Face id."))
+            );
+        }
+    }
+    out
+}
+
 /// A link to an anchor of the page.
 fn link(anchor: &str, text: &str) -> String {
     format!("<a href=\"#{}\">{}</a>", esc(anchor), esc(text))
+}
+
+/// A link around markup already escaped.
+fn link_html(anchor: &str, html: &str) -> String {
+    format!("<a href=\"#{}\">{html}</a>", esc(anchor))
 }
 
 /// A link with class `cls`, none where it is "".
@@ -334,10 +578,7 @@ pub(crate) fn analysis_anchor(aid: &str) -> String {
 pub(crate) fn call_anchor(subject: &str) -> String {
     format!("call-{subject}")
 }
-/// A qualification of a question (its `n`th limit, from 0), a reading group (rb's rule word, plural), a variant.
-pub(crate) fn qualification_anchor(qid: &str, n: usize) -> String {
-    format!("q-{qid}:lim:{n}")
-}
+/// A reading group of a question (rb's rule word, plural), a variant.
 pub(crate) fn reading_anchor(qid: &str, word: &str) -> String {
     format!("q-{qid}:rd:{}", slug(word))
 }
@@ -347,17 +588,13 @@ pub(crate) fn source_anchor(key: &str) -> String {
     format!("cite-{key}")
 }
 
-pub(crate) fn variant_anchor(eid: &str, variant: &str) -> String {
-    format!("x-{eid}:v:{variant}")
+/// A file's card (UX5 1.4).
+pub(crate) fn file_anchor(path: &str) -> String {
+    format!("file-{path}")
 }
 
-/// `inner` as the glossary's term `key`: rb's line on hover and focus, described by its glossary entry (SHELL-SPEC 7.5);
-/// a word the glossary does not hold is drawn plain.
-fn term(key: &str, inner: &str) -> String {
-    match w::hint(key) {
-        Some(line) => format!("<span class=\"term\" data-hint=\"{}\" aria-describedby=\"{}\">{inner}</span>", esc(line), w::glossary_id(key)),
-        None => inner.to_string(),
-    }
+pub(crate) fn variant_anchor(eid: &str, variant: &str) -> String {
+    format!("x-{eid}:v:{variant}")
 }
 
 /// The head of a finding's design cells where each says its interval and units, as rb page always said it.
@@ -369,12 +606,6 @@ const WITHIN_CELL_UNITS_ONLY: &str = "Within-cell units: each cell's mean over i
 const WITHIN_CELL_BEST: &str = "Within-cell units: each cell's mean over its own units; the rule reads each cell's best unit";
 const WITHIN_CELL_COUNT: &str = "Within-cell units: each cell's mean over its own units; the rule counts the units that meet it";
 
-/// A criterion's display noun on a screen (PLAIN-WORDS-PASS-1): a card says "rule", with the glossary's line that
-/// says what commands call it ("rule"). Commands, flags, kinds and anchors keep "criterion".
-fn rule_term(inner: &str) -> String {
-    term("rule", inner)
-}
-
 /// "what depends on this": the part of a card that lists what reads the record it is on.
 const DEPENDS: &str = "What depends on this";
 /// A run or an analysis named where it has no label or title, never by the id rb minted (FIX7; R's FIX6 words).
@@ -385,6 +616,23 @@ const AN_ANALYSIS: &str = "an analysis";
 
 /// A rule card's parts, in plain headings (DESIGN-PASS-1 target 4), each the tab that leads to it.
 const MEASURED: &str = "What rb measured";
+// a card's tabs, short, on one row (the UX lead's card, Nov 13 2026); each part keeps its heading for print and a page
+// read with no script
+const TAB_RESULT: &str = "Result";
+const TAB_RULE: &str = "Rule";
+const TAB_RUNS: &str = "Runs";
+const TAB_USED_BY: &str = "Used by";
+const TAB_SOURCE: &str = "Source";
+/// The fold of rb's working under a card's Source, closed until someone opens it.
+const HOW_WORKED: &str = "How rb worked it out";
+// the working's row labels in plain words (owner, msg 29: margin, timing, units, checks, evidence, review)
+const W_MARGIN: &str = "distance from the rule's number";
+const W_TIMING: &str = "when the rule was written";
+const W_UNITS: &str = "what it counts";
+const W_CHECKS: &str = "what rb checked";
+const W_EVIDENCE: &str = "the runs' files and code";
+const W_HISTORY: &str = "earlier readings";
+const W_REVIEW: &str = "decision";
 const AS_WRITTEN: &str = "The rule as written";
 const RESTS_ON: &str = "Runs it rests on";
 
@@ -466,7 +714,7 @@ fn cmdbox(text: &str, id: &str) -> String {
 // its own with `data-level`, so the inspector, print and a link can find it; nothing is said in two of them.
 
 /// The label of a card's Trace level, folded on every surface until someone opens it.
-const SOURCE_DETAILS: &str = "Source details";
+const SOURCE_DETAILS: &str = "Where it comes from";
 
 /// Understand: what the card is and its standing, the first thing it says.
 fn understand(inner: &str) -> String {
@@ -537,6 +785,34 @@ impl Doc<'_> {
 
     /// `text` linked to question `q`'s view, drawn plain where the document holds no such question (a call may be filed
     /// under one rb's questions do not list): a card links only where the page draws an element.
+    /// A question or an experiment as a trail names it: its words, cut short; its id only where it has none (closed form:
+    /// ids off screens).
+    fn short_name(&self, key: &str, field: &str, id: &str) -> String {
+        let t = list(self.doc, key).iter().find(|v| s(v, "id") == id).map(|v| s(v, field)).unwrap_or("").trim();
+        if t.is_empty() {
+            return id.to_string();
+        }
+        let cut: String = t.chars().take(40).collect();
+        if cut.chars().count() < t.chars().count() { format!("{}\u{2026}", cut.trim_end()) } else { cut }
+    }
+
+    /// A question or an experiment named by its words (cut), as the author's text, linked where the page draws it; by its
+    /// id where it has no words.
+    fn named_au(&self, key: &str, field: &str, id: &str) -> String {
+        let t = self.short_name(key, field, id);
+        if t == id { esc(id) } else { format!("<span class=\"au\">{}</span>", esc(&t)) }
+    }
+
+    fn qname(&self, q: &str) -> String {
+        let inner = self.named_au("questions", "text", q);
+        if list(self.doc, "questions").iter().any(|v| s(v, "id") == q) { link_html(&format!("q-{q}"), &inner) } else { inner }
+    }
+
+    fn xname(&self, x: &str) -> String {
+        let inner = self.named_au("experiments", "title", x);
+        if self.xdrawn(x, "") { link_html(&format!("x-{x}"), &inner) } else { inner }
+    }
+
     fn qlink(&self, q: &str, text: &str, cls: &str) -> String {
         if list(self.doc, "questions").iter().any(|v| s(v, "id") == q) {
             link_cls(&format!("q-{q}"), text, cls)
@@ -791,9 +1067,10 @@ impl Doc<'_> {
         match self.finding_of(cid) {
             Some(f) => {
                 let statement = s(f, "statement");
-                // one link: the sentence, its id trailing small inside it; then its state
+                // one link to the rule's card, whose Result works its state out: the sentence, its id trailing small
+                // inside it, then its state (one element a row: the scale record's runs list thousands)
                 format!(
-                    "<a class=\"ci\" href=\"#{}\">{} <span class=\"mono id\">{}</span></a>{DOT}{}",
+                    "<a class=\"ci\" href=\"#{}\">{} <span class=\"mono id\">{}</span>{DOT}{}</a>",
                     esc(&finding_anchor(cid)),
                     if statement.is_empty() { esc(cid) } else { au(statement) },
                     esc(cid),
@@ -817,57 +1094,106 @@ impl Doc<'_> {
         let home = q.map_or_else(|| "criteria".to_string(), |q| format!("q-{q}"));
         let mut lineage = vec![link("research", "Research")];
         if let Some(q) = q {
-            lineage.push(self.qlink(q, q, ""));
+            lineage.push(self.qname(q));
         }
         if !x.is_empty() {
-            lineage.push(self.xlink(x, "", x, ""));
+            lineage.push(self.xname(x));
         }
-        lineage.push(esc(cid));
         let cited = if at(f, "cited").is_some() { "<span class=\"tag\">cited</span>" } else { "" };
         // an id is the document's: escaped wherever it is written
         let ide = esc(&id);
         // a part is linked only where the card draws it: a finding with no receipt rows has no source details, and one
         // no call waits on has nothing to decide
         let rx = self.finding_receipts(f);
-        let to_receipts = if rx.is_empty() { String::new() } else { format!("<a href=\"#{ide}:receipts\">{SOURCE_DETAILS}</a>") };
+        // the Rule part says the rule in one sentence over its band; rb's working on it goes under Source's fold
+        let (rule_part, working) = self.finding_rule(cid, &id, f);
+        let source = self.finding_source(&id, f, &rx, &working);
+        let to_source = if source.is_empty() { String::new() } else { format!("<a href=\"#{ide}:source\">{TAB_SOURCE}</a>") };
         let calls: Vec<&Value> = list(self.doc, "calls").iter().filter(|c| s(c, "subject") == cid).collect();
         // a reader of a shared page is shown no Decide part: its tab goes to the same reasons, as status (OWNER-READER)
         let to_decide = match (calls.is_empty(), self.surface == Surface::Export) {
             (true, _) => String::new(),
             (false, false) => format!("<a href=\"#{ide}:decide\">Decide</a>"),
-            (false, true) => format!("<a href=\"#{ide}:decide\"><span data-vw=\"none owner\">Decide</span><span data-vw=\"reader\">{STILL_OPEN}</span></a>"),
+            (false, true) => format!("<a href=\"#{ide}:decide\" data-vw=\"none owner\">Decide</a>"),
         };
         // the rule's sentence first, its kind, role and experiment in one quiet line, the id last (P3); then its verdict,
-        // said once (FIX2: no state words after it; checks are told in The rule as written); the parts as a row of tabs
+        // said once (FIX2: no state words after it; checks are told in The rule as written), only where no drawing says
+        // it (the UX lead's card, Nov 13: the Result drawing and its chips are the answer); the parts as a row of tabs
+        // a drawing with no mark (a rule rb can't tell yet, or not tested) does not say the state: its sentence stays
+        let drawn = vs_drawn(f) && vs_mark(f).is_some();
+        // a rule nothing is read for yet is shown so, a chip, not a sentence (the UX lead's rule, Nov 13 2026)
+        let stand = if drawn {
+            String::new()
+        } else if matches!(s(f, "state"), "untested" | "gate untested") && s(f, "timing") != "taken_out" {
+            format!("<div class=\"stand\"><p class=\"str\"><span class=\"echip\">{}</span></p></div>", crate::shell::strings::NOT_TESTED_YET)
+        } else {
+            format!("<div class=\"stand\"><p class=\"str\">{}</p></div>", sentence_html_to(&verdict(f), &format!("{id}:runs"), &format!("{id}:rule")))
+        };
         let top = format!(
             "<p class=\"lineage\">{}</p>\
              <h3 class=\"tt\">{}</h3>\
              <div class=\"hd\"><span class=\"kind\">{}</span><span class=\"dim sm\">{}{}</span>{cited}<span class=\"id\">{}</span></div>\
-             <div class=\"stand\"><p class=\"str\">{}</p></div>\
-             <nav class=\"secnav tabs\" aria-label=\"Parts of {}\"><a href=\"#{ide}:reading\">{MEASURED}</a><a href=\"#{ide}:rule\">{AS_WRITTEN}</a>\
-             <a href=\"#{ide}:runs\">{RESTS_ON}</a><a href=\"#{ide}:impact\">{DEPENDS}</a>{to_receipts}{to_decide}</nav>",
+             {stand}\
+             <nav class=\"secnav tabs\" aria-label=\"Parts of {}\"><a href=\"#{ide}:reading\">{TAB_RESULT}</a><a href=\"#{ide}:rule\">{TAB_RULE}</a>\
+             <a href=\"#{ide}:runs\">{TAB_RUNS}</a><a href=\"#{ide}:impact\">{TAB_USED_BY}</a>{to_source}{to_decide}</nav>",
             lineage.join(" \u{203a} "),
-            self.au_cited(s(f, "statement")),
-            rule_term("rule"),
-            esc(s(f, "role")),
-            if x.is_empty() { String::new() } else { format!(" in {}", self.xlink(x, "", x, "")) },
+            titled(cid, &self.au_cited(s(f, "statement"))),
+            "rule",
+            // its role opens the rule as written, where the role is said with the rule (closed form)
+            format!("<a href=\"#{}:rule\">{}</a>", esc(&id), esc(s(f, "role"))),
+            if x.is_empty() { String::new() } else { format!(" in {}", self.xname(x)) },
             esc(cid),
-            sentence_html_to(&verdict(f), &format!("{id}:runs"), &format!("{id}:rule")),
             esc(cid),
         );
-        let body = self.finding_reading(&id, f) + &self.finding_rule(cid, &id, f) + &self.finding_rests_on(&id, f) + &self.finding_impact(&id, f);
+        let body = self.finding_reading(&id, f) + &rule_part + &self.finding_rests_on(&id, f) + &self.finding_impact(&id, f);
         // a relative change is in percent, its distances too: each amount of it says so where it is said (amount_unit),
         // and a run's own value keeps its metric's unit, points included
         format!(
-            "<div class=\"card crit{rule_cls}\" id=\"{}\" data-kind=\"criterion\" data-home=\"{}\" data-crumb=\"{}\">{}{}{}{}</div>",
+            "<div class=\"card crit{rule_cls}\" id=\"{}\" data-kind=\"criterion\" data-home=\"{}\" data-crumb=\"{}\">{}{}{}</div>",
             esc(&id),
             esc(&home),
             esc(cid),
             understand(&top),
-            examine(&body),
-            source_details(&id, "", &rx),
+            examine(&(body + &source)),
             if calls.is_empty() { String::new() } else { self.decide(&calls, cid, &id) },
         )
+    }
+
+    /// Source: the quoted line a cited rule rests on, with its file and line as a chip and its sha256 shortened to 12
+    /// with a copy button; then rb's working (its notes, each with an icon, and its receipt rows) under one fold, "How
+    /// rb worked it out", closed until someone opens it. Nothing where there is neither.
+    fn finding_source(&self, id: &str, f: &Value, rx: &str, working: &str) -> String {
+        let ide = esc(id);
+        let mut out = String::new();
+        if let Some(c) = at(f, "cited") {
+            let (path, line, quote, sha) = (s(c, "path"), num(c, "line"), s(c, "quote"), s(c, "sha256"));
+            let at_line = if line.is_empty() || line == "0" { path.to_string() } else { format!("{path}:{line}") };
+            let quote = if quote.is_empty() { String::new() } else { format!("<blockquote class=\"quote\">{}</blockquote>", au(quote)) };
+            let sha = if sha.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "<span class=\"sha12 mono\" title=\"sha256 {0}\">{1}</span><button type=\"button\" class=\"ibtn ico\" data-act=\"copy-text\" data-text=\"{0}\" aria-label=\"Copy the sha256\" title=\"Copy the sha256\">{2}</button>",
+                    esc(sha),
+                    esc(&sha.chars().take(12).collect::<String>()),
+                    icon("copy")
+                )
+            };
+            if !path.is_empty() {
+                out += &format!("<figure class=\"cq\">{quote}<figcaption><span class=\"fchip mono\">{}</span>{sha}</figcaption></figure>", self.runs_linked(&esc(&at_line)));
+            }
+        }
+        let notes: String = strs(f, "says.notes").iter().map(|t| format!("<li>{}<span>{}</span></li>", icon(note_icon(t)), self.runs_linked(&esc(&w::plainer(t))))).collect();
+        let notes = if notes.is_empty() { notes } else { format!("<ul class=\"notes how\">{notes}</ul>") };
+        let rows = if rx.is_empty() { String::new() } else { format!("<dl class=\"rx\" id=\"{ide}:receipts\">{rx}</dl>") };
+        let working = if working.is_empty() { String::new() } else { format!("<dl class=\"ax\">{working}</dl>") };
+        if !notes.is_empty() || !rows.is_empty() || !working.is_empty() {
+            out += &format!("<details class=\"fold how\" data-fold=\"{ide}:how\"><summary>{HOW_WORKED}</summary>{working}{notes}{rows}</details>");
+        }
+        if out.is_empty() {
+            return out;
+        }
+        format!("<section class=\"part\" id=\"{ide}:source\"><h4>{TAB_SOURCE}</h4>{out}</section>")
     }
 
     /// What rb measured: the value large in two decimals (rb's digits on hover), the reading as one plain sentence, the
@@ -881,16 +1207,49 @@ impl Doc<'_> {
         } else {
             big_reading(f, true)
         };
-        let mut out = format!(
-            "<section class=\"part\" id=\"{id}:reading\"><h4>{MEASURED}</h4><div class=\"big\"><a href=\"#{id}:runs\">{big}</a></div>",
-            id = esc(id)
-        );
+        // the claim against rb's number, drawn (the UX lead's card, Nov 13): "Claimed 3.6" beside "rb +3.60" with a
+        // check or a cross by the rule's outcome, over the figure of the interval with 0 and the claim on it
+        let vs = match figure::claim(f) {
+            Some((label, number)) if vs_drawn(f) => {
+                // the mark is the rule's outcome, met or missed, whatever the interval: "matches, but wide" is the
+                // figure's to show
+                // said to a screen reader in the page's words, as the card says the state (closed form)
+                let state = &w::plain_word(s(f, "state_label"));
+                let mark = match vs_mark(f) {
+                    Some(Mark::Met) => format!("<span class=\"vmk ok\" role=\"img\" aria-label=\"{}\">\u{2713}</span>", esc(state)),
+                    Some(Mark::OnEstimate) => {
+                        let said = s(f, "says.headline").split(" \u{b7} ").next().map(w::plain_word).unwrap_or_else(|| state.to_string());
+                        format!("<span class=\"vmk est\" role=\"img\" aria-label=\"{}\">\u{2713}</span>", esc(&said))
+                    }
+                    Some(Mark::Missed) => format!("<span class=\"vmk no\" role=\"img\" aria-label=\"{}\">\u{2717}</span>", esc(state)),
+                    None => String::new(),
+                };
+                format!(
+                    "<div class=\"vs\"><a class=\"cl\" href=\"#{1}:rule\"><span class=\"lb\">{label}</span> <span class=\"n\">{0}</span></a>\
+                     <a class=\"rbn\" href=\"#{1}:runs\"><span class=\"lb\">rb</span> {2}</a>{mark}</div>",
+                    esc(&number),
+                    esc(id),
+                    big_reading(f, true)
+                )
+            }
+            _ => String::new(),
+        };
+        let mut out = if vs.is_empty() {
+            format!("<section class=\"part\" id=\"{id}:reading\"><h4>{MEASURED}</h4><div class=\"big\"><a href=\"#{id}:runs\">{big}</a></div>", id = esc(id))
+        } else {
+            format!("<section class=\"part\" id=\"{}:reading\"><h4>{MEASURED}</h4>{vs}", esc(id))
+        };
         // the reading's sentence is the verdict's, said once above (FIX3): here what the number is from, once
         let from = s(f, "units_line");
-        if !from.is_empty() {
+        if !from.is_empty() && vs.is_empty() {
             out += &format!("<p class=\"reads\">{}</p>", link(&format!("{id}:runs"), from));
         }
-        out += &figure::draw(f, true);
+        // the figure is one object, opening what it is drawn from: the runs (closed form)
+        let fig = figure::draw(f);
+        if !fig.is_empty() {
+            out += &format!("<a class=\"figl\" href=\"#{}:runs\" aria-label=\"{}\">{fig}</a>", esc(id), w_runs_label());
+        }
+        out += &chips(id, f);
         if self.live() {
             out += &self.observed(id, f);
         }
@@ -922,13 +1281,13 @@ impl Doc<'_> {
     /// The rule as written: what it passes on in a plain sentence, the margin, when it was written against its results
     /// (and the unit amended after the lock), the units, the review, rb's notes; rb's own rule and timing lines in
     /// Details (P8). Only a link's own words are in link colour (P7).
-    fn finding_rule(&self, cid: &str, id: &str, f: &Value) -> String {
+    fn finding_rule(&self, cid: &str, id: &str, f: &Value) -> (String, String) {
         let mut dl = String::new();
-        // what the rule passes on, in words: the declared statement is the card's title; this is how rb reads it
+        // what the rule passes on, in words: the declared statement is the card's title; this is how rb reads it. It is
+        // the Rule part's one sentence (the UX lead's card, Nov 13 2026); the rows after it are rb's working
         let passes = rule_passes(f);
-        if !passes.is_empty() {
-            dl += &format!("<dt>passes when</dt><dd>{}</dd>", esc(&passes));
-        }
+        // the rule as rb reads it opens the rule as recorded: its record's card (closed form)
+        let sentence = if passes.is_empty() { String::new() } else { format!("<p class=\"passes\">{}</p>", titled(cid, &esc(&passes))) };
         // the word once: rb's row says "margin 0.8433", and the label beside it says margin already
         let margin = s(f, "row.margin");
         let margin = margin.strip_prefix("margin ").unwrap_or(margin);
@@ -944,7 +1303,7 @@ impl Doc<'_> {
                 }
                 None => margin.to_string(),
             };
-            dl += &format!("<dt>margin</dt><dd>{}</dd>", link(&format!("{id}:reading"), &said));
+            dl += &format!("<dt>{}</dt><dd>{}</dd>", W_MARGIN, link(&format!("{id}:reading"), &said));
         }
         // when it was written, in plain words; rb's line (which runs, how many) in Details
         let mut timing = esc(&timing_said(f));
@@ -960,7 +1319,7 @@ impl Doc<'_> {
             }
         }
         if !timing.is_empty() {
-            dl += &format!("<dt>{}</dt><dd>{timing}</dd>", term("timing", "timing"));
+            dl += &format!("<dt>{}</dt><dd>{timing}</dd>", W_TIMING);
         }
         let units = s(f, "says.units");
         let units_line = s(f, "units_line");
@@ -969,7 +1328,7 @@ impl Doc<'_> {
             // the count is the link; what rb says of it beside stays text
             let (count, rest) = shown.split_once(DOT).unwrap_or((shown, ""));
             let rest = if rest.is_empty() { String::new() } else { format!("{DOT}{}", esc(rest)) };
-            dl += &format!("<dt>{}</dt><dd>{}{rest}</dd>", term("units", "units"), link(&format!("{id}:runs"), count));
+            dl += &format!("<dt>{}</dt><dd>{}{rest}</dd>", W_UNITS, link(&format!("{id}:runs"), count));
         }
         // what rb checked under the reading, told here and not beside the verdict (FIX2): a problem in full, ok quietly
         let integrity = s(f, "says.integrity");
@@ -979,17 +1338,17 @@ impl Doc<'_> {
             // every problem, one a line, never "(and 1 more)"
             let all = strs(f, "says.problems");
             let said = if all.len() > 1 { all.iter().map(|p| esc(p)).collect::<Vec<_>>().join("<br>") } else { esc(integrity) };
-            dl += &format!("<dt>{}</dt><dd{cls}>{}</dd>", term("integrity", "checks"), self.runs_linked(&said));
+            dl += &format!("<dt>{}</dt><dd{cls}>{}</dd>", W_CHECKS, self.runs_linked(&said));
         }
         // what the reading's runs rest on (E5): recorded, unchanged, here and rerun kept apart, in one line
         let evidence = s(f, "says.evidence");
         if !evidence.is_empty() {
             // the row names it: the line without its own "Evidence:"
-            dl += &format!("<dt>evidence</dt><dd>{}</dd>", self.runs_linked(&esc(evidence.strip_prefix("Evidence: ").unwrap_or(evidence))));
+            dl += &format!("<dt>{}</dt><dd>{}</dd>", W_EVIDENCE, self.runs_linked(&esc(evidence.strip_prefix("Evidence: ").unwrap_or(evidence))));
         }
         let history = s(f, "says.history");
         if !history.is_empty() {
-            dl += &format!("<dt>history</dt><dd>{}</dd>", esc(history));
+            dl += &format!("<dt>{}</dt><dd>{}</dd>", W_HISTORY, esc(history));
         }
         let call = self.call_line(f);
         let mut review = if call.is_empty() { "No call made on it.".to_string() } else { esc(call) };
@@ -998,9 +1357,11 @@ impl Doc<'_> {
             // a reader of a shared page is shown no Decide part: the link goes to the same reasons, said as status
             review += &format!("{DOT}<a href=\"#{}:decide\">{}</a>", esc(&id), self.calls_view());
         }
-        dl += &format!("<dt>review</dt><dd>{review}</dd>");
-        let notes = self.runs_linked(&notes_list(f));
-        format!("<section class=\"part\" id=\"{}:rule\"><h4>{AS_WRITTEN}</h4><dl class=\"ax\">{dl}</dl>{notes}</section>", esc(id))
+        dl += &format!("<dt>{}</dt><dd>{review}</dd>", W_REVIEW);
+        // the rule's target as a small band; its rows and rb's notes are its working, under Source's fold
+        let band = figure::target_band(f);
+        let band = if band.is_empty() { band } else { titled(cid, &format!("<div class=\"tbw\">{band}</div>")) };
+        (format!("<section class=\"part\" id=\"{}:rule\"><h4>{AS_WRITTEN}</h4>{sentence}{band}</section>", esc(id)), dl)
     }
 
     /// E5's sentences name a run as the page does ("since run fp32 and int8 · seed 1 was recorded"): that name (`named`), in
@@ -1161,12 +1522,13 @@ impl Doc<'_> {
             // each value carries its unit, as the verdict says it (FIX5)
             body += &format!("<div class=\"wrap\"><table class=\"obs obsr\"><thead><tr><th>arm</th><th>run</th><th>value</th></tr></thead><tbody>{rows}</tbody></table></div>");
         } else {
-            let none = if s(f, "timing") == "taken_out" {
-                crate::shell::strings::evidence("took_runs", &[])
+            // no run is read yet: shown, not written (the UX lead's rule, Nov 13 2026), a chip and the table's outline;
+            // runs git took out are said so, which is no empty state
+            if s(f, "timing") == "taken_out" {
+                body += &format!("<p class=\"dim sm\">{}</p>", esc(&crate::shell::strings::evidence("took_runs", &[])));
             } else {
-                "No recorded run is read yet.".to_string()
-            };
-            body += &format!("<p class=\"dim sm\">{}</p>", esc(&none));
+                body += &format!("<p class=\"roll\"><span class=\"echip\">{}</span></p>{}", crate::shell::strings::NO_RUNS_CHIP, empty_outline("table"));
+            }
         }
         format!("<section class=\"part\" id=\"{}:runs\"><h4>{RESTS_ON}{n}</h4>{body}</section>", esc(id))
     }
@@ -1197,10 +1559,9 @@ impl Doc<'_> {
                 (false, true, true) => "A note, not in force:",
                 (false, false, true) => "A note, not in force, not confirmed:",
             };
-            let key = if active { w::RECORDED_INTERPRETATION } else { w::CONDITIONAL_INTERPRETATION };
             li += &format!(
                 "<li><div class=\"said\">{} {}</div><div class=\"by\">on question {}</div></li>",
-                term(key, lead),
+                lead,
                 self.au_cited(s(ip, "text")),
                 self.qlink(q, q, "")
             );
@@ -1219,7 +1580,8 @@ impl Doc<'_> {
         }
         // the call made on it is said once, as the declared criterion's review; one waiting on it is the card's Decide
         if li.is_empty() {
-            li = "<li class=\"dim\">Nothing links to it yet.</li>".into();
+            // shown, not written: the outline of what would link to it
+            return format!("<section class=\"part\" id=\"{}:impact\"><h4>{DEPENDS}</h4>{}</section>", esc(id), empty_outline("card"));
         }
         format!("<section class=\"part\" id=\"{}:impact\"><h4>{DEPENDS}</h4><ul class=\"rests\">{li}</ul></section>", esc(id))
     }
@@ -1257,6 +1619,8 @@ impl Doc<'_> {
             }),
         ]);
         rows += &self.rows(list(f, "receipt_rows"), "");
+        // rb's own lines, with the screens' plainer labels (no "no interval", no "provisional")
+        let mut rows = w::plainer(&rows);
         if let Some(c) = at(f, "cited") {
             let mut where_ = s(c, "path").to_string();
             let line = num(c, "line");
@@ -1347,17 +1711,23 @@ impl Doc<'_> {
         let label = s(r, "label");
         let mut top = format!(
             "<h3 class=\"tt\">{}</h3><div class=\"hd\"><span class=\"kind\">run</span><span class=\"dim sm\">in {}{}</span>{}</div>",
-            esc(&self.run_named(rid)),
-            self.xlink(x, "", x, ""),
-            if dates.is_empty() { String::new() } else { format!("{DOT}{}", esc(&dates)) },
-            if retracted.is_some() { "<span class=\"tag\">retracted</span>" } else { "" },
+            titled(rid, &esc(&self.run_named(rid))),
+            self.xname(x),
+            // its times open its receipt, where each is said in full with how rb knows it (closed form)
+            if dates.is_empty() { String::new() } else { format!("{DOT}{}", link(&format!("{id}:receipts"), &dates)) },
+            if retracted.is_some() { "<a class=\"tag\" href=\"#history\">retracted</a>" } else { "" },
         );
         if let Some(ret) = retracted {
-            top += &format!("<div class=\"retr\"><b>retracted</b> {}: {}</div>", esc(s(ret, "at")), self.au_cited(s(ret, "why")));
+            // the retraction opens History, where its write is said with when it was made (closed form)
+            let why = self.au_cited(s(ret, "why"));
+            let why = if why.contains("<a ") { why } else { link_html("history", &why) };
+            top += &format!("<div class=\"retr\">{}: {why}</div>", link_html("history", &format!("<b>retracted</b> {}", esc(s(ret, "at")))));
         }
         let note = s(r, "note");
         if !note.is_empty() {
-            top += &format!("<p class=\"note\">note: {}</p>", self.au_cited(note));
+            // a run's note opens the run's record card, which says when it was written (closed form)
+            let said = self.au_cited(note);
+            top += &format!("<p class=\"note\">{}</p>", if !said.contains("<a ") && super::fields::has(rid) { link_html(&super::fields::to(rid), &format!("note: {said}")) } else { format!("note: {said}") });
         }
         if self.live() {
             top += &self.recorded_in(r);
@@ -1435,14 +1805,14 @@ impl Doc<'_> {
         format!(
             "<div class=\"card run short{}\" id=\"{}\" data-kind=\"run\" data-home=\"x-{}\" data-crumb=\"{}\">\
              <div class=\"lv\" data-level=\"understand\"><h3 class=\"tt\">{}</h3><div class=\"hd\"><span class=\"kind\">run</span><span class=\"dim sm\">in {}</span>{}</div>\
-             </div><div class=\"lv\" data-level=\"examine\"><p class=\"sm mets\" id=\"{}:results\">{}</p>{}\
-             <p class=\"stub\">This page holds the newest {RECEIPT_CAP} receipts of {}; rb open loads this one in full.</p></div></div>",
+             </div><div class=\"lv\" data-level=\"examine\"><p class=\"sm mets\" id=\"{}:results\"><a href=\"#x-{x}:runs\">{}</a></p>{}\
+             <p class=\"stub\"><a href=\"#x-{x}:runs\">This page holds the newest {RECEIPT_CAP} receipts of {}; rb open loads this one in full.</a></p></div></div>",
             if at(r, "retracted").is_some() { " gone" } else { "" },
             esc(&id),
             esc(x),
             esc(&self.run_named(rid)),
-            esc(&self.run_named(rid)),
-            self.xlink(x, "", x, ""),
+            titled(rid, &esc(&self.run_named(rid))),
+            self.xname(x),
             if at(r, "retracted").is_some() { "<span class=\"tag\">retracted</span>" } else { "" },
             esc(&id),
             results_line(r),
@@ -1450,7 +1820,7 @@ impl Doc<'_> {
                 String::new()
             } else {
                 // the words first, the ids it counts toward after them (a short card is a placeholder: its whole receipt says each)
-                format!("<p class=\"sm\">Counts toward {}: {}</p>", plural(counts.len(), "rule", "rules"), counts.iter().map(|c| link_c(&finding_anchor(c), c, "mono")).collect::<Vec<_>>().join(", "))
+                format!("<p class=\"sm\">{}: {}</p>", link(&format!("x-{x}:criteria"), &format!("Counts toward {}", plural(counts.len(), "rule", "rules"))), counts.iter().map(|c| link_c(&finding_anchor(c), c, "mono")).collect::<Vec<_>>().join(", "))
             },
             esc(x),
         )
@@ -1487,7 +1857,7 @@ impl Doc<'_> {
     fn counts_toward(&self, id: &str, r: &Value, retracted: bool) -> String {
         if retracted {
             return format!(
-                "<section class=\"part\" id=\"{}:counts\"><h4>Counts toward <span class=\"n\">nothing</span></h4><p class=\"dim sm\">A retracted run leaves every reading.</p></section>",
+                "<section class=\"part\" id=\"{}:counts\"><h4>Counts toward <span class=\"n\">nothing</span></h4><p class=\"dim sm\"><a href=\"#history\">A retracted run leaves every reading.</a></p></section>",
                 esc(id)
             );
         }
@@ -1512,7 +1882,7 @@ impl Doc<'_> {
         let mut body = String::new();
         if !counted.is_empty() {
             // the heading counts them; a line of its own only where rules that leave it out follow
-            let lead = if left.is_empty() { String::new() } else { format!("<p class=\"sm\">Counted in {}.</p>", plural(counted.len(), "rule", "rules")) };
+            let lead = if left.is_empty() { String::new() } else { format!("<p class=\"sm\">{}</p>", link(&format!("{id}:counts"), &format!("Counted in {}.", plural(counted.len(), "rule", "rules")))) };
             body += &format!("{lead}<ul class=\"ctq\">{}</ul>", counted.iter().map(|c| item(c)).collect::<String>());
         }
         let mut reasons: Vec<&str> = Vec::new();
@@ -1525,7 +1895,8 @@ impl Doc<'_> {
             let these: Vec<&&Value> = left.iter().filter(|c| s(c, "reason") == reason).collect();
             let why = if reason.is_empty() { String::new() } else { format!(": {}", esc(reason)) };
             body += &format!(
-                "<p class=\"sm\">Not counted in {}{why}.</p><ul class=\"ctq nc\">{}</ul>",
+                "<p class=\"sm\"><a href=\"#{}:counts\">Not counted in {}{why}.</a></p><ul class=\"ctq nc\">{}</ul>",
+                esc(id),
                 plural(these.len(), "rule", "rules"),
                 these.iter().map(|c| item(c)).collect::<String>()
             );
@@ -1550,8 +1921,10 @@ impl Doc<'_> {
             return format!("<section class=\"part\" id=\"{}:results\"><h4>Results</h4><p class=\"mets\">{}</p></section>", esc(id), esc(s(r, "metrics_text")));
         }
         // each number as rb show says it, rb's own digits: a card never rounds a run's number past the rules that read it
+        // the numbers open where they were read from: the receipt's rows, the file among them (closed form), the list
+        // as one row
         let rows: String = pairs.iter().map(|(k, v)| format!("<dt>{}</dt><dd>{}</dd>", esc(k), esc(v.trim()))).collect();
-        format!("<section class=\"part\" id=\"{}:results\"><h4>Results</h4><dl class=\"ax mets\">{rows}</dl></section>", esc(id))
+        format!("<section class=\"part\" id=\"{0}:results\"><h4>Results</h4><dl class=\"ax mets\" data-go=\"{0}:receipts\">{rows}</dl></section>", esc(id))
     }
 
     /// command (as given): always there, apart from the recipe, with how rb knows it. The receipt's own rows give its
@@ -1581,7 +1954,7 @@ impl Doc<'_> {
         } else {
             (format!("<code>{}</code>", esc(text)), format!("<span class=\"k\">{}</span><span class=\"v s\">{}</span>", HOW_RB_KNOWS, esc(why)))
         };
-        format!("<div class=\"asgiven\" id=\"{}:command\"><span class=\"k\">{}</span><span class=\"v\">{v}</span>{how}</div>", esc(id), term(label, label))
+        format!("<div class=\"asgiven\" id=\"{}:command\"><span class=\"k\">{}</span><span class=\"v\">{v}</span>{how}</div>", esc(id), label)
     }
 
     /// Reproduce this run: what it takes to run it again, the recipe narrowed to the run to copy, and the same-bytes
@@ -1677,39 +2050,57 @@ impl Doc<'_> {
 
     // ------------------------------------------------------------ the resource card: r-<res>
 
+    /// A resource's chips (owner, Nov 13 2026: "human can understand???"), as its card and its Resources row draw them:
+    /// where a reader gets it, then how many runs read it and how many rules rest on them, each a link to its list on
+    /// the card.
+    pub(crate) fn resource_chips(&self, res: &str, r: &Value) -> String {
+        let id = resource_anchor(res);
+        let mut out = get_it(self.doc, res, r, false, false);
+        let runs = list(r, "read_by.runs").len();
+        if runs > 0 {
+            out += &link_c(&format!("{id}:readers"), &plural(runs, "run", "runs"), "fch fch-use");
+        }
+        let rules = strs(r, "rests_on.criteria").len();
+        if rules > 0 {
+            out += &link_c(&format!("{id}:criteria"), &plural(rules, "rule", "rules"), "fch fch-use");
+        }
+        out
+    }
+
     pub fn resource(&self, res: &str, r: &Value) -> String {
         let id = resource_anchor(res);
         let runs = list(r, "read_by.runs");
         let analyses: Vec<&str> = strs(r, "read_by.analyses");
-        let readers = if runs.is_empty() { "no recorded run reads it".to_string() } else { plural(runs.len(), "run reads it", "runs read it") };
-        let readers = if runs.is_empty() { esc(&readers) } else { link(&format!("{id}:rests"), &readers) };
-        // its availability once, on its standing line, drilling to where its bytes are
-        let mut who = vec![esc(s(r, "type")), term(s(r, "availability"), &link(&format!("{id}:places"), s(r, "availability")))];
+        // a type icon and the name; its type a quiet badge, its id small and last (P3); no sentence under it
         let role = s(r, "role");
-        // its role once: a checkpoint whose role is checkpoint says it once (P2)
-        if !role.is_empty() && role != s(r, "type") {
-            who.push(esc(role));
-        }
-        who.push(readers);
-        // its name first, the id last (P3)
+        let role = if !role.is_empty() && role != s(r, "type") { format!("<span class=\"kind\">{}</span>", esc(role)) } else { String::new() };
         let top = format!(
-            "<h3 class=\"tt\">{}</h3><div class=\"hd\"><span class=\"kind\">resource</span><span class=\"dim sm\">{}</span><span class=\"id\">{}</span></div>",
+            "<h3 class=\"tt\">{}{}</h3><div class=\"hd\"><span class=\"kind\">{}</span>{role}<span class=\"id\">{}</span></div>",
+            resource_icon(s(r, "type")),
             au(s(r, "name")),
-            who.join(DOT),
+            esc(if s(r, "type").is_empty() { "resource" } else { s(r, "type") }),
             esc(res),
         );
-        // Examine: whether it can be had, what made it and what rests on it; where its bytes are, its identity and
-        // how to get it again are source details
-        let mut out = String::new();
+        // Examine: its chips, what made it, the rules that rest on it by question, the runs that read it as a table;
+        // where its bytes are, its identity and how to get it again are source details
+        let mut out = format!("<p class=\"rchips\">{}</p>", self.resource_chips(res, r));
+        if self.live() {
+            let copies: Vec<String> = list(r, "copies").iter().map(|c| s(c, "said").to_string()).filter(|c| !c.is_empty()).collect();
+            if !copies.is_empty() {
+                out += &format!("<p class=\"sm dim copies\">{}</p>", copies.iter().map(|c| copy_linked(c)).collect::<Vec<_>>().join(DOT));
+            }
+            // the ask in words, and none at a past version (plat-1c's B1)
+            if self.past.is_none() && at(r, "asks").and_then(Value::as_bool) == Some(true) {
+                out += &format!(
+                    "{}",
+                    next_ask(&format!("In this repository, use Rabbit Brain to record where {res} can be downloaded: its URL or its Hugging Face id."))
+                );
+            }
+        }
         let made_by = list(r, "made_by");
         if !made_by.is_empty() {
-            out += &format!(
-                "<p class=\"sm\">made by {}</p>",
-                listed(
-                    &made_by.iter().map(|m| self.run_named(s(m, "run"))).collect::<Vec<_>>(),
-                    made_by.iter().map(|m| format!("{} ({})", self.run_link(s(m, "run")), esc(s(m, "experiment")))).collect()
-                )
-            );
+            let made: String = made_by.iter().map(|m| link_c(&run_anchor(s(m, "run")), &format!("made by {}", self.run_named(s(m, "run"))), "fch fch-use")).collect();
+            out += &format!("<p class=\"rchips\">{made}</p>");
         }
         if !runs.is_empty() || !analyses.is_empty() {
             out += &self.resource_rests(&id, r, runs, &analyses);
@@ -1735,7 +2126,8 @@ impl Doc<'_> {
         let how = how.as_str();
         let from = s(r, "acquisition.from");
         // on a past version the part a run's card links to stays, with the file it comes from or that no command shows
-        let recipe = if s(r, "acquisition.command").is_empty() && s(r, "how").is_empty() {
+        // a recipe is how to get it again; a citation or an address is said on its Get it line
+        let recipe = if s(r, "acquisition.command").is_empty() {
             String::new()
         } else {
             format!(
@@ -1759,73 +2151,32 @@ impl Doc<'_> {
         )
     }
 
-    /// What rests on a resource: what rests on the runs and analyses that read it, by question, and its readers by
-    /// experiment, each folded under its count.
+    /// What rests on a resource (owner, Nov 13 2026): the rules that read its runs, as chips under each question they
+    /// bear on, then the runs that read it as a small table (the run, its experiment), and the analyses that read it.
     fn resource_rests(&self, id: &str, r: &Value, runs: &[Value], analyses: &[&str]) -> String {
-        let criteria = strs(r, "rests_on.criteria");
         let by_q = entries(r, "rests_on.by_question");
-        // each count drills to the list it counts, inside its fold
-        let mut lead = format!("read by {}", link(&format!("{id}:readers"), &plural(runs.len(), "run", "runs")));
-        if !analyses.is_empty() {
-            lead += &format!(" and {}", link(&format!("{id}:readers"), &plural(analyses.len(), "analysis", "analyses")));
-        }
-        if !criteria.is_empty() {
-            lead += &format!(
-                "; {} them, under {}",
-                link(&format!("{id}:criteria"), &plural(criteria.len(), "rule reads", "rules read")),
-                by_q.iter().map(|(q, _)| self.qlink(q, q, "")).collect::<Vec<_>>().join(", ")
-            );
-        }
-        let crit_li: String = by_q
+        let rules: String = by_q
             .iter()
             .map(|(q, cs)| {
                 let cs: Vec<&str> = cs.as_list().map_or_else(Vec::new, |l| l.iter().filter_map(Value::as_str).collect());
-                format!(
-                    "<li><span class=\"qh\">{}{DOT}{}</span><span class=\"ids\">{}</span></li>",
-                    self.qlink(q, q, ""),
-                    self.qlink(q, &plural(cs.len(), "rule", "rules"), ""),
-                    cs.iter().map(|c| link_c(&finding_anchor(c), c, "mono")).collect::<Vec<_>>().join(" ")
-                )
+                let chips: String = cs
+                    .iter()
+                    .map(|c| {
+                        let said = self.finding_of(c).map(|f| s(f, "statement")).filter(|t| !t.is_empty()).unwrap_or(c);
+                        format!("<a class=\"fch fch-use\" href=\"#{}\" title=\"{}\">{}</a>", esc(&finding_anchor(c)), esc(said), esc(&clip(said, 48)))
+                    })
+                    .collect();
+                format!("<div class=\"rbq\"><span class=\"rbqh\">{}</span><span class=\"rbqc\">{chips}</span></div>", self.qlink(q, q, ""))
             })
             .collect();
-        let mut by_x: Vec<(&str, Vec<&str>)> = Vec::new();
-        for run in runs {
-            let x = s(run, "experiment");
-            match by_x.iter_mut().find(|(e, _)| *e == x) {
-                Some((_, v)) => v.push(s(run, "run")),
-                None => by_x.push((x, vec![s(run, "run")])),
-            }
-        }
-        let mut runs_li: String = by_x
+        let rules = if rules.is_empty() { String::new() } else { format!("<div class=\"rbqs\" id=\"{}:criteria\">{rules}</div>", esc(id)) };
+        let rows: String = runs
             .iter()
-            .map(|(x, zs)| {
-                format!(
-                    "<li><span class=\"qh\">{}{DOT}{}</span><span class=\"ids\">{}</span></li>",
-                    self.xlink(x, "", x, ""),
-                    self.xlink(x, "", &plural(zs.len(), "run", "runs"), ""),
-                    self.run_links(zs)
-                )
-            })
+            .map(|run| format!("<tr><td>{}</td><td>{}</td></tr>", self.run_link(s(run, "run")), self.xlink(s(run, "experiment"), "", s(run, "experiment"), "")))
             .collect();
-        runs_li += &analyses.iter().map(|a| format!("<li><span class=\"qh\">{}</span></li>", self.the_analysis(a))).collect::<String>();
-        let crit_fold = if crit_li.is_empty() {
-            String::new()
-        } else {
-            format!(
-                "<details class=\"fold\" data-fold=\"{}:criteria\"><summary>{}, by question</summary><ul class=\"idl\" id=\"{}:criteria\">{crit_li}</ul></details>",
-                esc(id),
-                plural(criteria.len(), "rule", "rules"),
-                esc(id)
-            )
-        };
-        format!(
-            "<section class=\"part\" id=\"{}:rests\"><h4>{DEPENDS}</h4><p class=\"sm\">{lead}</p>{crit_fold}\
-             <details class=\"fold\" data-fold=\"{}:readers\"><summary>{}, by experiment</summary><ul class=\"idl\" id=\"{}:readers\">{runs_li}</ul></details></section>",
-            esc(id),
-            esc(id),
-            plural(runs.len(), "run", "runs"),
-            esc(id)
-        )
+        let table = if rows.is_empty() { String::new() } else { format!("<table class=\"rruns\" id=\"{}:readers\"><thead><tr><th>run</th><th>experiment</th></tr></thead><tbody>{rows}</tbody></table>", esc(id)) };
+        let an = if analyses.is_empty() { String::new() } else { format!("<p class=\"rchips\">{}</p>", analyses.iter().map(|a| self.the_analysis(a)).collect::<Vec<_>>().join(" ")) };
+        format!("<section class=\"part\" id=\"{}:rests\"><h4>{DEPENDS}</h4>{rules}{table}{an}</section>", esc(id))
     }
 
     // ------------------------------------------------------------ the analysis card: a-<aid>
@@ -1835,15 +2186,16 @@ impl Doc<'_> {
         let reads: Vec<&str> = strs(a, "reads");
         let used_by: Vec<&str> = strs(a, "used_by");
         let x = self.analysis_experiment(a);
-        let (home, within) = if x.is_empty() { ("runs-analyses".to_string(), String::new()) } else { (format!("x-{x}"), format!("<span class=\"dim sm\">in {}</span>", self.xlink(x, "", x, ""))) };
+        let (home, within) = if x.is_empty() { ("runs-analyses".to_string(), String::new()) } else { (format!("x-{x}"), format!("<span class=\"dim sm\">in {}</span>", self.xname(x))) };
         // its title first, the id last (P3)
         let top = format!(
             "<h3 class=\"tt\">{}</h3><div class=\"hd\"><span class=\"kind\">analysis</span>{within}<span class=\"dim sm\">{}</span></div>",
-            match s(a, "title") {
+            titled(aid, &match s(a, "title") {
                 "" => esc(&self.analysis_named(aid)),
                 t => au(t),
-            },
-            esc(s(a, "recorded")),
+            }),
+            // when it was recorded opens History, where its write is (closed form)
+            link("history", s(a, "recorded")),
         );
         // what it reports: the readings of the criteria that read it
         let mut out = String::new();
@@ -1932,22 +2284,25 @@ impl Doc<'_> {
         };
         let mut lineage = vec![format!("<a href=\"#your-call\">{}</a>", self.calls_view())];
         if !q.is_empty() && q != ":unfiled" {
-            lineage.push(self.qlink(q, q, ""));
+            lineage.push(self.qname(q));
         }
-        lineage.push(esc(subject));
         // the eyebrow says whose call it is and its id, once; the title; then the verdict, said once (plain words
         // pass 4): no status chips, no kind word, no "why" that says the title again
         // the rule it is about, by id, where the call is on something else (an experiment and its gate)
         let on = match f {
-            Some(f) if cid != subject => format!("{DOT}{} {}", if s(f, "role") == "gate" { "gate" } else { "rule" }, link_c(&finding_anchor(cid), cid, "mono id")),
+            Some(f) if cid != subject => format!("{DOT}{}", link(&finding_anchor(cid), if s(f, "role") == "gate" { "its gate" } else { "its rule" })),
             _ => String::new(),
         };
         let mut top = format!(
-            "<p class=\"lineage\">{}</p><div class=\"hd\"><span class=\"kind\">{}</span>{DOT}{}{on}</div><h3 class=\"tt\">{}</h3>",
+            "<p class=\"lineage\">{}</p><div class=\"hd\"><a class=\"kind\" href=\"#your-call\">{}</a>{DOT}{}{on}</div><h3 class=\"tt\">{}</h3>",
             lineage.join(" \u{203a} "),
             self.eyebrow(),
             self.id_link(subject, "id"),
-            self.au_cited(s(c, "title")),
+            // the title opens the rule the call is on (closed form)
+            {
+                let t = self.au_cited(s(c, "title"));
+                if cid.is_empty() || t.contains("<a ") { t } else { link_html(&finding_anchor(cid), &t) }
+            },
         );
         if let Some(f) = f {
             let fa = finding_anchor(cid);
@@ -2021,12 +2376,15 @@ impl Doc<'_> {
     /// what is recorded on it; the cited source goes to Source details.
     fn call_read(&self, cid: &str, f: &Value) -> (String, String) {
         let fa = finding_anchor(cid);
-        let mut out = format!("<section class=\"part\">{}", figure::draw(f, false));
+        // the figure opens the runs it is drawn from (closed form)
+        let fig = figure::draw(f);
+        let fig = if fig.is_empty() { fig } else { format!("<a class=\"figl\" href=\"#{}:runs\" aria-label=\"{}\">{fig}</a>", esc(&fa), w_runs_label()) };
+        let mut out = format!("<section class=\"part\">{fig}");
         let units = s(f, "units_line");
         if !units.is_empty() {
             // "3 seeds from 6 runs" reads "From 3 seeds (6 runs)"
             let said = match units.split_once(" from ") {
-                Some((u, runs)) => format!("From {} ({runs})", link(&format!("{fa}:runs"), u)),
+                Some((u, runs)) => format!("From {}", link(&format!("{fa}:runs"), &format!("{u} ({runs})"))),
                 None => format!("From {}", link(&format!("{fa}:runs"), units)),
             };
             out += &format!("<p class=\"sm\">{said}{DOT}{}</p>", link(&fa, "the whole finding"));
@@ -2035,7 +2393,8 @@ impl Doc<'_> {
         // what is recorded on it: the call line rb gives, or that nothing is yet
         let recorded = match self.call_line(f) {
             "" => NOTHING_RECORDED.to_string(),
-            line => esc(&self.said(line)),
+            // the call opens the rule it is on, where it is said with its reason (closed form)
+            line => link(&fa, &self.said(line)),
         };
         out += &format!("<p class=\"sm\">{recorded}</p>");
         // the cited file and its words are a source detail
@@ -2185,12 +2544,25 @@ impl Doc<'_> {
         let id = source_anchor(key);
         let ide = esc(&id);
         let label = s(c, "label");
-        let title = chip_inner(c);
+        // the cited lines' title opens the whole file's card (closed form: a path opens the file)
+        let held = !s(c, "path").is_empty() && list(self.doc, "files").iter().any(|f| s(f, "path") == s(c, "path"));
+        let title = if !held { chip_inner(c) } else { format!("<a href=\"#{}\">{}</a>", esc(&file_anchor(s(c, "path"))), chip_inner(c)) };
         let line = num(c, "line");
         let end = num(c, "end");
         let at_lines = if end.is_empty() || end == line { format!("line {line}") } else { format!("lines {line}-{end}") };
+        // the file's folder path, each folder opening Files there (UX5 1.4, a quote's folder path)
+        // only where the page draws Files
+        let folder = if list(self.doc, "files").is_empty() { "" } else { s(c, "path").rsplit_once('/').map(|(f, _)| f).unwrap_or("") };
+        let mut at_ = String::new();
+        let mut crumb = String::new();
+        for part in folder.split('/').filter(|p| !p.is_empty()) {
+            at_ += part;
+            at_ += "/";
+            crumb += &format!("<a class=\"fpath mono\" href=\"#files\" data-folder=\"{}\">{}/</a>", esc(&at_), esc(part));
+        }
+        let crumb = if crumb.is_empty() { String::new() } else { format!("<p class=\"sm fcrumb\">{crumb}</p>") };
         let top = format!(
-            "<h3 class=\"tt\">{title}</h3><div class=\"hd\"><span class=\"kind\">cited file</span></div>"
+            "{crumb}<h3 class=\"tt\">{title}</h3><div class=\"hd\"><span class=\"kind\">cited file</span></div>"
         );
         let mut body = String::new();
         let (missing, not_quoted) = (s(c, "missing"), s(c, "not_quoted"));
@@ -2228,11 +2600,15 @@ impl Doc<'_> {
         }
         let read = s(c, "read");
         if !read.is_empty() {
-            body += &format!("<p class=\"sm dim\">{}</p>", esc(read));
+            // the commit it was read at opens its card where the page holds one (closed form)
+            let sha = read.rsplit(' ').next().unwrap_or("");
+            let sha_like = sha.len() >= 7 && sha.chars().all(|c| c.is_ascii_hexdigit());
+            let said = if sha_like && super::fields::opens(sha) { link(&super::fields::to(sha), read) } else { esc(read) };
+            body += &format!("<p class=\"sm dim\">{said}</p>");
         }
         let url = s(c, "open_url");
         if self.live() && !url.is_empty() && self.past.is_none() {
-            body += &format!("<p class=\"sm\"><a class=\"openfile\" href=\"{}\">Open the file</a><span class=\"dim\"> in your editor, at {}</span></p>", esc(url), esc(&at_lines));
+            body += &format!("<p class=\"sm\"><a class=\"openfile\" href=\"{}\">Open the file in your editor, at {}</a></p>", esc(url), esc(&at_lines));
         }
         let lines_part = format!("<section class=\"part\" id=\"{ide}:lines\"><h4>{}</h4>{body}</section>", if quoted { "The cited lines" } else { "The citation" });
         let by: String = list(c, "cited_by").iter().map(|b| format!("<li>{}</li>", self.citer(s(b, "kind"), s(b, "id")))).collect();
@@ -2261,6 +2637,220 @@ impl Doc<'_> {
             understand(&top),
             examine(&(lines_part + &by_part)),
             source_details(&id, "", &rows),
+        )
+    }
+
+    /// A file's chips (owner, Nov 13 2026), as its row in the Files tree and its card draw them: how the record uses
+    /// it ("cited ×2", "7 settings", "made by run r004" or "read by 3 runs"), then what git and this checkout say of
+    /// it: amber "not committed", red "changed since cited", grey "missing", grey "ignored by git". Each is a class
+    /// (`use`, `warn`, `bad`, `dim`) and its words.
+    pub(crate) fn file_chips(&self, f: &Value) -> Vec<(&'static str, String)> {
+        let mut out: Vec<(&'static str, String)> = Vec::new();
+        let marks = list(f, "marks");
+        let n_of = |k: &str| marks.iter().find(|m| s(m, "key") == k).map(|m| at(m, "n").and_then(Value::as_i64).unwrap_or(1));
+        if let Some(n) = n_of("cited") {
+            out.push(("use", if n > 1 { format!("cited \u{d7}{n}") } else { "cited".to_string() }));
+        }
+        if let Some(n) = n_of("setting") {
+            out.push(("use", plural(n as usize, "setting", "settings")));
+        }
+        let runs: Vec<&str> = list(f, "cited_by").iter().filter(|b| s(b, "kind") == "run").map(|b| s(b, "id")).collect();
+        match runs.len() {
+            0 => {}
+            1 => out.push(("use", format!("made by {}", self.run_named(runs[0])))),
+            n => out.push(("use", format!("read by {n} runs"))),
+        }
+        if n_of("uncommitted").is_some() {
+            out.push(("warn", "not committed".to_string()));
+        }
+        if n_of("changed").is_some() {
+            out.push(("bad", "changed since cited".to_string()));
+        }
+        if n_of("absent").is_some() {
+            out.push(("dim", "missing".to_string()));
+        }
+        if n_of("ignored").is_some() {
+            out.push(("dim", "ignored by git".to_string()));
+        }
+        out
+    }
+
+    /// A short link to what cites a file's line, beside the line: the rule, the run, the experiment or question by its
+    /// own anchor where the page draws it, else the Source view of the citation.
+    fn cite_tag(&self, kind: &str, id: &str, key: &str) -> String {
+        let (anchor, said) = match kind {
+            "criterion" => (self.finding_of(id).map(|_| finding_anchor(id)), format!("rule {id}")),
+            "run" => (Some(run_anchor(id)), self.run_named(id)),
+            "experiment" => (self.xdrawn(id, "").then(|| format!("x-{id}")), format!("experiment {id}")),
+            "question" => (list(self.doc, "questions").iter().any(|q| s(q, "id") == id).then(|| format!("q-{id}")), format!("question {id}")),
+            "note" => (Some(source_anchor(key)), "a note".to_string()),
+            "call" => (Some(source_anchor(key)), "a call".to_string()),
+            _ => (Some(source_anchor(key)), kind.to_string()),
+        };
+        link_c(&anchor.unwrap_or_else(|| source_anchor(key)), &said, "ctag")
+    }
+
+    /// A file's card (owner, Nov 13 2026; UX5 1.4), at `file-<path>`: its place (each folder a link to Files), its
+    /// chips, then the file. Whole where the document gives its lines (`body`: rb open, and a page that carries the
+    /// file), each line the record cites marked and linked to what cites it; else the lines the record cites, with a
+    /// chip that says the whole file stays on the machine it was made on. A past version quotes no line (guarantee 38).
+    pub fn file(&self, f: &Value) -> String {
+        let path = s(f, "path");
+        let id = file_anchor(path);
+        let ide = esc(&id);
+        let mut crumb = String::new();
+        let mut at_ = String::new();
+        for part in s(f, "folder").split('/').filter(|p| !p.is_empty()) {
+            at_ += part;
+            at_ += "/";
+            crumb += &format!("<a class=\"fpath\" href=\"#files\" data-folder=\"{}\">{}/</a>", esc(&at_), esc(part));
+        }
+        let top = format!(
+            "<h3 class=\"tt mono\">{crumb}{}</h3><div class=\"hd\">{}<span class=\"kind\">file</span></div>",
+            esc(s(f, "name")),
+            file_icon(path)
+        );
+        let cites: Vec<(&str, &Value)> = entries(self.doc, "citations").into_iter().filter(|(_, c)| s(c, "path") == path).collect();
+        // each chip opens what it counts: what cites the file, listed under it (closed form)
+        let mut chips: String = self.file_chips(f).iter().map(|(k, t)| format!("<a class=\"fch fch-{k}\" href=\"#{ide}:by\">{}</a>", esc(t))).collect();
+        // a file git ignores is said by its path and that git ignores it, with none of its lines (AGENTS.md)
+        let ignored = s(f, "git") == "ignored";
+        let body = at(f, "body").filter(|b| b.is_dict() && !ignored);
+        let commit = body.map(|b| s(b, "commit")).filter(|c| !c.is_empty()).or_else(|| cites.iter().map(|(_, c)| s(c, "commit_short")).find(|c| !c.is_empty()));
+        if let Some(c) = commit {
+            // the commit opens its own card where the page draws one
+            chips += &if super::fields::opens(c) {
+                format!("<a class=\"fch fch-at mono\" href=\"#{}\" title=\"the commit rb read it at\">{}</a>", esc(&super::fields::to(c)), esc(&crate::checkout::short(c)))
+            } else {
+                format!("<span class=\"fch fch-at mono\" title=\"the commit rb read it at\">{}</span>", esc(&crate::checkout::short(c)))
+            };
+        }
+        let whole = body.map_or(false, |b| !list(b, "lines").is_empty());
+        if !whole && !ignored && self.past.is_none() && !self.live() {
+            chips += &format!("<span class=\"fch fch-dim\">{FULL_FILE_STAYS}</span>");
+        }
+        let mut lines_html = String::new();
+        if self.past.is_some() {
+            if !cites.is_empty() {
+                lines_html += &format!("<p class=\"sm dim\">{PAST_NO_QUOTE}</p>");
+            }
+        } else if ignored {
+        } else if let Some(b) = body.filter(|_| whole) {
+            // the file whole: each line its number; a line the record cites marked, and after a citation's last line
+            // the links to what cites it
+            let cited: std::collections::BTreeSet<i64> = list(f, "lines").iter().filter_map(Value::as_i64).collect();
+            let mut tags: IndexMap<i64, Vec<String>> = IndexMap::new();
+            for (key, c) in &cites {
+                let last = at(c, "end").and_then(Value::as_i64).or_else(|| at(c, "line").and_then(Value::as_i64)).unwrap_or(0);
+                for by in list(c, "cited_by") {
+                    tags.entry(last).or_default().push(self.cite_tag(s(by, "kind"), s(by, "id"), key));
+                }
+            }
+            let rows: Vec<String> = list(b, "lines")
+                .iter()
+                .enumerate()
+                .map(|(i, l)| {
+                    let n = i as i64 + 1;
+                    let on = cited.contains(&n);
+                    let tag = tags.get(&n).map(|t| format!("<span class=\"ctags\">{}</span>", t.join(""))).unwrap_or_default();
+                    format!(
+                        "<span class=\"sl{}\" data-n=\"{n}\"><span class=\"ln\">{n}</span>{} {}{tag}</span>",
+                        if on { " on" } else { "" },
+                        if on { "<span class=\"cm\" title=\"cited\">\u{25b8}</span>" } else { "<span class=\"cm\"> </span>" },
+                        esc(l.as_str().unwrap_or(""))
+                    )
+                })
+                .collect();
+            lines_html += &format!("<pre class=\"srclines fwhole\">{}</pre>", rows.join("\n"));
+            let more = at(b, "more").and_then(Value::as_i64).unwrap_or(0);
+            if more > 0 {
+                lines_html += &format!("<p><span class=\"fch fch-dim\">+{} lines</span></p>", more);
+            }
+        } else {
+            if let Some(why) = body.map(|b| s(b, "why")).filter(|w| !w.is_empty()) {
+                chips += &format!("<span class=\"fch fch-dim\">{}</span>", esc(why));
+            }
+            // the cited lines of every citation, merged in the file's order, a gap where lines are left out, and after a
+            // citation's last line the links to what cites it
+            let mut shown: std::collections::BTreeMap<i64, (String, bool)> = std::collections::BTreeMap::new();
+            let mut tags: std::collections::BTreeMap<i64, Vec<String>> = std::collections::BTreeMap::new();
+            for (key, c) in &cites {
+                let ls = list(c, "lines");
+                for l in ls {
+                    let n = at(l, "n").and_then(Value::as_i64).unwrap_or(0);
+                    let on = at(l, "cited").and_then(Value::as_bool).unwrap_or(false);
+                    let e = shown.entry(n).or_insert_with(|| (s(l, "text").to_string(), false));
+                    e.1 |= on;
+                }
+                if ls.is_empty() {
+                    continue;
+                }
+                let last = at(c, "end").and_then(Value::as_i64).or_else(|| at(c, "line").and_then(Value::as_i64)).unwrap_or(0);
+                for by in list(c, "cited_by") {
+                    let t = self.cite_tag(s(by, "kind"), s(by, "id"), key);
+                    let v = tags.entry(last).or_default();
+                    if !v.contains(&t) {
+                        v.push(t);
+                    }
+                }
+            }
+            let mut rows: Vec<String> = Vec::new();
+            let mut before: Option<i64> = None;
+            for (n, (text, on)) in &shown {
+                if before.map_or(false, |b| *n > b + 1) {
+                    rows.push("<span class=\"sl gap\"><span class=\"ln\">\u{22ef}</span></span>".to_string());
+                }
+                before = Some(*n);
+                let tag = tags.get(n).map(|t| format!("<span class=\"ctags\">{}</span>", t.join(""))).unwrap_or_default();
+                rows.push(format!(
+                    "<span class=\"sl{}\" data-n=\"{n}\"><span class=\"ln\">{n}</span>{} {}{tag}</span>",
+                    if *on { " on" } else { "" },
+                    if *on { "<span class=\"cm\" title=\"cited\">\u{25b8}</span>" } else { "<span class=\"cm\"> </span>" },
+                    esc(text)
+                ));
+            }
+            if !rows.is_empty() {
+                lines_html += &format!("<pre class=\"srclines\">{}</pre>", rows.join("\n"));
+            }
+        }
+        // what cites it: the settings it is the source of, said once per experiment ("Settings of x1: optim.lr,
+        // data.crop"), each run by its name, and the rest as a Source view says them
+        let mut settings: Vec<(String, Vec<String>)> = Vec::new();
+        let mut by = String::new();
+        for b in list(f, "cited_by") {
+            let (kind, bid) = (s(b, "kind"), s(b, "id"));
+            match (kind, bid.split_once('/')) {
+                ("setting", Some((x, name))) => match settings.iter_mut().find(|(k, _)| k == x) {
+                    Some((_, v)) => v.push(name.to_string()),
+                    None => settings.push((x.to_string(), vec![name.to_string()])),
+                },
+                ("run", _) => by += &format!("<li>{}</li>", link_c(&run_anchor(bid), &self.run_named(bid), "")),
+                _ => by += &format!("<li>{}</li>", self.citer(kind, bid)),
+            }
+        }
+        let by = settings
+            .iter()
+            .map(|(x, names)| format!("<li>Settings of {}: <span class=\"mono\">{}</span></li>", self.xname(x), esc(&names.join(", "))))
+            .collect::<String>()
+            + &by;
+        let mut rest = String::new();
+        if !by.is_empty() {
+            rest += &format!("<h4 id=\"{ide}:by\">Cited by</h4><ul class=\"plain citedby\">{by}</ul>");
+        } else {
+            // nothing cites it: a chip opens the file's row in Files, where its marks are listed, never a part the card
+            // does not hold
+            let folder = path.rsplit_once('/').map(|(d, _)| format!("{d}/")).unwrap_or_default();
+            chips = chips.replace(&format!("href=\"#{ide}:by\""), &format!("href=\"#files\" data-folder=\"{}\"", esc(&folder)));
+        }
+        let open = cites.first().map(|(_, c)| s(c, "open_url")).filter(|u| !u.is_empty() && self.live() && self.past.is_none());
+        if let Some(u) = open {
+            rest += &format!("<p class=\"sm\"><a class=\"openfile\" href=\"{}\">Open in your editor</a></p>", esc(u.rsplit_once(':').map_or(u, |(head, _)| head)));
+        }
+        format!(
+            "<div class=\"card fcard\" id=\"{ide}\" data-kind=\"file\" data-home=\"overview\" data-crumb=\"{}\">{}{}</div>",
+            esc(path),
+            understand(&top),
+            examine(&format!("<p class=\"fchips\">{chips}</p>{lines_html}{rest}"))
         )
     }
 
@@ -2311,19 +2901,33 @@ impl Doc<'_> {
                     // a call that waits for a confirmation, by what it is, as History's rows say it (model.rs
                     // minted_names), never by the id rb minted (FIX9)
                     let action = s(row, "text").split(' ').next().unwrap_or("");
-                    let subject = self.id_link(s(row, "subject"), "");
-                    match s(row, "kind") {
-                        "past" => format!("A past call to {} {subject} mentioned, not confirmed", esc(action)),
-                        _ => format!("A proposed call to {} {subject}, not made", esc(action)),
+                    let on = s(row, "subject");
+                    let said = match s(row, "kind") {
+                        "past" => format!("A past call to {action} {on} mentioned, not confirmed"),
+                        _ => format!("A proposed call to {action} {on}, not made"),
+                    };
+                    // the whole line opens what the call is on (closed form)
+                    match self.anchor_of(on) {
+                        Some(to) => link(&to, &said),
+                        None => {
+                            let subject = self.id_link(on, "");
+                            match s(row, "kind") {
+                                "past" => format!("A past call to {} {subject} mentioned, not confirmed", esc(action)),
+                                _ => format!("A proposed call to {} {subject}, not made", esc(action)),
+                            }
+                        }
                     }
                 } else if let Some(row) = list(self.doc, "pending.rows").iter().find(|r| s(r, "id") == id && s(r, "kind") == "gate") {
                     // a gate waits with its design: said by its experiment, never by the design's hash
                     let x = id.split('@').next().unwrap_or("");
                     let x = if s(row, "subject").is_empty() { x } else { s(row, "subject") };
-                    format!("The gate on {}, not confirmed", self.xlink(x, "", x, ""))
+                    format!("The gate on {}, not confirmed", self.xname(x))
                 } else if minted(id, "d") {
                     // a decision the document does not say: "a call", never the id rb minted
                     "A call".to_string()
+                } else if super::fields::has(id) {
+                    // a call on a setting opens the setting's card
+                    link(&super::fields::to(id), &format!("A call on {id}"))
                 } else {
                     format!("A call on {}", self.id_link(id, ""))
                 }
@@ -2383,31 +2987,6 @@ impl Doc<'_> {
     }
 
     // ------------------------------------------------------------ qualification, reading group and variant cards
-
-    /// A question's qualifications, each a card: its label, what it means, and the criteria that carry it.
-    fn qualifications(&self, q: &Value) -> String {
-        let qid = s(q, "id");
-        let mut out = String::new();
-        for (i, lim) in list(q, "overview.limits").iter().enumerate() {
-            let label = s(lim, "label");
-            let criteria = strs(lim, "criteria");
-            let meaning = qualification_meaning(label).map_or(String::new(), |m| format!("<p class=\"sm\">{}</p>", esc(m)));
-            out += &format!(
-                "<div class=\"card lim\" id=\"{}\" data-kind=\"qualification\" data-home=\"q-{}\" data-crumb=\"{}\">\
-                 <h3 class=\"tt\">{}</h3><div class=\"hd\"><span class=\"kind\">qualification</span>{}</div>{meaning}\
-                 <p class=\"dim sm\">{} it</p><ul class=\"ctw\" id=\"{}:criteria\">{}</ul></div>",
-                esc(&qualification_anchor(qid, i)),
-                esc(qid),
-                esc(label),
-                esc(label),
-                self.qlink(qid, qid, "id"),
-                link(&format!("{}:criteria", qualification_anchor(qid, i)), &plural(criteria.len(), "comparison carries", "comparisons carry")),
-                esc(&qualification_anchor(qid, i)),
-                criteria.iter().map(|c| format!("<li>{}</li>", self.crit_item(c))).collect::<String>()
-            );
-        }
-        out
-    }
 
     /// A question's findings by rb's rule word, each group a card ("rules met · 3"); its anchor keeps rb's word.
     fn reading_groups(&self, q: &Value) -> String {
@@ -2473,7 +3052,9 @@ impl Doc<'_> {
             // rb's label for a metric where it gives one, as the grid titles it
             let heads: Vec<(String, String)> =
                 cols.iter().zip(&units).zip(&labels).map(|((m, u), l)| { let (title, unit) = metric_head(m, u); (if l.is_empty() { title } else { l.to_string() }, unit) }).collect();
-            let head: String = heads.iter().map(|(title, _)| format!("<th>{}</th>", esc(title))).collect();
+            // a metric's head and a row's settings open the runs behind each mean (closed form)
+            let runs_to = format!("{}:runs", variant_anchor(eid, v));
+            let head: String = heads.iter().map(|(title, _)| format!("<th>{}</th>", link(&runs_to, title))).collect();
             // each column's means in the digits the page's grid says them in (FIX5)
             let places: Vec<usize> = cols
                 .iter()
@@ -2508,7 +3089,7 @@ impl Doc<'_> {
                         if read_by.is_empty() { String::new() } else { format!("<span class=\"s\">{}</span>", read_by.join(", ")) }
                     );
                 }
-                body += &format!("<tr><td class=\"dim\">{}</td>{tds}</tr>", esc(&label));
+                body += &format!("<tr><td class=\"dim\">{}</td>{tds}</tr>", link(&runs_to, &label));
             }
             let behind: Vec<&str> = mine.iter().flat_map(|r| strs(r, "runs")).collect();
             let behind = if behind.is_empty() { runs.clone() } else { behind };
@@ -2617,12 +3198,7 @@ fn cites_in<'a>(doc: &'a Value, text: &str) -> Vec<(usize, usize, &'a Value)> {
 }
 
 fn said_plain(phrase: &str) -> String {
-    let said = w::plain_word(phrase);
-    let (n, key) = match said.split_once(' ') {
-        Some((n, rest)) if n.chars().all(|c| c.is_ascii_digit()) => (format!("{n} "), rest.to_string()),
-        _ => (String::new(), said.clone()),
-    };
-    if w::hint(&key).is_some() && key != "rule" { format!("{}{}", esc(&n), term(&key, &esc(&key))) } else { esc(&said) }
+    esc(&w::plain_word(phrase))
 }
 
 /// rb's rule line without the rule's state it leads with ("criterion met: estimate -0.0029 at least -0.01" reads
@@ -2674,22 +3250,9 @@ fn reading_shown(word: &str) -> &str {
 /// After "Rules: " (PLAIN-WORDS-PASS-3), so "rules met" reads "Rules: met".
 fn reading_title(word: &str) -> String {
     let shown = reading_shown(word);
-    term(shown, &esc(shown.strip_prefix("rules ").unwrap_or(shown)))
+    esc(shown.strip_prefix("rules ").unwrap_or(shown))
 }
 
-/// What a qualification means, in rb's own words (SHELL-SPEC section 12's glossary lines).
-fn qualification_meaning(label: &str) -> Option<&'static str> {
-    Some(match label {
-        "Retrospective" | "Rule written after the results" => "declared after the evidence existed or after the data was seen, or linked to the question after either: never read as prospective.",
-        "No interval" => "one estimate with no interval, so how much it could vary is unknown. rb gives one from 3 units, and none across fixed design cells.",
-        "Uncertainty remains" => "unresolved: the interval includes 0.",
-        "Fixed design cells" => {
-            "the reading spans fixed design choices: each cell is read on its own, with how many meet and their range, and no sampling interval across cells."
-        }
-        "Reversal observed; repeatability uncertain" => "the two sides of a declared reversal measured opposite directions, but not both with intervals clear of 0.",
-        _ => return None,
-    })
-}
 
 /// The first byte where `word` stands whole in `text` (no letter, digit, "_" or "-" either side).
 fn whole_word(text: &str, word: &str) -> Option<usize> {
@@ -3197,7 +3760,7 @@ fn reading_parts(f: &Value) -> Option<(String, String)> {
         (Some(lo), Some(hi)) => format!(" ({} to {})", bound(lo), bound(hi)),
         // rb gives no interval across fixed design cells, ever; elsewhere one comes from 3 units
         _ if !list(f, "design_cells").is_empty() => " (no interval across design cells)".to_string(),
-        _ => " (no interval yet)".to_string(),
+        _ => " (no range yet)".to_string(),
     };
     let units = at(f, "reading.n").and_then(Value::as_i64).unwrap_or(0);
     let u = s(f, "reading.unit");
@@ -3299,11 +3862,12 @@ pub(crate) fn verdict(f: &Value) -> String {
 fn verdict_said(f: &Value) -> String {
     let state = s(f, "state");
     let word = match state {
-        "meets" | "gate met" => "Met",
-        "misses" | "gate missed" => "Not met",
+        // the screens' words (closed form, owner Nov 13 2026): a rule holds or does not hold, or is not settled
+        "meets" | "gate met" => "Holds",
+        "misses" | "gate missed" => "Does not hold",
         "reproduced" => "Reproduced",
         "not reproduced" => "Not reproduced",
-        "undetermined" | "gate undetermined" => "Can't tell yet",
+        "undetermined" | "gate undetermined" => "Not settled",
         _ => return "Not tested: nothing is read for this rule yet.".to_string(),
     };
     // a count rule and a best of N are said by their units, as the card's reading says them, never by a mean
@@ -3686,10 +4250,47 @@ fn sentence_html_to(text: &str, href: &str, rule: &str) -> String {
     if !pairs('\u{1}', '\u{2}') || !pairs('\u{3}', '\u{4}') {
         return esc(&clean(text));
     }
-    esc(text)
-        .replace('\u{1}', &format!("<a href=\"#{}\">", esc(href)))
-        .replace('\u{3}', &format!("<a href=\"#{}\">", esc(rule)))
-        .replace(['\u{2}', '\u{4}'], "</a>")
+    // the state word that leads it ("Holds:", "Not reproduced:") opens the rule, where its state is worked out
+    let led;
+    let text = match text.split_once(':') {
+        Some((word, rest)) if !rule.is_empty() && word.len() < 48 && !word.contains(['\u{1}', '\u{3}']) => {
+            led = format!("\u{3}{word}:\u{4}{rest}");
+            led.as_str()
+        }
+        _ => text,
+    };
+    // the words between the marked numbers open the reading too (closed form: every value and label opens its
+    // source), as links of their own beside the numbers', so no link holds another
+    let mut out = String::new();
+    let mut plain = String::new();
+    let mut inside = false;
+    let flush = |plain: &mut String, out: &mut String| {
+        if !plain.is_empty() {
+            if plain.trim().is_empty() {
+                out.push_str(&esc(plain));
+            } else {
+                out.push_str(&format!("<a class=\"sx\" href=\"#{}\">{}</a>", esc(href), esc(plain)));
+            }
+            plain.clear();
+        }
+    };
+    for c in text.chars() {
+        match c {
+            '\u{1}' | '\u{3}' => {
+                flush(&mut plain, &mut out);
+                out.push_str(&format!("<a href=\"#{}\">", esc(if c == '\u{1}' { href } else { rule })));
+                inside = true;
+            }
+            '\u{2}' | '\u{4}' => {
+                out.push_str("</a>");
+                inside = false;
+            }
+            c if inside => out.push_str(&esc(&c.to_string())),
+            c => plain.push(c),
+        }
+    }
+    flush(&mut plain, &mut out);
+    out
 }
 
 /// A sentence as plain text, its numbers unmarked: for a description, an aria-label.
@@ -3702,8 +4303,17 @@ pub(crate) fn sentence_text(text: &str) -> String {
 /// S2 (MP-1111-0219): chosen by the finding's timing code (`timing`), never by the words of rb's sentence, which open
 /// "declared; order unknown: ..." where the code is unknown. A finding with no evidence to be before or after
 /// (untested) says so, or, where git took its evidence out, that its results were taken out.
+/// A rule written before or after its results is placed against them in time where both days are known ("results
+/// 14 Oct ──▶ rule 20 Oct"), never named by a word that needs a definition (no glossary, show instead).
 fn timing_said(f: &Value) -> String {
-    timing_of_code(s(f, "timing"))
+    let (code, rule, results) = (s(f, "timing"), s(f, "when.rule"), s(f, "when.results"));
+    match code {
+        "before" | "after_evidence" if !rule.is_empty() && !results.is_empty() => {
+            let said = crate::shell::strings::in_time(code != "before", rule, results);
+            format!("{}{}.", said[..1].to_uppercase(), &said[1..])
+        }
+        _ => timing_of_code(code),
+    }
 }
 
 fn timing_of_code(code: &str) -> String {
@@ -3770,6 +4380,12 @@ mod tests {
             from = start;
         }
         out
+    }
+
+    /// Whether `html` draws a button that acts (the call composer's), a button that copies a source's sha256 aside:
+    /// copying a hash changes nothing, and a reader has it too.
+    fn acts(html: &str) -> bool {
+        html.split("<button").skip(1).any(|b| !b[..b.find('>').unwrap_or(b.len())].contains("data-act=\"copy-text\""))
     }
 
     /// The value at a path of dicts, to change in a test.
@@ -3839,7 +4455,7 @@ mod tests {
         out + rest
     }
 
-    fn anchors(doc: &Value) -> Vec<String> {
+    fn anchors(doc: &Value, surface: Surface) -> Vec<String> {
         let mut want: Vec<String> = Vec::new();
         want.extend(entries(doc, "findings").iter().map(|(c, _)| finding_anchor(c)));
         want.extend(entries(doc, "runs").iter().map(|(r, _)| run_anchor(r)));
@@ -3848,6 +4464,8 @@ mod tests {
         want.extend(list(doc, "calls").iter().map(|c| call_anchor(s(c, "subject"))));
         // each citation the document resolved has its Source view (CITE item 3)
         want.extend(entries(doc, "citations").iter().map(|(k, _)| source_anchor(k)));
+        // each file the record names has its File card on a page (UX5 1.4); rb open serves them when opened
+        want.extend(list(doc, "files").iter().filter(|_| surface != Surface::Open).filter(|f| at(f, "named").and_then(Value::as_bool).unwrap_or(false)).map(|f| file_anchor(s(f, "path"))));
         want
     }
 
@@ -3858,7 +4476,7 @@ mod tests {
         for (name, surface) in [("owner", Surface::Page), ("owner", Surface::Export), ("live", Surface::Open)] {
             let doc = example(name);
             let page = all(&doc, surface);
-            let mut want = anchors(&doc);
+            let mut want = anchors(&doc, surface);
             want.extend(["x-e1:v:fp32", "x-e1:v:int8", "x-e2:v:fp32", "x-e2:v:int8"].map(String::from));
             for id in &want {
                 assert_eq!(page.matches(&format!(" id=\"{id}\"")).count(), 1, "{name} {surface:?}: #{id}");
@@ -3868,11 +4486,7 @@ mod tests {
             assert_eq!(page.matches("class=\"card").count(), want.len(), "{name}: a card no object asks for");
             // a question's qualifications and reading groups live in its view's folds: the region leaves them to the
             // view, and the inspector gets each whole by its anchor
-            let mut folded: Vec<String> = ["q-q1:rd:criteria-met", "q-q1:rd:not-reproduced", "q-q1a:rd:criteria-not-met"].map(String::from).to_vec();
-            for q in list(&doc, "questions") {
-                folded.extend((0..list(q, "overview.limits").len()).map(|i| qualification_anchor(s(q, "id"), i)));
-            }
-            assert!(folded.len() > 3);
+            let folded: Vec<String> = ["q-q1:rd:criteria-met", "q-q1:rd:not-reproduced", "q-q1a:rd:criteria-not-met"].map(String::from).to_vec();
             for id in &folded {
                 assert!(!page.contains(&format!(" id=\"{id}\"")), "{name} {surface:?}: #{id} is the view's");
                 let c = one(&doc, surface, id).unwrap_or_else(|| panic!("{id}"));
@@ -3890,10 +4504,11 @@ mod tests {
         }
     }
 
-    /// The levels (OVERVIEW-V2): a finding card says what it is and its standing (Understand), then the reading, the
-    /// declared criterion, what it rests on and what rests on it, unfolded (Examine); then "Source details", folded,
-    /// the receipts' id on the list inside it; then Decide where a call waits. A run card says what it is, then what
-    /// it counts toward and its results, then its command and receipts in Source details, then Reproduce, folded.
+    /// The levels (OVERVIEW-V2, the UX lead's card): a finding card says what it is and its tabs (Understand), then
+    /// the reading drawn against the rule, the declared criterion, what it rests on, what rests on it and its Source
+    /// (Examine), rb's working folded inside Source as "How rb worked it out", the receipts' id on the list inside it;
+    /// then Decide where a call waits. A run card says what it is, then what it counts toward and its results, then
+    /// its command and receipts in Source details, then Reproduce, folded.
     #[test]
     fn a_card_keeps_its_levels() {
         let doc = example("owner");
@@ -3901,22 +4516,27 @@ mod tests {
         let c1 = card(&page, "c-c1");
         let order: Vec<usize> = [
             "data-level=\"understand\"",
-            "class=\"stand\"",
+            "<nav class=\"secnav tabs\"",
             "data-level=\"examine\"",
             "id=\"c-c1:reading\"",
+            "<div class=\"vs\">",
             "id=\"c-c1:rule\"",
             "id=\"c-c1:runs\"",
             "id=\"c-c1:impact\"",
-            "<details class=\"fold lv src\" data-level=\"trace\" data-fold=\"c-c1:source\"><summary>Source details</summary>",
+            "<section class=\"part\" id=\"c-c1:source\"><h4>Source</h4>",
+            "<details class=\"fold how\" data-fold=\"c-c1:how\"><summary>How rb worked it out</summary>",
             "id=\"c-c1:receipts\"",
         ]
         .iter()
         .map(|p| c1.find(p).unwrap_or_else(|| panic!("{p}")))
         .collect();
         assert!(order.windows(2).all(|w| w[0] < w[1]), "{order:?}");
-        assert!(!c1[..order[7]].contains("<details"), "Understand and Examine hold a fold");
+        assert!(!c1[..order[9]].contains("<details"), "Understand and Examine hold no fold above Source's");
+        // the drawing is the answer: no verdict sentence beside it (the UX lead's card, part 4.3)
+        assert!(!c1.contains("class=\"stand\""), "c1 is drawn and says no sentence");
+        assert!(!c1.contains(SOURCE_DETAILS), "a rule card's Source is a part, not a run card's fold");
         assert!(!c1.contains("data-level=\"decide\""), "no call waits on c1");
-        // a fold is never drawn open: the inspector, a page and rb open's swap leave Source details shut
+        // a fold is never drawn open: the inspector, a page and rb open's swap leave How rb worked it out shut
         assert!(!page.contains(" open>") && !page.contains(" open=\""));
         let runs1 = card(&page, "run-runs1");
         let order: Vec<usize> = [
@@ -3924,7 +4544,7 @@ mod tests {
             "data-level=\"examine\"",
             "id=\"run-runs1:counts\"",
             "id=\"run-runs1:results\"",
-            "<details class=\"fold lv src\" data-level=\"trace\" data-fold=\"run-runs1:source\"><summary>Source details</summary>",
+            "<details class=\"fold lv src\" data-level=\"trace\" data-fold=\"run-runs1:source\"><summary>Where it comes from</summary>",
             "id=\"run-runs1:command\"",
             "id=\"run-runs1:receipts\"",
             "<details class=\"fold lv repro\" data-level=\"trace\" data-fold=\"run-runs1:reproduce\"><summary>Reproduce this run",
@@ -3976,20 +4596,26 @@ mod tests {
             .flat_map(|(_, f)| [s(f, "reading.estimate_text").to_string(), s(f, "units_line").to_string()])
             .filter(|t| !t.is_empty())
             .collect();
-        let cards: Vec<String> = anchors(&doc).into_iter().filter(|a| !a.starts_with("q-")).collect();
+        let cards: Vec<String> = anchors(&doc, Surface::Page).into_iter().filter(|a| !a.starts_with("q-")).collect();
         for anchor in &cards {
             let c = card(&page, anchor);
             let own = anchor.split_once('-').unwrap().1;
-            // Understand and Examine: everything above the Source details fold
-            let bands = &c[..c.find("data-level=\"trace\"").map_or(c.len(), |i| c[..i].rfind('<').unwrap())];
+            // Understand and Examine: everything above the Source details fold (a run card's) or the How rb worked it
+            // out fold (a rule card's Source)
+            let cut = [c.find("data-level=\"trace\"").map(|i| c[..i].rfind('<').unwrap()), c.find("<details class=\"fold how\"")].into_iter().flatten().min();
+            let bands = &c[..cut.unwrap_or(c.len())];
             // author text is the author's: its words are not rb's to link
-            let bands = bands.split("<span class=\"au\">").map(|p| p.split_once("</span>").map_or(p, |(_, rest)| rest)).collect::<String>();
+            // (each cut starts at its opening: the text before the first is kept whole)
+            let cut_out = |html: &str, open: &str, close: &str| -> String {
+                html.split(open).enumerate().map(|(i, p)| if i == 0 { p } else { p.split_once(close).map_or(p, |(_, rest)| rest) }).collect::<String>()
+            };
+            let bands = cut_out(bands, "<span class=\"au\">", "</span>");
             // a fold's summary is its control (the count it shows is linked in the line above it)
-            let bands = bands.split("<summary>").map(|p| p.split_once("</summary>").map_or(p, |(_, rest)| rest)).collect::<String>();
+            let bands = cut_out(&bands, "<summary>", "</summary>");
             // the figure is geometry: its numbers are its marks' titles, beside the linked reading
-            let bands = bands.split("<svg").map(|p| p.split_once("</svg>").map_or(p, |(_, rest)| rest)).collect::<String>();
+            let bands = cut_out(&bands, "<svg", "</svg>");
             // a command to copy is a payload, never a link
-            let bands = bands.split("<pre").map(|p| p.split_once("</pre>").map_or(p, |(_, rest)| rest)).collect::<String>();
+            let bands = cut_out(&bands, "<pre", "</pre>");
             let loose = text_of(&unlinked(&bands));
             for id in ids.iter().filter(|i| *i != own) {
                 assert!(whole_word(&loose, id).is_none(), "{anchor}: {id} unlinked in {loose:?}");
@@ -4000,9 +4626,13 @@ mod tests {
             }
         }
         let c1 = card(&page, "c-c1");
-        // the verdict leads with the state word; its numbers drill to the runs (FIX2: no state words after it)
-        assert!(c1.contains("<p class=\"str\">Met: ") && level(c1, "understand").contains("href=\"#c-c1:runs\""), "{}", &c1[..1200]);
-        assert!(card(&page, "c-c2").contains("<p class=\"str\">Not reproduced: "));
+        // a drawn card says no verdict sentence (the UX lead's card, part 4.3): rb's number drills to the runs, and the
+        // standing is its mark, named for a screen reader
+        assert!(!c1.contains("<p class=\"str\">"), "{}", &c1[..1200]);
+        assert!(level(c1, "examine").contains("<a class=\"rbn\" href=\"#c-c1:runs\">"), "{}", &c1[..1200]);
+        assert!(c1.contains("<span class=\"vmk ok\" role=\"img\" aria-label=\"holds\">"));
+        let c2 = card(&page, "c-c2");
+        assert!(!c2.contains("<p class=\"str\">") && c2.contains("<span class=\"vmk no\" role=\"img\" aria-label=\"not reproduced\">"));
     }
 
     /// A page (rb page, rb export) draws no place and no platform, whatever document it is handed; rb open draws both.
@@ -4182,7 +4812,8 @@ mod tests {
                     assert!(cc.contains(&format!("data-cons=\"{}\"", esc(s(a, "consequence")))));
                 }
             }
-            assert_eq!(page.contains("<button") || page.contains("<input"), owner, "{surface:?}");
+            // a copy of a source's sha256 is no action on the record: every viewer has it
+            assert_eq!(acts(&page) || page.contains("<input"), owner, "{surface:?}");
         }
         // a reader of a shared link reads why each call is open and what rb read, and is offered no action: no button,
         // no reason field, no rb command, no Record a call
@@ -4194,10 +4825,10 @@ mod tests {
                 assert!(!text_of(cc).contains(s(a, "line")), "{}", s(a, "line"));
             }
         }
-        assert!(!reader.contains("<button") && !reader.contains("<input") && !reader.contains("Record a call") && !text_of(&reader).contains("rb decide"));
+        assert!(!acts(&reader) && !reader.contains("<input") && !reader.contains("Record a call") && !text_of(&reader).contains("rb decide"));
         // a call on an experiment reads its gate
         let e2 = card(&all(&doc, Surface::Page), "call-e2").to_string();
-        assert!(text_of(&e2).contains("Not met: 1 of 4 design cells is outside the rule") && e2.contains("gate <a class=\"mono id\" href=\"#c-c5\">c5</a>"), "{e2}");
+        assert!(text_of(&e2).contains("Does not hold: 1 of 4 design cells is outside the rule") && e2.contains("<a href=\"#c-c5\">its gate</a>"), "{e2}");
         assert!(e2.contains("From <a href=\"#c-c5:runs\">4 runs</a>"), "{e2}");
     }
 
@@ -4275,7 +4906,7 @@ mod tests {
         assert!(s0.contains("<a class=\"mono\" href=\"#c-c1\">c1</a>") && text_of(s0).contains("top1, FP32 0.7598"), "{s0}");
         // its results by their titles, as the full card says them (FIX5)
         assert!(!s0.contains("top1=") && !s0.contains("fp32:"), "{s0}");
-        assert!(!s0.contains("<details") && card(&page, "run-runx59").contains("<summary>Source details</summary>"));
+        assert!(!s0.contains("<details") && card(&page, "run-runx59").contains(&format!("<summary>{SOURCE_DETAILS}</summary>")));
         // its results keep their anchor: an analysis that read it drills there
         assert!(s0.contains(" id=\"run-runx00:results\""), "{s0}");
     }
@@ -4375,7 +5006,7 @@ mod tests {
         let r = card(&page, "r-imagenet-val");
         let rests = &r[r.find(":rests\"").unwrap()..];
         no_id(&rests[..rests.find("</section>").unwrap()], "What depends on this");
-        assert!(rests.contains("<span class=\"ids\"><a href=\"#run-"), "{rests}");
+        assert!(rests.contains("<td><a href=\"#run-"), "{rests}");
         let a1 = card(&page, "a-a1");
         assert!(!a1.contains("<span class=\"id\">") && a1.contains("data-crumb=\"per-class accuracy, int8 against fp32\""), "{a1}");
         let reads = &a1[a1.find("id=\"a-a1:reads\"").unwrap()..];
@@ -4415,15 +5046,49 @@ mod tests {
         let page = all(&doc, Surface::Page);
         assert!(card(&page, "c-c1").contains("<a href=\"#run-runs1\">seed 1</a>"), "{}", card(&page, "c-c1"));
         assert!(card(&page, "a-a1").contains("<a href=\"#a-a1:reads\">3 runs</a>") && page.contains("id=\"a-a1:reads\""));
-        assert!(one(&doc, Surface::Page, "q-q1:lim:0").unwrap().contains("<a href=\"#q-q1:lim:0:criteria\">1 comparison carries</a>"));
         assert!(one(&doc, Surface::Page, "q-q1:rd:criteria-met").unwrap().contains("<a href=\"#q-q1:rd:criteria-met:criteria\">3</a>"));
         let v = card(&page, "x-e1:v:int8");
         assert!(v.contains("<a href=\"#x-e1:v:int8:runs\">0.7568</a>") && v.contains("<a href=\"#x-e1:v:int8:runs\">4 runs</a>"), "{v}");
         let r = card(&page, "r-imagenet-val");
-        assert!(r.contains("<a href=\"#r-imagenet-val:places\">available</a>") && r.contains("id=\"r-imagenet-val:receipts\"") && r.contains("id=\"r-imagenet-val:places\""));
+        assert!(r.contains("class=\"chip nolink\" tabindex=\"0\" title=\"") && r.contains("id=\"r-imagenet-val:receipts\"") && r.contains("id=\"r-imagenet-val:places\""));
         let mut doc = example("owner");
         dig(&mut doc, &["findings", "c1", "says"]).as_dict_mut().unwrap().insert("integrity".into(), Value::str("ok"));
-        assert!(card(&all(&doc, Surface::Page), "c-c1").contains("<dt><span class=\"term\" data-hint=\"problems with what a finding depends on (a stale source, an undeclared difference, a record edited outside rb). ok when there are none. Not the repository&#x27;s own checks.\" aria-describedby=\"g-checks\">checks</span></dt><dd class=\"dim\">ok</dd>"));
+        assert!(card(&all(&doc, Surface::Page), "c-c1").contains(&format!("<dt>{W_CHECKS}</dt><dd class=\"dim\">ok</dd>")));
+    }
+
+    /// A file's chips say how the record uses it and its state, in words and a colour each (owner, Nov 13 2026).
+    #[test]
+    fn a_files_chips_say_its_state_in_words() {
+        let doc = example("owner");
+        let d = Doc::new(&doc, Surface::Page);
+        let f = crate::pyjson::loads(
+            r#"{"path": "a/b.yaml", "cited_by": [], "marks": [{"key": "cited", "n": 2}, {"key": "setting", "n": 1}, {"key": "uncommitted"}, {"key": "changed"}, {"key": "absent"}, {"key": "ignored"}]}"#,
+        )
+        .unwrap();
+        let said: Vec<(&str, String)> = d.file_chips(&f);
+        let want = [("use", "cited \u{d7}2"), ("use", "1 setting"), ("warn", "not committed"), ("bad", "changed since cited"), ("dim", "missing"), ("dim", "ignored by git")];
+        assert_eq!(said, want.iter().map(|(k, t)| (*k, t.to_string())).collect::<Vec<_>>());
+        let one = crate::pyjson::loads(r#"{"path": "x.json", "marks": [{"key": "output"}], "cited_by": [{"kind": "run", "id": "nope"}]}"#).unwrap();
+        assert!(d.file_chips(&one)[0].1.starts_with("made by "));
+        let two = crate::pyjson::loads(r#"{"path": "x.json", "marks": [{"key": "output"}], "cited_by": [{"kind": "run", "id": "a"}, {"kind": "run", "id": "b"}]}"#).unwrap();
+        assert_eq!(d.file_chips(&two), vec![("use", "read by 2 runs".to_string())]);
+        assert_eq!(file_icon("configs/train.yaml"), "<i class=\"fti fti-cfg\"></i>");
+        assert!(file_icon("logs/agent.log").contains("fti-log") && file_icon("eval.py").contains("fti-code") && file_icon("Makefile").contains("fti-file"));
+    }
+
+    /// A file git ignores is said by its path and that git ignores it, with none of its lines, even where the document
+    /// carries them (AGENTS.md; review of rec-2).
+    #[test]
+    fn an_ignored_file_shows_no_line() {
+        let doc = example("live");
+        let d = Doc::new(&doc, Surface::Open);
+        let f = crate::pyjson::loads(
+            r#"{"path": "secrets/config.yaml", "folder": "secrets/", "name": "config.yaml", "git": "ignored", "cited_by": [], "lines": [],
+                "marks": [{"key": "ignored"}], "body": {"lines": ["token: abc"], "more": 0, "why": "", "commit": ""}}"#,
+        )
+        .unwrap();
+        let card = d.file(&f);
+        assert!(!card.contains("srclines") && !card.contains("token: abc") && card.contains("ignored by git"), "{card}");
     }
 
     /// One card by its anchor is the card `all` draws there, for every card of the document; a run past the cap
@@ -4432,13 +5097,13 @@ mod tests {
     fn one_card_by_its_anchor() {
         let doc = example("owner");
         let page = all(&doc, Surface::Page);
-        let mut want = anchors(&doc);
+        let mut want = anchors(&doc, Surface::Page);
         want.push("x-e2:v:int8".into());
         for a in &want {
             assert_eq!(one(&doc, Surface::Page, a).as_deref(), Some(card(&page, a)), "{a}");
         }
         assert_eq!(super::card(&doc, "reading", "q1:rd:criteria-met", Surface::Page), one(&doc, Surface::Page, "q-q1:rd:criteria-met"));
-        assert!(one(&doc, Surface::Page, "q-q1:rd:criteria-met").is_some() && one(&doc, Surface::Page, "q-q1:lim:0").is_some());
+        assert!(one(&doc, Surface::Page, "q-q1:rd:criteria-met").is_some() && one(&doc, Surface::Page, "q-q1:lim:0").is_none());
         assert_eq!(super::card(&doc, "criterion", "c1", Surface::Page), one(&doc, Surface::Page, "c-c1"));
         assert_eq!(super::card(&doc, "variant", "e1:v:fp32", Surface::Page).as_deref(), Some(card(&page, "x-e1:v:fp32")));
         for missing in ["c-c99", "run-nope", "q-q9:lim:0", "x-e1:v:bf16", "nothing", "zz-c1"] {
@@ -4453,7 +5118,7 @@ mod tests {
             runs.insert(format!("runy{i:02}"), r);
         }
         assert!(card(&all(&doc, Surface::Open), "run-runy00").contains("card run short"));
-        assert!(one(&doc, Surface::Open, "run-runy00").unwrap().contains("<summary>Source details</summary>"));
+        assert!(one(&doc, Surface::Open, "run-runy00").unwrap().contains(&format!("<summary>{SOURCE_DETAILS}</summary>")));
     }
 
     /// A page drops the user's words by the field that holds them, never by reading quotes in a line: words that hold
@@ -4494,7 +5159,7 @@ mod tests {
         let page = all(&doc, Surface::Page);
         let (gone, kept) = (card(&page, "run-runz00"), card(&page, "run-runz01"));
         assert!(gone.contains("card run short gone") && !gone.contains("Counts toward"), "{gone}");
-        assert!(kept.contains("card run short") && kept.contains("Counts toward 2 rules: <a class=\"mono\" href=\"#c-c2\">c2</a>, <a class=\"mono\" href=\"#c-c3\">c3</a></p>"), "{kept}");
+        assert!(kept.contains("card run short") && kept.contains("Counts toward 2 rules</a>: <a class=\"mono\" href=\"#c-c2\">c2</a>, <a class=\"mono\" href=\"#c-c3\">c3</a></p>"), "{kept}");
         // the whole receipt counts each criterion once
         let full = one(&doc, Surface::Page, "run-runz01").unwrap();
         assert!(full.contains(">2 rules \u{b7} not counted in 1</a>"), "{full}");
@@ -4539,8 +5204,10 @@ mod tests {
         c1.insert("receipt_rows".into(), Value::List(Vec::new()));
         c1.shift_remove("cited");
         let c1 = card(&all(&doc, Surface::Page), "c-c1").to_string();
-        // rb's own rule line is still a source detail, so the tab to it stays
-        assert!(c1.contains("<a href=\"#c-c1:impact\">What depends on this</a><a href=\"#c-c1:receipts\">Source details</a></nav>"), "{c1}");
+        // rb's own rule line is still rb's working, under Source's fold, so the tab to Source stays, and leads to it
+        assert!(c1.contains("<a href=\"#c-c1:impact\">Used by</a><a href=\"#c-c1:source\">Source</a></nav>"), "{c1}");
+        assert!(c1.contains("<section class=\"part\" id=\"c-c1:source\">") && c1.contains("id=\"c-c1:receipts\""), "{c1}");
+        assert!(!c1.contains("<figure class=\"cq\">"), "no cited source, no quote: {c1}");
     }
 
     /// A card says a criterion in plain words (PLAIN-WORDS-PASS-1): "rule", "the rule as declared", "checks",
@@ -4553,15 +5220,14 @@ mod tests {
         let page = all(&doc, Surface::Page);
         let c1 = card(&page, "c-c1");
         let kind = &c1[c1.find("<span class=\"kind\">").unwrap()..];
-        assert!(kind.starts_with(&format!("<span class=\"kind\">{}</span>", rule_term("rule"))), "{c1}");
-        // the chip carries the glossary's line on "rule" (a key the glossary holds, so it is not drawn plain)
-        assert!(kind.starts_with(&format!("<span class=\"kind\"><span class=\"term\" data-hint=\"{}\"", esc(w::hint("rule").unwrap()))), "{c1}");
+        assert!(kind.starts_with(&format!("<span class=\"kind\">{}</span>", "rule")), "{c1}");
         assert!(c1.contains("data-kind=\"criterion\""));
-        assert!(c1.contains("<a href=\"#c-c1:rule\">The rule as written</a>") && c1.contains("<h4>The rule as written</h4>"), "{c1}");
-        assert!(c1.contains("<a href=\"#c-c1:impact\">What depends on this</a>") && c1.contains("<h4>What depends on this</h4>"), "{c1}");
-        assert!(c1.contains(">checks</span></dt><dd class=\"dim\">ok</dd>"), "{c1}");
+        // a tab says its part short (the UX lead's card); the part keeps its plain heading, for print and no script
+        assert!(c1.contains("<a href=\"#c-c1:rule\">Rule</a>") && c1.contains("<h4>The rule as written</h4>"), "{c1}");
+        assert!(c1.contains("<a href=\"#c-c1:impact\">Used by</a>") && c1.contains("<h4>What depends on this</h4>"), "{c1}");
+        assert!(c1.contains(&format!("<dt>{W_CHECKS}</dt><dd class=\"dim\">ok</dd>")), "{c1}");
         let r = card(&page, "r-imagenet-val");
-        assert!(r.contains("<h4>What depends on this</h4>") && r.contains("rules read</a>"), "{r}");
+        assert!(r.contains("<h4>What depends on this</h4>") && r.contains(":criteria\">5 rules</a>"), "{r}");
         let c2 = card(&page, "c-c2");
         assert!(c2.contains("<span class=\"cons\">The record will say: ") && c2.contains("<p class=\"willread\">The record will say: <span>"), "{c2}");
         let text = text_of(&page);
@@ -4577,28 +5243,13 @@ mod tests {
             dig(&mut doc, &["findings", "c1"]).as_dict_mut().unwrap().insert("standing".into(), Value::str(word));
             let anchor = format!("q-q1:rd:{}", word.replace("criterion", "criteria").replace(' ', "-"));
             let group = one(&doc, Surface::Page, &anchor).unwrap_or_else(|| panic!("{anchor}"));
-            assert!(group.contains(&format!("data-crumb=\"{}\"", esc(shown))) && group.contains(&format!("<h3 class=\"tt\">Rules: {} (", term(shown, &esc(shown.strip_prefix("rules ").unwrap_or(shown))))), "{group}");
+            assert!(group.contains(&format!("data-crumb=\"{}\"", esc(shown))) && group.contains(&format!("<h3 class=\"tt\">Rules: {} (", esc(shown.strip_prefix("rules ").unwrap_or(shown)))), "{group}");
         }
         // a run no rule reads says so
         let mut doc = example("owner");
         dig(&mut doc, &["runs", "runs1"]).as_dict_mut().unwrap().insert("counts_toward".into(), Value::List(Vec::new()));
         let run = card(&all(&doc, Surface::Page), "run-runs1").to_string();
         assert!(run.contains("<p class=\"dim sm\">No recorded rule reads it.</p>"), "{run}");
-        // what a card says of no interval
-        assert!(qualification_meaning("No interval").unwrap().starts_with("one estimate with no interval, so how much it could vary is unknown."));
-        assert_eq!(qualification_meaning("Rule written after the results"), qualification_meaning("Retrospective"));
-    }
-
-    /// Each of the glossary's terms a card draws is described by its entry (aria-describedby), the command's too.
-    #[test]
-    fn a_cards_terms_name_their_glossary_entries() {
-        let page = all(&example("owner"), Surface::Page);
-        let terms: Vec<&str> = page.split("<span class=\"term\"").skip(1).map(|t| &t[..t.find('>').unwrap()]).collect();
-        assert!(terms.len() > 10);
-        for t in &terms {
-            assert!(t.contains(" aria-describedby=\"g-"), "{t}");
-        }
-        assert!(card(&page, "run-runs1").contains("aria-describedby=\"g-command-as-given\">command (as given)</span>"));
     }
 
     /// DESIGN-PASS-1 target 7: a run's title is in human words, its id last in the quiet line; when it was produced and
@@ -4606,9 +5257,9 @@ mod tests {
     #[test]
     fn a_runs_head_is_its_title_then_its_days() {
         for (produced, when, want) in [
-            ("2026-10-14", "2026-10-20", "runin e1 \u{b7} produced 2026-10-14 \u{b7} recorded 2026-10-20"),
-            ("2026-10-20", "2026-10-20", "runin e1 \u{b7} produced and recorded 2026-10-20"),
-            ("", "2026-10-20", "runin e1 \u{b7} recorded 2026-10-20"),
+            ("2026-10-14", "2026-10-20", "runin int8 against fp32 \u{b7} produced 2026-10-14 \u{b7} recorded 2026-10-20"),
+            ("2026-10-20", "2026-10-20", "runin int8 against fp32 \u{b7} produced and recorded 2026-10-20"),
+            ("", "2026-10-20", "runin int8 against fp32 \u{b7} recorded 2026-10-20"),
         ] {
             let mut doc = example("owner");
             let r = dig(&mut doc, &["runs", "runs1"]).as_dict_mut().unwrap();
@@ -4658,21 +5309,21 @@ mod tests {
         let band = |c: &str, t: f64, tol: Option<f64>| crate::obj! {"comparator" => c, "target" => t, "tolerance" => tol.map_or(Value::Null, Value::Float)};
         // far past the margin on the better side: never "within 1 point of"
         let f = with("change.top1, lower bound ≥ -1", band("at least", -1.0, None), "meets", 3.28, 3.06, 3.5);
-        assert_eq!(sentence_text(&verdict(&f)), "Met: INT8 is 3.28 points higher than the FP32 baseline (+3.06 to +3.50); its worse end is 4.06 points past the -1 point it asks for.");
+        assert_eq!(sentence_text(&verdict(&f)), "Holds: INT8 is 3.28 points higher than the FP32 baseline (+3.06 to +3.50); its worse end is 4.06 points past the -1 point it asks for.");
         let f = with("change.top1 ≥ -1", band("at least", -1.0, None), "meets", 3.28, 3.06, 3.5);
-        assert_eq!(sentence_text(&verdict(&f)), "Met: INT8 is 3.28 points higher than the FP32 baseline (+3.06 to +3.50), 4.28 points past the -1 point it asks for.");
+        assert_eq!(sentence_text(&verdict(&f)), "Holds: INT8 is 3.28 points higher than the FP32 baseline (+3.06 to +3.50), 4.28 points past the -1 point it asks for.");
         let f = with("change.top1 ≥ -1", band("at least", -1.0, None), "misses", -1.5, -1.9, -1.1);
-        assert_eq!(sentence_text(&verdict(&f)), "Not met: INT8 is 1.50 points lower than the FP32 baseline (-1.90 to -1.10), short of the -1 point the rule asks for.");
+        assert_eq!(sentence_text(&verdict(&f)), "Does not hold: INT8 is 1.50 points lower than the FP32 baseline (-1.90 to -1.10), short of the -1 point the rule asks for.");
         // each kind of rule says what it reads
         let f = with("change.top1 better, its interval clear of 0", band("at least", 0.0, None), "misses", 0.2, -0.1, 0.5);
         assert_eq!(rule_passes(&f), "The whole interval is clear of 0 on the better side (INT8 against the FP32 baseline).");
-        assert_eq!(sentence_text(&verdict(&f)), "Not met: INT8 is 0.20 points higher than the FP32 baseline (-0.10 to +0.50); its interval is not clear of 0 on the better side.");
+        assert_eq!(sentence_text(&verdict(&f)), "Does not hold: INT8 is 0.20 points higher than the FP32 baseline (-0.10 to +0.50); its interval is not clear of 0 on the better side.");
         let f = with("change.top1 within ±0.5, its interval inside ±0.5", band("within", 0.0, Some(0.5)), "meets", 0.1, -0.2, 0.4);
         assert_eq!(rule_passes(&f), "The whole interval is inside \u{b1}0.5 points (INT8 against the FP32 baseline).");
-        assert_eq!(sentence_text(&verdict(&f)), "Met: INT8 is 0.10 points higher than the FP32 baseline (-0.20 to +0.40); its interval is inside \u{b1}0.5 points.");
+        assert_eq!(sentence_text(&verdict(&f)), "Holds: INT8 is 0.10 points higher than the FP32 baseline (-0.20 to +0.40); its interval is inside \u{b1}0.5 points.");
         let f = with("each unit's change.top1 ≥ -1", band("at least", -1.0, None), "misses", -0.5, -0.9, -0.1);
         assert_eq!(rule_passes(&f), "Every unit's value is at least -1 point (INT8 against the FP32 baseline).");
-        assert_eq!(sentence_text(&verdict(&f)), "Not met: INT8 is 0.50 points lower than the FP32 baseline (-0.90 to -0.10); a unit's value falls outside it.");
+        assert_eq!(sentence_text(&verdict(&f)), "Does not hold: INT8 is 0.50 points lower than the FP32 baseline (-0.90 to -0.10); a unit's value falls outside it.");
         let f = with("change.top1, its interval = 3 ± 0.5", band("within", 3.0, Some(0.5)), "meets", 3.1, 2.8, 3.4);
         assert_eq!(rule_passes(&f), "The whole interval is within 0.5 points of 3 points (INT8 against the FP32 baseline).");
         // a cited difference is in points, as every difference is
@@ -4697,7 +5348,7 @@ mod tests {
         for (c, v) in cells.iter_mut().zip(["88.2", "89.92", "89.9", "90.1"]) {
             c.as_dict_mut().unwrap().insert("estimate_text".into(), Value::str(v));
         }
-        let fig = figure::draw(&f, true);
+        let fig = figure::draw(&f);
         assert!(fig.contains("calib images 128: 88.20") && fig.contains("calib images 512: 89.92") && !fig.contains(": +"), "{fig}");
         // a rule with no results says so
         // S2: by the timing's code, never by the words of rb's sentence ("declared; order unknown: ...")
@@ -4724,8 +5375,11 @@ mod tests {
         let f = dig(&mut doc, &["findings", "c3"]).as_dict_mut().unwrap();
         f.insert("standing".into(), Value::str("criterion untested \u{b7} untested"));
         f.insert("state".into(), Value::str("untested"));
+        // a rule with no results has no estimate to draw: its card keeps the sentence
+        f.get_mut("reading").unwrap().as_dict_mut().unwrap().insert("estimate_text".into(), Value::str(""));
         let page = all(&doc, Surface::Page);
         let c3 = card(&page, "c-c3");
+        assert!(!c3.contains("<div class=\"vs\">"), "{c3}");
         let sti = &c3[c3.find("<p class=\"str\">").unwrap()..];
         assert_eq!(text_of(&sti[..sti.find("</p>").unwrap()]).to_lowercase().matches("not tested").count(), 1, "{sti}");
         let mut doc = example("owner");
@@ -4751,11 +5405,12 @@ mod tests {
         let run = card(&page, "run-runs1");
         let counts = &run[run.find("id=\"run-runs1:counts\"").unwrap()..];
         let counts = &counts[..counts.find("</section>").unwrap()];
-        assert!(counts.contains("<li><a class=\"ci\" href=\"#c-c1\"><span class=\"au\">int8 holds top1 within 1 point of fp32</span> <span class=\"mono id\">c1</span></a> \u{b7} <span class=\"sw good\">rule met</span></li>"), "{counts}");
+        assert!(counts.contains("<li><a class=\"ci\" href=\"#c-c1\"><span class=\"au\">int8 holds top1 within 1 point of fp32</span> <span class=\"mono id\">c1</span> \u{b7} <span class=\"sw good\">rule holds</span></a></li>"), "{counts}");
         assert_eq!(text_of(counts).matches(why).count(), 1, "{counts}");
         assert!(text_of(counts).contains(&format!("Counted in 1 rule.")) && text_of(counts).contains(&format!("Not counted in 2 rules: {why}.")), "{}", text_of(counts));
         // a run's numbers in rb's own digits, as rb show gives them
-        assert!(run.contains("<dl class=\"ax mets\"><dt>top1, FP32</dt><dd>0.7598</dd><dt>top1, INT8</dt><dd>0.7569</dd></dl>"), "{run}");
+        // the numbers open the receipt they were read from, as one row (closed form)
+        assert!(run.contains("<dl class=\"ax mets\" data-go=\"run-runs1:receipts\"><dt>top1, FP32</dt><dd>0.7598</dd><dt>top1, INT8</dt><dd>0.7569</dd></dl>"), "{run}");
         // a rule card's table: the arm all its runs share and the values every run has, once above it
         let c1 = card(&page, "c-c1");
         let runs = &c1[c1.find("id=\"c-c1:runs\"").unwrap()..];
@@ -4866,7 +5521,7 @@ mod tests {
     fn a_row_says_its_label_once() {
         let page = all(&example("owner"), Surface::Page);
         let c1 = card(&page, "c-c1");
-        assert!(c1.contains("<dt>margin</dt><dd><a href=\"#c-c1:reading\">0.0071</a></dd>"), "{c1}");
+        assert!(c1.contains("<dt>distance from the rule's number</dt><dd><a href=\"#c-c1:reading\">0.0071</a></dd>"), "{c1}");
         let mut doc = example("owner");
         let rows = dig(&mut doc, &["runs", "runs1", "receipt_rows"]).as_list_mut().unwrap();
         rows[1] = Value::List(vec![Value::str("produced"), Value::str("produced 2026-10-14 01:54 UTC (as reported)"), Value::List(Vec::new())]);
@@ -4945,10 +5600,11 @@ mod tests {
         assert_eq!(text_of(c2).matches(call).count(), 1, "{}", text_of(c2));
         let f = at(&doc, "findings.c2").unwrap();
         let result = s(f, "reading.result");
+        // c2 is drawn: its Result's mark says the state (the UX lead's card, part 4.3), so the head says no sentence
         let sti = level(c2, "understand");
-        let sti = &sti[sti.find("<p class=\"str\">").unwrap()..];
+        assert!(!sti.contains("<p class=\"str\">") && level(c2, "examine").contains("<span class=\"vmk no\""), "{sti}");
         // said at most once; a level's "measured" says nothing, and is not said
-        assert!(text_of(&sti[..sti.find("</p>").unwrap()]).matches(result).count() <= 1);
+        assert!(text_of(sti).matches(result).count() <= 1);
         assert_eq!(text_of(level(c2, "examine")).replace(MEASURED, "").matches(result).count(), 0, "{}", text_of(level(c2, "examine")));
         // on a page with no call on it, the finding has no Decide
         assert!(!card(&page, "c-c1").contains("data-level=\"decide\"") && !card(&page, "c-c1").contains("#c-c1:decide"));
@@ -4961,12 +5617,12 @@ mod tests {
         let doc = example("owner");
         let page = all(&doc, Surface::Page);
         let c = card(&page, "call-c2");
-        let order: Vec<usize> = ["data-level=\"understand\"", "data-level=\"examine\"", "<summary>Source details</summary>", "id=\"call-c2:decide\""]
+        let order: Vec<usize> = ["data-level=\"understand\"", "data-level=\"examine\"", "<summary>Where it comes from</summary>", "id=\"call-c2:decide\""]
             .iter()
             .map(|p| c.find(p).unwrap_or_else(|| panic!("{p}")))
             .collect();
         assert!(order.windows(2).all(|w| w[0] < w[1]), "{order:?}");
-        assert!(level(c, "understand").contains("<p class=\"verdict\">Not reproduced: "), "{c}");
+        assert!(level(c, "understand").contains("<p class=\"verdict\"><a href=\"#c-c2:rule\">Not reproduced:</a>"), "{c}");
         assert!(!level(c, "examine").contains("README.md") && level(c, "trace").contains("README.md:14"), "the cited file is a source detail");
     }
 
@@ -4981,7 +5637,7 @@ mod tests {
         for detail in ["data/imagenet/val", "sha256 of the file list", "python get_data.py", "scripts/README.md"] {
             assert!(!up.contains(detail) && level(r, "trace").contains(detail), "{detail}");
         }
-        assert_eq!(text_of(r).matches("available").count(), 1, "{}", text_of(r));
+        assert_eq!(text_of(r).matches("No download link").count(), 1, "{}", text_of(r));
         let a = card(&page, "a-a1");
         let up = &a[..a.find("data-level=\"trace\"").unwrap()];
         for detail in ["analysis/per_class.py", "61be0c94d7a2"] {
@@ -5021,7 +5677,6 @@ mod tests {
                 let confirmed = list(f, "rests_on.interpretations").iter().any(|i| at(i, "active").and_then(Value::as_bool) == Some(true) && at(i, "confirmed").and_then(Value::as_bool) == Some(true));
                 let lead = if confirmed { "Note:" } else if lead == "Note:" { "A note, not confirmed:" } else { lead };
                 assert_eq!(said, format!("{lead} {words}"), "{surface:?} {id}");
-                assert!(impact.contains(&format!("aria-describedby=\"{}\">{lead}</span>", w::glossary_id(w::RECORDED_INTERPRETATION))), "{surface:?} {id}");
                 assert!(text_of(impact).contains("on question q1") || text_of(impact).contains("on question q"), "{surface:?} {id}");
                 for old in ["reading", "Recorded interpretation", "not confirmed\u{b7}", "note: "] {
                     assert!(!said.contains(old), "{surface:?} {id}: {old} in {said}");
@@ -5050,11 +5705,11 @@ mod tests {
     fn a_rule_says_its_state_and_reading_in_sentences() {
         let doc = example("owner");
         let want = [
-            ("c1", "Met: INT8 is 0.0029 lower than the FP32 baseline (-0.0046 to -0.0012), 0.0071 past the -0.01 it asks for.", "INT8 is 0.0029 lower than the FP32 baseline (-0.0046 to -0.0012), 3 seeds."),
+            ("c1", "Holds: INT8 is 0.0029 lower than the FP32 baseline (-0.0046 to -0.0012), 0.0071 past the -0.01 it asks for.", "INT8 is 0.0029 lower than the FP32 baseline (-0.0046 to -0.0012), 3 seeds."),
             ("c2", "Not reproduced: FP32 baseline: 0.7597 (0.7591 to 0.7603), not within 0.001 of the cited 0.7613.", "FP32 baseline: 0.7597 (0.7591 to 0.7603), 3 seeds."),
-            ("c4", "Met: INT8: 0.994 share (no interval yet), 0.004 share past the 0.99 share it asks for.", "INT8: 0.994 share (no interval yet), 3 runs."),
-            ("c5", "Not met: 1 of 4 design cells is outside the rule (calib images 128).", ""),
-            ("c6", "Not met: INT8 against the FP32 baseline: 0.64 (no interval yet), over the 0.6 the rule allows.", "INT8 against the FP32 baseline: 0.64 (no interval yet), 1 run."),
+            ("c4", "Holds: INT8: 0.994 share (no range yet), 0.004 share past the 0.99 share it asks for.", "INT8: 0.994 share (no range yet), 3 runs."),
+            ("c5", "Does not hold: 1 of 4 design cells is outside the rule (calib images 128).", ""),
+            ("c6", "Does not hold: INT8 against the FP32 baseline: 0.64 (no range yet), over the 0.6 the rule allows.", "INT8 against the FP32 baseline: 0.64 (no range yet), 1 run."),
         ];
         for (cid, status, reading) in want {
             let f = at(&doc, &format!("findings.{cid}")).unwrap();
@@ -5074,29 +5729,42 @@ mod tests {
         r.insert("estimate_text".into(), Value::str("-0.07667"));
         r.insert("interval_text".into(), Value::str("[-0.2264, +0.07307]"));
         let f = at(&doc, "findings.c1").unwrap();
-        assert_eq!(sentence_text(&verdict(f)), "Met: INT8 is 0.08 points lower than the FP32 baseline (-0.23 to +0.07); its worse end is 0.77 points past the -1 point it asks for.");
+        assert_eq!(sentence_text(&verdict(f)), "Holds: INT8 is 0.08 points lower than the FP32 baseline (-0.23 to +0.07); its worse end is 0.77 points past the -1 point it asks for.");
         assert_eq!(sentence_text(&reading_sentence(f)), "INT8 is 0.08 points lower than the FP32 baseline (-0.23 to +0.07), 3 seeds.");
         assert_eq!(rule_passes(f), "The interval's worse end is at least -1 point (INT8 against the FP32 baseline).");
-        // the card: the status sentence under the title, the big number in two decimals with rb's digits on hover, the
-        // reading's numbers drilling to the runs and nothing else in link colour
+        // the card: drawn, so no status sentence (the UX lead's card, part 4.3); the rule's number beside rb's, rb's in
+        // two decimals with its digits on hover, drilling to the runs, and the rule's outcome as its mark
         let page = all(&doc, Surface::Page);
         let c1 = card(&page, "c-c1");
         let f1 = at(&doc, "findings.c1").unwrap();
-        assert!(c1.contains(&format!("<p class=\"str\">{}</p>", sentence_html_to(&verdict(f1), "c-c1:runs", "c-c1:rule"))), "{c1}");
-        assert!(c1.contains("<span class=\"e\"><span class=\"nb\" title=\"-0.07667\">-0.08</span></span><span class=\"u\"> points</span><span class=\"iv\"> (<span class=\"nb\" title=\"-0.2264\">-0.23</span> to <span class=\"nb\" title=\"+0.07307\">+0.07</span>)</span>"), "{c1}");
-        // What rb measured says what the number is from, never the verdict's reading again (FIX3)
-        assert!(c1.contains(&format!("<p class=\"reads\"><a href=\"#c-c1:runs\">{}</a></p>", esc(s(f1, "units_line")))), "{c1}");
-        assert!(!c1.contains("<p class=\"reads\">INT8 is"), "{c1}");
-        // rb's machine lines are Source details, never the Understand or Examine text (P8)
-        let trace = &c1[c1.find("data-level=\"trace\"").unwrap()..];
-        let above = &c1[..c1.find("data-level=\"trace\"").unwrap()];
+        assert!(!c1.contains("<p class=\"str\">"), "{c1}");
+        let num = "<span class=\"e\"><span class=\"nb\" title=\"-0.07667\">-0.08</span></span><span class=\"u\"> points</span><span class=\"iv\"> (<span class=\"nb\" title=\"-0.2264\">-0.23</span> to <span class=\"nb\" title=\"+0.07307\">+0.07</span>)</span>";
+        assert!(c1.contains(&format!("<a class=\"rbn\" href=\"#c-c1:runs\"><span class=\"lb\">rb</span> {num}</a><span class=\"vmk ok\"")), "{c1}");
+        assert!(c1.contains("<div class=\"vs\"><a class=\"cl\" href=\"#c-c1:rule\"><span class=\"lb\">Rule</span> <span class=\"n\">\u{2265} -1 point</span></a>"), "{c1}");
+        // what the number is from is a chip that opens the runs, never the verdict's reading again (FIX3)
+        assert!(c1.contains(&format!("<a class=\"chip k-runs\" href=\"#c-c1:runs\">{}<span>{}</span></a>", icon("runs"), esc(s(f1, "units_line")))), "{c1}");
+        assert!(!c1.contains("<p class=\"reads\">"), "{c1}");
+        // with no band to draw against, the card says its status sentence under the title, as before
+        let mut nb = doc.clone();
+        dig(&mut nb, &["findings", "c1"]).as_dict_mut().unwrap().shift_remove("check_band");
+        let fnb = at(&nb, "findings.c1").unwrap();
+        assert!(figure::claim(fnb).is_none());
+        let cnb = card(&all(&nb, Surface::Page), "c-c1").to_string();
+        assert!(cnb.contains(&format!("<p class=\"str\">{}</p>", sentence_html_to(&verdict(fnb), "c-c1:runs", "c-c1:rule"))), "{cnb}");
+        assert!(cnb.contains(&format!("<div class=\"big\"><a href=\"#c-c1:runs\">{num}</a></div>")) && !cnb.contains("<div class=\"vs\">"), "{cnb}");
+        assert!(cnb.contains(&format!("<p class=\"reads\"><a href=\"#c-c1:runs\">{}</a></p>", esc(s(fnb, "units_line")))), "{cnb}");
+        // rb's machine lines are in How rb worked it out, under Source, never the Understand or Examine text (P8)
+        let fold = c1.find("<details class=\"fold how\"").unwrap();
+        let trace = &c1[fold..];
+        let above = &c1[..fold];
         for raw in [s(f, "rule"), s(f, "says.comparison"), s(f, "says.timing")] {
             assert!(!text_of(above).contains(raw) && text_of(trace).contains(raw), "{raw}");
         }
         for row in ["rule", "rb reads", "timing", "comparison"] {
             assert!(trace.contains(&format!("<dt>{row}</dt>")), "{row}");
         }
-        assert!(text_of(above).contains("Written before its results."), "{}", text_of(above));
+        // placed in time where both days are known (no glossary, show instead), a row of rb's working under Source
+        assert!(text_of(trace).contains("Rule 12 Oct \u{2500}\u{2500}\u{25b6} results 14 Oct."), "{}", text_of(trace));
     }
 
     #[test]
@@ -5194,20 +5862,12 @@ mod tests {
         assert!(all(&past_acts, Surface::Page).contains("rb decide"));
     }
 
-    /// Every glossary key a card asks for is one the glossary holds: an unknown key draws its word plain, with no hover
-    /// (plain words pass 2: "rule (noun)" left 8 rule chips without one).
+    /// A card's words carry no hover that defines them (no glossary, show instead): no card draws a term's hint.
     #[test]
-    fn every_term_a_card_asks_for_is_in_the_glossary() {
-        let src = include_str!("nodes.rs");
-        let mut keys = Vec::new();
-        for (i, _) in src.match_indices("term(\"") {
-            let rest = &src[i + 6..];
-            let key = &rest[..rest.find('"').unwrap()];
-            keys.push(key);
-        }
-        assert!(keys.len() >= 5, "{keys:?}");
-        for key in keys {
-            assert!(w::hint(key).is_some(), "{key}");
+    fn no_card_defines_its_words_on_hover() {
+        for viewer in ["owner", "away"] {
+            let html = all(&example(viewer), Surface::Page);
+            assert!(!html.contains("data-hint") && !html.contains("aria-describedby=\"g-") && !html.contains("class=\"term\""), "{viewer}");
         }
     }
 
@@ -5225,6 +5885,8 @@ mod tests {
         says.insert("rule".into(), Value::str("criterion undetermined: 2 units; the criterion needs 3"));
         let r = dig(&mut doc, &["findings", "c3", "reading"]).as_dict_mut().unwrap();
         r.insert("result".into(), Value::str("untested"));
+        // untested: no estimate to draw, so the card keeps its sentence
+        r.insert("estimate_text".into(), Value::str(""));
         let page = all(&doc, Surface::Page);
         let c3 = card(&page, "c-c3");
         // the card says its verdict once (FIX2): no state words after it; checks are a row of The rule as written
@@ -5233,16 +5895,30 @@ mod tests {
         // rb's rule line is a source detail now, in the screens' words
         assert!(c3.contains("<dt>rb reads</dt><dd>2 units; the criterion needs 3</dd>"), "{c3}");
         let c1 = card(&page, "c-c1");
+        // checks are a row of rb's working, under Source's fold "How rb worked it out", never the Rule part's
         let rule = &c1[c1.find("id=\"c-c1:rule\"").unwrap()..];
-        assert!(rule[..rule.find("</section>").unwrap()].contains(&format!("<dt>{}</dt><dd class=\"dim\">ok</dd>", term("integrity", "checks"))), "{c1}");
+        assert!(!rule[..rule.find("</section>").unwrap()].contains(&format!("<dt>{W_CHECKS}</dt>")), "{c1}");
+        let how = &c1[c1.find("<details class=\"fold how\"").unwrap()..];
+        assert!(how[..how.find("</details>").unwrap()].contains(&format!("<dt>{}</dt><dd class=\"dim\">ok</dd>", W_CHECKS)), "{c1}");
         let call = card(&page, "call-c3");
         // the call says the rule's state in the rule card's own sentence, never rb's rule line (P8)
         let f3 = at(&doc, "findings.c3").unwrap();
         assert!(call.contains(&format!("<p class=\"verdict\">{}</p>", sentence_html_to(&verdict(f3), "c-c3:runs", "c-c3:rule"))) && !call.contains("the criterion needs 3"), "{call}");
         for cid in ["c1", "c3", "c5"] {
-            let st = card(&page, &finding_anchor(cid));
-            let st = &st[st.find("<p class=\"str\">").unwrap()..];
-            let st = text_of(&st[..st.find("</p>").unwrap()]);
+            let card = card(&page, &finding_anchor(cid));
+            // a drawn card says its state as its mark's name, and no sentence (the UX lead's card, part 4.3)
+            let st = match card.find("<p class=\"str\">") {
+                Some(k) => {
+                    assert!(!card.contains("<div class=\"vs\">"), "{cid}: a sentence beside the drawing");
+                    let st = &card[k..];
+                    text_of(&st[..st.find("</p>").unwrap()])
+                }
+                None => {
+                    let mk = &card[card.find("<span class=\"vmk ").unwrap_or_else(|| panic!("{cid}: no sentence and no mark"))..];
+                    mk[mk.find("aria-label=\"").unwrap() + 12..].split('"').next().unwrap().to_string()
+                }
+            };
+            assert!(!st.is_empty(), "{cid}");
             for old in ["criterion", "criteria", "untested", "undetermined"] {
                 assert!(!st.contains(old), "{cid}: {st}");
             }
@@ -5268,10 +5944,13 @@ mod tests {
             assert_eq!(text.starts_with("Record a call"), viewer != "reader", "{viewer}: {text}");
             assert_eq!(text.starts_with(STILL_OPEN), viewer == "reader", "{viewer}: {text}");
             assert_eq!(part.contains("<a href=\"#call-c2:decide\">its call card</a>"), viewer != "reader", "{viewer}");
-            assert!(!c2.contains("rb decide") && !c2.contains("<button") && !c2.contains("<input"), "{viewer}: {c2}");
-            // its tab says what the part is to each viewer
-            let tab = if viewer == "reader" { "<span data-vw=\"reader\">Still open</span>" } else { "<span data-vw=\"none owner\">Decide</span>" };
-            assert!(c2.contains(&format!("<a href=\"#c-c2:decide\">{tab}</a>")), "{viewer}: {c2}");
+            assert!(!c2.contains("rb decide") && !acts(c2) && !c2.contains("<input"), "{viewer}: {c2}");
+            // its Decide tab is the owner's and an export's with no viewer named; a reader sees state, never an
+            // owner's action, so no tab leads a reader to Decide
+            let nav = &c2[c2.find("<nav class=\"secnav tabs\"").unwrap()..];
+            let nav = &nav[..nav.find("</nav>").unwrap()];
+            assert_eq!(nav.contains("<a href=\"#c-c2:decide\" data-vw=\"none owner\">Decide</a>"), viewer != "reader", "{viewer}: {nav}");
+            assert_eq!(nav.contains(":decide"), viewer != "reader", "{viewer}: {nav}");
             // the call card is where the call is recorded: its actions for the owner and an export with no viewer
             let call = card(&page, "call-c2");
             assert_eq!(call.contains("id=\"call-c2:decide\"") && call.contains("rb decide c2 accept --why"), viewer != "reader", "{viewer}");
@@ -5286,7 +5965,8 @@ mod tests {
             c.as_dict_mut().unwrap().insert("actions".into(), Value::List(Vec::new()));
         }
         let c2 = as_viewer(&all(&bare, Surface::Export), "reader");
-        assert!(text_of(card(&c2, "c-c2")).contains("Not reproduced") && card(&c2, "c-c2").contains("id=\"c-c2:decide\""));
+        // why it is open is the drawing: rb's number against the cited one, marked not reproduced (the UX lead's card)
+        assert!(card(&c2, "c-c2").contains("<span class=\"vmk no\" role=\"img\" aria-label=\"not reproduced\">") && card(&c2, "c-c2").contains("id=\"c-c2:decide\""));
         let c2 = all(&bare, Surface::Export);
         assert!(card(&c2, "c-c2").contains("<a href=\"#call-c2\">its call card</a>"));
         // and on rb page and rb open, where the finding's own tab and review link land on it
@@ -5433,7 +6113,7 @@ mod tests {
         let doc = cited(true);
         let page = all(&doc, Surface::Open);
         let log = card(&page, "cite-logs/agent.log:669");
-        assert!(log.contains("<a class=\"openfile\" href=\"vscode://file/home/ana/int8/logs/agent.log:669\">Open the file</a>"), "{log}");
+        assert!(log.contains("<a class=\"openfile\" href=\"vscode://file/home/ana/int8/logs/agent.log:669\">Open the file in your editor, at line 669</a>"), "{log}");
         assert!(log.contains("srclines") && text_of(log).contains("read from the file as it is now; git does not track it"));
         // the editor is the user's own: no product is named
         assert!(text_of(log).contains("Open the file in your editor, at line 669") && !text_of(&page).contains("VS Code"), "{}", text_of(log));
@@ -5450,6 +6130,15 @@ mod tests {
         let mut doc = example("owner");
         let f = dig(&mut doc, &["findings", "c1"]).as_dict_mut().unwrap();
         f.insert("state".into(), Value::str(state));
+        // the state's plain words, as the model gives them beside it (model.rs state_label)
+        let label = match state {
+            "meets" => "met",
+            "misses" => "not met",
+            "undetermined" => "can't tell yet",
+            "untested" => "not tested",
+            other => other,
+        };
+        f.insert("state_label".into(), Value::str(label));
         f.insert("standing".into(), Value::str(standing));
         f.insert("subject_label".into(), Value::str("step_by_step"));
         f.insert("reference_label".into(), Value::str("plain baseline"));
@@ -5473,14 +6162,14 @@ mod tests {
     #[test]
     fn a_verdict_says_the_state_the_reading_and_how_far_from_the_rule() {
         let f = step_by_step(3.6, 0.619, 6.581, "misses", "criterion not met \u{b7} gain");
-        assert_eq!(sentence_text(&verdict(&f)), "Not met: step by step is 3.60 points higher than the plain baseline (+0.62 to +6.58), short of the 5 points the rule asks for.");
+        assert_eq!(sentence_text(&verdict(&f)), "Does not hold: step by step is 3.60 points higher than the plain baseline (+0.62 to +6.58), short of the 5 points the rule asks for.");
         let f = step_by_step(6.4, 5.2, 7.6, "meets", "criterion met \u{b7} gain");
-        assert_eq!(sentence_text(&verdict(&f)), "Met: step by step is 6.40 points higher than the plain baseline (+5.20 to +7.60), 1.40 points past the 5 points it asks for.");
+        assert_eq!(sentence_text(&verdict(&f)), "Holds: step by step is 6.40 points higher than the plain baseline (+5.20 to +7.60), 1.40 points past the 5 points it asks for.");
         // met on its estimate alone: said so after the reading
         let f = step_by_step(6.4, 4.2, 8.6, "meets", "estimate meets criterion \u{b7} gain");
         assert!(sentence_text(&verdict(&f)).ends_with("1.40 points past the 5 points it asks for; its interval does not show it yet."));
         // the state words, each first
-        for (state, word) in [("reproduced", "Reproduced"), ("not reproduced", "Not reproduced"), ("undetermined", "Can't tell yet"), ("untested", "Not tested")] {
+        for (state, word) in [("reproduced", "Reproduced"), ("not reproduced", "Not reproduced"), ("undetermined", "Not settled"), ("untested", "Not tested")] {
             let f = step_by_step(3.6, 0.619, 6.581, state, state);
             assert!(sentence_text(&verdict(&f)).starts_with(&format!("{word}:")), "{state}: {}", verdict(&f));
         }
@@ -5508,17 +6197,17 @@ mod tests {
         b.insert("comparator".into(), Value::str("at most"));
         b.insert("target".into(), Value::Float(0.0));
         let v = sentence_text(&verdict(&w));
-        assert!(v.starts_with("Met: wide at loops 8 is 0.05 nats lower than wide at loops 6 (no interval yet), 0.05 nats under the 0 nats it allows"), "{v}");
+        assert!(v.starts_with("Holds: wide at loops 8 is 0.05 nats lower than wide at loops 6 (no range yet), 0.05 nats under the 0 nats it allows"), "{v}");
         assert!(rule_passes(&w).ends_with("(wide at loops 8 against wide at loops 6)."), "{}", rule_passes(&w));
         // a level in percent, and a metric with no arm by its title; a unit that is the metric's own name is none
         let mut l = step_by_step(0.81, 0.73, 0.89, "undetermined", "criterion undetermined \u{b7} measured");
         l.as_dict_mut().unwrap().insert("reference_label".into(), Value::str(""));
         l.as_dict_mut().unwrap().insert("subject_label".into(), Value::str("wide"));
-        assert_eq!(sentence_text(&verdict(&l)), "Can't tell yet: wide: 0.81% (0.73% to 0.89%).");
+        assert_eq!(sentence_text(&verdict(&l)), "Not settled: wide: 0.81% (0.73% to 0.89%).");
         l.as_dict_mut().unwrap().insert("subject_label".into(), Value::str(""));
         dig(&mut l, &["row"]).as_dict_mut().unwrap().insert("metric".into(), Value::str("top1"));
         dig(&mut l, &["reading"]).as_dict_mut().unwrap().insert("unit_text".into(), Value::str("top1"));
-        assert_eq!(sentence_text(&verdict(&l)), "Can't tell yet: top1: 0.81 (0.73 to 0.89).");
+        assert_eq!(sentence_text(&verdict(&l)), "Not settled: top1: 0.81 (0.73 to 0.89).");
         // the card: the reading's sentence once (the verdict), what it is from once, the margin in the reading's digits
         let mut doc = example("owner");
         let mut m = step_by_step(3.6, 0.619, 6.581, "misses", "criterion not met \u{b7} gain");
@@ -5526,12 +6215,15 @@ mod tests {
         dig(&mut doc, &["findings"]).as_dict_mut().unwrap().insert("c1".into(), m);
         let page = all(&doc, Surface::Page);
         let text = text_of(card(&page, "c-c1"));
-        assert_eq!(text.matches("3.60 points higher than the plain baseline").count(), 1, "{text}");
+        // drawn, the card says its reading once, as rb's number beside the rule's, and no sentence (the UX lead's card)
+        assert_eq!(text.matches("3.60 points higher than the plain baseline").count(), 0, "{text}");
+        assert_eq!(text.matches("+3.60 points").count(), 1, "{text}");
+        assert!(card(&page, "c-c1").contains("<a class=\"rbn\" href=\"#c-c1:runs\"><span class=\"lb\">rb</span> "), "{text}");
         let c = card(&page, "c-c1");
         let measured = &c[c.find("id=\"c-c1:reading\"").unwrap()..];
         let measured = text_of(&measured[..measured.find("</section>").unwrap()]);
         assert_eq!(measured.matches("3 seeds from 6 runs").count(), 1, "{measured}");
-        assert!(card(&page, "c-c1").contains("<dt>margin</dt><dd><a href=\"#c-c1:reading\">-1.40 points</a></dd>"), "{text}");
+        assert!(card(&page, "c-c1").contains("<dt>distance from the rule's number</dt><dd><a href=\"#c-c1:reading\">-1.40 points</a></dd>"), "{text}");
         // the margin in the verdict's digits, whatever digits rb's own margin text has ("1.412" for a 1.41 the verdict says)
         let mut doc = example("owner");
         let mut m = step_by_step(6.4123, 5.2, 7.6, "meets", "criterion met \u{b7} gain");
@@ -5539,7 +6231,7 @@ mod tests {
         assert!(sentence_text(&verdict(&m)).contains("1.41 points past the 5 points it asks for"), "{}", verdict(&m));
         dig(&mut doc, &["findings"]).as_dict_mut().unwrap().insert("c1".into(), m);
         let page = all(&doc, Surface::Page);
-        assert!(card(&page, "c-c1").contains("<dt>margin</dt><dd><a href=\"#c-c1:reading\">1.41 points</a></dd>"), "{}", card(&page, "c-c1"));
+        assert!(card(&page, "c-c1").contains("<dt>distance from the rule's number</dt><dd><a href=\"#c-c1:reading\">1.41 points</a></dd>"), "{}", card(&page, "c-c1"));
         // the tolerance with its unit, as the verdict says it; a ratio has no unit
         let mut e = step_by_step(-0.5, -0.6, -0.4, "reproduced", "reproduced");
         let b = dig(&mut e, &["check_band"]).as_dict_mut().unwrap();
@@ -5567,7 +6259,7 @@ mod tests {
         b.insert("comparator".into(), Value::str("at most"));
         b.insert("target".into(), Value::Float(0.0));
         assert_eq!(reading_digits(&z), 2);
-        assert!(sentence_text(&verdict(&z)).starts_with("Met: step by step is the same as the plain baseline (-0.66 to +0.66)"), "{}", verdict(&z));
+        assert!(sentence_text(&verdict(&z)).starts_with("Holds: step by step is the same as the plain baseline (-0.66 to +0.66)"), "{}", verdict(&z));
         // every rule card of the demo: its reading's sentence at most once
         let doc = example("owner");
         let page = all(&doc, Surface::Page);
@@ -5588,7 +6280,7 @@ mod tests {
         l.as_dict_mut().unwrap().insert("reference_label".into(), Value::str(""));
         l.as_dict_mut().unwrap().insert("subject_label".into(), Value::str("int8"));
         dig(&mut l, &["reading"]).as_dict_mut().unwrap().insert("unit_text".into(), Value::str("ms"));
-        assert_eq!(sentence_text(&verdict(&l)), "Can't tell yet: INT8: 7.10 ms (6.90 ms to 7.30 ms).");
+        assert_eq!(sentence_text(&verdict(&l)), "Not settled: INT8: 7.10 ms (6.90 ms to 7.30 ms).");
         // one number, one rounding: rb's text "-0.075" of an estimate a hair past it reads 0.08 in the verdict, the big
         // number and the margin alike, rb's text on hover
         let mut doc = example("owner");
@@ -5604,22 +6296,22 @@ mod tests {
         b.insert("target".into(), Value::Float(0.0));
         // M's margin comes in the verdict's digits and unit (FIX4), drawn as M words it (FIX5)
         dig(&mut w, &["row"]).as_dict_mut().unwrap().insert("margin".into(), Value::str("margin 0.075 nats"));
-        assert!(sentence_text(&verdict(&w)).contains("is 0.075 nats lower than the plain baseline (no interval yet), 0.075 nats under the 0 nats it allows"), "{}", verdict(&w));
+        assert!(sentence_text(&verdict(&w)).contains("is 0.075 nats lower than the plain baseline (no range yet), 0.075 nats under the 0 nats it allows"), "{}", verdict(&w));
         dig(&mut doc, &["findings"]).as_dict_mut().unwrap().insert("c1".into(), w.clone());
         let page = all(&doc, Surface::Page);
         let c = card(&page, "c-c1");
         // one reading, one way: two significant digits of a small difference, in the verdict, the number and the margin
         assert!(c.contains(">-0.075</span></span>"), "{c}");
-        assert!(c.contains("<dt>margin</dt><dd><a href=\"#c-c1:reading\">0.075 nats</a></dd>"), "{c}");
+        assert!(c.contains("<dt>distance from the rule's number</dt><dd><a href=\"#c-c1:reading\">0.075 nats</a></dd>"), "{c}");
         assert!(!text_of(c).contains("0.08"), "{}", text_of(c));
         // the figure's rule label says its number with its unit, as the verdict does
-        assert!(figure::draw(&w, false).contains(">the rule: 0 nats or less</text>"), "{}", figure::draw(&w, false));
+        assert!(figure::draw(&w).contains(">the rule: 0 nats or less</text>"), "{}", figure::draw(&w));
         let m = step_by_step(3.6, 0.619, 6.581, "misses", "criterion not met \u{b7} gain");
-        assert!(figure::draw(&m, false).contains(">the rule: 5 points or more</text>"), "{}", figure::draw(&m, false));
+        assert!(figure::draw(&m).contains(">the rule: 5 points or more</text>"), "{}", figure::draw(&m));
         let mut lv = step_by_step(90.48, 89.92, 91.04, "meets", "criterion met \u{b7} measured");
         lv.as_dict_mut().unwrap().insert("reference_label".into(), Value::str(""));
         dig(&mut lv, &["check_band"]).as_dict_mut().unwrap().insert("target".into(), Value::Float(90.0));
-        assert!(figure::draw(&lv, false).contains(">the rule: 90% or more</text>"), "{}", figure::draw(&lv, false));
+        assert!(figure::draw(&lv).contains(">the rule: 90% or more</text>"), "{}", figure::draw(&lv));
         // the big reading says a level as the verdict does, each bound with its unit, in brackets
         let mut doc = example("owner");
         let mut lv = step_by_step(13.07, 11.0, 15.14, "undetermined", "criterion undetermined \u{b7} measured");
@@ -5630,8 +6322,9 @@ mod tests {
         dig(&mut doc, &["findings"]).as_dict_mut().unwrap().insert("c1".into(), lv);
         let page = all(&doc, Surface::Page);
         let c = card(&page, "c-c1");
-        let big = &c[c.find("<div class=\"big\">").unwrap()..];
-        assert_eq!(text_of(&big[..big.find("</div>").unwrap()]), "13.07% (11.00% to 15.14%)", "{c}");
+        // drawn against its rule, rb's number is said beside the rule's (the UX lead's card)
+        let big = &c[c.find("<a class=\"rbn\"").unwrap()..];
+        assert_eq!(text_of(&big[..big.find("</a>").unwrap()]), "rb 13.07% (11.00% to 15.14%)", "{c}");
         // an analysis card's big number is the number its sentence reads, in its digits
         let mut doc = example("owner");
         let c4 = dig(&mut doc, &["findings", "c4"]).as_dict_mut().unwrap();
@@ -5710,7 +6403,8 @@ mod tests {
         let v = card(&page, &variant_anchor("e1", "fp32"));
         let text = text_of(v);
         // a name joined with _ heads its column as declared (round 4), its unit kept for the values
-        for want in ["<th>top1</th>", "<th>onnx_top1</th>", "<th>latency_ms</th>"] {
+        // closed form: each head opens the variant's runs
+        for want in ["top1</a></th>", "onnx_top1</a></th>", "latency_ms</a></th>"] {
             assert!(v.contains(want), "{want}: {v}");
         }
         // top1's means in the digits its rules read it in (round 4: never fewer than a rule's)
@@ -5723,7 +6417,7 @@ mod tests {
         let e1 = dig(&mut doc2, &["experiments"]).as_list_mut().unwrap().iter_mut().find(|x| s(x, "id") == "e1").unwrap();
         let lat = dig(e1, &["table", "metrics"]).as_list_mut().unwrap().iter_mut().find(|m| s(m, "name") == "latency_ms").unwrap();
         lat.as_dict_mut().unwrap().insert("label".into(), Value::str("Inference time"));
-        assert!(card(&all(&doc2, Surface::Page), &variant_anchor("e1", "fp32")).contains("<th>Inference time</th>"));
+        assert!(card(&all(&doc2, Surface::Page), &variant_anchor("e1", "fp32")).contains("Inference time</a></th>"));
         // c1's runs: an arm's own number in the level's unit, a run's difference in points
         let obs = |arm: &str, run: &str, seed: &str, value: &str| crate::obj! {"arm" => arm, "run" => run, "counted" => true, "value_text" => value, "per_run" => crate::obj! {"seed" => seed}};
         let mut doc = example("owner");
@@ -5735,7 +6429,7 @@ mod tests {
         let c = card(&page, "c-c1");
         let runs = text_of(&c[c.find("id=\"c-c1:runs\"").unwrap()..]);
         assert!(runs.contains("14.00%") && runs.contains("10.40%"), "{runs}");
-        assert!(text_of(c).contains("margin-1.40 points") || text_of(c).contains("margin -1.40 points"), "{}", text_of(c));
+        assert!(text_of(c).contains(&format!("{W_MARGIN}-1.40 points")) || text_of(c).contains(&format!("{W_MARGIN} -1.40 points")), "{}", text_of(c));
         let mut doc = example("owner");
         let mut m = step_by_step(3.6, 0.619, 6.581, "misses", "criterion not met \u{b7} gain");
         m.as_dict_mut().unwrap().insert("observations".into(), Value::List(vec![obs("", "runs1", "1", "3.6"), obs("", "runs2b", "2", "1")]));
@@ -5772,8 +6466,8 @@ mod tests {
             let c = card(page, "call-c1");
             let text = text_of(c);
             assert_eq!(c.matches("<p class=\"verdict\">").count(), 1, "{name}");
-            assert!(text.contains("Not met: step by step is 3.60 points higher than the plain baseline (+0.62 to +6.58), short of the 5 points the rule asks for."), "{name}: {text}");
-            assert_eq!(text.to_lowercase().matches("not met").count(), 1, "{name}: {text}");
+            assert!(text.contains("Does not hold: step by step is 3.60 points higher than the plain baseline (+0.62 to +6.58), short of the 5 points the rule asks for."), "{name}: {text}");
+            assert_eq!(text.to_lowercase().matches("does not hold").count(), 1, "{name}: {text}");
             assert_eq!(text.matches("Step by step scores at least 5 points above the plain prompt").count(), 1, "the title once: {name}");
             assert!(!c.contains("class=\"stand\"") && !text.contains("gain") && !text.contains("Review this result"), "{name}: {text}");
             assert!(text.contains("From 3 seeds (6 runs) \u{b7} the whole finding") && text.contains("Nothing is recorded on it yet."), "{name}: {text}");
@@ -5806,7 +6500,8 @@ mod tests {
     /// FIX2: a rule's card says its verdict once, under its title: no state words after it ("This rule: not met ·
     /// checks: ok"), and its call box holds the actions and its line about the terminal, never the rule's state again
     /// ("Rule not met · estimate +3.6 < 5"). For every state, on every surface, for each export viewer and at a past
-    /// version, the status phrase is said once in the card's text; checks are told in The rule as written.
+    /// version, the status phrase is said once in the card's text, or, where the Result draws it with a mark, by the
+    /// mark's name alone (the UX lead's card); checks are told in The rule as written.
     #[test]
     fn a_rule_card_says_its_verdict_once() {
         let past = crate::pyjson::loads(include_str!("../../../tests/fixtures/shell/int8-demo.past.view.json")).unwrap();
@@ -5815,7 +6510,7 @@ mod tests {
             ("misses", "criterion not met \u{b7} gain", "not met"),
             ("reproduced", "reproduced", "reproduced"),
             ("not reproduced", "not reproduced", "not reproduced"),
-            ("undetermined", "criterion undetermined", "can't tell yet"),
+            ("undetermined", "criterion undetermined", "not settled"),
             ("untested", "criterion untested \u{b7} untested", "not tested"),
         ];
         for (state, standing, phrase) in states {
@@ -5842,13 +6537,29 @@ mod tests {
                 for (name, page) in &pages {
                     let c = card(page, "c-c1");
                     let text = text_of(c);
-                    assert_eq!(said_count(&text, phrase), 1, "{state} {name}: {text}");
                     assert!(!c.contains("<p class=\"sti\">") && !text_of(level(c, "understand")).contains("checks"), "{state} {name}: {text}");
                     let said = sentence_text(&verdict(at(&doc, "findings.c1").unwrap()));
-                    assert!(text_of(level(c, "understand")).contains(&said), "{state} {name}: {said} not in {text}");
-                    // checks are a row of The rule as written
+                    if matches!(state, "meets" | "misses" | "reproduced" | "not reproduced") {
+                        // drawn and marked (the UX lead's card, part 4.3): the mark names the state, once, and no
+                        // sentence says it again
+                        assert_eq!(said_count(&text, phrase), 0, "{state} {name}: {text}");
+                        assert_eq!(c.matches("<span class=\"vmk ").count(), 1, "{state} {name}");
+                        assert!(c.contains(&format!("role=\"img\" aria-label=\"{}\">", esc(&w::plain_word(phrase)))), "{state} {name}: {c}");
+                        assert!(!c.contains("<p class=\"str\">") && !text.contains(&said), "{state} {name}: {text}");
+                    } else if state == "untested" {
+                        // nothing read yet: a chip says so, and no sentence (the UX lead's rule, Nov 13 2026)
+                        assert!(c.contains(&format!("<span class=\"echip\">{}</span>", crate::shell::strings::NOT_TESTED_YET)) && !text.contains(&said), "{state} {name}: {text}");
+                        assert!(!c.contains("<span class=\"vmk "), "{state} {name}");
+                    } else {
+                        // a drawing with no mark does not say the state: the sentence does, once
+                        assert_eq!(said_count(&text, phrase), 1, "{state} {name}: {text}");
+                        assert!(!c.contains("<span class=\"vmk ") && text_of(level(c, "understand")).contains(&said), "{state} {name}: {said} not in {text}");
+                    }
+                    // checks are a row of rb's working, under Source's fold, never the Rule part's one sentence
                     let rule = &c[c.find("id=\"c-c1:rule\"").unwrap()..];
-                    assert!(text_of(&rule[..rule.find("</section>").unwrap()]).contains("checks"), "{state} {name}");
+                    assert!(!text_of(&rule[..rule.find("</section>").unwrap()]).contains("checks"), "{state} {name}");
+                    let how = &c[c.find("<details class=\"fold how\"").unwrap_or_else(|| panic!("{state} {name}: no working"))..];
+                    assert!(how[..how.find("</details>").unwrap()].contains(&format!("<dt>{W_CHECKS}</dt>")), "{state} {name}");
                     // the call box: no reason that is the rule's state again, no rb shorthand of it
                     if let Some(i) = c.find("id=\"c-c1:decide\"") {
                         let part = text_of(&c[c[..i].rfind('<').unwrap()..]);
@@ -5899,22 +6610,22 @@ mod tests {
         let page = all(&doc, Surface::Page);
         let c6 = text_of(card(&page, "call-c6"));
         // the label is the verdict's state again (FIX2): the detail stays as its own line, the state said once
-        assert!(c6.contains("Can't tell yet: ") && c6.contains("A cited number's settings differ from the source's"), "{c6}");
-        assert_eq!(said_count(&c6, "can't tell yet"), 1, "{c6}");
+        assert!(c6.contains("Not settled: ") && c6.contains("A cited number's settings differ from the source's"), "{c6}");
+        assert_eq!(said_count(&c6, "not settled"), 1, "{c6}");
         // and on the rule's own card, whose call box says why and not the state
         let card6 = card(&page, "c-c6");
         let part = text_of(level(card6, "decide"));
-        assert!(part.contains("A cited number's settings differ from the source's") && said_count(&part, "can't tell yet") == 0, "{part}");
-        assert_eq!(said_count(&text_of(card6), "can't tell yet"), 1, "{}", text_of(card6));
+        assert!(part.contains("A cited number's settings differ from the source's") && said_count(&part, "not settled") == 0, "{part}");
+        assert_eq!(said_count(&text_of(card6), "not settled"), 1, "{}", text_of(card6));
         // c3: "Too little evidence" stays; its "1 run" and "criterion met" are the card's own lines already
         let c3 = text_of(card(&page, "call-c3"));
         assert!(c3.contains("Too little evidence") && c3.matches("1 run").count() == 1 && !c3.contains("criterion met"), "{c3}");
         // the rule's number drills to the rule, the reading's to its runs
         let c2 = card(&page, "call-c2");
-        assert!(c2.contains("of the cited <a href=\"#c-c2:rule\">0.7613</a>.") && c2.contains("<a href=\"#c-c2:runs\">0.7597</a>"), "{c2}");
+        assert!(c2.contains("of the cited </a><a href=\"#c-c2:rule\">0.7613</a>") && c2.contains("<a href=\"#c-c2:runs\">0.7597</a>"), "{c2}");
         // a direction call says what it asks, and the gate it reads is in its eyebrow
         let e2 = card(&page, "call-e2");
-        assert!(text_of(e2).contains("Choose whether this work continues") && e2.contains("gate <a class=\"mono id\" href=\"#c-c5\">c5</a></div>"), "{e2}");
+        assert!(text_of(e2).contains("Choose whether this work continues") && e2.contains("<a href=\"#c-c5\">its gate</a></div>"), "{e2}");
         assert!(!text_of(e2).contains(". \u{b7}"), "{e2}");
         // 6.004 against 5 is said 1.00 point past, as shown
         let f = step_by_step(6.004, 5.5, 6.5, "meets", "criterion met \u{b7} gain");
@@ -5935,7 +6646,7 @@ mod tests {
         let src = text_of(card(&all(&d, Surface::Page), "cite-notes.md:3"));
         assert!(src.contains("A proposed call to accept c3, not made") && !src.contains("dec7"), "{src}");
         // 061 item 3: a gate that waits is said by its experiment, and a decision the document does not say by no id
-        for (id, said) in [("e2@fd981c33ec98", "The gate on e2, not confirmed"), ("dwv225b", "A call")] {
+        for (id, said) in [("e2@fd981c33ec98", "The gate on calibration set size"), ("dwv225b", "A call")] {
             let mut d = doc.clone();
             if id.contains('@') {
                 let row: Value = crate::pyjson::loads(&format!(r#"{{"id": "{id}", "kind": "gate", "subject": "e2", "text": "e2 gates: if it holds: INT8 ships"}}"#)).unwrap();

@@ -487,6 +487,19 @@ impl Ledger {
         }
         // a note changes no reading (taken_for counts none either)
         out.retain(|k| k.0 != "note");
+        // a setting rests on its experiment's file and the calls on it, never on a call on another setting
+        // (MP-1111-0952's F4: a reject on int8/cuda taken out said nothing of int8/lr)
+        if name.is_some() {
+            let others: Vec<Key> = t
+                .lines
+                .iter()
+                .flat_map(|l| l.writes.iter())
+                .filter(|w| w.key.0 == "decision")
+                .filter(|w| w.form.as_ref().and_then(|f| f.get_str("subject")).map_or(false, |s| s.starts_with(&format!("{head}/")) && s != subject))
+                .map(|w| w.key.clone())
+                .collect();
+            out.retain(|k| !others.contains(k));
+        }
         Ok(out)
     }
 
@@ -507,7 +520,14 @@ impl Ledger {
     /// Whether git took out the subject's own write, or a call on it: what asks for that write back in place of the
     /// subject's own command (a vouch on a setting whose reject was taken out, N2).
     pub fn took_direct(&self, subject: &str) -> Res<bool> {
-        Ok(self.taken_record(None, subject)?.is_some() || self.taken_under("setting", subject)?.iter().any(|k| k.0 == "decision"))
+        // a design's confirmation alone, a log line that wrote no file, is no write a command of the subject's rests
+        // on: rb doctor --restore puts it back and leaves the item as it is (MP-1111-0952's F4)
+        let t = self.taken_out()?;
+        let own = match self.taken_record(None, subject)? {
+            Some((kind, id)) => t.lines.iter().flat_map(|l| l.writes.iter()).any(|w| w.key.0 == kind && w.key.1 == id),
+            None => false,
+        };
+        Ok(own || self.taken_under("setting", subject)?.iter().any(|k| k.0 == "decision"))
     }
 
     /// Whether git took out a write that changed whether a record is retracted (L1): its state on disk is then not the

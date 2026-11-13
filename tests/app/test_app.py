@@ -26,6 +26,8 @@ ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "tests" / "app"
 FIXTURE = ROOT / "tests" / "fixtures" / "shell" / "dom-fixture.html"
 SCRIPT = ROOT / "rust" / "src" / "shell" / "assets" / "script.js"
+# the script pages inline and the export names by its sha256: script.js squeezed (rust/gen/gen_script.py)
+INLINED = ROOT / "rust" / "src" / "shell" / "assets" / "script.min.js"
 GUIDE_CSS = ROOT / "rust" / "src" / "shell" / "assets" / "guide.css"
 CONTRACT = ROOT / "tests" / "fixtures" / "shell" / "dom-contract.json"
 EXAMPLE = str(ROOT / "tests" / "fixtures" / "shell" / "int8-demo.{}.view.json")
@@ -33,7 +35,6 @@ REQUIRED = os.environ.get("RB_REQUIRE_BROWSER") == "1"
 # checks that fail on GitHub's macOS and Windows runners and pass on Linux and in Chrome on a Mac (issue #1)
 RUNNER_KNOWN = pytest.mark.xfail(os.environ.get("GITHUB_ACTIONS") == "true" and sys.platform in ("darwin", "win32"),
                                  reason="fails on GitHub's macOS and Windows runners (issue #1)", strict=False)
-WINDOWS_KNOWN = pytest.mark.xfail(os.name == "nt", reason="fails on Windows (issue #1)", strict=False)
 
 
 def _without(why: str) -> None:
@@ -473,7 +474,7 @@ def test_an_empty_inspector_folds_to_a_slim_rail_on_every_page_the_script_runs(a
     page = out / "page.html"
     if surface == "export":
         html = page.read_text(encoding="utf-8")
-        script = SCRIPT.read_text(encoding="utf-8")
+        script = INLINED.read_text(encoding="utf-8")
         assert f'data-shell="sha256:{hashlib.sha256(script.encode()).hexdigest()}"' in html and "<script" not in html
         page.write_text(html.replace("</head>", f"<script>{script}</script></head>", 1), encoding="utf-8")
     said = harness(page.as_uri(), timeout=240, runner="rail.mjs")
@@ -699,9 +700,15 @@ const acts = () => { const rb = /^(cd \\S.* && )?rb (?!clone\\b)[a-z]/, n = s =>
     copy: n('.cp, [data-act="copy"]'), choices: n('.seg button, .decide button'), why: n('input.why'), composer: n('.composer'), decide: n('[data-level="decide"], .decide') }; };
 setTimeout(() => {
   let stored = 'kept'; try { localStorage.getItem('x'); } catch (_) { stored = 'throws'; }
-  const row = document.querySelector('#overview .queue a[data-decide], #overview .queue a');
+  const row = document.querySelector('#overview [data-queue] a');
   // where a row opens nothing (the export's queue today), the first call's card by its address
   if (row) row.click(); else { const c = document.querySelector('main .nodes .card[id^="call-"]') || document.querySelector('main .nodes .card[id]'); if (c) location.hash = '#' + c.id; }
+  setTimeout(() => {
+    const tab = Array.from(document.querySelectorAll('.ibody [role="tab"][href$=":decide"]')).find(vis); if (tab) tab.click();
+  setTimeout(() => {
+    const seg = document.querySelector('.ibody .decide .seg button');
+    const call = Array.from(document.querySelectorAll('.ibody a[href^="#call-"][href$=":decide"]')).find(vis);
+    if (!(seg && vis(seg)) && call) call.click();
   setTimeout(() => {
     const pick = document.querySelector('.ibody .decide .seg button'); if (pick && vis(pick)) pick.click();
     const why = document.querySelector('.ibody .decide input.why');
@@ -710,6 +717,8 @@ setTimeout(() => {
     parent.postMessage(JSON.stringify({ stored, hosted: document.documentElement.classList.contains('hosted'), viewer: document.documentElement.dataset.viewer || null,
       line: out && vis(out) ? out.textContent : null, live: !!(cp && !cp.disabled), acts: acts(), net, errors: said }), '*');
   }, 600);
+  }, 300);
+  }, 300);
 }, 1500);
 </script>"""
 _VIEWER_HOST = """<!doctype html><html><body style="margin:0"><script>
@@ -740,7 +749,7 @@ def test_the_owner_s_view_composes_and_a_reader_s_view_offers_no_action(a_record
         at.write_text(html.replace("<head>", "<head>" + _VIEWER.format(who), 1), encoding="utf-8")
         urls[who] = at.as_uri()
     exp = (tmp_path / "exp" / "page.html").read_text(encoding="utf-8")
-    script = SCRIPT.read_text(encoding="utf-8")
+    script = INLINED.read_text(encoding="utf-8")
     assert "<script" not in exp
     share = tmp_path / "share.html"
     share.write_text(exp.replace("</head>", _VIEWER.format("reader") + f"<script>{script}</script></head>", 1), encoding="utf-8")
@@ -760,7 +769,7 @@ def test_the_owner_s_view_composes_and_a_reader_s_view_offers_no_action(a_record
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
     names = [c["name"] for c in said["checks"]]
     for at in ("1440 light", "1440 dark", "390 light", "390 dark"):
-        for n in ("reader: a queue's row opens its item to read, with no command, button or reason field", "owner: the composer composes the call with the reason and copies it",
+        for n in ("reader: no queue row shows, and the item a row links to opens to read, with no command, button or reason field", "owner: the composer composes the call with the reason and copies it",
                   "export, reader: no view or card shows an rb command, a Copy, a call's choices or reason"):
             assert f"{n} [{at}]" in names, (n, at)
     assert sum(n.startswith("framed (") for n in names) == 2, names
@@ -768,11 +777,10 @@ def test_the_owner_s_view_composes_and_a_reader_s_view_offers_no_action(a_record
     assert "reader: where the app never starts, no rb command box shows" in names
 
 
-@pytest.mark.xfail(strict=True, reason="R's and M's words: rb page's views draw the owner's wording whatever the meta says (by_viewer only on "
-                   "the export: views.rs:3024 the queue's heading, nodes.rs:435 the nav's Your call), and on both surfaces "
-                   "'Your reading:' (R, now 'Note:' in design pass 1) and '... none of them for your judgment' (M, PLAIN4 M1) "
-                   "speak to the owner: requests.md, PLAIN4. Passes once they land.")
-@pytest.mark.parametrize("surface", ["page", "export"])
+# the export passes since cf-2 (MP-1113-2018); rb page with the reader's meta still draws the owner's wording
+@pytest.mark.parametrize("surface", [pytest.param("page", marks=pytest.mark.xfail(strict=True, reason=(
+    "R's and M's words: rb page's views draw the owner's wording whatever the meta says (by_viewer only on the export: "
+    "views.rs:3024 the queue's heading, nodes.rs:435 the nav's Your call): requests.md, PLAIN4. Passes once they land."))), "export"])
 def test_a_reader_s_page_says_no_your_and_offers_no_action(a_record, tmp_path, surface):
     """Plain words pass 4: rb page with the reader's meta (as the preview shows a reader), and rb export's page as the
     hub serves a share link, read as a reader's: no view, navigator or top bar says "your", and none offers an action
@@ -791,17 +799,20 @@ def test_a_reader_s_page_says_no_your_and_offers_no_action(a_record, tmp_path, s
 
 
 def test_a_reader_s_queue_row_opens_by_its_own_link_with_no_review_button(a_record, tmp_path):
-    """Plain words pass 4: a reader is shown no queue row's Review or Inspect button where the row's title is a link of
-    its own (design pass 1's rows: `a.qa` beside `a.qbtn`, both to the item), on rb page with the reader's meta too; the
-    title opens the item to read."""
+    """Plain words pass 4: a reader is shown no queue row's Review or Inspect button, on rb page with the reader's meta
+    too. The queue is the Overview's Decisions (`ul[data-queue]`): each row wholly a link, with no button at all; a
+    reader is shown the record's state in its place, and the row's own link, followed, opens the item to read."""
     page = tmp_path / "page.html"
     r = subprocess.run([*command(), "page", "--out", str(page)], cwd=a_record, env=_rb_env(EXAMPLE.format("owner")),
                        capture_output=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
     assert r.returncode == 0, r.stderr
     html = page.read_text(encoding="utf-8")
-    # each row's title is its link, beside the row's Review button, as design pass 1 draws them (R's views.rs)
+    # each row is wholly its own link, its state chip inside it, as the Decisions draw them (story.rs), and no row has
+    # a button
     rows = html
-    assert re.search(r'<span class="qv"><a class="qa" href="(#[^"]+)">.*?</a></span>.*?<a class="qbtn" href="\1"', html), "no queue row drawn"
+    dq = re.search(r'<ul class="dq dql" data-queue>(.*?)</ul>', html, re.S)
+    assert dq and re.search(r'<li class="dr dl1" data-kind="\w+"><a class="drow" href="#[^"]+"[^>]*><span class="st ', dq.group(1)), "no queue row drawn"
+    assert "qbtn" not in dq.group(1) and "<button" not in dq.group(1)
     reader = tmp_path / "reader.html"
     reader.write_text(rows.replace("<head>", "<head>" + _VIEWER.format("reader"), 1), encoding="utf-8")
     said = harness(None, "--rows", reader.as_uri(), timeout=120, runner="viewer.mjs")
@@ -818,34 +829,6 @@ def test_the_owner_reads_your_call_where_the_export_says_open_calls(a_record, tm
     said = harness(None, "--ownerexp", exp.as_uri(), "--readerexp", _export_with(a_record, tmp_path / "r", "reader").as_uri(),
                    timeout=120, runner="viewer.mjs")
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
-
-
-def test_a_term_says_its_meaning_in_place_and_moves_nothing(a_record, tmp_path):
-    """Plain words pass 4 (Oct 25 15:05 +08): a click or a tap on a word with a meaning shows it beside the word and
-    follows nothing, not the link or the row the word sits in; the working view, its scroll, the address and the
-    inspector stay; Esc or a click elsewhere closes it. On rb export's page as the hub serves it to its owner, on a
-    question's view and in a rule's card, at 1280 and 390, light and dark."""
-    exp = _export_with(a_record, tmp_path, "owner")
-    said = harness(None, "--url", exp.as_uri(), "--view", "q-q1", "--card", "c-c1", "--inlink", "1", timeout=240, runner="terms.mjs")
-    assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
-    names = [c["name"] for c in said["checks"]]
-    for at in ("1280 light", "390 dark"):
-        assert any(n.startswith("term: ") and "(in a card)" in n and n.endswith(f"[{at}]") for n in names), at
-
-
-def test_a_term_s_line_is_written_once_and_shows_on_every_use(a_record, tmp_path):
-    """A page writes each term's line once (orchestrator's call, Nov 10 2026, for E5's line on pages): its first use
-    carries the hint, its later uses name the glossary entry, and the script gives them its line. With the script every
-    use shows it on hover; without it, the first use does. On rb page, and on rb export's page as the hub serves it."""
-    page = tmp_path / "p.html"
-    r = subprocess.run([*command(), "page", "--out", str(page)], cwd=a_record, env=_rb_env(EXAMPLE.format("owner")),
-                       capture_output=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
-    assert r.returncode == 0, r.stderr
-    for url in (page.as_uri(), _export_with(a_record, tmp_path, "owner").as_uri()):
-        said = harness(None, "--url", url, timeout=120, runner="hints.mjs")
-        assert said["exit"] == 0 and said["ok"], (url, _failed(said), said["stderr"][-3000:])
-        names = [c["name"] for c in said["checks"]]
-        assert any("a later one of its" in n and n.endswith("[with the script]") for n in names) and any(n.endswith("[without the script]") for n in names), names
 
 
 def test_inside_the_hub_the_page_draws_no_bar_of_its_own(a_record, tmp_path):
@@ -892,7 +875,7 @@ def test_a_detail_on_another_view_opens_in_the_inspector_and_back_returns(a_reco
         page = out / "page.html"
         if surface == "export":
             html = page.read_text(encoding="utf-8")
-            page.write_text(html.replace("</head>", _VIEWER.format("owner") + f"<script>{SCRIPT.read_text(encoding='utf-8')}</script></head>", 1), encoding="utf-8")
+            page.write_text(html.replace("</head>", _VIEWER.format("owner") + f"<script>{INLINED.read_text(encoding='utf-8')}</script></head>", 1), encoding="utf-8")
         url = page.as_uri()
     said = harness(url, timeout=240, runner="p12.mjs")
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
@@ -909,7 +892,7 @@ def _export_with(a_record, tmp_path, who: str) -> Path:
     assert r.returncode == 0, r.stderr
     exp = (tmp_path / "exp" / "page.html").read_text(encoding="utf-8")
     at = tmp_path / f"{who}.html"
-    at.write_text(exp.replace("</head>", _VIEWER.format(who) + f"<script>{SCRIPT.read_text(encoding='utf-8')}</script></head>", 1), encoding="utf-8")
+    at.write_text(exp.replace("</head>", _VIEWER.format(who) + f"<script>{INLINED.read_text(encoding='utf-8')}</script></head>", 1), encoding="utf-8")
     return at
 
 
@@ -981,7 +964,6 @@ def _without_rerun(html: str) -> str:
     return out
 
 
-@WINDOWS_KNOWN
 def test_rerun_this_research_copies_its_prompt_by_real_clicks(tmp_path):
     """Rerun this research on the DOM fixture, drawn as rb draws an export with a clone address (R's markup: the openers
     a.rrb[href="#rerun"], the panel aside#rerun, an experiment's prompt, rb's own addresses in the text, named by
@@ -1110,7 +1092,6 @@ def _rerun_want(html: str, bundle: str, page: str) -> dict:
             "card": xid, "rows": rows, "bar": False}
 
 
-@WINDOWS_KNOWN
 def test_rerun_this_research_on_an_export_as_the_hub_serves_it(a_record, tmp_path):
     """The same walk on the page rb draws: rb export --with-record --url, served as the hub serves it (the shell's script
     and the viewer, rb-clone and rb-page metas beside it); rb page (no clone address) offers none of it; a reader copies

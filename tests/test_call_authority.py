@@ -100,7 +100,7 @@ class Rec:
         return r.stdout
 
     def status(self) -> dict:
-        return self.ok("status")["data"]
+        return self.ok("status", "--full")["data"]
 
     def log(self) -> list:
         return [json.loads(line) for line in (self.root / ".rb" / "log.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -172,12 +172,12 @@ def test_a_call_recorded_in_an_agent_session_is_proposed_and_changes_nothing(rec
     proposed = [i for i in st["open"] if i["code"] == "call_proposed"]
     assert [(i["who"], i["subject"], i["do"], i["decision"]) for i in proposed] == [("human", d["subject"], f"rb confirm {d['id']}", d["id"]) for d in calls]
     assert not [i for i in st["open"] if i["code"] in ("undecided", "decision_outdated") and i["subject"] in ("q-width", "int8")]
-    text = rec.text("status")
+    text = rec.text("status", "--full")
     every = "rb confirm " + " ".join(d["id"] for d in calls)
     assert "Proposed, not made (4)" in text and f"Confirm all 4: {every}" in text
     assert f"  - reject q-width · note: the sweep is done · confirm: rb confirm {calls[0]['id']}" in text
     assert "call: " not in text and "Needs judgment" not in text
-    assert f"  {calls[0]['id']}: proposed, not made: reject q-width · note: the sweep is done · confirm: rb confirm {calls[0]['id']}" in rec.text("show", "q-width")
+    assert f"  {calls[0]['id']}: proposed, not made: reject q-width · note: the sweep is done · confirm: rb confirm {calls[0]['id']}" in rec.text("show", "--long", "q-width")
     context = rec.text("context")
     assert "## Proposed, not made" in context and f"- park int8 · note: later · confirm: rb confirm {calls[1]['id']}" in context
     assert "## Decisions" not in context
@@ -185,9 +185,24 @@ def test_a_call_recorded_in_an_agent_session_is_proposed_and_changes_nothing(rec
     page = html_mod.unescape((tmp_path / "page.html").read_text(encoding="utf-8"))
     # the page lists them as rb status does, apart from the calls waiting on the user, each with the one command
     said = text_of(page, "")
-    # the page names Your call, as its own view, holding none of them
-    assert "Proposed, not made (4)" in said and f"Confirm all 4{every}" in said and "Your call" not in no_calls_said(said)
-    assert all(f"confirm in your own terminal:rb confirm {d['id']}" in said for d in calls) and "reject q-width · note: the sweep is done" in said
+    # the page names Your call, as its own view; its pin counts the Decisions rows, each a row to confirm (UX5 1.3),
+    # and the view lists those rows, each with its command (the rulings of Nov 12 07:15 +08), the reason a session gave
+    # never there bare
+    # closed form (owner, Nov 13 2026): a page offers no rb confirm to type; each waiting call, and Confirm all, is a
+    # prompt button for their agent (cpprompt, which a reader's view holds back)
+    ask = "In this repository, use Rabbit Brain to show me what waits for my confirmation on {}, and how I confirm it."
+    every_ask = "In this repository, use Rabbit Brain to show me every decision that waits for my confirmation, and how I confirm them."
+    assert "Proposed, not made (4)" in said and "Confirm all 4" in said and "Your call" not in no_calls_said(said, waits_only_to_confirm(st))
+    assert "rb confirm" not in said and every not in page
+    waiting = page.split('id="to-confirm"', 1)[1].split("</details>", 1)[0]
+    assert all(f'data-text="{ask.format(d["subject"])}"' in waiting for d in calls) and f'data-text="{every_ask}"' in waiting
+    yours_html = page.split('id="your-call"', 1)[1].split("</section>", 1)[0]
+    yours = text_of(yours_html, "")
+    assert all(f'data-text="{ask.format(d["subject"])}"' in yours_html for d in calls) and "the sweep is done" not in yours
+    assert "rb confirm" not in yours
+    # closed form (owner, Nov 13 2026): no "confirm in your own terminal:" label; the line and its prompt button
+    assert said.count("confirm in your own terminal:") == 0 and waiting.count('class="ibtn ico cpprompt') >= 4
+    assert "reject q-width · note: the sweep is done" in said
 
 
 def test_a_call_from_the_sdk_or_over_mcp_in_an_agent_session_is_proposed_too(rec, monkeypatch):
@@ -201,7 +216,7 @@ def test_a_call_from_the_sdk_or_over_mcp_in_an_agent_session_is_proposed_too(rec
     assert [str(w.message) for w in said if issubclass(w.category, RBWarning)] == [
         f"{did} is proposed, not made: it changes nothing until it is confirmed (rb confirm {did}, in your own terminal)."]
     # rb show says where to confirm it as rb open does, with no word on who wrote it
-    shown = rec.text("show", did)
+    shown = rec.text("show", "--long", did)
     assert f"  It changes nothing until it is confirmed: rb confirm {did}, in your own terminal." in shown
     assert "agent session" not in shown
     server = Mcp(root=rec.root, env={**rec.env, "RB_SESSION": "sess-calls-mcp-1"})
@@ -247,7 +262,7 @@ def test_one_command_in_the_users_terminal_confirms_and_an_agent_session_cannot(
     assert {"by", "words"} <= keys <= {"rb", "kind", *ORDINARY_CALL}
     code, env = rec.rb("confirm", d["id"])
     assert code == 2 and env["errors"][0]["message"] == f"{d['id']} was confirmed already, as {made['id']}."
-    shown = rec.text("show", d["id"])
+    shown = rec.text("show", "--long", d["id"])
     assert shown.startswith(f"Decision {d['id']}: proposed: reject q-width · note: the sweep is done") and f"  confirmed as {made['id']}" in shown
 
 
@@ -285,7 +300,7 @@ def test_a_call_made_outside_an_agent_session_needs_no_confirmation(rec):
     assert d["authority"] == {"state": "direct", "basis": "recorded outside an agent session", "pending": False}
     st = rec.status()
     assert {q["id"]: q["state"] for q in st["questions"]}["q-width"] == "dropped" and st["pending"] == []
-    assert 'call: rejected: "Does width matter?" (the sweep is done) · your words: "drop it"' in rec.text("status")
+    assert 'call: rejected: "Does width matter?" (the sweep is done) · your words: "drop it"' in rec.text("status", "--full")
 
 
 def test_a_proposal_waits_no_more_once_a_call_is_made_on_its_subject(rec):
@@ -294,7 +309,7 @@ def test_a_proposal_waits_no_more_once_a_call_is_made_on_its_subject(rec):
     made = rec.decide("int8", "continue", "--why", "one more seed first", agent=None)
     st = rec.status()
     assert st["pending"] == [] and {e["id"]: e["state"] for e in st["experiments"]}["int8"] == "open"
-    shown = rec.ok("show", d["id"])["data"]["authority"]
+    shown = rec.ok("show", "--long", d["id"])["data"]["authority"]
     assert (shown["state"], shown["pending"], shown["answered_by"]) == ("proposed", False, made["id"])
 
 
@@ -307,15 +322,15 @@ def test_a_past_call_mentioned_with_no_document_waits_and_confirmed_reads_retros
     assert (d["past"], d["authority"]["state"], d["authority"]["basis"]) == ({"when": "May 7", "source": None}, "past_unconfirmed", "given with no document")
     st = rec.status()
     assert states(st) == before and [i["code"] for i in st["open"] if i["code"].endswith("unconfirmed")] == ["past_call_unconfirmed"]
-    text = rec.text("status")
+    text = rec.text("status", "--full")
     assert f"Past calls mentioned, not confirmed (1)\n  - park int8 (May 7) · note: too slow to iterate · confirm: rb confirm {d['id']}" in text
     assert "Proposed, not made" not in text
     made = rec.ok("confirm", d["id"])["data"]["confirmed"][0]["object"]
     assert made["past"] == {"when": "May 7", "source": None}
     assert {e["id"]: e["state"] for e in rec.status()["experiments"]}["int8"] == "parked"
-    assert 'call: parked May 7 (a past call, Retrospective): "INT8 vs FP32" · note: too slow to iterate' in rec.text("status")
+    assert 'call: parked May 7 (a past call, Retrospective): "INT8 vs FP32" · note: too slow to iterate' in rec.text("status", "--full")
     unknown = rec.decide("q-width", "reject", "--why", "dropped long ago", "--past")
-    assert unknown["past"]["when"] == "unknown" and "reject q-width (date unknown) · note: dropped long ago" in rec.text("status")
+    assert unknown["past"]["when"] == "unknown" and "reject q-width (date unknown) · note: dropped long ago" in rec.text("status", "--full")
 
 
 def test_a_past_call_a_session_quotes_from_a_document_committed_before_the_record_began_waits_for_one_confirm(rec):
@@ -331,8 +346,8 @@ def test_a_past_call_a_session_quotes_from_a_document_committed_before_the_recor
     assert {q["id"]: q["state"] for q in st["questions"]}["q-width"] == "open" and st["decisions"] == []
     assert [p["id"] for p in st["pending"]] == [d["id"]]
     line = f'reject q-width (date unknown): docs/calls.md:3: "We drop the width question" · note: the sweep is done · {found}'
-    assert f"Past calls mentioned, not confirmed (1)\n  - {line} · confirm: rb confirm {d['id']}" in rec.text("status")
-    shown = rec.text("show", d["id"])
+    assert f"Past calls mentioned, not confirmed (1)\n  - {line} · confirm: rb confirm {d['id']}" in rec.text("status", "--full")
+    shown = rec.text("show", "--long", d["id"])
     assert shown.startswith(f"Decision {d['id']}: a past call mentioned, not confirmed: reject q-width (date unknown): docs/calls.md:3: ")
     assert f"  {found}\n" in shown and "It changes nothing until it is confirmed" in shown
     assert f"  {d['id']}  a past call mentioned, not confirmed: {line.replace(' · ' + found, '')} · {found}" in rec.text("confirm")
@@ -340,7 +355,7 @@ def test_a_past_call_a_session_quotes_from_a_document_committed_before_the_recor
     st = rec.status()
     assert {q["id"]: q["state"] for q in st["questions"]}["q-width"] == "dropped" and st["pending"] == []
     assert ('call: rejected (a past call from docs/calls.md:3, "We drop the width question", date unknown, Retrospective): "Does width matter?" '
-            '· note: the sweep is done') in rec.text("status")
+            '· note: the sweep is done') in rec.text("status", "--full")
     # the same past call given at the user's own terminal is theirs, as any call they make
     mine = rec.decide("q1", "investigate", "--why", "one more look", "--past", "--source", "docs/calls.md:4", "--quote", "We pause INT8 for now", agent=None)
     assert (mine["authority"]["state"], mine["authority"]["pending"]) == ("direct", False)
@@ -382,7 +397,7 @@ def test_a_document_that_cannot_date_the_call_establishes_nothing(tmp_path, tmp_
     assert states(rec.status()) == before
     said = rec.text("decide", "q1", "investigate", "--why", "paused", "--past", "--source", path, "--quote", quote, agent=AGENT)
     assert f"  {why}\n" in said and "It changes nothing until it is confirmed" in said
-    assert f"park int8 (date unknown): {path}:{d['past']['source']['line']}: \"{quote}\" · note: paused · {why} · confirm: rb confirm {d['id']}" in rec.text("status")
+    assert f"park int8 (date unknown): {path}:{d['past']['source']['line']}: \"{quote}\" · note: paused · {why} · confirm: rb confirm {d['id']}" in rec.text("status", "--full")
     if how.startswith("the record"):
         other = rec.decide("q-width", "reject", "--why", "the sweep is done", "--past", "--source", path, "--quote", "We drop the width question",
                            agent=OTHER)
@@ -476,7 +491,7 @@ def test_a_quote_the_document_no_longer_commits_establishes_nothing(rec, how):
            "written") if how.endswith("here") else "first held the quote in commit"
     assert d["authority"]["state"] == "past_unconfirmed" and why in d["authority"]["basis"]
     (rec.root / "docs" / "calls.md").write_text(CALLS.replace("We drop", "We keep"), encoding="utf-8")
-    assert rec.ok("show", d["id"])["data"]["authority"]["state"] == "past_unconfirmed"
+    assert rec.ok("show", "--long", d["id"])["data"]["authority"]["state"] == "past_unconfirmed"
 
 
 def test_confirm_all_leaves_a_subject_two_calls_wait_on_to_the_user(rec):
@@ -577,7 +592,7 @@ def test_a_write_where_an_agent_session_left_its_id_is_that_sessions(rec, monkey
     assert d["by"].startswith("agent:") and d["authority"]["state"] == "past_unconfirmed" and d["authority"]["pending"]
     rec.ok("note", "add", "-e", "int8", "seed 2 looked odd", agent=left)
     rec.ok("experiment", "gate", "int8", "--if-holds", "ship INT8", "--words", "ship it if it holds", agent=left)
-    text = rec.text("status")
+    text = rec.text("status", "--full")
     assert "seed 2 looked odd · not confirmed" in text and 'words (as given): "ship it if it holds"' in text and "your words" not in text
     assert "call: parked" not in text and [p["id"] for p in rec.status()["pending"]] == [d["id"]]
     at_the_users_terminal(rec, monkeypatch)
@@ -604,8 +619,8 @@ def test_a_by_edited_in_a_sessions_decision_file_makes_it_nobodys_call(rec):
     st = rec.status()
     assert st["decisions"] == [] and st["pending"] == [] and {q["id"]: q["state"] for q in st["questions"]}["q-width"] == "open"
     assert "edited_outside_rb" in [i["code"] for i in st["open"]]
-    assert rec.ok("show", d["id"])["data"]["authority"]["state"] == "past_unconfirmed"
-    for text in (rec.text("status"), rec.text("show", d["id"]), rec.text("show", "q-width"), rec.text("context")):
+    assert rec.ok("show", "--long", d["id"])["data"]["authority"]["state"] == "past_unconfirmed"
+    for text in (rec.text("status", "--full"), rec.text("show", "--long", d["id"]), rec.text("show", "--long", "q-width"), rec.text("context")):
         assert "call: rejected" not in text and "Decision " + d["id"] + ": rejected" not in text and "your words" not in text
         assert text.count("the sweep is done") == text.count("· note: the sweep is done")
 
@@ -617,10 +632,19 @@ def text_of(page: str, gap: str = " ") -> str:
     return re.sub(r"<[^>]+>", gap, re.sub(r"(?is)<(script|style)\b[^>]*>.*?</\1\s*>", gap, page))
 
 
-def no_calls_said(page: str) -> str:
+def no_calls_said(page: str, pinned: int = 0) -> str:
     """A page's text without the places it names its Your call view by and says it holds no call ("Your call (0)",
-    the nav's "Your call 0"): what is left must not say Your call at all."""
-    return re.sub(r"Your call (?:\(0\)|0(?!\d))", "", page)
+    the view's heading) and the pin's badge (the nav's "Your call 4"), which counts the Overview's Decisions rows, a
+    row to confirm among them (UX5 1.3: one number on every surface): what is left must not say Your call at all."""
+    # the view's heading counts what the pin opens, the same rows (the rulings of Nov 12 07:15 +08)
+    return re.sub(r"Your call (?:\((?:0|" + str(pinned) + r")\)|" + str(pinned) + r"(?!\d))", "", page)
+
+
+def waits_only_to_confirm(st: dict) -> int:
+    """How many rows the Overview's Decisions hold, each one a confirmation (none a call to make): the pin's badge."""
+    rows = st["overview"]["decisions"]
+    assert rows and {d["kind"] for d in rows} == {"confirm"}, rows
+    return len(rows)
 
 def screens_of(rec: Rec, monkeypatch, tmp_path) -> dict:
     """What the user's screens say: rb status, rb context, a page's text, rb open's data and rb ui's views."""
@@ -634,7 +658,7 @@ def screens_of(rec: Rec, monkeypatch, tmp_path) -> dict:
             state = json.loads(r.read().decode("utf-8"))
     finally:
         server.close()
-    return {"status": rec.text("status"), "context": rec.text("context"), "page": " ".join(page.split()),
+    return {"status": rec.text("status", "--full"), "context": rec.text("context"), "page": " ".join(page.split()),
             "open": json.dumps(state, ensure_ascii=False), "ui": json.dumps(home(rec.root), ensure_ascii=False)}
 
 
@@ -646,9 +670,9 @@ def test_a_past_calls_line_rests_on_the_documents_words_and_says_the_reason_give
     d = rec.decide("int8", "park", "--why", "calibration first", "--past", "--when", "2026-05-07", "--source", "notes.md:3", "--quote", "We pause INT8 until the calibration set is fixed")
     assert d["authority"]["state"] == "past_unconfirmed"
     line = 'park int8 (2026-05-07): notes.md:3: "We pause INT8 until the calibration set is fixed" · note: calibration first'
-    shown = rec.text("show", d["id"])
+    shown = rec.text("show", "--long", d["id"])
     assert shown.startswith(f"Decision {d['id']}: a past call mentioned, not confirmed: {line} · recorded ")
-    assert f"{line} · {d['authority']['basis']} · confirm: rb confirm {d['id']}" in rec.text("show", "int8")
+    assert f"{line} · {d['authority']['basis']} · confirm: rb confirm {d['id']}" in rec.text("show", "--long", "int8")
     for where, said in screens_of(rec, monkeypatch, tmp_path).items():
         said = said.replace('\\"', '"')
         assert line in said, where
@@ -660,7 +684,7 @@ def test_a_past_call_a_session_reconstructs_never_reads_as_the_users_call_until_
     sessions: until one rb confirm, no screen says it as the user's (no call line, no Your call, no "you decided"); each
     says the file's words with file and line, the session's reason as its note, and what git shows of the file."""
     from rbtest import object_card
-    rec.ok("show", "q-width", agent=OTHER)                                 # another session has looked: it is told what comes next
+    rec.ok("show", "--long", "q-width", agent=OTHER)                                 # another session has looked: it is told what comes next
     d = rec.decide("q-width", "reject", "--why", "the sweep is done", "--past", "--when", "2026-05-07", "--source", "docs/calls.md:3",
                    "--quote", "We drop the width question")
     file_voice = 'reject q-width (2026-05-07): docs/calls.md:3: "We drop the width question" · note: the sweep is done'
@@ -683,14 +707,15 @@ def test_a_past_call_a_session_reconstructs_never_reads_as_the_users_call_until_
     assert st["decisions"] == [] and [p["authority"]["state"] for p in st["pending"]] == ["past_unconfirmed"] * 3
     assert {q["id"]: q["state"] for q in st["questions"]}["q-width"] == "open"
     assert {e["id"]: e["state"] for e in st["experiments"]}["int8"] == "open"
+    pinned = waits_only_to_confirm(rec.status())
     screens = screens_of(rec, monkeypatch, tmp_path)
-    screens.update({"show the call": rec.text("show", d["id"]), "show the question": rec.text("show", "q-width"), "confirm": rec.text("confirm"),
-                    "rb_delta": "\n".join(f["text"] for f in rec.ok("show", "q-width", agent=OTHER)["rb_delta"])})
+    screens.update({"show the call": rec.text("show", "--long", d["id"]), "show the question": rec.text("show", "--long", "q-width"), "confirm": rec.text("confirm"),
+                    "rb_delta": "\n".join(f["text"] for f in rec.ok("show", "--long", "q-width", agent=OTHER)["rb_delta"])})
     for where, said in screens.items():
         said = said.replace('\\"', '"')
         assert file_voice in said, where
         # a page names its Your call view, holding no call: that is no call said as the user's
-        said = no_calls_said(said) if where == "page" else said
+        said = no_calls_said(said, pinned) if where == "page" else said
         for not_theirs in ("Your call", "your call", "you decided", "You decided", "rejected (a past call", "call: rejected"):
             assert not_theirs not in said, (where, not_theirs)
     # a card lists the calls made on its subject: none
@@ -704,7 +729,7 @@ def test_a_past_call_a_session_reconstructs_never_reads_as_the_users_call_until_
     for where in ("open", "ui"):                                           # the open item's own line
         assert '"We drop the width question" · note: the sweep is done · the quote is in' in screens[where].replace('\\"', '"'), where
         assert "the sweep is done (the quote is in" not in screens[where], where
-    assert 'park int8 (2026-05-07): docs/calls.md:4: "We pause INT8 for now" · note: fp32 first · the quote is in docs/calls.md:4' in rec.text("show", "int8")
+    assert 'park int8 (2026-05-07): docs/calls.md:4: "We pause INT8 for now" · note: fp32 first · the quote is in docs/calls.md:4' in rec.text("show", "--long", "int8")
 
 
 def test_a_confirmed_calls_reason_stays_the_sessions_note(rec, tmp_path, monkeypatch):
@@ -713,7 +738,7 @@ def test_a_confirmed_calls_reason_stays_the_sessions_note(rec, tmp_path, monkeyp
     for it: once confirmed, a past call's and a proposal's reason read only as `· note:` on rb confirm, rb status,
     rb context, rb show (call and subject), a page, rb open, the cards and rb_delta. The user's own call is unchanged."""
     from rbtest import object_card
-    rec.ok("show", "q-width", agent=OTHER)                                 # another session has looked: it is told what changed
+    rec.ok("show", "--long", "q-width", agent=OTHER)                                 # another session has looked: it is told what changed
     past = rec.decide("q-width", "reject", "--why", "SESSION sweep done", "--past", "--when", "2026-05-07", "--source", "docs/calls.md:3",
                       "--quote", "We drop the width question")
     rec.decide("int8", "continue", "--why", "SESSION more seeds")
@@ -721,8 +746,8 @@ def test_a_confirmed_calls_reason_stays_the_sessions_note(rec, tmp_path, monkeyp
     said = {"confirm": rec.text("confirm", "--all")}
     made = {x["authority"]["confirms"]: x["id"] for x in rec.status()["decisions"] if x["authority"].get("confirms")}
     assert len(made) == 2
-    said.update({"show the call": rec.text("show", made[past["id"]]), "show the question": rec.text("show", "q-width"), "show int8": rec.text("show", "int8"),
-                 "rb_delta": "\n".join(f["text"] for f in rec.ok("show", "q-width", agent=OTHER)["rb_delta"])})
+    said.update({"show the call": rec.text("show", "--long", made[past["id"]]), "show the question": rec.text("show", "--long", "q-width"), "show --long int8": rec.text("show", "--long", "int8"),
+                 "rb_delta": "\n".join(f["text"] for f in rec.ok("show", "--long", "q-width", agent=OTHER)["rb_delta"])})
     said.update(screens_of(rec, monkeypatch, tmp_path))
     said["cards"] = json.dumps([object_card(s, rec.root) for s in ("q-width", "int8")], ensure_ascii=False)
     for where, text in said.items():
@@ -747,13 +772,13 @@ def test_a_past_park_says_which_runs_of_its_experiment_were_produced_after_the_d
     assert st["pending"][0]["runs_after"] == [late]
     assert [i["what"] for i in st["open"] if i["code"] == "past_call_unconfirmed"] == [
         f"park int8 (2026-05-07), a past call mentioned, not confirmed · note: calibration first · {said}"]
-    assert f"  {said}" in rec.text("show", d["id"]).splitlines() and rec.ok("show", d["id"])["data"]["runs_after"] == [late]
+    assert f"  {said}" in rec.text("show", "--long", d["id"]).splitlines() and rec.ok("show", "--long", d["id"])["data"]["runs_after"] == [late]
     for where, text in screens_of(rec, monkeypatch, tmp_path).items():
         assert said in text, where
     rec.ok("confirm", d["id"])
     st = rec.status()
     [made] = [x for x in st["decisions"] if x["subject"] == "int8"]
-    assert made["runs_after"] == [late] and f'call: parked 2026-05-07 (a past call, Retrospective): "INT8 vs FP32" · note: calibration first · {said}' in rec.text("status")
+    assert made["runs_after"] == [late] and f'call: parked 2026-05-07 (a past call, Retrospective): "INT8 vs FP32" · note: calibration first · {said}' in rec.text("status", "--full")
     later = rec.decide("int8", "stop", "--why", "done", "--past", "--when", "2026-05-20")
     vouch = rec.decide("c1", "accept", "--why", "fine", "--past", "--when", "2026-05-01")
     rows = {p["id"]: p for p in rec.status()["pending"]}
@@ -782,14 +807,14 @@ def test_a_past_call_lists_no_reading_as_what_it_was_made_on(rec, tmp_path, monk
     said = rec.text("confirm", d["id"])
     assert "  c1 reads now: " in said and "made on" not in said.replace(f"a call made on int8", "")
     [made] = [x for x in rec.status()["decisions"] if x["subject"] == "int8"]
-    shown = rec.text("show", made["id"])
+    shown = rec.text("show", "--long", made["id"])
     assert "  c1 read when it was recorded: " in shown and "made on" not in shown
     assert "c1" in made["basis"]                                         # the record and the JSON keep the reading
     rec.ok("run", "add", "int8", "fp32.val_loss=5.60", "int8.val_loss=5.90", "--command", "python eval.py")
-    text, st = rec.text("status"), rec.status()
+    text, st = rec.text("status", "--full"), rec.status()
     assert " · its readings have moved since it was recorded" in text and "made on" not in text
     assert not [i for i in st["open"] if i["code"] == "decision_outdated"]
-    assert " · its readings have moved since it was recorded (c1)" in rec.text("show", "int8")
+    assert " · its readings have moved since it was recorded (c1)" in rec.text("show", "--long", "int8")
     assert "made on" not in rec.text("context").split("## Decisions")[1]
     # a past accept on the criterion, confirmed, then a run that moves its reading
     rec.commit("docs/plan.md", "# Plan\n\nWe accept the INT8 validation loss as it stands.\n", when=MAY)
@@ -814,15 +839,15 @@ def test_words_given_in_an_agent_session_never_read_as_the_users_until_they_conf
     confirms the call they came with, they are the user's words wherever rb says them."""
     from rbtest import home, object_card
     criterion_words, call_words = "make it 0.1, it is noisy", "park INT8 until the calibration set is fixed"
-    rec.ok("show", "int8", agent=OTHER)                                   # another session has looked: it is told what comes next
+    rec.ok("show", "--long", "int8", agent=OTHER)                                   # another session has looked: it is told what comes next
     rec.ok("criterion", "add", "INT8 adds at most 0.1", "-e", "int8", "--metric", "change.val_loss", "--at-most", "0.1", "--id", "c2",
            "--words", criterion_words, agent=AGENT)
     said = rec.text("decide", "int8", "park", "--why", "the calibration set is wrong", "--words", call_words, agent=AGENT)
     d = rec.status()["pending"][0]
     texts = {
-        "decide": said, "status": rec.text("status"), "show the call": rec.text("show", d["id"]), "show the experiment": rec.text("show", "int8"),
-        "show the criterion": rec.text("show", "c2"), "context": rec.text("context"), "confirm": rec.text("confirm"),
-        "rb_delta": "\n".join(f["text"] for f in rec.ok("show", "int8", agent=OTHER)["rb_delta"]),
+        "decide": said, "status": rec.text("status", "--full"), "show the call": rec.text("show", "--long", d["id"]), "show the experiment": rec.text("show", "--long", "int8"),
+        "show the criterion": rec.text("show", "--long", "c2"), "context": rec.text("context"), "confirm": rec.text("confirm"),
+        "rb_delta": "\n".join(f["text"] for f in rec.ok("show", "--long", "int8", agent=OTHER)["rb_delta"]),
     }
     for where, text in texts.items():
         for words in (criterion_words, call_words):
@@ -845,8 +870,8 @@ def test_words_given_in_an_agent_session_never_read_as_the_users_until_they_conf
     page = (tmp_path / "page.html").read_text(encoding="utf-8")
     assert criterion_words not in page and call_words not in page
     rec.ok("confirm", d["id"])
-    assert f'call: parked: "INT8 vs FP32" · note: the calibration set is wrong · your words: "{call_words}"' in rec.text("status")
-    assert f'words (as given): "{criterion_words}"' in rec.text("show", "c2")       # a criterion's words have no call to confirm
+    assert f'call: parked: "INT8 vs FP32" · note: the calibration set is wrong · your words: "{call_words}"' in rec.text("status", "--full")
+    assert f'words (as given): "{criterion_words}"' in rec.text("show", "--long", "c2")       # a criterion's words have no call to confirm
 
 
 def test_a_notes_words_show_beside_it_as_given_and_in_the_json(rec, tmp_path, monkeypatch):
@@ -865,10 +890,10 @@ def test_a_notes_words_show_beside_it_as_given_and_in_the_json(rec, tmp_path, mo
     context = rec.ok("context")["data"]["state"]
     assert [n.get("words") for e in context["experiments"] for n in e["notes"]] == [agent_words]
     given = 'No file records the stop. · words (as given): "If it still costs "most of a point", I stop."'
-    for where in ("status", "context", ("show", "int8")):
+    for where in (("status", "--full"), "context", ("show", "--long", "int8")):
         text = rec.text(*([where] if isinstance(where, str) else where))
         assert given in text and not [line for line in text.splitlines() if line.startswith("I stop.")], where
-    assert 'The validation split is the 50k images. · your words: "use the 50k split"' in rec.text("status")
+    assert 'The validation split is the 50k images. · your words: "use the 50k split"' in rec.text("status", "--full")
     screens = screens_of(rec, monkeypatch, tmp_path)
     for where in ("open", "ui"):
         assert json.dumps(given, ensure_ascii=False)[1:-1] in screens[where], where
@@ -890,18 +915,18 @@ def test_a_gates_words_show_beside_it_as_given_and_in_the_json(rec, tmp_path, mo
     assert (exp["gate_words"], exp["gate_by"]) == (said, "agent:claude-code")
     assert [e.get("gate_words") for e in rec.ok("context")["data"]["state"]["experiments"]] == [said]
     given = f'if it holds: words (as given): "{said}"'
-    assert given in rec.text("status") and f"- {given}" in rec.text("context") and f"  {given}" in rec.text("show", "int8")
+    assert given in rec.text("status", "--full") and f"- {given}" in rec.text("context") and f"  {given}" in rec.text("show", "--long", "int8")
     screens = screens_of(rec, monkeypatch, tmp_path)
     assert f'words (as given): \\"{said}\\"' in screens["open"] and f'words (as given): "{said}"' in screens["page"]
     assert json.dumps(given, ensure_ascii=False)[1:-1] in json.dumps(object_card("int8", rec.root), ensure_ascii=False)
-    for text in (rec.text("status"), rec.text("context"), rec.text("show", "int8")):
+    for text in (rec.text("status", "--full"), rec.text("context"), rec.text("show", "--long", "int8")):
         assert text.count(said) == text.count(given), "the gate's words show bare somewhere"
     # the same at the user's own terminal reads as theirs once the gate is: the gate a session set waits with its design
     # until the user confirms it (review of the snapshot rule, round 1); a later gate with no words drops them
     rec.ok("experiment", "gate", "int8", "--if-not", "keep FP32", "--words", "else keep FP32")
-    assert 'if it holds: ' + said + ' · if not: keep FP32 · words (as given): "else keep FP32" · not confirmed' in rec.text("status")
+    assert 'if it holds: ' + said + ' · if not: keep FP32 · words (as given): "else keep FP32" · not confirmed' in rec.text("status", "--full")
     rec.ok(*[e for e in rec.status()["experiments"] if e["id"] == "int8"][0]["design"]["confirm"].split()[1:])
-    assert 'if it holds: ' + said + ' · if not: keep FP32 · your words: "else keep FP32"' in rec.text("status")
+    assert 'if it holds: ' + said + ' · if not: keep FP32 · your words: "else keep FP32"' in rec.text("status", "--full")
     rec.ok("experiment", "gate", "int8", "--if-not", "keep FP32 for now")
     assert "gate_words" not in [e for e in rec.status()["experiments"] if e["id"] == "int8"][0]
     # the SDK and MCP keep them the same way
@@ -915,7 +940,7 @@ def test_a_gates_words_show_beside_it_as_given_and_in_the_json(rec, tmp_path, mo
             "experiment": "int8", "if_holds": "ship INT8 now", "words": "ship it now"}}})
     finally:
         server.close()
-    assert 'if it holds: ship INT8 now · if not: keep FP32 for now · words (as given): "ship it now"' in rec.text("status")
+    assert 'if it holds: ship INT8 now · if not: keep FP32 for now · words (as given): "ship it now"' in rec.text("status", "--full")
 
 
 def test_a_sessions_note_and_interpretation_show_as_not_confirmed_and_keep_their_source_underneath(rec, tmp_path, monkeypatch):
@@ -929,7 +954,7 @@ def test_a_sessions_note_and_interpretation_show_as_not_confirmed_and_keep_their
     rec.ok("note", "add", "-e", "int8", session, agent=AGENT)
     rec.ok("criterion", "file", "c1", "q1", "--when-met", "INT8 costs nothing that matters here", "--why", "docs/calls.md:4", agent=AGENT)
     said = f"{session} · not confirmed"
-    texts = {"status": rec.text("status"), "context": rec.text("context"), "show": rec.text("show", "int8"),
+    texts = {"status": rec.text("status", "--full"), "context": rec.text("context"), "show": rec.text("show", "--long", "int8"),
              "card": json.dumps(object_card("int8", rec.root), ensure_ascii=False)}
     for where, text in texts.items():
         assert said in text, where
@@ -950,7 +975,7 @@ def test_a_sessions_note_and_interpretation_show_as_not_confirmed_and_keep_their
     st = rec.status()
     [exp] = [e for e in st["experiments"] if e["id"] == "int8"]
     assert [(n["text"], n["by"]) for n in exp["notes"]] == [(human, "human:ana"), (session, "agent:claude-code")]
-    links = rec.ok("show", "c1")["data"]["object"]["question_links"]
+    links = rec.ok("show", "--long", "c1")["data"]["object"]["question_links"]
     assert [l["declared_by"] for l in links if l["retracted"] is None] == ["agent:claude-code"]
     assert [r.get("session") for r in rec.log() if r.get("op") == "note"][-1] == AGENT["CLAUDE_CODE_SESSION_ID"]
 
@@ -977,7 +1002,7 @@ def test_a_run_note_a_session_wrote_shows_as_not_confirmed(rec, tmp_path, monkey
     screens = screens_of(rec, monkeypatch, tmp_path)
     texts = {"context": screens["context"], "page": screens["page"], "open": screens["open"]}
     for how, rid in ids.items():
-        texts[f"show {how}"] = rec.text("show", rid)
+        texts[f"show {how}"] = rec.text("show", "--long", rid)
         texts[f"card {how}"] = json.dumps(object_card(rid, rec.root), ensure_ascii=False)
     for where, text in texts.items():
         for note in sessions:
@@ -985,7 +1010,7 @@ def test_a_run_note_a_session_wrote_shows_as_not_confirmed(rec, tmp_path, monkey
         assert "the user's own run note · not confirmed" not in text, where
     assert all(f"{n} · not confirmed" in texts["context"] for n in sessions) and "the user's own run note" in texts["context"]
     assert "seed 2 looked odd · not confirmed" in texts["page"] and "seed 2 looked odd · not confirmed" in texts["card cli"]
-    assert rec.ok("show", ids["cli"])["data"]["object"]["created_by"] == "agent:claude-code"
+    assert rec.ok("show", "--long", ids["cli"])["data"]["object"]["created_by"] == "agent:claude-code"
 
 
 # ---------------------------------------------------------------- the JSON, and the older rb
@@ -997,20 +1022,20 @@ def test_the_json_only_grows(rec):
     what the record holds (witness)."""
     made = rec.decide("q-width", "reject", "--why", "the sweep is done", agent=None)
     rec.decide("int8", "park", "--why", "later")
-    env = rec.ok("status")
+    env = rec.ok("status", "--full")
     assert {"ok", "rb_version", "command", "data", "errors", "next", "rb_delta"} == set(env)
     st = env["data"]
     old = {"project", "root", "actor", "experiment_id", "counts", "tally", "results", "findings", "experiments", "runs", "analyses", "questions",
            "resources", "decisions", "retracted", "metrics", "repository", "open", "gate", "found_unrecorded", "elsewhere", "fail_on", "outcome"}
     assert old <= set(st) and set(st) - old == {"pending", "record_start", "gates_pending", "designs_pending", "scope", "uncited_changes", "found_needs",
-                                                 "witness", "tally_on_estimate"}
+                                                 "witness", "tally_on_estimate", "overview", "files"}
     assert {"question_count", "experiment_count", "criterion_count", "run_count", "analysis_count", "resource_count", "decision_count"} <= set(st["counts"])
     [row] = st["decisions"]
     old_row = {"id", "subject", "action", "why", "revisit", "by", "at", "via", "session", "words", "basis", "inquiry_basis", "value", "across",
                "retracted", "current"}
     assert old_row <= set(row) and set(row) - old_row == {"authority", "past", "witness"} and row["past"] is None
     assert {"who", "code", "subject", "what", "do"} <= set(next(i for i in st["open"] if i["code"] == "call_proposed"))
-    shown = rec.ok("show", made["id"])["data"]
+    shown = rec.ok("show", "--long", made["id"])["data"]
     assert {"object", "current", "authority"} <= set(shown)
     assert {"object", "actor", "authority"} <= set(rec.ok("decide", "q1", "investigate", "--why", "one more look", "--dry-run")["data"])
 
@@ -1086,7 +1111,7 @@ def test_a_miss_with_a_proposed_call_on_it_does_not_say_no_call_is_recorded(rec)
     [after] = [i for i in rec.status()["open"] if i["code"] == "undecided" and i["subject"] == "c1"]
     assert after["what"] == ("c1 misses its rule and the call recorded on it is not made yet: it waits for a confirmation: "
                              "INT8 adds at most 0.05 validation loss")
-    assert "no call on it is recorded" not in rec.text("status")
+    assert "no call on it is recorded" not in rec.text("status", "--full")
 
 
 def test_confirming_a_design_says_the_notes_on_it_stay_not_confirmed_and_how_to_say_one(rec):
@@ -1103,7 +1128,7 @@ def test_confirming_a_design_says_the_notes_on_it_stay_not_confirmed_and_how_to_
     confirm = next(w for w in listed.split() if w.startswith("int8@"))
     done = rec.text("confirm", confirm)
     assert "int8's design is confirmed." in done and line in done
-    assert "the calibration draw is fixed · not confirmed" in rec.text("show", "int8")
+    assert "the calibration draw is fixed · not confirmed" in rec.text("show", "--long", "int8")
 
 
 def test_a_cited_value_that_differs_is_said_where_it_is_set_and_once_on_its_criterion(rec, monkeypatch):
@@ -1124,7 +1149,7 @@ def test_a_cited_value_that_differs_is_said_where_it_is_set_and_once_on_its_crit
     assert any("data.batch_size is 256 here and 128 in the cited source" in str(w.message) for w in caught), [str(w.message) for w in caught]
     rec.ok("criterion", "add", "INT8 reproduces the paper's validation loss", "-e", "int8", "--metric", "int8.val_loss", "--equals", "5.64",
            "--tolerance", "0.005", "--source", "docs/paper.md", "--quote", "INT8 validation loss is 5.64", "--locator", "line 3", "--id", "c3")
-    shown = rec.text("show", "c3")
+    shown = rec.text("show", "--long", "c3")
     assert shown.count("data.batch_size 256 here vs 128 in the cited source") == 1, shown
 
 
@@ -1137,5 +1162,5 @@ def test_a_run_recorded_again_has_one_space_before_not_confirmed(rec):
     again = rec.ok("run", "add", "int8", "--from", "out/m.json", "--produced-at", "2026-10-02T10:00:00Z", "--again", "--why", "rerun from its receipt.",
                    agent=AGENT)["data"]["object"]
     assert again["note"] == "recorded again: rerun from its receipt."
-    shown = rec.text("show", again["id"])
+    shown = rec.text("show", "--long", again["id"])
     assert "  note: recorded again: rerun from its receipt. · not confirmed\n" in shown and ".  ·" not in shown

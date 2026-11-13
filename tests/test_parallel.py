@@ -259,11 +259,11 @@ def test_the_next_write_moves_an_experiment_to_a_file_per_part_and_changes_no_fi
 
 def test_a_project_note_from_before_ids_is_listed_without_one(before, capsys):
     """A project note an older rb wrote has no id: rb status and rb context list it as a note, never as `note None`."""
-    for argv in (["status"], ["context"]):
+    for argv in (["status", "--full"], ["context"]):
         main(argv)
         out = capsys.readouterr().out
         assert "a project note" in out and "None" not in out, argv
-    assert "  note (2026-10-01): a project note" in (main(["status"]), capsys.readouterr().out)[1]
+    assert "  note (2026-10-01): a project note" in (main(["status", "--full"]), capsys.readouterr().out)[1]
 
 
 def test_a_criterion_edited_outside_rb_is_not_moved(before, capsys):
@@ -1057,7 +1057,7 @@ def test_a_shallow_clone_says_it_cannot_see_the_merge_that_made_a_record(merged,
     assert st.data["outcome"]["passed"] is False
     code = main(["status", "--fail-on", "unmet", "--json"])
     assert code == 1 and Envelope.model_validate_json(capsys.readouterr().out).data["outcome"]["failures"][0]["code"] == "shallow_clone"
-    main(["status"])
+    main(["status", "--full"])
     text = capsys.readouterr().out
     for said in (json.dumps(doctor.data), json.dumps(st.data), text):
         assert "this clone is shallow" in said and "git fetch --unshallow" in said
@@ -1465,7 +1465,7 @@ def test_status_says_what_is_in_other_worktrees_and_branches(repo, capsys, monke
     assert (wide["path"], wide["same_project"], wide["gone"]) == (listed_paths()[wt.resolve()], True, False)
     assert {k: len(v) for k, v in wide["added"]["e1"].items()} == {"variant": 1, "run": 2, "note": 1}
     assert list(places["agent/depth"]["added"][""]) == ["question"] and places["agent/depth"]["path"] is None
-    main(["status"])
+    main(["status", "--full"])
     text = capsys.readouterr().out
     assert "Elsewhere (2)" in text
     # a place by its branch and its path, as git gives them, and its commit; nothing that says who wrote there
@@ -1492,7 +1492,7 @@ def test_a_call_elsewhere_is_counted_and_never_said_to_be_on_the_project(repo, c
         git("add", "-A")
         git("commit", "-qm", branch)
     git("checkout", "-q", "main")
-    main(["status"])
+    main(["status", "--full"])
     text = capsys.readouterr().out
     depth_at, call_at = git("rev-parse", "try/depth").strip()[:12], git("rev-parse", "try/call").strip()[:12]
     assert f"  try/depth at {depth_at}: 1 question on the project; 1 decision\n" in text
@@ -1518,7 +1518,7 @@ def test_status_tells_worktrees_at_one_commit_apart_by_branch_and_path(repo, cap
     monkeypatch.chdir(repo)
     listed = listed_paths()
     at = git("rev-parse", "main").strip()[:12]
-    main(["status"])
+    main(["status", "--full"])
     text = capsys.readouterr().out
     lines = sorted(line.strip() for line in text.splitlines() if " at " + at + ": " in line)
     assert lines == sorted(
@@ -1546,7 +1546,7 @@ def test_a_worktree_removed_without_prune_reads_as_removed_since(repo, capsys, m
     shutil.rmtree(wt)
     [place] = rb(capsys, "status").data["elsewhere"]
     assert (place["branch"], place["path"], place["gone"], place["uncommitted"]) == ("try/gone", listed, True, 0)
-    main(["status"])
+    main(["status", "--full"])
     at = git("rev-parse", "try/gone").strip()[:12]
     assert f"  try/gone · {listed} at {at} (removed since): 1 run on e1 (width)" in capsys.readouterr().out
 
@@ -1568,7 +1568,7 @@ def test_a_worktree_holding_a_separate_project_is_told_apart(repo, capsys, monke
     assert theirs != rb(capsys, "status").data["project"]["uid"]
     [place] = rb(capsys, "status").data["elsewhere"]
     assert (place["branch"], place["same_project"]) == ("other", False)
-    main(["status"])
+    main(["status", "--full"])
     text = capsys.readouterr().out
     assert f"  other · {listed_paths()[wt.resolve()]} at {git('rev-parse', 'other').strip()[:12]}: a separate project, with its own record" in text
     assert "new experiment e1" not in text

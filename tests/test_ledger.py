@@ -131,7 +131,7 @@ def int8_experiment(capsys, *extra):
 
 
 def finding(capsys, criterion_id) -> dict:
-    return ok(capsys, "show", criterion_id)["finding"]
+    return ok(capsys, "show", "--long", criterion_id)["finding"]
 
 
 def log_entries(root: Path) -> list[dict]:
@@ -218,7 +218,7 @@ def test_an_experiments_hypothesis_links_to_its_question_and_a_missing_one_is_re
     e = ok(capsys, "experiment", "add", "INT8 vs FP32", "--hypothesis", "INT8 keeps quality", "-q", q,
            "-m", "quantisation noise is small")["object"]
     assert e["questions"] == [q] and e["hypothesis"] == "INT8 keeps quality" and e["why"] == "quantisation noise is small"
-    assert ok(capsys, "show", e["id"])["state"] == "planned"
+    assert ok(capsys, "show", "--long", e["id"])["state"] == "planned"
     refused(capsys, 2, "E_OBJECT_NOT_FOUND", "experiment", "add", "x", "--hypothesis", "h", "-q", "qnone")
 
 
@@ -229,10 +229,10 @@ def test_an_experiment_is_planned_until_a_run_tests_it(lab, capsys):
     e = ok(capsys, "experiment", "add", "INT8 vs FP32", "--id", "e1", "--hypothesis", "INT8 keeps quality",
            "--baseline", "fp32", "--candidate", "int8")["object"]
     assert e["hypothesis"] == "INT8 keeps quality"
-    assert ok(capsys, "show", "e1")["state"] == "planned"
+    assert ok(capsys, "show", "--long", "e1")["state"] == "planned"
     assert ("planned", "e1") in [(o["code"], o["subject"]) for o in ok(capsys, "status")["open"]]
     ok(capsys, "run", "add", "e1", "int8.val_loss=1.2")
-    assert ok(capsys, "show", "e1")["state"] == "open"
+    assert ok(capsys, "show", "--long", "e1")["state"] == "open"
     assert "planned" not in [o["code"] for o in ok(capsys, "status")["open"]]
 
 
@@ -240,7 +240,7 @@ def test_a_note_applies_to_an_existing_experiment_or_the_project(lab, capsys):
     int8_experiment(capsys)
     n = ok(capsys, "note", "add", "the held-out set is not in the pretraining set", "-e", "e1")["object"]
     assert (n["kind"], n["experiment_id"], n["text"], n["by"]) == ("note", "e1", "the held-out set is not in the pretraining set", HUMAN)
-    assert [x["text"] for x in ok(capsys, "show", "e1")["object"]["notes"]] == ["the held-out set is not in the pretraining set"]
+    assert [x["text"] for x in ok(capsys, "show", "--long", "e1")["object"]["notes"]] == ["the held-out set is not in the pretraining set"]
     refused(capsys, 2, "E_OBJECT_NOT_FOUND", "note", "add", "x", "-e", "enone")
     ok(capsys, "note", "add", "the evaluation split is fixed")
     assert [x["text"] for x in ok(capsys, "status")["project"]["notes"]] == ["the evaluation split is fixed"]
@@ -272,7 +272,7 @@ def test_variant_add_adds_an_arm_with_its_role(lab, capsys):
     int8_experiment(capsys)
     v = ok(capsys, "variant", "add", "e1", "no-quant-head", "--role", "ablation")["object"]
     assert v["kind"] == "variant" and v["experiment_id"] == "e1" and v["name"] == "no-quant-head" and v["role"] == "ablation"
-    variants = ok(capsys, "show", "e1")["object"]["variants"]
+    variants = ok(capsys, "show", "--long", "e1")["object"]["variants"]
     assert ("no-quant-head", "ablation") in [(x["name"], x["role"]) for x in variants]
 
 
@@ -454,7 +454,7 @@ def test_a_comment_states_no_analysis_s_numbers(project, capsys):
     a = ok(capsys, *compare, "REPORT.md")["object"]
     assert a["comparisons"][0]["source"]["line"] == 3
     Path("REPORT.md").write_text("# Report\n\n<!-- int8 vs fp32: val_loss 0.023 [0.014, 0.032] -->\n", encoding="utf-8")
-    assert "REPORT.md:3 is a comment, and a comment states nothing" in json.dumps(ok(capsys, "show", a["id"]))
+    assert "REPORT.md:3 is a comment, and a comment states nothing" in json.dumps(ok(capsys, "show", "--long", a["id"]))
 
 
 def test_output_states_an_analysis_s_numbers_whatever_mark_opens_its_line(project, capsys):
@@ -626,19 +626,19 @@ def test_a_variant_setting_overrides_the_shared_one_for_that_variant(lab, capsys
     s = ok(capsys, "spec", "set", "e1", "int8.precision", "int8", "--source", "note:quantised export")["object"]
     assert s["address"] == "e1/int8.precision" and s["name"] == "precision"
     assert ok(capsys, "spec", "set", "e1", "precision", "fp16", "--variant", "fp32")["object"]["address"] == "e1/fp32.precision"
-    exp = ok(capsys, "show", "e1")["object"]
+    exp = ok(capsys, "show", "--long", "e1")["object"]
     own = {v["name"]: {x["name"]: x["value"] for x in v["settings"]} for v in exp["variants"]}
     assert own == {"fp32": {"precision": "fp16"}, "int8": {"precision": "int8"}} and exp["settings"] == []
-    assert ok(capsys, "show", "e1/int8.precision")["object"]["value"] == "int8"
+    assert ok(capsys, "show", "--long", "e1/int8.precision")["object"]["value"] == "int8"
 
 
 def test_a_difference_between_variants_not_declared_in_varies_is_a_confound_problem(lab, capsys):
     int8_experiment(capsys)
     ok(capsys, "spec", "set", "e1", "int8.precision", "int8", "--source", "note:x")
     ok(capsys, "spec", "set", "e1", "fp32.precision", "fp32", "--source", "note:x")
-    assert not [c for c in ok(capsys, "show", "e1")["caveats"] if c["code"] == "confound"]    # declared: the question itself
+    assert not [c for c in ok(capsys, "show", "--long", "e1")["caveats"] if c["code"] == "confound"]    # declared: the question itself
     ok(capsys, "spec", "set", "e1", "int8.calib_batches", "64", "--source", "note:x")
-    [confound] = [c for c in ok(capsys, "show", "e1")["caveats"] if c["code"] == "confound"]
+    [confound] = [c for c in ok(capsys, "show", "--long", "e1")["caveats"] if c["code"] == "confound"]
     assert confound["problem"] and "calib_batches" in confound["subject"]
 
 
@@ -684,7 +684,7 @@ def test_now_in_a_source_s_own_words_never_says_the_source_changed(project, caps
     for _ in range(2):
         code, env = rb(capsys, "spec", "verify", "e1", "lr", "wd")
         assert code == 1 and {row["setting"]: row["reason"] for row in env.data["results"]} == said
-        assert {n: ok(capsys, "show", f"e1/{n}")["object"]["conflict"]["text"] for n in said} == said
+        assert {n: ok(capsys, "show", "--long", f"e1/{n}")["object"]["conflict"]["text"] for n in said} == said
 
 
 def test_a_source_outside_the_project_is_refused(lab, capsys, tmp_path_factory):
@@ -824,7 +824,7 @@ def test_a_run_made_before_it_was_recorded_names_its_own_code_or_leaves_it_unkno
     int8_experiment(capsys)
 
     def again() -> dict:
-        return {r["what"]: (r["state"], r["detail"]) for r in ok(capsys, "show", "e1")["rerunnability"]}
+        return {r["what"]: (r["state"], r["detail"]) for r in ok(capsys, "show", "--long", "e1")["rerunnability"]}
 
     ok(capsys, "run", "add", "e1", "int8.val_loss=1.4", "--produced-at", "2026-05-09T19:50:42Z")
     code, env = "the run was made before it was recorded, and names no commit", "the run was made before it was recorded, in an environment rb did not see"
@@ -860,7 +860,7 @@ def test_counts_of_one_and_two_read_as_the_only_one_both_or_neither(project, cap
     assert main(["log", "-n", "1"]) == 0 and "both settings checked as stated" in capsys.readouterr().out
     for v in (1.4, 1.5):
         ok(capsys, "run", "add", "e1", f"int8.val_loss={v}", "--produced-at", "2026-05-09T19:50:42Z")
-    rows = {r["what"]: (r["state"], r["detail"]) for r in ok(capsys, "show", "e1")["rerunnability"]}
+    rows = {r["what"]: (r["state"], r["detail"]) for r in ok(capsys, "show", "--long", "e1")["rerunnability"]}
     assert rows["code"] == ("unknown", "both runs were made before they were recorded, and neither names its commit"), rows
     assert rows["environment"] == ("unknown", "both runs were made before they were recorded, in environments rb did not see"), rows
     Path("results/calib").mkdir(parents=True)
@@ -885,7 +885,7 @@ def test_a_run_made_before_it_was_recorded_from_a_tree_says_its_uncommitted_chan
     tree = git("write-tree")
     git("reset", "-q", "train.py")
     ok(capsys, "run", "add", "e1", "int8.val_loss=1.4", "--produced-at", "2026-05-10", "--commit", head, "--tree", tree)
-    code = {r["what"]: (r["state"], r["detail"]) for r in ok(capsys, "show", "e1")["rerunnability"]}["code"]
+    code = {r["what"]: (r["state"], r["detail"]) for r in ok(capsys, "show", "--long", "e1")["rerunnability"]}["code"]
     assert code == ("ok", f"commit {head[:12]} · changes outside the record not committed, kept as git trees")
 
 
@@ -909,7 +909,7 @@ def test_a_run_is_made_before_it_was_recorded_by_a_sign_of_its_own_output(lab, c
     int8_experiment(capsys)
 
     def again() -> dict:
-        return {r["what"]: r["state"] for r in ok(capsys, "show", "e1")["rerunnability"]}
+        return {r["what"]: r["state"] for r in ok(capsys, "show", "--long", "e1")["rerunnability"]}
 
     Path("out/a.json").write_text(json.dumps({"int8": {"val_loss": 1.45}}), encoding="utf-8")
     run = ok(capsys, "run", "add", "e1", "--from", "out/a.json")["object"]
@@ -933,7 +933,7 @@ def test_a_run_is_made_before_it_was_recorded_by_a_sign_of_its_own_output(lab, c
     os.utime("out/c.json", (1767225600, 1767225600))      # written months ago, and kept out of git
     run = ok(capsys, "run", "add", "e1", "--from", "out/c.json")["object"]
     assert run["produced_basis"] == "file" and run["receipt"]["produced"]["existed"] == {"at": "2026-01-01T00:00:00.000+00:00", "by": "file"}
-    rows = {r["what"]: r["detail"] for r in ok(capsys, "show", "e1")["rerunnability"]}
+    rows = {r["what"]: r["detail"] for r in ok(capsys, "show", "--long", "e1")["rerunnability"]}
     assert rows["code"].endswith(" · 2 of 5 runs were made before they were recorded and name no commit")
 
 
@@ -955,7 +955,7 @@ def test_a_second_execution_that_wrote_the_same_bytes_is_recorded_as_it_landed(l
     for extra in (("--again", "--why", "rerun after the refactor"), ("--repeats", first, "--again", "--why", "a check")):
         run = ok(capsys, "run", "add", "e1", "--from", "results/metrics.json", *extra)["object"]
         assert (run["produced_basis"], run["receipt"]["produced"]["existed"]["by"]) == ("git", "file"), extra
-    rows = {r["what"]: r["state"] for r in ok(capsys, "show", "e1")["rerunnability"]}
+    rows = {r["what"]: r["state"] for r in ok(capsys, "show", "--long", "e1")["rerunnability"]}
     assert (rows["code"], rows["environment"]) == ("ok", "ok")
 
 
@@ -1130,7 +1130,7 @@ def test_a_number_no_criterion_reads_is_said_unread_with_no_rule_to_declare(lab,
     items = {o["code"]: o for o in ok(capsys, "status")["open"]}
     assert items["unread_metric"]["what"] == "e1: runs report int8.latency_ms, which no recorded criterion reads" and items["unread_metric"]["do"] == ""
     assert items["unread_comparison"]["do"] == ""
-    assert main(["status"]) in (0, 1)
+    assert main(["status", "--full"]) in (0, 1)
     said = capsys.readouterr().out
     quiet = said[said.index("Facts that ask for nothing ("):]
     assert "  - e1: runs report int8.latency_ms, which no recorded criterion reads" in quiet
@@ -1172,7 +1172,7 @@ def test_every_list_cut_short_says_how_many_more(lab, capsys):
     for name in "abcd":
         ok(capsys, "spec", "set", "e1", f"opt.{name}", "2", "--no-verify")
     run = ok(capsys, "run", "add", "e1", "int8.val_loss=0.9", "--config", "ran.yaml")["object"]["id"]
-    [o] = [o for o in ok(capsys, "show", "c1")["finding"]["observations"] if o["run"] == run]
+    [o] = [o for o in ok(capsys, "show", "--long", "c1")["finding"]["observations"] if o["run"] == run]
     assert o["reason"].startswith("ran with opt.a 1 (the spec says 2); ") and o["reason"].endswith("; and 1 more")
     Path("out").mkdir()
     Path("out/m.json").write_text(json.dumps({k: i for i, k in enumerate(("alpha", "beta", "gamma", "delta", "eps"))}), encoding="utf-8")
@@ -1182,7 +1182,7 @@ def test_every_list_cut_short_says_how_many_more(lab, capsys):
         ok(capsys, "experiment", "add", "x", "--id", e, "--baseline", "fp32", "--candidate", "int8")
     for e in ("e1", "e2", "e3", "e4"):
         ok(capsys, "run", "add", e, *[f"int8.m{i}={i}" for i in range(8)])
-    assert main(["status"]) in (0, 1)
+    assert main(["status", "--full"]) in (0, 1)
     said = capsys.readouterr().out
     assert all(f"  - {e}: runs report int8.m0, int8.m1, int8.m2, int8.m3, int8.m4, int8.m5 and 2 more, which no recorded criterion reads" in said
                for e in ("e2", "e3", "e4"))
@@ -1198,10 +1198,10 @@ def test_rb_show_says_a_repository_with_no_commit_yet_and_counts_an_analysis_s_u
     plural, as the criterion that reads it does, a unit given in the plural as given."""
     int8_experiment(capsys)
     run = ok(capsys, "run", "add", "e1", "int8.val_loss=1.4")["object"]["id"]
-    assert main(["show", run]) == 0 and "repository when recorded: no commit yet\n" in capsys.readouterr().out
+    assert main(["show", "--long", run]) == 0 and "repository when recorded: no commit yet\n" in capsys.readouterr().out
     a = ok(capsys, "analysis", "add", "e1", "--compare", "int8/fp32:val_loss=0.1[0.05,0.15]", "--method", "bootstrap", "--unit", "image",
            "--units", "100")["object"]["id"]
-    assert main(["show", a]) == 0
+    assert main(["show", "--long", a]) == 0
     said = capsys.readouterr().out
     assert "method: bootstrap · 100 images · 95%" in said and "· 100 images" in said
     assert main(["analysis", "add", "e1", "--compare", "int8/fp32:val_loss=0.2[0.1,0.3]", "--method", "bootstrap", "--unit", "images",
@@ -1224,7 +1224,7 @@ def test_a_call_made_on_readings_that_moved_counts_every_one(lab, capsys):
     ok(capsys, "run", "add", "e1", *[f"int8.m{i}=2" for i in range(1, 7)])
     moved = [o["what"] for o in ok(capsys, "status")["open"] if o["code"] == "decision_outdated"]
     assert len(moved) == 2 and all(m.endswith("was made on readings that have moved since: c1, c2, c3, c4 and 2 more") for m in moved)
-    assert main(["show", "e1"]) == 0
+    assert main(["show", "--long", "e1"]) == 0
     assert "made on readings that have moved since (c1, c2, c3, c4 and 2 more)" in capsys.readouterr().out
 
 
@@ -1248,10 +1248,10 @@ def _agent_setup(capsys, monkeypatch):
 
 
 @pytest.mark.parametrize("argv, by", [
-    (["freeze", "e1", "-m", "pre-register"], lambda capsys, run: ok(capsys, "show", "e1")["object"]["frozen"]["by"]),
+    (["freeze", "e1", "-m", "pre-register"], lambda capsys, run: ok(capsys, "show", "--long", "e1")["object"]["frozen"]["by"]),
     # a call the agent records is the agent's, and proposed: the finding reads no review until the user confirms it
     (["decide", "c1", "accept", "-m", "looks fine"], lambda capsys, run: ok(capsys, "status")["pending"][0]["by"] if finding(capsys, "c1")["review"] is None else None),
-    (["retract", "{run}", "-m", "wrong normalisation"], lambda capsys, run: ok(capsys, "show", run)["object"]["retracted"]["by"]),
+    (["retract", "{run}", "-m", "wrong normalisation"], lambda capsys, run: ok(capsys, "show", "--long", run)["object"]["retracted"]["by"]),
 ], ids=["freeze", "decide", "retract"])
 def test_an_agents_freeze_ruling_and_retraction_are_recorded_as_the_agents(lab, capsys, monkeypatch, argv, by):
     """Nothing is refused for who makes it: the call goes through, the record it makes names the agent, and so does
@@ -1302,7 +1302,7 @@ def test_a_frozen_spec_changes_only_with_an_amendment(lab, capsys):
     refused(capsys, 2, "E_FROZEN", "criterion", "add", "late", "-e", "e1", "--metric", "int8.val_loss", "--at-most", "1")
     refused(capsys, 2, "E_OBJECT_INVALID", "spec", "set", "e1", "lr", "0.2", "--amend")
     ok(capsys, "spec", "set", "e1", "lr", "0.2", "--amend", "-m", "the config was fixed before any held-out run")
-    [amendment] = ok(capsys, "show", "e1")["object"]["amendments"]
+    [amendment] = ok(capsys, "show", "--long", "e1")["object"]["amendments"]
     assert amendment["why"] == "the config was fixed before any held-out run" and "0.1 -> 0.2" in amendment["change"]
 
 
@@ -1315,9 +1315,9 @@ def test_a_decision_moves_the_state_of_what_it_decides(lab, capsys, kind, outcom
     d = ok(capsys, "decide", subject, outcome, "-m", "because")["object"]
     assert d["kind"] == "decision" and d["subject"] == subject and d["action"] == outcome and d["by"] == HUMAN
     if kind == "experiment":
-        assert ok(capsys, "show", subject)["state"] == state
+        assert ok(capsys, "show", "--long", subject)["state"] == state
     else:
-        assert "status" not in ok(capsys, "show", subject)["object"]
+        assert "status" not in ok(capsys, "show", "--long", subject)["object"]
         assert [q["state"] for q in ok(capsys, "status")["questions"] if q["id"] == subject] == [state]
 
 
@@ -1364,7 +1364,7 @@ def test_a_setting_taken_back_and_set_again_stays_on_record_beside_the_new_one(l
         ok(capsys, "retract", f"e1/{name}", "--why", "the wrong run's value")
         ok(capsys, "spec", "set", "e1", name, "0.2", "--source", "note:a second guess")
         ok(capsys, "spec", "set", "e1", name, "0.3", "--source", "note:the value it ran with")
-        assert ok(capsys, "show", f"e1/{name}")["object"]["value"] == 0.3
+        assert ok(capsys, "show", "--long", f"e1/{name}")["object"]["value"] == 0.3
     kept = rbyaml.loads((lab / ".rb" / "experiments" / "e1" / "experiment.yaml").read_text(encoding="utf-8"))["settings"]
     assert [(s["name"], s["value"], "retracted" in s) for s in kept] == [("lr", 0.1, True), ("lr", 0.3, False)]
     assert rb(capsys, "status")[0] == 0 and rb(capsys, "doctor")[0] == 0
@@ -1445,17 +1445,17 @@ def test_status_counts_a_setting_whose_source_says_otherwise_as_conflict_or_stal
     ok(capsys, "spec", "set", "e1", "batch_size", "--source", "configs/train.yaml#batch_size")
     [e] = ok(capsys, "status")["experiments"]
     assert e["settings_count"] == {"verified": 2, "provisional": 0, "unknown": 0, "inherited": 0, "per_run": 0}
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     assert "· settings 2 verified · 0 provisional · 0 unknown · runs 0" in capsys.readouterr().out
     Path("configs/train.yaml").write_text(TRAIN_YAML.replace("lr: 1e-4", "lr: 3e-4").replace("batch_size: 6\n", ""), encoding="utf-8")
     [e] = ok(capsys, "status")["experiments"]
     assert e["settings_count"] == {"verified": 0, "provisional": 0, "unknown": 0, "inherited": 0, "per_run": 0, "conflict": 1, "stale": 1}
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     assert "· settings 0 verified · 0 provisional · 0 unknown · 1 conflict · 1 stale · runs 0" in capsys.readouterr().out
     assert rb(capsys, "spec", "verify", "e1")[0] == 1          # lr's conflict is now on record; batch_size is provisional
     [e] = ok(capsys, "status")["experiments"]
     assert e["settings_count"] == {"verified": 0, "provisional": 1, "unknown": 0, "inherited": 0, "per_run": 0, "conflict": 1}
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     assert "· settings 0 verified · 1 provisional · 0 unknown · 1 conflict · runs 0" in capsys.readouterr().out
 
 
@@ -1511,7 +1511,7 @@ def test_one_comparison_shows_one_number_where_a_criterion_reads_it_paired_over_
     assert t["conditions"] == ["depth"]
     cells = {(r["variant"], r["where"]["depth"]): r["metrics"]["val_loss"] for r in t["rows"]}
     assert list(cells) == [("fp32", 6), ("fp32", 10), ("int8", 6), ("int8", 10)]
-    reads = ok(capsys, "show", "c10")["finding"]["comparison"]
+    reads = ok(capsys, "show", "--long", "c10")["finding"]["comparison"]
     assert reads["estimate"] == pytest.approx(0.22) and cells[("int8", 10)]["delta"] == pytest.approx(0.22)
     assert "read_by" not in cells[("int8", 10)] and cells[("int8", 6)]["delta"] == pytest.approx(0.03)
     assert all(c["n"] == 3 for c in cells.values())
@@ -1524,10 +1524,19 @@ def test_one_comparison_shows_one_number_where_a_criterion_reads_it_paired_over_
     page = " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", raw)).split())
     table = page[page.index("Comparison"):page.index("Its rules")]
     # the grid (PIVOT): two variants under two depths lie on their side, a row per depth, the change within it
-    assert '<thead><tr><th></th><th>FP32 <span class="tag">baseline</span></th><th>INT8</th><th>Difference</th></tr></thead>' in raw
+    # closed form (owner, Nov 13 2026): each variant's head opens the variant, so the cells are read through their links,
+    # and every link names an element the page holds
+    heads = [h for h in re.findall(r"<thead>(.*?)</thead>", raw, flags=re.S) if "Difference" in h]
+    cells_said = [[" ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", c)).split()) for c in re.findall(r"<th>(.*?)</th>", h, flags=re.S)] for h in heads]
+    assert ["", "FP32 baseline", "INT8", "Difference"] in cells_said, cells_said
+    for h in heads:
+        for to in re.findall(r'href="#([^"]+)"', h):
+            assert f' id="{to}"' in raw, to
     # what it varies, as rb show says it: once, beside what it compares (rb gives compares), never again as a facts row
     card = raw.split('id="x-e1"', 1)[1].split("</article>", 1)[0]
-    assert re.search(r'<p class="cmpl"><span>[^<]+</span><span> · varies </span><span class="mono">precision</span></p>', card)
+    # closed form (owner, Nov 13 2026): what it compares opens its comparison, where the page draws one
+    cmpl = re.search(r'<p class="cmpl">(?:<span>[^<]+</span>|<a href="#(x-e1:cmp)">[^<]+</a>)<span> · varies </span><span class="mono">precision</span></p>', card)
+    assert cmpl and (not cmpl.group(1) or ' id="x-e1:cmp"' in raw), card
     assert "<dt>varies</dt>" not in card
     assert re.search(r"Depth: 10 1\.22 · 3 \w+ 1\.44 · 3 \w+ 0\.22 nats higher than FP32", table) and "0.125" not in table, table
 
@@ -1571,7 +1580,8 @@ def test_a_variant_run_in_two_cells_has_a_row_per_cell_never_a_mean_pooled_acros
     capsys.readouterr()
     page = " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", Path("page.html").read_text(encoding="utf-8"))).split())
     # a row per cell (the grid on its side, PIVOT), its condition named on the row (Calib: 512), the change within it
-    assert re.search(r"Calib: 512 0\.754 · 3 \w+ 0\.74 · 1 run 0\.014 lower than FP32 · [^.]*so no interval", page), page
+    # closed form (owner, Nov 13 2026): a reading with no interval yet says 'no range yet' on the page
+    assert re.search(r"Calib: 512 0\.754 · 3 \w+ 0\.74 · 1 run 0\.014 lower than FP32 · [^.]*so no range yet", page), page
     # one cell: no condition and one row per variant, as before
     ok(capsys, "experiment", "add", "INT8 at one size", "--id", "e2", "--baseline", "fp32", "--candidate", "int8")
     ok(capsys, "spec", "set", "e2", "calib", "--per-run", "--design-factor")
@@ -1634,9 +1644,10 @@ def test_a_change_vs_baseline_says_one_run_unpaired_units_and_a_second_factor(la
     assert main(["page", "--out", "page.html"]) == 0
     capsys.readouterr()
     page = " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", Path("page.html").read_text(encoding="utf-8"))).split())
-    assert re.search(r"INT8 0\.755 · 1 run 0\.0080 lower than FP32 · [^.]*so no interval", page), page
-    assert re.search(r"INT8 · Calib: 512 0\.745 · 1 run 0\.017 lower than the baseline · [^·]*so no interval · also differs in precision and calib", page), page
-    assert re.search(r"FP32 · Calib: 512 0\.76 · 1 run 0\.0020 lower than the baseline · [^·]*so no interval", page), page
+    # closed form (owner, Nov 13 2026): a reading with no interval yet says 'no range yet' on the page
+    assert re.search(r"INT8 0\.755 · 1 run 0\.0080 lower than FP32 · [^.]*so no range yet", page), page
+    assert re.search(r"INT8 · Calib: 512 0\.745 · 1 run 0\.017 lower than the baseline · [^·]*so no range yet · also differs in precision and calib", page), page
+    assert re.search(r"FP32 · Calib: 512 0\.76 · 1 run 0\.0020 lower than the baseline · [^·]*so no range yet", page), page
 
 
 def test_a_per_run_setting_a_variant_holds_two_values_of_splits_the_table_and_the_reading_says_it_pools(lab, capsys):
@@ -1660,13 +1671,13 @@ def test_a_per_run_setting_a_variant_holds_two_values_of_splits_the_table_and_th
     assert cells == {("fp32", 512): pytest.approx(0.761), ("fp32", 1024): pytest.approx(0.761),
                      ("int8", 512): pytest.approx(0.752), ("int8", 1024): pytest.approx(0.762)}
     assert rabbit_brain.open().experiment("e1").compare()["rows"] == t["rows"]
-    pooled = [c for c in ok(capsys, "show", "c1")["finding"]["caveats"] if c["code"] == "pooled_setting"]
+    pooled = [c for c in ok(capsys, "show", "--long", "c1")["finding"]["caveats"] if c["code"] == "pooled_setting"]
     # the arms hold different calibration sizes: a condition, never offered as a repeat
     assert [c["text"] for c in pooled] == ["the runs it reads hold calib 512 and 1024, pooled in one reading: a rule with --where calib=<value> reads one"]
     ok(capsys, "criterion", "add", "INT8 against FP32 at 1024", "-e", "e1", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
        "--better", "--where", "calib=1024", "--id", "c2")
-    assert not [c for c in ok(capsys, "show", "c2")["finding"]["caveats"] if c["code"] == "pooled_setting"]
-    assert main(["status"]) == 0
+    assert not [c for c in ok(capsys, "show", "--long", "c2")["finding"]["caveats"] if c["code"] == "pooled_setting"]
+    assert main(["status", "--full"]) == 0
     assert "· the runs it reads hold calib 512 and 1024, pooled in one reading" in capsys.readouterr().out
 
 
@@ -1782,7 +1793,7 @@ def _one_of_each(capsys) -> dict:
 @pytest.mark.parametrize("kind", ["question", "experiment", "metric", "criterion", "run", "resource", "decision"])
 def test_show_returns_each_kind_of_object_named_by_its_kind(lab, capsys, kind):
     ids = _one_of_each(capsys)
-    data = ok(capsys, "show", ids[kind])
+    data = ok(capsys, "show", "--long", ids[kind])
     assert data["object"]["kind"] == kind and data["object"]["id"] == ids[kind]
     if kind == "criterion":
         f = data["finding"]
@@ -1800,7 +1811,7 @@ def test_show_a_resource_counts_the_runs_and_analyses_past_its_first_twelve(lab,
         ok(capsys, "run", "add", "e1", f"int8.val_loss=1.{i + 10}", "--input", "heldout:eval")
         ok(capsys, "analysis", "add", "e1", "--compare", f"int8:val_loss=1.{i + 10}", "--method", "a mean", "--input", "heldout:eval")
         if i in (12, 13):
-            assert main(["show", "heldout"]) == 0
+            assert main(["show", "--long", "heldout"]) == 0
             said = capsys.readouterr().out.splitlines()
             more = ["  and 1 more run", "  and 1 more analysis"] if i == 12 else ["  and 2 more runs", "  and 2 more analyses"]
             assert [line for line in said if line.startswith("  and ")] == more
@@ -1815,7 +1826,7 @@ def test_a_call_reads_as_made_wherever_it_is_said(lab, capsys):
     f = finding(capsys, c)
     assert f["review"]["action"] == "accept" and re.fullmatch(r"accepted \d{4}-\d\d-\d\d: ship it", f["says"]["review"])
     assert f["review"]["by"] == HUMAN
-    assert main(["show", d]) == 0
+    assert main(["show", "--long", d]) == 0
     assert capsys.readouterr().out.startswith(f"Decision {d}: accepted {c} at ")
     assert main(["decide", "e1", "park", "-m", "later"]) == 0
     assert ": parked e1: later" in capsys.readouterr().out
@@ -1830,7 +1841,7 @@ def test_show_a_setting_address_gives_the_setting_and_its_history(project, capsy
     int8_experiment(capsys)
     ok(capsys, "spec", "set", "e1", "lr", "--source", "configs/train.yaml#optim.lr")
     ok(capsys, "spec", "set", "e1", "lr", "3e-4")
-    data = ok(capsys, "show", "e1/lr")
+    data = ok(capsys, "show", "--long", "e1/lr")
     s = data["object"]
     assert s["kind"] == "setting" and s["address"] == "e1/lr" and s["experiment_id"] == "e1"
     assert s["value"] == 0.0003 and s["status"] == "provisional" and s["source"] is None   # the old source stated the old value
@@ -1841,20 +1852,20 @@ def test_show_a_setting_address_gives_the_setting_and_its_history(project, capsy
 def test_show_a_setting_says_what_this_read_finds_of_its_source(project, capsys):
     int8_experiment(capsys)
     ok(capsys, "spec", "set", "e1", "lr", "--source", "configs/train.yaml#optim.lr")
-    assert ok(capsys, "show", "e1/lr")["caveats"] == []
+    assert ok(capsys, "show", "--long", "e1/lr")["caveats"] == []
     Path("configs/train.yaml").write_text(TRAIN_YAML.replace("lr: 1e-4", "lr: 3e-4"), encoding="utf-8")
-    data = ok(capsys, "show", "e1/lr")
+    data = ok(capsys, "show", "--long", "e1/lr")
     assert data["object"]["status"] == "verified"                         # the record as rb wrote it
     [now] = data["caveats"]                                               # and what this read finds, as rb status does
     assert (now["code"], now["subject"], now["problem"]) == ("conflict", "e1/lr", True)
     assert now["text"] == "lr: the record says 0.0001, but configs/train.yaml#optim.lr now says 0.0003"     # the record's value first
     assert any((i["code"], i["subject"]) == ("conflict", "e1/lr") for i in ok(capsys, "status")["open"])
-    assert main(["show", "e1/lr"]) == 0
+    assert main(["show", "--long", "e1/lr"]) == 0
     said = capsys.readouterr().out.splitlines()
     assert said[0].endswith("· verified · CONFLICT") and said[2] == "  ✗ lr: the record says 0.0001, but configs/train.yaml#optim.lr now says 0.0003"
 
 
-@pytest.mark.parametrize("argv", [["show", "zzz"], ["show", "e1/nope"], ["spec", "set", "enone", "lr", "1"],
+@pytest.mark.parametrize("argv", [["show", "--long", "zzz"], ["show", "--long", "e1/nope"], ["spec", "set", "enone", "lr", "1"],
                                   ["criterion", "add", "x", "-e", "enone", "--metric", "m", "--at-most", "1"],
                                   ["run", "add", "enone", "m=1"], ["decide", "cnone", "accept", "-m", "x"]])
 def test_an_id_that_does_not_exist_is_E_OBJECT_NOT_FOUND(lab, capsys, argv):
@@ -1918,7 +1929,7 @@ def test_context_is_the_markdown_briefing_with_its_sections(project, capsys):
     assert "rb decide c2" in sections["Needs judgment"] and "c1" not in sections["Needs judgment"]
     assert "Can INT8 ship?" in sections["Can be done now"]
     # the heading names no one: what can be done now, whoever does it (JSON keys unchanged)
-    main(["status"])
+    main(["status", "--full"])
     status = capsys.readouterr().out
     assert "Agent can do" not in md and "Agent can do" not in status and "\nCan be done now (1)\n" in status
     assert "| setting | value | status | checked in |" in sections[exp]
@@ -2004,7 +2015,7 @@ def test_every_command_status_context_and_next_suggest_exists(project, capsys, m
     keep("criterion", "add", "agent's", "-e", "e1", "--metric", "int8.val_loss", "--at-most", "2")   # declared after the run: late
     monkeypatch.delenv("CLAUDECODE")
     keep("freeze", "e2", "-m", "pre-register")
-    st = keep("status")
+    st = keep("status", "--full")
     ctx = keep("context")
     hints = [o["do"] for o in st["open"]] + nexts
     assert "rb spec verify e1 lr" in hints
@@ -2028,7 +2039,7 @@ def test_the_confound_hint_run_as_written_clears_the_confound(lab, capsys, froze
     assert hint, item["do"]
     command = hint.group(0).replace('"..."', '"calibration does not change what is compared"')
     ok(capsys, *shlex.split(command)[1:])
-    problems = [c for c in ok(capsys, "show", "e1")["caveats"] if c["code"] == "confound" and c["problem"]]
+    problems = [c for c in ok(capsys, "show", "--long", "e1")["caveats"] if c["code"] == "confound" and c["problem"]]
     assert problems == [], (command, problems)
 
 
@@ -2042,7 +2053,7 @@ def run_as_written(capsys, command: str, *values: str) -> dict:
 
 def kept_source(capsys, address: str) -> dict:
     """A setting's source as it is kept, what rb read from it aside."""
-    return {k: v for k, v in ok(capsys, "show", address)["object"]["source"].items() if k != "resolved"}
+    return {k: v for k, v in ok(capsys, "show", "--long", address)["object"]["source"].items() if k != "resolved"}
 
 
 @needs_git
@@ -2179,4 +2190,4 @@ def test_resource_add_file_reads_the_file_from_the_current_folder(lab, capsys, m
     assert res["sha256"] == hashlib.sha256(b"int8 weights\n").hexdigest()
     assert [(loc["provider"], loc["ref"]) for loc in res["locations"]] == [("local", "ckpt/int8.bin")]
     monkeypatch.chdir("..")
-    assert ok(capsys, "show", "int8-ckpt")["availability"]["state"] == "present"
+    assert ok(capsys, "show", "--long", "int8-ckpt")["availability"]["state"] == "present"

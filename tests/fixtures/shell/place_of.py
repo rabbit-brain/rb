@@ -40,6 +40,9 @@ def recorded_here(here):
 
 
 if state == "away":
+    # exp-b's checkout holds no PLAIN.md: no plain line anywhere
+    doc["overview"]["plain"] = None
+    doc["overview"]["question"]["plain"], doc["overview"]["question"]["plain_cite"] = None, None
     # another place, now: its own scope bar, no Elsewhere (that is the live start place's), every command with its cd
     P["place"] = {"id": EXPB["id"], "label": EXPB["label"], "path": EXPB["path"], "start": False, "read_only": False, "version": None,
                   "line": "exp-b · .worktrees/b · 1 run not merged into main"}
@@ -49,7 +52,7 @@ if state == "away":
                        "commit": sha, "on_branch": True, "name": "exp-b", "record_files_not_committed": 1, "record_files_ignored": 0,
                        "ignored_by": None, "record_held": True, "changes_outside_record": False, "why": None,
                        "page_line": "1 record file not committed · at commit 5d1e0a7c4b3a", "fold": [{"text": "at commit 5d1e0a7c4b3a", "kind": "commit", "sha": sha}],
-                       "record_files": 42, "not_committed_files": [{"path": ".rb/log.jsonl", "change": "changed", "from": None}], "ignored_files": [],
+                       "record_files": 42, "chip": {"ref": "exp-b", "commit": sha, "not_committed": 1, "files": [".rb/log.jsonl"]}, "not_committed_files": [{"path": ".rb/log.jsonl", "change": "changed", "from": None}], "ignored_files": [],
                        "checked_at": doc["checkout"]["checked_at"], "check": "git -C /home/ana/int8-resnet50/.worktrees/b status --short --untracked-files=all -- .rb",
                        "evidence": [{"kind": "found", "text": "rb checked the record with git just now: 1 of its 42 record files is new, changed or deleted since commit 5d1e0a7c4b3a.",
                                      "when": "just now", "at": doc["checkout"]["checked_at"], "sha": sha, "code": []},

@@ -31,13 +31,21 @@ def test_rule_labels_read_the_declared_threshold_not_the_direction(workdir, monk
     assert tui.standing_class(headline.split(' · ')[0]) == ('good' if green else 'bad' if finding['rule_outcome'] == 'misses' else 'dim')
     page = workdir / 'record.html'
     cli('page', '--out', str(page))
-    # the card says its verdict once, under its title, led by the rule's state word (FIX2); a rule met on its estimate
-    # says its interval does not show it yet; the card is green only when the rule is met soundly
+    # the card says its verdict once, as the mark beside rb's drawn number, and no sentence repeats it: a rule met or
+    # missed soundly as a check or a cross; a rule met on its estimate alone as a check in no state's colour, named as
+    # rb's headline names it, over the figure that shows how wide its interval is; the card is green only when the rule
+    # is met soundly (the UX lead's card, Nov 13 2026: "matches, but wide" is seen, not read)
     lead = headline.split(' · ')[0]
     text = page.read_text()
-    stand = text.split('id="c-c"', 1)[1].split('<p class="str">', 1)[1].split('</p>', 1)[0]
-    assert stand.startswith('Not met: ' if lead == 'criterion not met' else 'Met: '), stand
-    assert ('its interval does not show it yet' in stand) == (lead == 'estimate meets criterion'), stand
+    card = text.split('id="c-c"', 1)[1].split('<div class="card', 1)[0]
+    if lead == 'estimate meets criterion':
+        assert card.count('<span class="vmk ') == 1 and '<span class="vmk est" role="img" aria-label="estimate meets the rule">' in card, card  # closed form: the page's words
+        assert '<p class="str">' not in card, card
+    else:
+        assert '<p class="str">' not in card and 'does not show it yet' not in card, card
+        # closed form (owner, Nov 13 2026): the mark is said in the page's words
+        mark = 'no" role="img" aria-label="does not hold">' if lead == 'criterion not met' else 'ok" role="img" aria-label="holds">'
+        assert card.count('<span class="vmk ') == 1 and f'<span class="vmk {mark}' in card, card
     assert ('<div class="card crit is-good" id="c-c"' in text) == green
     assert '≤' in page.read_text()
 
@@ -71,7 +79,7 @@ def linked(workdir, monkeypatch, capsys):
 def test_a_questions_counts_say_rbs_words_and_keep_linked_criteria_apart_from_what_is_below_it(linked):
     shown = linked('show', 'q1', text=True)
     assert '  linked here, by rule: 2 criteria met · 1 criterion not met · by result: 3 loss\n' in shown
-    status = linked('status', text=True)
+    status = linked('status', '--full', text=True)
     assert '  below it: 1 sub-question, 1 open · 1 planned\n' in status
     assert '    linked here: 2 criteria met · 1 criterion not met; below it: 1 planned\n' in status
     assert not re.search(r'(?<!\w)\d+ (meets|misses|undetermined|untested)\b', shown + status)

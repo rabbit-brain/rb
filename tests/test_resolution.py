@@ -87,7 +87,7 @@ def test_a_second_copy_of_a_record_is_caught_set_aside_and_never_adopted(rb, cap
     assert ok(rb, "show", "c1").data["object"]["target"] == 0.7                  # the record rb wrote is the one read
     code, env = rb("doctor")
     assert code != 0
-    code, env = rb("status", "--fail-on", "unestablished")
+    code, env = rb("status", "--full", "--fail-on", "unestablished")
     assert code == 1 and any(i["code"] == "edited_outside_rb" and "second copy" in i["what"] for i in env.data["open"])
     code, env = rb("doctor", "--adopt", "--why", "keep it")
     assert code != 0 and env.errors[0].code == "E_ADOPT_AUTHORITY"

@@ -48,7 +48,7 @@ def test_a_row_of_a_table_is_a_run(rb):
     assert run["metrics"] == {"int8.top1": 75.4} and run["per_run"] == {"seed": 2} and run["produced_at"].startswith("2026-05-02T11:00:00")
     row = run["receipt"]["table_row"]
     assert row["path"] == "results/sweep.csv" and row["line"] == 4 and row["where"] == {"precision": "int8", "seed": 2}
-    code, out = rb("show", run["id"], text=True)
+    code, out = rb("show", "--long", run["id"], text=True)
     assert "row of results/sweep.csv, line 4 (precision=int8, seed=2)" in out
     # another row of the same table is another run; the same row again is the run already recorded
     other = rb("run", "add", "int8", "--from", "results/sweep.csv", "--where", "precision=int8,seed=1", "--variant", "int8", "--set", "seed=@seed")

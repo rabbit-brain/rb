@@ -99,7 +99,7 @@ def test_the_proposed_run_of_a_watched_command_carries_the_command(repo, capsys)
     assert command.endswith("eval.py"), command
     code, env = repo("reconcile", "--apply")
     assert code == 0, env.errors
-    code, env = repo("status")
+    code, env = repo("status", "--full")
     (run,) = env.data["runs"]
     assert run["command"]["text"] == command and run["command"]["given"] == "observed", run["command"]
 
@@ -173,7 +173,7 @@ def test_flat_numbers_with_no_arm_stated_name_no_variant(repo, capsys):
 
 
 def uncited(rb):
-    code, env = rb("status")
+    code, env = rb("status", "--full")
     return [u["path"] for u in env.data.get("uncited_changes", [])]
 
 

@@ -1,4 +1,4 @@
-//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.18` of a record for one tier
+//! The shell's document (SPRINT-OCT24.md section 1.3): `build` assembles `rb-shell-view/1.22` of a record for one tier
 //! and place, from view::home and the per-object fields the build plan adds. It holds the fields rb computes today
 //! (M0), each object in the contract's shape and nothing outside it; the later phases add theirs. It names no writer:
 //! no actor, session, channel or "by <name>" enters it, and the Owner tier holds none of the Live tier's own values.
@@ -16,7 +16,7 @@ use crate::view::{self, ExperimentBrief, FindingLine, Home};
 use indexmap::IndexMap;
 
 /// The contract's version, as the document's `contract` names it.
-pub const CONTRACT: &str = "rb-shell-view/1.18";
+pub const CONTRACT: &str = "rb-shell-view/1.22";
 
 /// The document of `led` for `tier`, at `place` (rb open's chosen place and version; none on a page): drawn on rb open
 /// for the Live tier, on rb page for the Owner tier.
@@ -124,6 +124,18 @@ fn document(led: &Ledger, surface: Surface, at: Option<&At>, served: Option<&str
             }
         }
         doc.insert("home".into(), home_v);
+        // the Overview's view model, as rb status --json gives it (UX5 1.1)
+        // a past version offers no command to copy (guarantee 38): its decisions keep their words alone
+        let mut view_model = home.overview.clone();
+        if view::at_past_version() {
+            if let Some(Value::List(ds)) = view_model.as_dict_mut().and_then(|o| o.get_mut("decisions")) {
+                for d in ds.iter_mut().filter_map(Value::as_dict_mut) {
+                    d.insert("cmd".into(), "".into());
+                    d.insert("do".into(), "".into());
+                }
+            }
+        }
+        doc.insert("overview".into(), view_model);
         doc.insert("pending".into(), pending_value(&home, at));
         let (calls, made_calls) = calls_value(led, &home, at)?;
         doc.insert("your_call".into(), crate::obj! {"n" => calls.len(), "first" => calls.first().map(|c| text(c, "subject")).unwrap_or_default()});
@@ -235,8 +247,20 @@ fn document(led: &Ledger, surface: Surface, at: Option<&At>, served: Option<&str
         // a past version is read from a checkout rb takes away when it stops: nothing links into it
         let reader = crate::ledger::cite::Reader::new(&led.root, surface == Surface::Export, tier == Tier::Live && !at.map_or(false, |a| a.chosen.version.is_some()));
         let citations = crate::ledger::cite::of_document(&doc, &reader);
+        // the files the record names, with their marks, and on rb open at its start place, now, the whole project (UX5 1.4)
+        let whole = tier == Tier::Live && !at.map_or(false, |a| a.chosen.version.is_some());
+        let mut files = crate::files::of(led, Some(&citations), whole)?;
+        // a page names no worktree's path: a file inside a linked worktree nested in the checkout is that worktree's,
+        // and its run's card says it there (guarantee: no linked worktree's path reaches a page)
+        if tier != Tier::Live {
+            let trees = view::page_trees_of(led);
+            if let Value::List(fs) = &mut files {
+                fs.retain(|f| f.get("path").and_then(Value::as_str).map_or(true, |p| !trees.iter().any(|t| p.starts_with(&format!("{t}/")))));
+            }
+        }
         if let Value::Dict(d) = &mut doc {
             d.insert("citations".into(), citations);
+            d.insert("files".into(), files);
         }
         // what a screen would hide is drawn as its escape, as rb open and rb page draw it, and the document says so
         let escaped = led.shows_escapes()? && crate::ledger::design::shown_in(&mut doc);
@@ -263,6 +287,17 @@ pub fn digest_of(of_record: String, chosen: &Chosen) -> String {
 /// address, which a page shows only when rb export --url names the address it is served from (`served`).
 fn blanks(doc: &mut Value, tier: Tier, served: bool) {
     let Value::Dict(d) = doc else { return };
+    // rb's ask for a download link is the owner's Next step: a page's reader sees only the chip (tier: LocalCopies)
+    if !tier.has(Row::LocalCopies) {
+        if let Some(Value::List(gs)) = d.get_mut("open_items") {
+            gs.retain(|g| g.get_str("code") != Some("no_download_link"));
+        }
+        for key in ["open", "next"] {
+            if let Some(Value::List(xs)) = d.get_mut(key) {
+                xs.retain(|x| x.get_str("code") != Some("no_download_link"));
+            }
+        }
+    }
     // the words given with a comparison's declaration are the user's, Live only (contract 1.5)
     if let Some(Value::List(qs)) = d.get_mut("questions").filter(|_| !tier.has(Row::YourWords)) {
         let relations = qs
@@ -305,6 +340,12 @@ fn blanks(doc: &mut Value, tier: Tier, served: bool) {
         for r in rs.values_mut().filter_map(Value::as_dict_mut) {
             if !tier.has(Row::Places) {
                 r.shift_remove("where_short");
+            }
+            // a page anyone may be sent names no local copy (its `where` is made for a page: view::location_said), and
+            // asks its reader for nothing: the chip says it
+            if !tier.has(Row::LocalCopies) {
+                r.shift_remove("copies");
+                r.shift_remove("asks");
             }
             let shown = match tier.shows(Row::DownloadAddress) {
                 super::tier::Shown::Yes => true,
@@ -658,7 +699,14 @@ fn tallies_of(findings: &Value, ids: &[String]) -> Value {
     rows.sort_by_key(|(k, _)| crate::cmds::tally_order(k));
     Value::List(
         rows.into_iter()
-            .map(|(state, ids)| crate::obj! {"state" => state.clone(), "n" => ids.len(), "label" => format!("{} {}", ids.len(), state_label(&state)), "criteria" => Value::list_of_str(ids)})
+            // the screens' words (closed form): "3 hold", "1 does not hold", "5 not settled"
+            .map(|(state, ids)| {
+                let label = match state.as_str() {
+                    "meets" | "misses" | "undetermined" => super::strings::tally_word(&state, ids.len() as i64).to_string(),
+                    _ => super::strings::plainer(&state_label(&state)),
+                };
+                crate::obj! {"state" => state.clone(), "n" => ids.len(), "label" => format!("{} {label}", ids.len()), "criteria" => Value::list_of_str(ids)}
+            })
             .collect(),
     )
 }
@@ -682,7 +730,13 @@ fn standing_of(q: &Value, state: &str, ids: &[String], tallies: &Value, findings
     let id = text(q, "id");
     let n = ids.len();
     let mut reasons: Vec<Value> = Vec::new();
-    let reason = |kind: &str, text: String, criteria: Vec<String>| crate::obj! {"kind" => kind, "text" => text, "criteria" => Value::list_of_str(criteria)};
+    // each reason names what it is about (G3): the rules it counts, the designs and the calls that wait, each a subject
+    // a screen opens; `criteria` keeps the rules' ids as before
+    let subject = |kind: &str, id: &str| crate::obj! {"kind" => kind, "id" => id};
+    let reason = |kind: &str, text: String, criteria: Vec<String>| {
+        let subjects: Vec<Value> = criteria.iter().map(|c| subject("criterion", c)).collect();
+        crate::obj! {"kind" => kind, "text" => text, "criteria" => Value::list_of_str(criteria), "subjects" => Value::List(subjects)}
+    };
     let line;
     if state == "open" {
         let of = |pred: &dyn Fn(&Value) -> bool| -> Vec<String> { ids.iter().filter(|c| pred(finding(c))).cloned().collect() };
@@ -730,14 +784,18 @@ fn standing_of(q: &Value, state: &str, ids: &[String], tallies: &Value, findings
         if !unsettled.is_empty() {
             reasons.push(reason("unsettled", format!("{} {} {word}", of_criteria(unsettled.len(), n), plural_is(unsettled.len())), unsettled));
         }
-        for (kind, said) in waits_of(&id, ids, exps, pending, away) {
-            reasons.push(reason(kind, said, Vec::new()));
+        for (kind, said, on) in waits_of(&id, ids, exps, pending, away) {
+            let mut r = reason(kind, said, Vec::new());
+            if let Value::Dict(d) = &mut r {
+                d.insert("subjects".into(), Value::List(on));
+            }
+            reasons.push(r);
         }
         if n == 0 && reasons.is_empty() {
             reasons.push(reason("no_criteria", "no rule is linked to it".into(), Vec::new()));
         }
-        reasons.truncate(2);
-        let why: Vec<String> = reasons.iter().map(|r| text(r, "text")).collect();
+        // the line says the two strongest; every reason stays in `reasons`, and `more` counts those the line leaves out
+        let why: Vec<String> = reasons.iter().take(2).map(|r| text(r, "text")).collect();
         // the latest call on it that keeps it open (continue, investigate), else none is recorded
         let call = made_calls.iter().rev().find(|m| text(m, "subject") == id).map(|m| text(m, "line"));
         line = match why.as_slice() {
@@ -777,7 +835,8 @@ fn standing_of(q: &Value, state: &str, ids: &[String], tallies: &Value, findings
         c.make_ascii_uppercase();
     }
     crate::obj! {
-        "question" => id, "text" => text(q, "text"), "state" => state, "state_word" => word, "line" => line, "reasons" => Value::List(reasons),
+        "question" => id, "text" => text(q, "text"), "state" => state, "state_word" => word, "line" => line,
+        "more" => if state == "open" && !ids.is_empty() { reasons.len().saturating_sub(2) } else { 0 }, "reasons" => Value::List(reasons),
         "tallies" => tallies.clone(), "interpretation" => interpretation
     }
 }
@@ -785,16 +844,24 @@ fn standing_of(q: &Value, state: &str, ids: &[String], tallies: &Value, findings
 /// What waits for a confirmation in question `id`'s tree (its criteria `ids`, what lies below it `exps`): the designs,
 /// then the calls, each with its count, in the user's voice on their own screens and in no one's on a page that leaves
 /// the machine ("1 experiment design waits for your confirmation", "... for a confirmation").
-fn waits_of(id: &str, ids: &[String], exps: &[String], pending: &[Value], away: bool) -> Vec<(&'static str, String)> {
+fn waits_of(id: &str, ids: &[String], exps: &[String], pending: &[Value], away: bool) -> Vec<(&'static str, String, Vec<Value>)> {
     let whose = if away { "a" } else { "your" };
     let mut said = Vec::new();
-    let designs = pending.iter().filter(|p| text(p, "kind") == "design" && exps.contains(&design_of(p))).count();
-    if designs > 0 {
-        said.push(("design", if designs == 1 { format!("1 experiment design waits for {whose} confirmation") } else { format!("{designs} experiment designs wait for {whose} confirmation") }));
+    // each wait names its subjects (G3): the experiment whose design waits, the call that waits
+    let on = |kind: &str, id: String| crate::obj! {"kind" => kind, "id" => id};
+    let designs: Vec<Value> = pending.iter().filter(|p| text(p, "kind") == "design" && exps.contains(&design_of(p))).map(|p| on("design", design_of(p))).collect();
+    if !designs.is_empty() {
+        let n = designs.len();
+        said.push(("design", if n == 1 { format!("1 experiment design waits for {whose} confirmation") } else { format!("{n} experiment designs wait for {whose} confirmation") }, designs));
     }
-    let calls = pending.iter().filter(|p| matches!(text(p, "kind").as_str(), "proposed" | "past") && { let s = text(p, "subject"); s == id || ids.contains(&s) || exps.contains(&s) }).count();
-    if calls > 0 {
-        said.push(("pending_call", if calls == 1 { format!("1 call waits for {whose} confirmation") } else { format!("{calls} calls wait for {whose} confirmation") }));
+    let calls: Vec<Value> = pending
+        .iter()
+        .filter(|p| matches!(text(p, "kind").as_str(), "proposed" | "past") && { let s = text(p, "subject"); s == id || ids.contains(&s) || exps.contains(&s) })
+        .map(|p| on("decision", text(p, "id")))
+        .collect();
+    if !calls.is_empty() {
+        let n = calls.len();
+        said.push(("pending_call", if n == 1 { format!("1 call waits for {whose} confirmation") } else { format!("{n} calls wait for {whose} confirmation") }, calls));
     }
     said
 }
@@ -817,7 +884,7 @@ fn no_rule_line(id: &str, ids: &[String], exps: &[String], pending: &[Value], fi
         1 => "No rule is linked to this question itself; 1 rule is linked to its sub-questions.".to_string(),
         n => format!("No rule is linked to this question itself; {n} rules are linked to its sub-questions."),
     };
-    let waits: Vec<String> = waits_of(id, ids, exps, pending, away).into_iter().map(|(_, s)| s).collect();
+    let waits: Vec<String> = waits_of(id, ids, exps, pending, away).into_iter().map(|(_, s, _)| s).collect();
     match waits.as_slice() {
         [] => head,
         [one] => format!("{head} {}.", capital(one)),
@@ -1101,6 +1168,8 @@ fn queue_of(led: &Ledger, doc: &Dict, home: &Home, findings: &Value, pending: &[
             } else {
                 ((format!("Review the {label} result"), stands(&format!("The {label} result"), f)), format!("{} · {short}", rule_state(f)))
             };
+            let taken = text(c, "taken_out");
+            let detail = if taken.is_empty() || detail.contains(&taken) { detail } else { format!("{detail} \u{b7} {taken}") };
             rows.push((1, at, row("baseline", title, detail, subject.clone(), vec![subject], "Review", 1)));
             continue;
         }
@@ -1126,6 +1195,9 @@ fn queue_of(led: &Ledger, doc: &Dict, home: &Home, findings: &Value, pending: &[
             _ if text(c, "code") == "decision_outdated" => earlier().unwrap_or_else(|| in_words(&reason, &words)),
             _ => in_words(&reason, &words),
         };
+        // what git took out that it rests on, as rb status's item says it (MP-1111-0952's F2)
+        let taken = text(c, "taken_out");
+        let detail = if taken.is_empty() || detail.contains(&taken) { detail } else if detail.is_empty() { taken } else { format!("{detail} \u{b7} {taken}") };
         rows.push((2, at, row("call", title, detail, subject.clone(), vec![subject], "Review", 2)));
     }
     let designs: Vec<String> = pending.iter().filter(|p| text(p, "kind") == "design").map(design_of).collect();
@@ -1214,6 +1286,9 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
         lines.entry(f.criterion_id.clone()).or_insert(f);
     }
     let of: IndexMap<String, &Value> = list(st, "findings").iter().map(|f| (text(f, "criterion"), f)).collect();
+    // what rb status asks a call on (MP-1113-0936 S1): a rule its `undecided` item names, and a gate its experiment's
+    // `gate_missed` item names; only those carry the "not decided" chip
+    let waits: Vec<(String, String)> = list(st, "open").iter().filter(|i| matches!(text(i, "code").as_str(), "undecided" | "gate_missed")).map(|i| (text(i, "code"), text(i, "subject"))).collect();
     let mut out = Dict::new();
     for (id, f) in lines {
         let graphed = match g.finding(&id) {
@@ -1249,6 +1324,46 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
             // a rule met on the estimate alone, which a tally says apart (ledger/views.rs on_estimate_alone)
             "on_estimate" => g.finding(&id).map_or(false, |(_, fd)| crate::ledger::views::on_estimate_alone(fd))
         };
+        // the rule card's Result chips (the UX lead's card, Nov 13): each state the reading carries, in a few words
+        if let Value::Dict(d) = &mut v {
+            let asked = waits.iter().any(|(code, subject)| match code.as_str() {
+                "undecided" => *subject == id,
+                _ => *subject == text(found, "experiment") && text(found, "role") == "gate" && text(found, "rule_outcome") == "misses",
+            });
+            d.insert("chips".into(), finding_chips(found, asked));
+            // the badge on a comparison that mixes them: the values its counted runs hold
+            let mixes = match g.finding(&id) {
+                Some((c, found)) => match led.load::<Experiment>(&c.experiment) {
+                    Ok(x) => {
+                        let counted: Vec<&Dict> = found.observations.iter().filter(|o| o.counted).map(|o| &o.per_run).collect();
+                        mixes_among(&mix_settings(led, &x), counted.into_iter())
+                    }
+                    Err(_) => Value::List(Vec::new()),
+                },
+                None => Value::List(Vec::new()),
+            };
+            // and how rb reads it, from the finding's own notes: the arms differ in it, or the reading pools its values
+            let mut mixes = mixes;
+            if let Value::List(ms) = &mut mixes {
+                let caveats = found.get("caveats").and_then(Value::as_list).cloned().unwrap_or_default();
+                for m in ms.iter_mut() {
+                    let name = text(m, "setting");
+                    let how = caveats
+                        .iter()
+                        .filter(|c| text(c, "text").contains(&name))
+                        .find_map(|c| match text(c, "code").as_str() {
+                            "arms_differ" => Some("arms_differ"),
+                            "pooled_setting" | "pooled_misses" => Some("pooled"),
+                            _ => None,
+                        })
+                        .unwrap_or("");
+                    if let Some(d) = m.as_dict_mut() {
+                        d.insert("how".into(), how.into());
+                    }
+                }
+            }
+            d.insert("mixes".into(), mixes);
+        }
         // what rb show says under the rule, in its words (says.notes): every note but the one-unit one, and a cited value
         // that differs only where no not_comparable problem says it already
         if let Some(Value::Dict(says)) = v.as_dict_mut().and_then(|d| d.get_mut("says")) {
@@ -1288,6 +1403,80 @@ fn findings_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> {
         out.insert(id, v);
     }
     Ok(Value::Dict(out))
+}
+
+/// The states a finding carries, each as a chip of a few words (`kind`, `text`; rb's whole sentence is the card's working): when
+/// the rule was written against its results, each integrity problem, the settings its reading leaves unchecked, and no
+/// call made on it. The card draws them under its Result; the words are rb's, said short.
+pub(crate) fn finding_chips(found: &Value, asked: bool) -> Value {
+    let chip = |kind: &str, words: String, _sentence: String| crate::obj! {"kind" => kind.to_string(), "text" => words};
+    let mut out: Vec<Value> = Vec::new();
+    let says = |k: &str| found.get("says").map(|s| text(s, k)).unwrap_or_default();
+    match text(found, "timing").as_str() {
+        "after_evidence" => out.push(chip("late", "written after its results".into(), says("timing"))),
+        "after_exposure" => out.push(chip("late", "written after its data was seen".into(), says("timing"))),
+        "unknown" => out.push(chip("late", "order unknown".into(), says("timing"))),
+        _ => {}
+    }
+    // a path a problem's sentence names, said with its few words ("source missing (logs/agent.log)")
+    let path_in = |t: &str| {
+        t.split_whitespace()
+            .map(|w| w.trim_matches(|c: char| matches!(c, ',' | ':' | ';' | '(' | ')' | '\'' | '"')).trim_end_matches('.'))
+            .find(|w| w.contains('/') || (w.contains('.') && w.rsplit('.').next().map_or(false, |e| (1..=5).contains(&e.len()) && e.chars().all(|c| c.is_ascii_alphabetic()))))
+            .map(str::to_string)
+    };
+    for p in list(found, "integrity") {
+        let (code, t) = (text(p, "code"), text(p, "text"));
+        let low = t.to_lowercase();
+        let gone = ["gone", "missing", "no longer", "cannot be read", "not found"].iter().any(|w| low.contains(w));
+        let words = match code.as_str() {
+            "cited_source_changed" | "analysis_source_changed" if gone => "source missing".to_string(),
+            "cited_source_changed" | "analysis_source_changed" => "source changed".to_string(),
+            "cited_unchecked" => "source not checked".to_string(),
+            "evidence_file_changed" if gone => "a run's file is gone".to_string(),
+            "evidence_file_changed" => "a run's file changed".to_string(),
+            "edited_outside_rb" => "edited outside rb".to_string(),
+            "taken_out_by_git" => "taken out by git".to_string(),
+            "not_comparable" => "not comparable with its source".to_string(),
+            "conflict" | "stale" => "a setting's source changed".to_string(),
+            "unknown" => "a setting unknown".to_string(),
+            "rejected_setting" => "a setting rejected".to_string(),
+            "confound" => "arms differ in a setting".to_string(),
+            "drift" => "changed since it was frozen".to_string(),
+            other => other.replace('_', " "),
+        };
+        let words = match path_in(&t) {
+            Some(path) if code.contains("source") || code == "evidence_file_changed" => format!("{words} ({path})"),
+            _ => words,
+        };
+        out.push(chip("problem", words, t));
+    }
+    // the settings its reading leaves unchecked: each name the notes say is provisional, counted once
+    let mut names: Vec<String> = Vec::new();
+    let mut said: Vec<String> = Vec::new();
+    for c in list(found, "caveats") {
+        let code = text(c, "code");
+        if !matches!(code.as_str(), "provisional" | "source_postdates_run" | "unknown_optional") {
+            continue;
+        }
+        let t = text(c, "text");
+        let head = t.split(" is ").next().filter(|h| h.len() < t.len()).or_else(|| t.split(" are ").next().filter(|h| h.len() < t.len())).unwrap_or("");
+        // a name, or "name = value" where the note says the value too
+        for n in head.split(", ").map(|n| n.split(" = ").next().unwrap_or(n).trim()).filter(|n| !n.is_empty() && !n.contains(' ')) {
+            if !names.iter().any(|x| x == n) {
+                names.push(n.to_string());
+            }
+        }
+        said.push(t);
+    }
+    if !said.is_empty() {
+        let n = names.len().max(1);
+        out.push(chip("unchecked", format!("{n} setting{} unchecked", if n == 1 { "" } else { "s" }), said.join("\n")));
+    }
+    if asked && found.get("review").map_or(true, |r| matches!(r, Value::Null)) {
+        out.push(chip("undecided", "not decided".into(), says("review")));
+    }
+    Value::List(out)
 }
 
 /// A finding's own fields (BP 1b-1): its reading in parts, each as rb's comparison text says it, with rb's result word
@@ -1629,11 +1818,25 @@ fn finding_fields(led: &Ledger, c: &Criterion, f: &Finding) -> Res<Dict> {
         "unit_amended" => unit_amended, "receipt_rows" => Value::List(rows), "cited" => cited,
         "state" => state.clone(), "state_label" => state_label(&state), "subject_label" => subject_label, "reference_label" => reference_label,
         "reading_short" => reading_short, "verdict" => verdict, "tags" => Value::list_of_str(tags.into_iter().map(str::to_string)),
+        // when the rule was written and when its first counted result was made, each a day in UTC, so a screen places
+        // the two in time rather than name the order (no glossary, show instead)
+        "when" => crate::obj! {"rule" => f.declared.as_ref().map(|d| day(&d.at)).unwrap_or_default(), "results" => first_result_day(led, c, f)},
         // the headline's words on a reading that pools a per-run setting, as rb show says them
         "pooled" => f.says.get("headline").and_then(|h| h.split(" \u{b7} ").find(|p| p.starts_with("pooled over "))).unwrap_or("").to_string(),
         "reads_baseline" => reference.is_empty() && matches!(role_of(&subject).as_str(), "baseline" | "control"),
         "row_words" => crate::obj! {"criterion" => rule_said, "margin" => margin_said}
     })
+}
+
+/// The day the first counted result of a finding was made (its observations' `produced_at`), "" where none says.
+/// The day the rule's first result came in, read on its subject's runs as the finding's timing reads it (MP-1112-2347
+/// S1): a baseline's runs that came first are no result of the rule's; every counted run where no run names the subject.
+fn first_result_day(led: &Ledger, c: &Criterion, f: &Finding) -> String {
+    let subject = led.load::<Experiment>(&c.experiment).ok().and_then(|x| led.arms(&x, c).ok()).map(|a| a.0).unwrap_or_default();
+    let first = |only: bool| {
+        f.observations.iter().filter(|o| o.counted && (!only || o.arm == subject)).filter_map(|o| o.produced_at.as_deref()).filter(|t| !t.is_empty()).min().map(day)
+    };
+    first(!subject.is_empty()).or_else(|| first(false)).unwrap_or_default()
 }
 
 /// An arm as a screen names it, a baseline, control or ablation labelled as one: "fp32 baseline", "int8".
@@ -2061,7 +2264,7 @@ fn state_label(state: &str) -> String {
     match state {
         "meets" => "met".into(),
         "misses" => "not met".into(),
-        // PLAIN-WORDS-PASS-1 (D1): the two stay apart; the glossary's hover says how
+        // PLAIN-WORDS-PASS-1 (D1): the two stay apart
         "undetermined" => "can't tell yet".into(),
         "untested" => "not tested".into(),
         "gate undetermined" => "gate: can't tell yet".into(),
@@ -2442,6 +2645,44 @@ fn table_value(table: Option<&Dict>, varies: &[String]) -> Value {
     }
 }
 
+/// The per-run settings a badge says the values of (owner, Nov 13 2026: "2 graders: answer tag (6 runs) · last number (3
+/// runs)"): each a per-run setting of the experiment whose values are words, not numbers, that is not its declared
+/// unit, a declared repeat index or a fixed design factor (each of those is meant to take many values).
+fn mix_settings(led: &Ledger, x: &Experiment) -> Vec<String> {
+    let unit = led.unit_setting(x);
+    let repeats = led.repeat_settings(x);
+    x.settings
+        .iter()
+        .filter(|s| s.retracted.is_none() && s.per_run && s.design_factor != Some(true) && !s.name.starts_with("population."))
+        .map(|s| s.name.clone())
+        .filter(|n| unit.as_deref() != Some(n.as_str()) && !repeats.contains(n))
+        .collect()
+}
+
+/// Each such setting's values among `per_run` (one map per run), with how many runs hold each, in the order first seen;
+/// only where every value is a word and there are two or more of them.
+fn mixes_among<'a>(names: &[String], per_run: impl Iterator<Item = &'a Dict> + Clone) -> Value {
+    let mut out = Vec::new();
+    for n in names {
+        let mut values: IndexMap<String, i64> = IndexMap::new();
+        let mut words = true;
+        for pr in per_run.clone() {
+            match pr.get(n) {
+                Some(Value::Str(v)) if v.trim().parse::<f64>().is_err() => *values.entry(v.clone()).or_default() += 1,
+                Some(Value::Null) | None => {}
+                Some(_) => words = false,
+            }
+        }
+        if words && values.len() >= 2 {
+            out.push(crate::obj! {
+                "setting" => n.clone(),
+                "values" => Value::List(values.into_iter().map(|(v, k)| crate::obj! {"value" => v, "runs" => k}).collect()),
+            });
+        }
+    }
+    Value::List(out)
+}
+
 fn experiments_value(led: &Ledger, h: &Home, st: &Value, recipes: &crate::reproduce::Recipes) -> Res<Value> {
     let runs = led.all::<Run>()?;
     let rows: IndexMap<String, &Value> = list(st, "experiments").iter().map(|e| (text(e, "id"), e)).collect();
@@ -2477,6 +2718,9 @@ fn experiments_value(led: &Ledger, h: &Home, st: &Value, recipes: &crate::reprod
                 d.insert("reproduce".into(), recipes.experiment_of(&e.id)?);
                 let x = led.load::<Experiment>(&e.id).ok();
                 d.insert("compares".into(), x.as_ref().map(compares).unwrap_or_default().into());
+                // the per-run settings whose words differ across its standing runs (the grader badge)
+                let standing: Vec<&Run> = runs.iter().filter(|r| r.experiment == e.id && r.retracted.is_none()).collect();
+                d.insert("mixes".into(), x.as_ref().map_or(Value::List(Vec::new()), |x| mixes_among(&mix_settings(led, x), standing.iter().map(|r| &r.per_run))));
                 // the card's lines, one rule each (view::relation_lines, view::settings_of), and its rule counts
                 d.insert("relation_lines".into(), strs(&x.as_ref().map(view::relation_lines).unwrap_or_default()));
                 d.insert("settings_line".into(), x.as_ref().map(|x| view::settings_of(led, x).map(|s| s.0)).transpose()?.unwrap_or_default().into());
@@ -2636,8 +2880,13 @@ fn resources_value(led: &Ledger, h: &Home, st: &Value, g: &Graph) -> Res<Value> 
         let mut v = crate::obj! {
             "resource_id" => r.resource_id.clone(), "name" => r.name.clone(), "type" => r.r#type.clone(), "availability" => r.availability.clone(),
             "where" => strs(&r.where_), "where_short" => strs(&r.where_short), "identity" => r.identity.clone(), "exact" => r.exact,
-            "how" => how, "url" => url
+            "how" => how, "url" => url, "said" => r.said.clone(), "get" => r.get.clone(), "cite" => strs(&r.cite), "asks" => r.asks
         };
+        // the local copies and whether each is here: the owner's own screen alone (tier: LocalCopies)
+        if let (Some(res), Value::Dict(d)) = (records.get(&r.resource_id), &mut v) {
+            let copies: Vec<Value> = led.availability(res).get("copies").and_then(Value::as_list).cloned().unwrap_or_default();
+            d.insert("copies".into(), Value::List(copies));
+        }
         if let (Some(res), Value::Dict(d)) = (records.get(&r.resource_id), &mut v) {
             // who read it and who made it, apart, and the criteria resting on what read it
             let users = crate::graph::users_of(led, res)?;
@@ -3263,7 +3512,7 @@ mod tests {
             "c3" => finding_of("e1", "misses", "int8", false), "c4" => finding_of("e1", "misses", "int8", false)};
         let ids: Vec<String> = ["c1", "c2", "c3", "c4"].iter().map(|s| s.to_string()).collect();
         let labels: Vec<String> = tallies_of(&fs, &ids).as_list().unwrap().iter().map(|t| text(t, "label")).collect();
-        assert_eq!(labels, ["1 met", "2 not met", "1 not tested"]);
+        assert_eq!(labels, ["1 holds", "2 do not hold", "1 not tested"]);
     }
 
     /// A recorded interpretation's words keep their full stop as written, and its rules' state follows as a sentence
@@ -3310,7 +3559,7 @@ mod tests {
         let c = card(&mixed, &["c1", "c2", "c3"], none.clone(), "");
         assert_eq!(text(&list(&c, "reasons")[0], "text"), "2 of 3 rules are not settled");
         let labels: Vec<String> = list(&c, "tallies").iter().map(|t| text(t, "label")).collect();
-        assert_eq!(labels, ["1 met", "1 can't tell yet", "1 not tested"]);
+        assert_eq!(labels, ["1 holds", "1 not settled", "1 not tested"]);
         let untested = crate::obj! {"c1" => finding_of("e1", "untested", "int8", false), "c2" => finding_of("e1", "meets", "int8", false)};
         assert_eq!(text(&list(&card(&untested, &["c1", "c2"], none.clone(), ""), "reasons")[0], "text"), "1 of 2 rules is not tested");
         assert_eq!(text(&card(&untested, &["c1", "c2"], none, ""), "line"), "No answer yet: 1 of 2 rules is not tested.");

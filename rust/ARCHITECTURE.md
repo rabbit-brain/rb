@@ -87,8 +87,9 @@ Five files the binary is built from are written by a generator in `gen/`, each f
 | `src/assets/mcp.json` | `gen_mcp.py` | `src/mcp_tools.py` (the tools), `src/ir.py`, the format's schema |
 | `src/errors_table.rs` | `gen_errors.py` | `src/rabbit_brain/errors.py`: the error codes |
 | `src/record_gen.rs` | `gen_record.py` | `src/rabbit_brain/record.py`: the record models |
+| `src/shell/assets/script.min.js` | `gen_script.py` | `src/shell/assets/script.js`, its whole-line comments and indentation taken out: the script pages inline and the export names |
 
-`tests/test_generated.py` fails when one of the five is not what its generator gives now, so a declaration cannot be
+`tests/test_generated.py` fails when one of the six is not what its generator gives now, so a declaration cannot be
 changed and left unwritten. The page's stylesheet and icon (`src/page_assets.rs`), the bundle's README
 (`src/assets/export_readme.txt`) and rb open's shell (`src/shell/`) are edited where they are.
 

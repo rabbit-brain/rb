@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.8.6 (2026-11-14)
+
+rb status fits on one screen, and pages, rb open and rb ui open on the same overview, where what you click opens its card. `rb login` no longer waits, and each dataset or checkpoint says where to get it.
+
+- **rb status on one screen.** `rb status` shows the question, a strip with one square per check (passed, failed, can't tell yet, no results yet), a chart of each result against what its check accepts, what the results rest on, and the decisions waiting for you. It fits 80 columns by 24 lines.
+  - `rb status --full` prints the long form that `rb status` printed in 0.8.5, with this release's new words for resources and recorded notes.
+  - `--words` says each figure in words, `--ascii` draws plain characters, and `rb status --help` explains the marks.
+  - Each result is shown in its unit (`−0.15 points`, `13.07%`), the check's number heads its panel (`░ from −1`), and `[claim]` marks a check of a number or ordering a file states.
+  - `rb status <experiment>` shows the experiment's question. A question's strip counts its sub-questions' checks too.
+  - `rb context` opens with one line that says how to read the record yourself: rb status in a terminal, or rb ui.
+- **One overview, and cards.** Pages, `rb open` and `rb ui` open on the same overview as rb status: the question in its words, So far (the strip and the chart), What it rests on, and Decisions.
+  - On pages and in rb open, click a square, a chart row, a decision or a mark, and its card opens beside it. Each id or path on a card opens its own card, and the longer view is one link away.
+  - `rb show <id>` now draws a card too, and `rb show <id> --long` prints what `rb show` printed before. It also opens what the record cites: a file, its lines, a config key, a folder or a commit.
+  - Your call and Decisions hold one list with one count: each call to make and each call or design that waits for your confirmation.
+- **Files.** `rb files` lists the files the record cites, those changed or not committed, and each folder, with marks that `rb files --help` explains. Name a file to see which of its lines are cited, and by what. Pages and rb open have a Files tab beside Research, and rb ui has one on `f`.
+- **Pages say less.** Pages drop the glossary, the legends and the hovers that defined words. They use words that need no definition instead: a check "holds" or is "not settled", a result has "no range yet", a setting rb hasn't checked against its file is "not checked", and a rule written after its results shows both dates in order (`results 14 Oct ──▶ rule 20 Oct`). rb status, rb context, rb confirm and rb ui keep their own words for a check's state. In rb status --full and rb context, a recorded interpretation is now a note, "in force" or "not in force".
+  - Every value, count and state on pages and rb open links to where it comes from.
+  - The header has a git chip: the branch and the commit, a button that copies the commit, and an amber count of record files not committed. A page shows the branch there and nowhere else.
+  - Where a page or rb open showed a command to confirm or to take a next step, it offers a prompt to paste into your agent. The Decide part still shows `rb decide` lines. A reader of a shared page sees no actions.
+  - On a phone, the tabs are one row and a card fills the screen.
+- **rb ui.** Its home is the same overview in text, with Your call pinned.
+  - From 120 columns it shows three panes: Research or Files, the question, and the card. Each mark has its word beside it (`■ passed`), and `?` lists the keys.
+  - `c` on a design shows everything `rb confirm <exp>` prints, full screen, and confirms only once you have reached the end. `d` records a decision. `p` copies to your clipboard, through tmux, or over SSH.
+  - At another worktree or a past version, `c`, `d`, `y` and `n` do nothing. A past version offers nothing to copy and no next step.
+- **Where to get a dataset or checkpoint.** Each resource says where a reader gets it: `get it: <address>`, `get it: <path> in the repository`, or `no download link`. A Hugging Face id links to its page on huggingface.co. Pages and rb open draw a Get it button or a No download link chip.
+  - Where one has no download link and no recipe, `rb resource add` and `rb resource locate` warn you, and rb status and rb context list it with the command that records a link.
+  - rb records an origin it can see by reading files alone: the Hugging Face cache, a DVC import, or a config that names the file beside an address.
+  - The words "present", "remote" and "reconstructible" are gone. Your own screens say `copy here:`, `missing here:` or `missing from this checkout:`.
+  - Pages, and the page `rb sync` sends, no longer name a local path outside the repository, or an address with a password or token in it. A bundle leaves out a resource's local path and such an address, but a clone's parent path still travels with it.
+- **Signing in.** `rb login` shows the code and the link, and returns at once. Approve the code, then run `rb sync`: it finishes signing in, then syncs. Before you approve, `rb sync` sends nothing and stops with `E_LOGIN_PENDING`, and `rb login` shows the same code again. `rb login --wait` waits, as `rb login` did before.
+- **Plain lines for a reader.** A `PLAIN.md` beside `.rb/` can give each name in the record (a question, an experiment, a metric, a setting) one line in plain words. rb reads it and never writes it. The lines are in `rb status --json` and rb open's data, and `rb doctor` names a line for a name the record doesn't hold. No screen shows them yet.
+- **When git undoes rb's records.** The three places 0.8.5 listed under "Not yet" now say it.
+  - On pages and in rb open, an item under "Also open" says when a record it depends on was removed, a setting whose reject or vouch was removed reads "undetermined", and a missed gate's Your call line says when the call settling it was removed.
+  - When a design's confirmation is removed, a gate an agent session set reads "· not confirmed" again, with why, and `gate_by` keeps who set it.
+- **Windows.** The session hook rb installs now runs in sh, Git Bash, PowerShell and cmd, and also looks for rb in a Windows virtual environment (`.venv\Scripts`). `rb init` and `rb skill add` bring an older hook up to date in place.
+  - On Windows, an rb installed with `uv tool install` now updates itself, and so does one in a folder `UV_TOOL_DIR` names.
+- **Not yet.**
+  - In rb open, at another worktree, three prompts still say "In this repository": the confirm row under Your call, the line that confirms them all, and a resource's next step. Pasted into an agent, they name the wrong checkout. The `rb decide` line rb open composes there has no `cd` to that checkout either.
+  - rb ui and pages word the ask for a resource's download link differently.
+  - With scripts off, a reader of a shared page sees a copy-prompt button on a design's line.
+  - Pages call a setting "not checked" when rb did check its file but the file came after a run.
+  - `rb files` and the Files tab never mark a file git ignores.
+  - rb status draws ✓, ✗ and ‾ with no word beside them.
+  - A rule read across fixed design cells says "no range yet" in rb ui and on its card, though it never gets one.
+  - A rule's timing says "check" on its card, "rule" on a page, and "rule written after the results" in rb ui. In narrow panes, rb ui leaves out a result's range.
+  - When rb ui refuses to open in an agent session, its fix line is a generic one.
+  - `rb show <run>` doesn't say where each input stood when the run was recorded.
+  - A page's History lists a vouch whose retraction git removed as a plain call, with no mark.
+  - `rb logout` leaves `pending-login.lock` behind.
+  - With `--ascii`, a row of rb status with a range runs one column past 80.
+  - On pages and in rb open, a row under "Rules written after their results" gives the rule's words but not how many of its results came before it.
+  - In an experiment's comparison on pages and in rb open, a difference can link to a rule that reads the same comparison from an analysis, with other numbers. `rb compare` says both.
+  - On pages and in rb open, a run recorded with `--replaces` doesn't say which run it replaces; only History and the retracted run say it. `rb show <run>` says it with `--long`.
+  - In rb open, Elsewhere lists a call that waits in another worktree under "Waiting there for your confirmation", without the "Proposed, not made" this worktree's own list gives it.
+- **For scripts and tools (JSON).** Keys are only added. rb status's text changed: a script that reads it should read `rb status --full`, the long form 0.8.5's `rb status` printed, or `--json`.
+  - rb status (and so rb context, MCP and the SDK's status()) gains `overview`, with `plain` for PLAIN.md's lines, and `files`. `rb files --json` gives `files`, and MCP has a `files` tool.
+  - `rb show --json` gains `card`: `fields`, each with `command` where it gives one, and `cites`.
+  - A resource's availability gains `get`, `cite`, `said`, `said_public`, `copies` and `asks`. `no_download_link` is a new item, and `plain_lines` a new rb doctor check.
+  - `rb login --json` gives `state`: `pending` with `code`, `link` and `expires`, or `signed_in` with `handle`. `rb sync --json` gains `signed_in`, and `rb logout --json` gains `pending_removed`. `E_LOGIN_PENDING` is a new error.
+  - The shell's document is rb-shell-view/1.22 (`overview`, `files`, `checkout.chip`, and on findings `when`, `chips` and `mixes`). A bundle's manifest `repo` gains `branch` and `record_uncommitted`.
+- **Teams on two versions.** The record's format doesn't change: rb 0.7.0 to 0.8.5 read what 0.8.6 writes. rb 0.8.5 also clones a bundle whose manifest names its branch, and reads a record with a `PLAIN.md` beside it as it reads one without. Where 0.8.6 has written its newer session hook, `rb skill add` from 0.8.5 leaves the hook as it is and says so. A sign-in still waiting is kept in its own file: 0.8.5 says it has no credential and sends nothing. As before, 0.7.0 and 0.7.1 refuse a record that holds a format-2 file and leave it unchanged.
+
 ## 0.8.5 (2026-11-11)
 
 rb now notices when git undoes its records, and it keeps the code each run started with. Each run's evidence is listed one line at a time.

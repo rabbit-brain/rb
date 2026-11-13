@@ -75,7 +75,7 @@ def commit(root: Path, message: str) -> None:
 def said(rb) -> dict:
     """What rb says of the repository it is in, without the directory's own name: the state, every finding, every
     setting's check, what the reconcile would change."""
-    status = rb("status").data
+    status = rb("status", "--full").data
     status.pop("root")
     status["scope"].pop("looked_at")          # when rb looked, in each checkout
     status["scope"].pop("said")
@@ -147,5 +147,5 @@ def test_a_record_written_on_the_converting_side_reads_the_same_on_the_other(bot
     assert files_row(both) == {"what": "files", "state": "ok", "detail": "both files the runs named are here unchanged"}
     checked = both("spec", "verify", "warm").data["results"]
     assert all(c["ok"] and c["before"] == "verified" for c in checked), checked
-    status = both("status").data
+    status = both("status", "--full").data
     assert not [o for o in status["open"] if "changed since" in json.dumps(o)]

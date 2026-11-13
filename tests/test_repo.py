@@ -121,28 +121,28 @@ def test_a_check_belongs_to_the_folder_its_command_names_and_its_outcome_is_read
     check = rec.get("warmup_transfer", "experiment").checks[0]
     assert check.command == """python -c 'from research.warmup.audit_transfer import check; check("results/warmup_transfer")'"""
     assert check.said_at == "research/warmup/reproduction.md:33"
-    read = study("show", "warmup_transfer").data["repository"]
+    read = study("show", "--long", "warmup_transfer").data["repository"]
     assert read["checks"][0]["ok"] is None and read["checks"][0]["state"] == "not run under rb's watch"
     assert watched(capsys, "python", "-c", "from research.warmup.audit_transfer import check; check('results/warmup_transfer')") == 0
-    read = study("show", "warmup_transfer").data["repository"]
+    read = study("show", "--long", "warmup_transfer").data["repository"]
     assert read["checks"][0]["ok"] is True and read["checks"][0]["state"].startswith("passed at")
     assert watched(capsys, "python", "-c", "import research.warmup.audit_transfer; raise SystemExit(3)") != 0
-    st = study("status").data
+    st = study("status", "--full").data
     item = next(i for i in st["open"] if i["code"] == "check_failed")
     assert item["subject"] == "warmup_transfer" and "failed (exit 3)" in item["what"] and st["gate"]["checks"]
     assert watched(capsys, "python", str(Path("research/warmup/audit_transfer.py")), "results/warmup_transfer") == 0
-    assert study("show", "warmup_transfer").data["repository"]["checks"][0]["ok"] is True   # run by its path, as this system writes one
+    assert study("show", "--long", "warmup_transfer").data["repository"]["checks"][0]["ok"] is True   # run by its path, as this system writes one
 
 
 def test_a_manifest_is_checked_against_the_code_as_it_is_now(study):
     study("reconcile", "--apply")
-    read = study("show", "warmup_confirmation").data["repository"]
+    read = study("show", "--long", "warmup_confirmation").data["repository"]
     assert read["manifests"][0]["matched"] == read["manifests"][0]["sources"] == 4
     code = study.root / "research" / "warmup" / "run_confirmation.py"
     code.write_text(code.read_text() + "# a change after the freeze\n", encoding="utf-8")
-    read = study("show", "warmup_confirmation").data["repository"]
+    read = study("show", "--long", "warmup_confirmation").data["repository"]
     assert read["manifests"][0]["changed"] == ["research/warmup/run_confirmation.py"]
-    st = study("status").data
+    st = study("status", "--full").data
     # both manifests froze that file, so one item, one command, names both experiments
     assert any(i["code"] == "manifest_changed" and i["subject"] == "warmup_confirmation, warmup_transfer" for i in st["open"])
     assert st["gate"]["stale"]
@@ -151,7 +151,7 @@ def test_a_manifest_is_checked_against_the_code_as_it_is_now(study):
 def test_an_audit_that_says_it_failed_is_shown_as_it_says_it(study):
     study("reconcile", "--apply")
     (study.root / "results" / "warmup_transfer" / "independent_audit.json").write_text('{"passed": false, "checks": 12}')
-    st = study("status").data
+    st = study("status", "--full").data
     item = next(i for i in st["open"] if i["code"] == "audit_failed")
     assert "says passed: false" in item["what"] and st["gate"]["checks"]
 
@@ -161,7 +161,7 @@ def test_a_changed_report_is_read_again_and_the_diff_says_what_changed(study):
     readme = study.root / "results" / "warmup_transfer" / "README.md"
     readme.write_text(readme.read_text().replace("8.8% more steps", "9.1% more steps"), encoding="utf-8")
     commit(study.root)
-    st = study("status").data
+    st = study("status", "--full").data
     assert any(i["code"] == "reindex" and i["subject"] == "warmup_transfer" for i in st["open"])
     assert "result changed" in folder(study("reconcile"), "warmup_transfer")["changes"]
     env = study("reconcile", "--apply")
@@ -169,7 +169,7 @@ def test_a_changed_report_is_read_again_and_the_diff_says_what_changed(study):
     assert "1 re-indexed (warmup_transfer)" in env.data["applied"]["line"] and "1 result quoted" in env.data["applied"]["line"]
     q = next(q for q in state().get("warmup_transfer", "experiment").quotes if q.kind == "result")
     assert "9.1% more steps" in q.text
-    assert not any(i["code"] == "reindex" for i in study("status").data["open"])
+    assert not any(i["code"] == "reindex" for i in study("status", "--full").data["open"])
 
 
 def test_a_new_folder_is_listed_until_it_is_compiled(study):
@@ -178,10 +178,10 @@ def test_a_new_folder_is_listed_until_it_is_compiled(study):
     new.mkdir()
     (new / "README.md").write_text("# Warmup ablation\n\nWarmup removed at recorded checkpoints.\n")
     (new / "summary.json").write_text('{"cost": 3}')
-    assert any(i["code"] == "unindexed_folder" and i["subject"] == "results/warmup_ablation/" for i in study("status").data["open"])
+    assert any(i["code"] == "unindexed_folder" and i["subject"] == "results/warmup_ablation/" for i in study("status", "--full").data["open"])
     env = study("reconcile", "--apply")
     assert env.data["applied"]["added"] == ["warmup_ablation"]
-    assert not any(i["code"] == "unindexed_folder" for i in study("status").data["open"])
+    assert not any(i["code"] == "unindexed_folder" for i in study("status", "--full").data["open"])
 
 
 def test_a_folders_numbers_never_go_to_another_experiment(study):
@@ -208,10 +208,10 @@ def test_a_folders_numbers_never_go_to_another_experiment(study):
 def test_a_folder_not_ready_to_checkpoint_says_why(study):
     study("reconcile", "--apply")
     (study.root / "results" / "warmup_cost" / "notes.txt").write_text("scratch\n")
-    read = study("show", "warmup_cost").data["repository"]
+    read = study("show", "--long", "warmup_cost").data["repository"]
     assert read["git"]["ready"] is False and read["git"]["untracked"] == ["results/warmup_cost/notes.txt"]
     commit(study.root)
-    assert study("show", "warmup_cost").data["repository"]["git"]["ready"] is True
+    assert study("show", "--long", "warmup_cost").data["repository"]["git"]["ready"] is True
 
 
 def test_an_experiment_named_after_the_folder_is_the_one_that_reads_it(study):
@@ -234,11 +234,11 @@ def test_a_call_made_on_what_the_repository_said_moves_when_it_says_something_el
     d = study("decide", "warmup_transfer", "park", "--why", "the transfer does not hold; look again after the ablation").data["object"]
     assert d["basis"]["warmup_transfer#repository"]["result"] == [
         "The warmup arm does not beat cosine_only: 8.8% more steps on the wider model."]
-    assert not any(i["code"] == "decision_outdated" for i in study("status").data["open"])
+    assert not any(i["code"] == "decision_outdated" for i in study("status", "--full").data["open"])
     readme = study.root / "results" / "warmup_transfer" / "README.md"
     readme.write_text(readme.read_text().replace("does not beat cosine_only: 8.8% more", "beats cosine_only after the fix: 2.1% fewer"), encoding="utf-8")
     study("reconcile", "--apply")
-    item = next(i for i in study("status").data["open"] if i["code"] == "decision_outdated")
+    item = next(i for i in study("status", "--full").data["open"] if i["code"] == "decision_outdated")
     assert item["subject"] == "warmup_transfer" and "its repository says something else now" in item["what"]
 
 
@@ -250,11 +250,11 @@ def test_a_question_call_made_on_what_the_repository_said_moves_when_it_says_som
     study("experiment", "file", "warmup_transfer", "q1")
     d = study("decide", "q1", "park", "--why", "the transfer does not hold; look again after the ablation").data["object"]
     assert d["inquiry_basis"] is None and "warmup_transfer#repository" in d["basis"]
-    assert not any(i["code"] == "decision_outdated" for i in study("status").data["open"])
+    assert not any(i["code"] == "decision_outdated" for i in study("status", "--full").data["open"])
     readme = study.root / "results" / "warmup_transfer" / "README.md"
     readme.write_text(readme.read_text().replace("does not beat cosine_only: 8.8% more", "beats cosine_only after the fix: 2.1% fewer"), encoding="utf-8")
     study("reconcile", "--apply")
-    item = next(i for i in study("status").data["open"] if i["code"] == "decision_outdated" and i["subject"] == "q1")
+    item = next(i for i in study("status", "--full").data["open"] if i["code"] == "decision_outdated" and i["subject"] == "q1")
     assert "warmup_transfer (its repository says something else now)" in item["what"]
 
 
@@ -265,10 +265,10 @@ def test_a_call_that_moves_a_line_on_while_its_own_audit_says_failed_is_shown_to
     proposed = study("decide", "warmup_transfer", "accept", "--why", "the numbers look fine").data["object"]["id"]
     monkeypatch.delenv("CLAUDECODE")
     # proposed, it moves nothing on: it waits for the user, who confirms it, and then the call is shown with the failure
-    codes = [i["code"] for i in study("status").data["open"]]
+    codes = [i["code"] for i in study("status", "--full").data["open"]]
     assert "call_proposed" in codes and "call_on_failed_check" not in codes
     study("confirm", proposed)
-    item = next(i for i in study("status").data["open"] if i["code"] == "call_on_failed_check")
+    item = next(i for i in study("status", "--full").data["open"] if i["code"] == "call_on_failed_check")
     assert item["who"] == "human" and item["what"].startswith("warmup_transfer: accepted on 20") and "agent:" not in item["what"]
     assert "independent_audit.json says passed: false" in item["what"]
 
@@ -321,13 +321,13 @@ def test_status_reads_as_the_state_of_the_research(study, monkeypatch, capsys):
     proposed = study("decide", "warmup_transfer", "continue", "--why", "the peak rate is next", "--words", "so where is the saving coming from?").data["object"]["id"]
     monkeypatch.delenv("CLAUDECODE")
     # the agent's call is proposed, not made: listed apart, with the words given with it, which are not yet the user's
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     text = capsys.readouterr().out
     assert ("Proposed, not made (1)\n  - continue warmup_transfer · note: the peak rate is next · "
             f'words (as given): "so where is the saving coming from?" · confirm: rb confirm {proposed}') in text
     assert "call: continued" not in text and "your words" not in text
     study("confirm", proposed)
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     text = capsys.readouterr().out
     block = text.split("where does the saving come from? (open)", 1)[1].split("\n\n", 1)[0]
     assert '  result: "The warmup arm does not beat cosine_only: 8.8% more steps on the wider model." (README.md:7)' in block
@@ -345,7 +345,7 @@ def test_what_a_results_folder_holds_is_its_evidence_never_a_loose_heartbeat(stu
     study("journal", "scan")
     env = study("reconcile")
     assert env.data["unplaced"] == [] and env.data["found"] == []       # case files count steps; they are the folder's
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     assert "Found in the repository, not in the record" not in capsys.readouterr().out
 
 
@@ -436,7 +436,7 @@ def test_an_invalid_run_is_replaced_retracted_and_linked(study, capsys):
     retraction = [e for e in rec.log(None) if e.get("op") == "retract" and e.get("id") == old][-1]
     assert retraction["detail"]["replaced_by"] == new
     assert [r.id for r in rec.records("run", live=True) if r.experiment == "peak"] == [new]       # only the replacement counts
-    assert main(["show", old]) == 0 and f"replaced by {new}" in capsys.readouterr().out
+    assert main(["show", "--long", old]) == 0 and f"replaced by {new}" in capsys.readouterr().out
     # a replacement says why, and replaces a run of its own experiment
     assert study("run", "add", "peak", "low.steps=40", "high.steps=39", "--set", "seed=3", "--replaces", new, ok=False).errors[0].code == "E_USAGE"
     assert study("run", "add", "peak", "low.steps=40", "high.steps=39", "--set", "seed=3", "--replaces", "nope", "--why", "x",
@@ -450,8 +450,8 @@ def test_a_failing_check_shows_its_last_lines(study, capsys):
                  "import research.warmup.audit_transfer; print('width 8 diverged'); raise SystemExit(2)"])
     capsys.readouterr()
     assert code != 0
-    item = next(i for i in study("status").data["open"] if i["code"] == "check_failed" and i["subject"] == "warmup_transfer")
+    item = next(i for i in study("status", "--full").data["open"] if i["code"] == "check_failed" and i["subject"] == "warmup_transfer")
     assert item["last_lines"] == ["width 8 diverged"]
-    assert main(["status"]) == 0
+    assert main(["status", "--full"]) == 0
     text = capsys.readouterr().out
     assert "its last lines:" in text and "        width 8 diverged" in text

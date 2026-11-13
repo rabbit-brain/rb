@@ -11,6 +11,9 @@ use crate::value::Value;
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
+#[path = "story.rs"]
+mod story;
+
 const SHELL_CSS: &str = include_str!("assets/shell.css");
 const OPEN_CSS: &str = include_str!("assets/open.css");
 const PRINT_CSS: &str = include_str!("assets/print.css");
@@ -21,7 +24,7 @@ const GUIDE_CSS: &str = include_str!("assets/guide.css");
 pub fn page(doc: &Value, surface: Surface) -> String {
     // what the cards draw first, then the views twice: once to learn every id they draw, once to link to them, so a link
     // is drawn only where an element is
-    let cards = nodes::all(doc, surface);
+    let cards = nodes::all(doc, surface) + &super::fields::all(doc);
     let open = open_parts(doc, surface);
     let mut p = Page { doc, surface, ids: HashSet::new(), card_ids: HashSet::new(), elsewhere: &open.elsewhere, most_late: Default::default(), past: past_version(doc, surface) };
     ids_in(&cards, &mut p.card_ids);
@@ -30,9 +33,9 @@ pub fn page(doc: &Value, surface: Surface) -> String {
     if p.open_items_body().0 > 0 {
         p.card_ids.insert("open-items".to_string());
     }
+    let rests = p.rest_cards();
+    ids_in(&rests, &mut p.card_ids);
     p.ids = p.card_ids.clone();
-    let words = glossary(surface);
-    ids_in(&words, &mut p.ids);
     let mut parts = p.views();
     let mut ids = p.ids.clone();
     for part in &parts {
@@ -43,7 +46,7 @@ pub fn page(doc: &Value, surface: Surface) -> String {
     let [research, experiments, record] = parts;
     let overview = p.overview();
     let calls = p.your_call();
-    let cards = format!("{cards}{}", p.open_items_card());
+    let cards = format!("{cards}{rests}{}", p.open_items_card());
     let title = text(doc, "project.title");
     let script = match surface {
         Surface::Page | Surface::Open if !SCRIPT.trim().is_empty() => format!("<script>{SCRIPT}</script>"),
@@ -71,54 +74,10 @@ pub fn page(doc: &Value, surface: Surface) -> String {
         w::EXPERIMENTS,
         w::RECORD,
         w::NOTHING_PICKED,
-        about(doc, surface, &words),
+        about(doc, surface),
         p.rerun_panel(),
     );
-    match surface {
-        Surface::Page | Surface::Export => hints_once(&html),
-        _ => html,
-    }
-}
-
-/// A page writes each term's line once: its first use carries `data-hint`, and its later uses name the same glossary
-/// entry alone, which the script turns into the same hint. With no script, the first use and the glossary still say it.
-/// rb open keeps every hint, since it draws its views again as the record changes.
-fn hints_once(html: &str) -> String {
-    const OPEN: &str = "<span class=\"term\" data-hint=\"";
-    const DESC: &str = "\" aria-describedby=\"";
-    let mut seen: HashSet<&str> = HashSet::new();
-    let (mut out, mut rest) = (String::with_capacity(html.len()), html);
-    while let Some(i) = rest.find(OPEN) {
-        let after = &rest[i + OPEN.len()..];
-        let Some(d) = after.find(DESC) else { break };
-        let id_from = d + DESC.len();
-        let Some(id_len) = after[id_from..].find('"') else { break };
-        let id = &after[id_from..id_from + id_len];
-        // an escaped hint holds no quote: anything else is not a term as rb draws one, and is kept as it is
-        if after[..d].contains('"') {
-            out.push_str(&rest[..i + OPEN.len()]);
-            rest = after;
-            continue;
-        }
-        if seen.insert(id) {
-            out.push_str(&rest[..i + OPEN.len() + id_from]);
-        } else {
-            out.push_str(&rest[..i]);
-            out.push_str("<span class=\"term\" aria-describedby=\"");
-        }
-        rest = &after[id_from..];
-    }
-    out.push_str(rest);
-    out
-}
-
-/// The glossary, folded: each term the page draws with a hint, and rb's line for it at its anchor, which the term names
-/// as what describes it.
-fn glossary(surface: Surface) -> String {
-    // your checkout is rb open's alone: a page has none to compare
-    let rows: String = w::HINTS.iter().filter(|(t, _)| surface == Surface::Open || *t != w::YOUR_CHECKOUT).map(|(t, line)| format!("<dt>{}</dt><dd id=\"{}\">{}</dd>", esc(t), w::glossary_id(t), esc(line))).collect();
-    // in the About view, its fold open: the view is where the words are read (design pass 1, P10)
-    format!("<details class=\"fold words\" data-fold=\"words\" open><summary>{}</summary><div id=\"words\"><dl class=\"gloss\">{rows}</dl></div></details>", w::WORDS)
+    html
 }
 
 /// rb open's parts of the frame (A's open.rs): the top bar's pickers, the scope bar, what a past version withholds and
@@ -147,6 +106,25 @@ fn open_parts(doc: &Value, surface: Surface) -> OpenParts {
 #[cfg(not(test))]
 fn hook(_name: &str, draw: fn(&Value) -> String, doc: &Value) -> String {
     draw(doc)
+}
+
+/// rb's line that confirms everything waiting at once, as the document gives it: a line, or a line and its command.
+fn confirm_all(v: Option<&Value>, past: bool) -> String {
+    match v {
+        // rb's line in its older shape, "Confirm all 2 waiting at once: rb confirm --all": the words, and the action a
+        // prompt for their agent, never the command (owner, msg 47)
+        Some(Value::Str(s)) if !s.is_empty() => match s.split_once(": rb confirm") {
+            Some((said, _)) => format!("<p class=\"sm\">{}.{}</p>", esc(said.trim_end_matches('.')), if past { String::new() } else { prompt_button(w::ALL_PROMPT) }),
+            None => format!("<p class=\"sm\">{}</p>", esc(s)),
+        },
+        Some(v @ Value::Dict(_)) => {
+            let line = Some(text(v, "line")).filter(|s| !s.is_empty()).unwrap_or(text(v, "head"));
+            let cmd = Some(text(v, "confirm")).filter(|s| !s.is_empty()).unwrap_or(text(v, "command"));
+            let line = if line.is_empty() { String::new() } else { format!("<p class=\"sm\">{}</p>", esc(line)) };
+            line + &if cmd.is_empty() || past { String::new() } else { prompt_button(&placed(w::ALL_PROMPT, cmd)) }
+        }
+        _ => String::new(),
+    }
 }
 
 #[cfg(test)]
@@ -327,12 +305,12 @@ fn cut_title(s: &str) -> String {
     format!("{}\u{2026}", head.trim_end_matches(|c: char| c == ',' || c == ';' || c == ':' || c.is_whitespace()))
 }
 
-/// A breadcrumb's part: the author's title, cut, then its id, dim.
+/// A breadcrumb's part: the author's title, cut; its id only where it has no title (closed form: ids off screens).
 fn crumb_title(title: &str, id: &str) -> String {
     if title.trim().is_empty() {
         return esc(id);
     }
-    format!("<span class=\"au\">{}</span> <span class=\"cid\">{}</span>", esc(&cut_title(title)), esc(id))
+    format!("<span class=\"au\">{}</span>", esc(&cut_title(title)))
 }
 
 /// A question's or an experiment's view named in the top bar and the inspector's trail (NAV-SPEC 4): its title cut
@@ -356,6 +334,25 @@ fn whole_words(s: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// An action that is a prompt for their agent: an icon button that copies it, the prompt on hover and focus.
+pub(crate) fn prompt_button(prompt: &str) -> String {
+    format!(
+        "<button type=\"button\" class=\"ibtn ico cpprompt rbcmd\" data-act=\"copy-text\" data-text=\"{0}\" aria-label=\"{1}\" title=\"{1}: {0}\"><i class=\"ic ic-copy\"></i></button>",
+        esc(prompt),
+        w::COPY_PROMPT
+    )
+}
+
+/// A prompt said where its command runs: rb's command for another place starts `cd <its path> && `, and the prompt
+/// names that checkout in place of "this repository", so pasted into an agent in another checkout it still points at
+/// the record where the thing waits.
+pub(crate) fn placed(prompt: &str, cmd: &str) -> String {
+    match cmd.strip_prefix("cd ").and_then(|r| r.split_once(" && ")) {
+        Some((dir, _)) if !dir.is_empty() => prompt.replacen("In this repository,", &format!("In the checkout at {},", dir.trim_matches('\'')), 1),
+        _ => prompt.to_string(),
+    }
 }
 
 /// A command to copy: selected whole by one click without script; the script adds its button at `data-copybtn`.
@@ -382,20 +379,28 @@ pub(crate) fn yours(c: Option<&Value>, fold: &str) -> String {
         }
         words = head + &tail;
     }
-    // the experiment's Reproduce carries the term's line on hover; a run card, of which a record holds hundreds, points
-    // at the same glossary entry without repeating the line (the page's size budget)
-    let term_said = if fold.starts_with("run-") {
-        format!("<span class=\"term\" aria-describedby=\"{}\">{}</span>", w::glossary_id(w::YOUR_CHECKOUT), w::YOUR_CHECKOUT)
-    } else {
-        term(w::YOUR_CHECKOUT, w::YOUR_CHECKOUT)
-    };
-    let words = words.replacen(w::YOUR_CHECKOUT, &term_said, 1);
     let mut out = format!("<p class=\"yours{}\">{words}</p>", if state == "same" { " dim" } else { "" });
     let diff = text(c, "diff");
     if state == "differs" && !diff.is_empty() {
         out += &format!("<details class=\"fold ydiff\" data-fold=\"{}\"><summary>{}</summary>{}</details>", esc(fold), w::SHOW_CODE_DIFF, cmdbox(diff));
     }
     out
+}
+
+/// An empty state is shown, not written (the UX lead's rule, Nov 13 2026): a chip on the item ("Not tested yet", "No
+/// runs yet")...
+pub(super) fn empty_chip(words: &str) -> String {
+    format!("<span class=\"echip\">{}</span>", esc(words))
+}
+
+/// ...and, where the missing thing would sit, a muted outline of it: an empty card (`card`) or an empty table (`table`),
+/// with no words.
+pub(super) fn ghost(kind: &str) -> String {
+    let inner = match kind {
+        "table" => "<i class=\"gh\"></i><i></i><i></i><i></i>",
+        _ => "<i class=\"gt\"></i><i></i><i class=\"gs\"></i>",
+    };
+    format!("<div class=\"ghost g-{kind}\" aria-hidden=\"true\">{inner}</div>")
 }
 
 /// The words each viewer of the export reads (OWNER-READER). The hub names the viewer with its rb-viewer meta: owner
@@ -453,6 +458,56 @@ fn ready_said(r: Option<&Value>) -> String {
     format!("<span title=\"{}\">{}</span>", esc(line), esc(&w::rerun_ready(ok, rows.len())))
 }
 
+/// A state of a line of work as a coloured chip with an icon and a hover (owner, Nov 13 2026: "so bland and can't
+/// click"): open amber, accepted and shipped green, rejected and stopped red, parked grey, planned and untested hollow;
+/// its word as rb says it.
+pub(crate) fn state_chip(word: &str) -> String {
+    let (class, icon, tip) = match word {
+        "open" => ("st-open", "\u{25d0}", "evidence recorded, no call made on it yet"),
+        "accepted" | "answered" => ("st-ok", "\u{2713}", "a call accepted it"),
+        "shipped" => ("st-ok", "\u{2713}", "a call shipped it"),
+        "rejected" | "dropped" => ("st-bad", "\u{2715}", "a call rejected it"),
+        "stopped" => ("st-bad", "\u{25a0}", "a call stopped it"),
+        "parked" => ("st-dim", "\u{2016}", "a call parked it"),
+        "pivoted" => ("st-dim", "\u{21b7}", "a call pivoted it"),
+        "investigating" => ("st-open", "\u{25cc}", "a call asks for more before deciding"),
+        "planned" => ("st-hollow", "\u{25cb}", "nothing recorded tests it yet"),
+        "untested" => ("st-hollow", "\u{25cb}", "not tested yet"),
+        _ => ("st-dim", "\u{b7}", ""),
+    };
+    let tip = if tip.is_empty() { String::new() } else { format!(" title=\"{tip}\"") };
+    format!("<span class=\"stc {class}\"{tip}><span class=\"sti\" aria-hidden=\"true\">{icon}</span>{}</span>", esc(word))
+}
+
+/// The same chip opening `to`, where its state is said with how rb reached it (closed form: states open how they were
+/// computed); its words on hover and on keyboard focus.
+pub(crate) fn state_chip_to(word: &str, to: &str) -> String {
+    let chip = state_chip(word);
+    if to.is_empty() {
+        return chip;
+    }
+    let chip = chip.replacen("<span class=\"stc ", &format!("<a href=\"#{}\" class=\"stc ", esc(to)), 1);
+    format!("{}</a>", chip.strip_suffix("</span>").unwrap_or(&chip))
+}
+
+/// An experiment's header line as a row of chips (owner, Nov 13 2026: "Experiment · open · 9 runs" was "so bland and
+/// can't click"): its type a quiet badge, its state a coloured chip, "locked" a chip, its runs a link to its runs table.
+/// The same, the state and "locked" opening `card` (the experiment's record card), where rb says how it reached them.
+fn who_chips_to(who: &str, runs_to: &str, card: &str) -> String {
+    let Some(rest) = who.strip_prefix("experiment \u{b7} ") else { return esc(who) };
+    let mut out = format!("<span class=\"kind\">{}</span>", w::EXPERIMENT_KIND);
+    for p in rest.split(" \u{b7} ").filter(|p| *p != "not locked") {
+        if p == "locked" {
+            out += &if card.is_empty() { format!("<span class=\"fch fch-dim\">{}</span>", esc(p)) } else { format!("<a class=\"fch fch-dim\" href=\"#{}\">{}</a>", esc(card), esc(p)) };
+        } else if p.ends_with(" runs") || p.ends_with(" run") {
+            out += &format!("<a class=\"fch fch-use\" href=\"#{}\">{}</a>", esc(runs_to), esc(p));
+        } else {
+            out += &state_chip_to(p, card);
+        }
+    }
+    out
+}
+
 /// An experiment's header line (design pass 1, target 6): rb's line led by the word "Experiment", with "not locked" left
 /// out, since most experiments are not (P6); any other line as rb gives it.
 fn who_said(who: &str) -> String {
@@ -470,14 +525,6 @@ fn owner_voice(html: &str) -> String {
     html.replace("for a confirmation", "for your confirmation")
 }
 
-/// "a", "a and b", "a, b and c".
-fn and_said(parts: &[String]) -> String {
-    match parts {
-        [] => String::new(),
-        [one] => one.clone(),
-        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
-    }
-}
 
 fn plural(n: i64, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
@@ -488,18 +535,6 @@ fn nb(s: &str) -> String {
     s.replace(" \u{b1} ", "\u{a0}\u{b1}\u{a0}")
 }
 
-/// A term with rb's line for it, shown on hover and focus with or without script, and described by its glossary entry.
-fn term(word: &str, inner: &str) -> String {
-    term_as(word, inner)
-}
-
-/// `inner` as the glossary's term `key` ("open (question)" for a question's status).
-fn term_as(key: &str, inner: &str) -> String {
-    match w::hint(key) {
-        Some(line) => format!("<span class=\"term\" data-hint=\"{}\" aria-describedby=\"{}\">{inner}</span>", esc(line), w::glossary_id(key)),
-        None => inner.to_string(),
-    }
-}
 /// One standing word in its colour; with no colour, plain. Every piece of a line sits in an element of its own, so the
 /// line reads in order to anything that reads elements.
 fn word(part: &str, muted: &[String]) -> String {
@@ -519,15 +554,9 @@ fn said_lead(line: &str) -> String {
     }
 }
 
-/// rb's phrase in the screens' plain words (w::plain_word), escaped, with the glossary's line for it where it has one
-/// ("can't tell yet", "not tested"); its count outside the hover.
+/// rb's phrase in the screens' plain words (w::plain_word), escaped.
 fn said_plain(phrase: &str) -> String {
-    let said = w::plain_word(phrase);
-    let (n, key) = match said.split_once(' ') {
-        Some((n, rest)) if n.chars().all(|c| c.is_ascii_digit()) => (format!("{n} "), rest.to_string()),
-        _ => (String::new(), said.clone()),
-    };
-    if w::hint(&key).is_some() && key != "rule" { format!("{}{}", esc(&n), term(&key, &esc(&key))) } else { esc(&said) }
+    esc(&w::plain_word(phrase))
 }
 
 /// rb's separator between the parts of a line, as an element of its own.
@@ -553,6 +582,110 @@ const THEME_ICONS: &str = "<svg class=\"th th-sys\" viewBox=\"0 0 16 16\" aria-h
 <svg class=\"th th-light\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>\
 <svg class=\"th th-dark\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M13.5 10.2A6 6 0 0 1 5.8 2.5a6 6 0 1 0 7.7 7.7z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linejoin=\"round\"/></svg>";
 
+/// The strip's group a rule's state falls in (overview.rs STATES): met, missed, can't tell yet, not tested.
+fn outcome_of(state: &str) -> &'static str {
+    match state {
+        "meets" | "reproduced" | "gate met" => "meets",
+        "misses" | "not reproduced" | "gate missed" => "misses",
+        "undetermined" | "gate undetermined" => "undetermined",
+        _ => "untested",
+    }
+}
+
+/// A setting's status as the page draws it (owner, Nov 13 2026: "what is provisional? no hover over?"): verified as
+/// "checked" with a green check, provisional as "not checked" with an amber question mark, unknown and inherited in
+/// their own words; each with rb's words for this setting (`said`) on hover and on keyboard focus. The JSON keeps the
+/// field's own words.
+fn status_mark(status: &str, said: &str) -> String {
+    let (class, mark, word) = match status {
+        "verified" => ("ok", "\u{2713}", "checked"),
+        "provisional" => ("nc", "?", "not checked"),
+        "unknown" => ("nc", "?", "unknown"),
+        "inherited" => ("in", "\u{2193}", "inherited"),
+        "" => return String::new(),
+        other => ("in", "\u{b7}", other),
+    };
+    let tip = if said.is_empty() { word.to_string() } else { said.to_string() };
+    format!(
+        "<span class=\"sst {class}\" tabindex=\"0\" data-tip=\"{}\"><span class=\"sm2\" aria-hidden=\"true\">{mark}</span>{word}</span>",
+        esc(&tip)
+    )
+}
+
+/// rb's line of an experiment's setting counts in the page's words: verified said as checked, provisional as not
+/// checked (the JSON keeps its words).
+fn status_words(line: &str) -> String {
+    line.replace(" provisional", " not checked").replace(" verified", " checked")
+}
+
+/// A note's opening clause: its text up to the end of its first sentence, or its first ": " or "; ", whichever comes
+/// first and leaves at least 24 characters; past 110 characters, cut at a word with an ellipsis. The whole note opens
+/// under it.
+fn opening_clause(t: &str) -> (usize, bool) {
+    let ends = [". ", "; ", ": "];
+    let cut = ends.iter().filter_map(|e| t.match_indices(e).map(|(i, _)| i).find(|i| *i >= 24)).min();
+    // the clause with its stop (".", ";" or ":"), so the line and what follows it read the note word for word
+    let head = match cut {
+        Some(i) => i + 1,
+        None => t.len(),
+    };
+    if t[..head].chars().count() <= 110 {
+        return (head, false);
+    }
+    // past 110 characters, at the last word before them
+    let at = t.char_indices().nth(110).map_or(t.len(), |(i, _)| i);
+    match t[..at].rfind(' ') {
+        Some(sp) if sp > 0 => (sp, true),
+        _ => (at, true),
+    }
+}
+
+/// The header's git chips (owner, Nov 13 2026: "where is the git aware thingy?"), from the checkout's `chip`: the branch
+/// and the commit as one chip ("main · c07560f"), drawn here where no picker draws them (`with_ref`; on rb open the
+/// Where and Version pickers are that chip), a button that copies the whole commit, and, only where record files are
+/// not committed, an amber chip with their count that opens their list. Nothing where git cannot say.
+pub(crate) fn git_chips(doc: &Value, with_ref: bool) -> String {
+    git_chips_at(doc, with_ref, "top")
+}
+
+/// The same, `where_` naming its place (the header, About) in its fold's key, so each keeps its own open state.
+pub(crate) fn git_chips_at(doc: &Value, with_ref: bool, where_: &str) -> String {
+    let Some(c) = at(doc, "checkout.chip").filter(|c| c.is_dict()) else { return String::new() };
+    let commit = text(c, "commit");
+    let short: String = commit.chars().take(7).collect();
+    let branch = Some(text(c, "ref")).filter(|b| !b.is_empty());
+    let mut h = String::new();
+    if with_ref {
+        let b = branch.unwrap_or(w::NO_BRANCH);
+        let sha = if short.is_empty() { format!("<span class=\"gsha\">{}</span>", w::NO_COMMIT_YET) } else { format!("<span class=\"gsha mono\">{}</span>", esc(&short)) };
+        h += &format!(
+            "<a class=\"gref\" href=\"#in-git\" title=\"{}\"><i class=\"ic ic-branch\"></i><span class=\"gb\">{}</span>{sha}</a>",
+            esc(&if commit.is_empty() { b.to_string() } else { format!("{b} \u{b7} {commit}") }),
+            esc(b)
+        );
+    }
+    if !commit.is_empty() {
+        h += &format!(
+            "<button type=\"button\" class=\"gcopy\" data-sha=\"{}\" aria-label=\"{}\" title=\"{}\"><i class=\"ic ic-copy\"></i></button>",
+            esc(commit),
+            w::COPY_THE_COMMIT,
+            w::COPY_THE_COMMIT
+        );
+    }
+    let n = count(c, "not_committed").unwrap_or(0);
+    if n > 0 {
+        let files = texts(c, "files");
+        let shown: String = files.iter().take(50).map(|f| format!("<li class=\"mono\">{}</li>", esc(f))).collect();
+        let more = if files.len() > 50 { format!("<li><span class=\"fch fch-dim\">+{}</span></li>", files.len() - 50) } else { String::new() };
+        h += &format!(
+            "<details class=\"gunc\" data-fold=\"gunc:{where_}\"><summary class=\"fch fch-warn\" title=\"{}\">{n} not committed</summary><div class=\"gpop\" role=\"group\" aria-label=\"{}\"><ul class=\"gl\">{shown}{more}</ul></div></details>",
+            esc(&format!("{} not committed", if n == 1 { "1 record file".to_string() } else { format!("{n} record files") })),
+            w::RECORD_FILES_NOT_COMMITTED
+        );
+    }
+    if h.is_empty() { h } else { format!("<span class=\"gitc\">{h}</span>") }
+}
+
 fn top_bar(doc: &Value, surface: Surface, pickers: &str, rerun: &str) -> String {
     // the export, which the hub serves under its own bar, keeps About and the controls in the navigator instead
     let end = if surface == Surface::Export { String::new() } else { controls(surface) };
@@ -560,9 +693,11 @@ fn top_bar(doc: &Value, surface: Surface, pickers: &str, rerun: &str) -> String 
     // script writes in .vcrumb; the time small, as the snapshot's. The record's id, rb's version and a fork's parent are
     // About's, never the bar's
     format!(
-        "<header class=\"top\" id=\"top\" data-swap><span class=\"rbwm\">rb<span class=\"rbdot\">.</span></span><span class=\"ttl\">{}</span>\
-         <span class=\"vcrumb\"></span>{pickers}<span class=\"end\">{rerun}<span class=\"stamp\"{}>{}</span>{end}</span></header>",
+        "<header class=\"top\" id=\"top\" data-swap><span class=\"rbwm\">rb<span class=\"rbdot\">.</span></span><a class=\"ttl\" href=\"#overview\">{}</a>\
+         <span class=\"vcrumb\"></span>{}{pickers}<span class=\"end\">{rerun}<a class=\"stamp\" href=\"#in-git\"{}>{}</a>{end}</span></header>",
         au_title(text(doc, "project.title")),
+        // rb open's pickers draw the branch and the commit themselves (open.rs), with the rest of the chips
+        if surface == Surface::Open { String::new() } else { git_chips(doc, true) },
         // the export's own bar never shows it (the hub draws its own; with no script there is no app's bar)
         stamp_short(text(doc, "at")).filter(|_| surface != Surface::Export).map(|s| format!(" data-short=\"{}\"", esc(&s))).unwrap_or_default(),
         esc(text(doc, "at")),
@@ -623,23 +758,8 @@ fn witness(doc: &Value) -> String {
     } else {
         w::witness_line(began, &kinds.map(|(k, one)| (n(k), t(k), one, k)))
     };
-    if line.is_empty() { line } else { format!("<p class=\"dim sm wit\">{}</p>", esc(&line)) }
-}
-
-/// About's line on the record itself: its id, rb's version, and the project it was cloned from, when that is an address.
-fn record_line(doc: &Value) -> String {
-    let parent = text(doc, "project.parent");
-    let fork = if parent.starts_with("https://") || parent.starts_with("http://") {
-        format!(" \u{b7} {}<a href=\"{}\">{}</a>", w::A_FORK_OF, esc(parent), esc(parent))
-    } else {
-        String::new()
-    };
-    format!(
-        "<p class=\"recid dim\">{} <span class=\"mono\">{}</span> \u{b7} rb {}{fork}</p>",
-        w::RESEARCH_RECORD_CAP,
-        esc(text(doc, "project.id")),
-        esc(text(doc, "rb_version")),
-    )
+    // the line opens History, where each write it counts is said with when it was made
+    if line.is_empty() { line } else { format!("<p class=\"dim sm wit\"><a href=\"#history\">{}</a></p>", esc(&line)) }
 }
 
 /// The nav: Overview · Research (the questions whole, Rules) · Experiments (each by id and short title) · Record
@@ -652,10 +772,12 @@ fn nav(doc: &Value, surface: Surface) -> String {
         .iter()
         .map(|q| {
             let deep = count(q, "depth").unwrap_or(0) > 0;
+            // a row may cut it: its whole text on hover (owner, Nov 13 2026)
             format!(
-                "<li><a{} href=\"#q-{}\"><span class=\"tx q\">{}{}</span></a></li>",
+                "<li><a{} href=\"#q-{}\" title=\"{}\"><span class=\"tx q\">{}{}</span></a></li>",
                 if deep { " class=\"d1\"" } else { "" },
                 esc(text(q, "id")),
+                esc(text(q, "text")),
                 if deep { "\u{21b3} " } else { "" },
                 au_title(text(q, "text"))
             )
@@ -674,18 +796,32 @@ fn nav(doc: &Value, surface: Surface) -> String {
             )
         })
         .collect();
-    // Your call's badge counts the user's calls alone (your_call.n): a proposed or past call and a design that waits
-    // for a confirmation are listed apart, never under Your call (AGENTS.md, "Whose call it is"), so the Overview's
-    // queue, which holds them too, may count more
-    let yc = count(doc, "your_call.n").map(|n| format!(" <span class=\"n\">{n}</span>")).unwrap_or_default();
+    // the pin's badge counts the Overview's decisions, what waits on you to decide or to confirm, the same number on
+    // every surface (UX5 1.3); the section it opens lists the calls to make, and what waits for a confirmation apart
+    // (AGENTS.md, "Whose call it is"), so its own count may be smaller; a document from before the overview counts
+    // your_call.n
+    let yc = match doc.get("overview").map(|o| list(o, "decisions").len()) {
+        Some(n) if n > 0 => format!(" <span class=\"n\">{n}</span>"),
+        Some(_) => String::new(),
+        None => count(doc, "your_call.n").map(|n| format!(" <span class=\"n\">{n}</span>")).unwrap_or_default(),
+    };
     let foot = if surface == Surface::Export { controls(surface) } else { String::new() };
+    // the Files tree under Record (owner, Nov 13 2026): "Files (n)" opens it in place; with no script, none
+    let nfiles = list(doc, "files").len();
+    let files = if nfiles == 0 { String::new() } else {
+        format!(
+            "<li class=\"fls\"><a href=\"#files\" class=\"ftog\" aria-expanded=\"false\" aria-controls=\"files\">{} <span class=\"n\">{nfiles}</span></a>{}</li>",
+            w::FILES,
+            files_tree(doc, surface)
+        )
+    };
     // a reader has nothing to call: on the export (a reader's, unless the hub says its owner looks) the row leaves it out
     let row = if surface == Surface::Export { " data-row=\"owner\"" } else { "" };
     format!(
         "<nav class=\"nav\" id=\"nav\" aria-label=\"Research record\"><ul><li><a href=\"#overview\">{}</a></li>\
          <li><a href=\"#research\">{}{}</a><ul class=\"sub\">{qs}<li><a href=\"#criteria\"><span class=\"tx\">{}</span>{}</a></li></ul></li>\
          <li><a href=\"#experiments\">{}{}</a><ul class=\"sub\">{xs}</ul></li>\
-         <li class=\"rcd\"><a class=\"grp\" href=\"#record\">{}</a><ul class=\"rec\"><li><a href=\"#runs\">{}{}</a></li><li><a href=\"#resources\">{}{}</a></li><li><a href=\"#history\">{}</a></li></ul></li>\
+         <li class=\"rcd\"><a class=\"grp\" href=\"#record\">{}</a><ul class=\"rec\"><li><a href=\"#runs\">{}{}</a></li><li><a href=\"#resources\">{}{}</a></li><li><a href=\"#history\">{}</a></li>{files}</ul></li>\
          <li class=\"yc\"{row}><a href=\"#your-call\">{}{yc}</a></li></ul>{foot}</nav>",
         w::OVERVIEW,
         w::RESEARCH,
@@ -704,25 +840,74 @@ fn nav(doc: &Value, surface: Surface) -> String {
     )
 }
 
-/// The footer: the honesty line, once; what made the page and when; how to read the record.
-fn footer(doc: &Value, surface: Surface) -> String {
-    let made = match surface {
-        Surface::Open => format!("<span>{}</span><span>{}</span>", w::OPEN_MADE, w::OPEN_WHERE),
-        // line 1, rb's mark of its own page, first; line 2 how the checkout the page was made from held the record, and
-        // its commit (the document's checkout.line: no branch, no path), on its own line; a page an older rb made has none
-        _ => {
-            let held = text(doc, "checkout.line");
-            let held = if held.is_empty() { String::new() } else { format!("<span>{}</span>{}", phrase_linked(doc, held), git_block(doc, surface)) };
-            format!("<span>{}{}</span>{held}", w::PAGE_MADE, esc(text(doc, "at")))
+/// The Files tree (owner, Nov 13 2026: "where is my file explorer/dir/browser on left pane?"), under Record in the
+/// left pane: a filter box, then every file the document lists as a tree, folders first and each one folded but those
+/// that hold a file the record names; each row a type icon, the name and its chips (nodes.rs file_chips), and a link
+/// that opens the file's card. Hidden until "Files (n)" opens it; with no script, not drawn at all.
+fn files_tree(doc: &Value, surface: Surface) -> String {
+    let files = list(doc, "files");
+    if files.is_empty() {
+        return String::new();
+    }
+    let d = nodes::Doc::new(doc, surface);
+    #[derive(Default)]
+    struct Dir<'a> {
+        dirs: std::collections::BTreeMap<String, Dir<'a>>,
+        files: Vec<&'a Value>,
+        named: bool,
+    }
+    let mut top = Dir::default();
+    for f in files {
+        let named = at(f, "named").and_then(Value::as_bool).unwrap_or(false);
+        let mut here = &mut top;
+        here.named |= named;
+        for part in text(f, "folder").split('/').filter(|p| !p.is_empty()) {
+            here = here.dirs.entry(part.to_string()).or_default();
+            here.named |= named;
         }
-    };
-    let computed = if surface == Surface::Open { String::new() } else { format!("<p>{}</p>", w::HOW_TO_READ_COMPUTED) };
+        here.files.push(f);
+    }
+    // a short tree opens whole; a long one opens its top folders that hold a file the record names, the rest folded
+    let few = files.len() <= 30;
+    fn draw(d: &nodes::Doc, dir: &Dir, at_: &str, few: bool) -> String {
+        let mut h = String::new();
+        for (name, sub) in &dir.dirs {
+            let path = format!("{at_}{name}/");
+            let open = if few || (at_.is_empty() && sub.named && sub.files.len() + sub.dirs.len() <= 12) { " open" } else { "" };
+            h += &format!(
+                "<li class=\"fdir\"><details data-folder=\"{p}\" data-fold=\"files:{p}\"{open}><summary><i class=\"ic ic-fold\"></i><span class=\"fn\">{}</span></summary><ul>{}</ul></details></li>",
+                esc(name),
+                draw(d, sub, &path, few),
+                p = esc(&path)
+            );
+        }
+        let mut fs: Vec<&&Value> = dir.files.iter().collect();
+        fs.sort_by_key(|f| text(f, "name").to_lowercase());
+        for f in fs {
+            let path = text(f, "path");
+            // a chip cut short in the row says itself whole on hover
+            let chips: String = d
+                .file_chips(f)
+                .iter()
+                .map(|(k, t)| if t.chars().count() > 24 { format!("<span class=\"fch fch-{k}\" title=\"{}\">{}</span>", esc(t), esc(t)) } else { format!("<span class=\"fch fch-{k}\">{}</span>", esc(t)) })
+                .collect();
+            h += &format!(
+                "<li class=\"fr\" data-path=\"{}\"><a href=\"#{}\">{}<span class=\"fn\">{}</span><span class=\"fcs\">{chips}</span></a></li>",
+                esc(path),
+                esc(&nodes::file_anchor(path)),
+                nodes::file_icon(path),
+                esc(text(f, "name"))
+            );
+        }
+        h
+    }
     format!(
-        "<footer class=\"foot\"><p class=\"honest1\">{} {}</p>{made}<details data-fold=\"how-to-read\"><summary>{}</summary><p>{}</p>{computed}</details></footer>",
-        w::HONEST,
-        w::RB_NEVER_DECIDES,
-        w::HOW_TO_READ,
-        w::HOW_TO_READ_AXES
+        "<div class=\"ftree\" id=\"files\" aria-label=\"{}\"><div class=\"fhead\"><input type=\"search\" class=\"ffilter\" placeholder=\"{}\" aria-label=\"{}\" autocomplete=\"off\"><button type=\"button\" class=\"fclose\" aria-label=\"Close files\" title=\"Close files\">\u{2715}</button></div><ul class=\"ft\">{}</ul><p class=\"fnone\" hidden><span class=\"fch fch-dim\">{}</span></p></div>",
+        w::FILES,
+        w::FILTER_FILES,
+        w::FILTER_FILES,
+        draw(&d, &top, "", few),
+        w::NO_FILE_MATCHES
     )
 }
 
@@ -757,40 +942,6 @@ fn record_link(address: &str, sha: &str, record_dir: &str) -> Option<(String, &'
         "codeberg.org" if parts.len() == 2 => Some((format!("https://codeberg.org/{path}/src/commit/{sha}/{dir}"), "codeberg.org")),
         _ => None,
     }
-}
-
-/// An evidence line's text, each part it draws in monospace (`code`) in a span.
-fn evidence_html(l: &Value) -> String {
-    let code = texts(l, "code");
-    crate::checkout::segments(text(l, "text"), &code).iter().map(|(m, p)| if *m { format!("<span class=\"mono\">{}</span>", esc(p)) } else { esc(p) }).collect()
-}
-
-/// About's block under line 2 (PARITY 9.3): checkout.rs's page evidence (what rb found and what it means for this
-/// page, the commit whole, which files, what record files are), from the checkout the page was made from, never a
-/// bundle's copy; and, on a page published with its record at an address (reproduce_repo), the code's address part,
-/// drawn as the Rerun panel's parts are (rrun rrx). Never a branch, a place path or git's words.
-fn git_block(doc: &Value, surface: Surface) -> String {
-    let lines = at(doc, "checkout.page_evidence").and_then(Value::as_list).cloned().unwrap_or_default();
-    if lines.is_empty() {
-        return String::new();
-    }
-    let of = |k: &'static str| lines.iter().filter(move |l| text(l, "kind") == k);
-    let mut first: Vec<String> = of("found").map(evidence_html).collect();
-    first.extend(of("page").map(evidence_html));
-    let mut out = format!("<p>{}</p>", first.join(" "));
-    let sha = of("found").next().map(|l| text(l, "sha").to_string()).unwrap_or_default();
-    if !sha.is_empty() {
-        out.push_str(&format!("<p class=\"mono\">{}</p>", esc(&sha)));
-    }
-    for l in of("files") {
-        out.push_str(&format!("<p>{}</p>", evidence_html(l)));
-    }
-    out.push_str(&address_part(doc, surface, &sha));
-    for l in of("define") {
-        out.push_str(&format!("<p class=\"dim\">{}</p>", esc(text(l, "text"))));
-    }
-    // styled by its id alone: the small page has little room left (guarantee 29)
-    format!("<div id=\"{GIT_BLOCK}\" tabindex=\"-1\">{out}</div>")
 }
 
 /// The code's address part of About's block (PARITY 2.10): only on a page published with its record at an address,
@@ -846,10 +997,49 @@ fn address_part(doc: &Value, surface: Surface, sha: &str) -> String {
     format!("<div class=\"rrun rrx\">{}</div>", parts.join(""))
 }
 
-/// The About view (design pass 1, P10, target 11): what made the page, the honesty line, how to read the record and the
-/// words it uses, once, reached from the top bar; never at the foot of every view. Glossary hovers on terms stay.
-fn about(doc: &Value, surface: Surface, words: &str) -> String {
-    let body = format!("<h1 id=\"h-about\">{}</h1>{}{}{}{words}", w::ABOUT_TITLE, record_line(doc), witness(doc), footer(doc, surface));
+/// The About view (design pass 1, P10, target 11): what made the page and the honesty line, once, reached from the top
+/// bar; never at the foot of every view. No glossary: a word that needs one is shown instead (Nov 12 20:35 +08).
+/// About as one strip of facts (owner, Nov 13 2026: "i click About i see all these... human????? can read?????"): rb's
+/// version as a badge, when the page was made (on rb open, that it is live), the git chips the header draws, a fork's
+/// parent and the record's id; then the record's line and rb's one honest line, small. No paragraph on git and no
+/// definition: the chips show it. A page published with its record at an address keeps the lines that check out its
+/// code. The strip is `#in-git`, where the phrase that says how the checkout holds the record links.
+fn about_strip(doc: &Value, surface: Surface) -> String {
+    let mut chips = format!("<span class=\"abadge\">rb {}</span>", esc(text(doc, "rb_version")));
+    match surface {
+        Surface::Open => chips += &format!("<span class=\"fch fch-at\" title=\"{}\">{}</span>", w::OPEN_WHERE, w::LIVE_ON_THIS_MACHINE),
+        _ => {
+            let at_ = text(doc, "at");
+            if !at_.is_empty() {
+                // rb's mark of its own page rides on the chip's title: rb recognises a page it wrote by it
+                chips += &format!("<span class=\"fch fch-at\" title=\"{}{}\">{} {}</span>", w::PAGE_MADE, esc(at_), w::SNAPSHOT, esc(at_));
+            }
+        }
+    }
+    chips += &git_chips_at(doc, true, "about");
+    let state = text(doc, "checkout.state");
+    if !matches!(state, "" | "committed" | "not_committed" | "no_commit") {
+        // git ignores record files, or no git: what the checkout says, as a chip (no commit yet the git chip says)
+        chips += &format!("<span class=\"fch fch-warn\">{}</span>", esc(text(doc, "checkout.said")));
+    }
+    let parent = text(doc, "project.parent");
+    if parent.starts_with("https://") || parent.starts_with("http://") {
+        chips += &format!("<span class=\"fch fch-use\">{}<a href=\"{}\">{}</a></span>", w::A_FORK_OF, esc(parent), esc(parent));
+    }
+    // the record's id opens the record's front page
+    chips += &format!("<a class=\"fch fch-dim mono\" href=\"#overview\" title=\"{}\">{}</a>", w::RESEARCH_RECORD_CAP, esc(text(doc, "project.id")));
+    let sha = text(doc, "checkout.commit");
+    let address = address_part(doc, surface, sha);
+    format!(
+        "<div class=\"astrip\" id=\"{GIT_BLOCK}\" tabindex=\"-1\">{chips}</div>{}{address}<p class=\"dim sm honest1\">{} {}</p>",
+        witness(doc),
+        w::HONEST,
+        w::RB_NEVER_DECIDES
+    )
+}
+
+fn about(doc: &Value, surface: Surface) -> String {
+    let body = format!("<h1 id=\"h-about\">{}</h1>{}", w::ABOUT_TITLE, about_strip(doc, surface));
     format!("<div class=\"sec\" id=\"sec-about\">{}</div>", section("about", &with_project(doc, w::ABOUT), w::ABOUT, "insp-none", &body))
 }
 
@@ -893,8 +1083,8 @@ fn with_project(doc: &Value, what: &str) -> String {
 fn reason(c: &Value) -> String {
     let detail: Vec<&str> = [text(c, "reason.detail"), text(c, "reason.also")].into_iter().filter(|s| !s.is_empty()).collect();
     // drawn verbatim (the contract's drawn field): its plain words are the model's (M)
-    let detail = if detail.is_empty() { String::new() } else { format!("<span class=\"rd2\"> \u{b7} {}</span>", esc(&nb(&detail.join(" \u{b7} ")))) };
-    format!("<span class=\"rsn\"><span class=\"rl\">{}</span>{detail}</span>", esc(text(c, "reason.label")))
+    let detail = if detail.is_empty() { String::new() } else { format!("<span class=\"rd2\"> \u{b7} {}</span>", esc(&nb(&w::plainer(&detail.join(" \u{b7} "))))) };
+    format!("<span class=\"rsn\"><span class=\"rl\">{}</span>{detail}</span>", esc(&w::plainer(text(c, "reason.label"))))
 }
 
 /// A call in a rail, in two lines: why rb asks, then what it is about with its id last. `to` is where it links while
@@ -933,8 +1123,10 @@ fn past_version(doc: &Value, surface: Surface) -> bool {
     surface == Surface::Open && !text(doc, "places.place.version.sha").is_empty()
 }
 
-/// One row of the Overview's queue: its kind, what it asks (a verb phrase, HTML), one line of numbers or names (HTML),
-/// where its one action goes, the action's word, and what Your call draws for it at the Decide level.
+/// One row of the queue: its kind, what it asks (a verb phrase, HTML), one line of numbers or names (HTML), where its
+/// one action goes, the action's word, and what Your call draws for it at the Decide level. Since round 1 the Overview
+/// draws Decisions from `overview` (UX5 1.3), and Your call reads the queue only for its order (`src`).
+#[allow(dead_code)]
 struct QItem<'a> {
     kind: String,
     title: String,
@@ -1004,38 +1196,6 @@ fn tally_pairs(l: &[Value]) -> Vec<(String, i64)> {
             None => Some((text(t, "state").to_string(), count(t, "n")?)),
         })
         .collect()
-}
-/// A finding's tag key as a quiet tag with rb's line for it ("retrospective" reads "rule written after the results").
-fn tag_of(key: &str) -> String {
-    let (hint, label) = match key {
-        "criterion_untested" => ("not tested", "not tested"),
-        "retrospective" => ("rule written after the results", "rule written after the results"),
-        "uncertainty_remains" => ("Uncertainty remains", "Uncertainty remains"),
-        other => (other, other),
-    };
-    format!(" {}", term_as(hint, &format!("<span class=\"tag\">{}</span>", esc(label))))
-}
-
-/// rb's tally of rule words (home.tally's [word, n] pairs) as the screens say it (plain words pass 3): "Rules: 4 met ·
-/// 1 not reproduced · 4 can't tell yet", each word short and plain in its colour, what the counts count leading them.
-fn rule_tally(pairs: &[Value], muted: &[String], alone: Option<&Value>) -> String {
-    let words: Vec<String> = pairs
-        .iter()
-        .filter_map(|t| {
-            let pair = t.as_list()?;
-            let rule = pair.first()?.as_str()?;
-            let n = super::whole(pair.get(1)?)?;
-            let full = format!("{n} {}", crate::assess::rule_label(rule, n));
-            // a tally never hides a reading's outcome: the rules met on the estimate alone are said with it
-            let estimate = alone.and_then(|a| a.get(rule)).and_then(Value::as_i64).unwrap_or(0);
-            let said = said_plain(&format!("{n} {}", w::short_rule(rule))) + &esc(&crate::cmds::reading::on_estimate_said(estimate, &n.to_string()));
-            Some(match crate::surface::part_class(&full, muted).as_str() {
-                "dim" => format!("<span>{said}</span>"),
-                cls => format!("<span class=\"sw {cls}\">{said}</span>"),
-            })
-        })
-        .collect();
-    if words.is_empty() { String::new() } else { format!("<span class=\"k\">{}</span>{}", w::RULES_LEAD, words.join(DOT)) }
 }
 
 /// A number as a screen says it (design pass 1, P5): `x` to `places` decimals (two, see `places`); full precision stays
@@ -1201,7 +1361,7 @@ fn plain_reading(f: &Value) -> String {
         out.push_str(&format!(", {}", units_said(n, text(f, "reading.unit"))));
     }
     if lo.is_none() && n > 0 && n < 3 && text(f, "state") == "undetermined" {
-        out.push_str(", no interval yet (rb gives one from 3)");
+        out.push_str(", no range yet (rb gives one from 3)");
     }
     // the cited number in the rule's own digits, as every view says it ("49.6%", never "49.60%")
     if let Some(t) = target {
@@ -1416,19 +1576,28 @@ fn late_head(fs: &[&Value]) -> (String, bool) {
     (format!("{counted}{}", rest.trim_end_matches(" \u{b7} ")), late * 2 > tested)
 }
 
+/// rb's count of rules written after their results, opening Rules showing those alone (closed form).
+fn late_line(fs: &[&Value], late: &str) -> String {
+    if late.is_empty() {
+        return String::new();
+    }
+    let ids: Vec<String> = fs.iter().filter(|f| texts(f, "tags").iter().any(|t| t == "retrospective")).map(|f| format!("c-{}", text(f, "criterion_id"))).filter(|c| c != "c-").collect();
+    if ids.is_empty() {
+        return format!("<p class=\"quiet late\">{}</p>", esc(late));
+    }
+    format!("<p class=\"quiet late\"><a href=\"#criteria\" data-ids=\"{}\">{}</a></p>", esc(&ids.join(" ")), esc(late))
+}
+
 /// A row's one tag, only where it is the exception (design pass 1, P6): where most rules were written after their
-/// results, a rule written before them; else a rule written after them.
+/// results, a rule written before them; else a rule written after them. The tag places the two in time ("results
+/// 14 Oct ──▶ rule 20 Oct"), never a word that needs a definition.
 fn timing_tag(f: &Value, most_late: bool) -> String {
     let late = texts(f, "tags").iter().any(|t| t == "retrospective");
     // a rule with no results has no timing to be an exception in
-    if text(f, "state") == "untested" {
+    if text(f, "state") == "untested" || late == most_late {
         return String::new();
     }
-    match (late, most_late) {
-        (true, false) => tag_of("retrospective"),
-        (false, true) => format!(" {}", term_as("rule written before the results", &format!("<span class=\"tag\">{}</span>", w::WRITTEN_BEFORE))),
-        _ => String::new(),
-    }
+    format!(" <span class=\"tag\">{}</span>", esc(&w::in_time(late, text(f, "when.rule"), text(f, "when.results"))))
 }
 
 impl<'a> Page<'a> {
@@ -1524,6 +1693,62 @@ impl<'a> Page<'a> {
         format!("<span class=\"au\">{out}</span>")
     }
 
+    /// A setting's source as a chip (owner, Nov 13 2026): a file the page holds opens its card, at the commit rb read it;
+    /// any other source is its words, quiet.
+    fn source_chip(&self, src: &str) -> String {
+        if src.is_empty() {
+            return String::new();
+        }
+        let path = src.split(['#', '@']).next().unwrap_or(src);
+        let path = path.rsplit_once(':').filter(|(_, n)| n.chars().all(|c| c.is_ascii_digit())).map_or(path, |(p, _)| p);
+        let held = list(self.doc, "files").iter().any(|f| text(f, "path") == path && at(f, "named").and_then(Value::as_bool).unwrap_or(false));
+        if held {
+            format!("<a class=\"fch fch-use mono\" href=\"#{}\">{}</a>", esc(&nodes::file_anchor(path)), esc(src))
+        } else {
+            format!("<span class=\"mono dim\">{}</span>", esc(src))
+        }
+    }
+
+    /// A note's words as au_cited draws them, each `file:line` a chip, and each path the page holds as a file (its card)
+    /// or a folder (the Files tree there) a chip too (owner, Nov 13 2026: paths become chips that open them).
+    fn note_words(&self, s: &str) -> String {
+        let files: Vec<&str> = list(self.doc, "files").iter().map(|f| text(f, "path")).collect();
+        let named: std::collections::HashSet<&str> =
+            list(self.doc, "files").iter().filter(|f| at(f, "named").and_then(Value::as_bool).unwrap_or(false)).map(|f| text(f, "path")).collect();
+        let paths = |seg: &str| -> String {
+            let mut out = String::new();
+            let mut rest = seg;
+            while !rest.is_empty() {
+                let start = rest.find(|c: char| c.is_ascii_alphanumeric() || c == '.' || c == '_').unwrap_or(rest.len());
+                out.push_str(&esc(&rest[..start]));
+                rest = &rest[start..];
+                let end = rest.find(|c: char| !(c.is_ascii_alphanumeric() || "._/-".contains(c))).unwrap_or(rest.len());
+                let tok = &rest[..end];
+                let core = tok.trim_end_matches(['.', ',']);
+                let tail = &tok[core.len()..];
+                let folder = format!("{}/", core.trim_end_matches('/'));
+                if core.contains('/') && named.contains(core) {
+                    out.push_str(&format!("<a class=\"fch fch-use nchip\" href=\"#{}\">{}</a>{}", esc(&nodes::file_anchor(core)), esc(core), esc(tail)));
+                } else if core.contains('/') && files.iter().any(|f| f.starts_with(&folder)) {
+                    out.push_str(&format!("<a class=\"fch fch-use nchip\" href=\"#files\" data-folder=\"{}\">{}</a>{}", esc(&folder), esc(core), esc(tail)));
+                } else {
+                    out.push_str(&esc(tok));
+                }
+                rest = &rest[end..];
+            }
+            out
+        };
+        let mut out = String::new();
+        let mut from = 0;
+        for (i, end, c) in self.cites_in(s) {
+            out.push_str(&paths(&s[from..i]));
+            out.push_str(&self.cite_chip(c));
+            from = end;
+        }
+        out.push_str(&paths(&s[from..]));
+        format!("<span class=\"au\">{out}</span>")
+    }
+
     /// rb's line for a call, the note a session gave in it drawn as its words where rb hands the note apart: only after
     /// rb's "note: " is it the writer's.
     fn said_with_note(&self, line: &str, note: &str) -> String {
@@ -1582,16 +1807,35 @@ impl<'a> Page<'a> {
         line.split(" \u{b7} ").filter(|part| !cmds.iter().any(|c| nodes::names_command(part, c))).collect::<Vec<_>>().join(" \u{b7} ")
     }
 
-    /// The Next step's words to paste: in a box to copy, but on a past version (guarantee 38), where they are words.
-    fn prompt(&self, words: &str) -> String {
+    /// An empty state's Next step (the UX lead's rule, Nov 13 2026): one card in your view with a prompt written from the
+    /// record for this item and a Copy prompt button; nothing for a reader of the export, nor at a past version.
+    pub(super) fn next_card(&self, words: &str) -> String {
         if self.past {
-            format!("<p class=\"prompt\">\"{}\"</p>", esc(words))
+            return String::new();
+        }
+        let card = format!(
+            "<section class=\"nextc\"><h3>{}</h3><p class=\"prompt\">{}</p><button type=\"button\" class=\"cpp\" data-act=\"copy-text\" data-text=\"{}\">{}</button></section>",
+            w::NEXT_STEP,
+            esc(words),
+            esc(words),
+            w::COPY_PROMPT
+        );
+        if self.surface == Surface::Export { by_viewer("div", "", &card, &card, "") } else { card }
+    }
+
+    /// The Next step's words to paste: in a box to copy, but on a past version (guarantee 38), where they are words.
+    fn prompt(&self, words: &str, to: &str) -> String {
+        // said as words (a past version, a reader), they open what the step is for (closed form)
+        let said = format!("\"{}\"", esc(words));
+        let said = if self.ids.contains(&esc(to)) { a(to, &said, "") } else { said };
+        if self.past {
+            format!("<p class=\"prompt\">{said}</p>")
         } else {
             // the reader of the export reads the Next step's words, with no box to copy them from (OWNER-READER: an open
             // item stays in view; only the action goes)
             let boxed = format!("<div class=\"cmdbox\" data-copybtn><pre class=\"cmd prompt\">\"{}\"</pre></div>", esc(words));
             if self.surface == Surface::Export {
-                by_viewer("div", "", &boxed, &boxed, &format!("<p class=\"prompt\">\"{}\"</p>", esc(words)))
+                by_viewer("div", "", &boxed, &boxed, &format!("<p class=\"prompt\">{said}</p>"))
             } else {
                 boxed
             }
@@ -1612,6 +1856,86 @@ impl<'a> Page<'a> {
     fn voiced(&self, html: &str) -> String {
         let owner = owner_voice(html);
         if self.surface == Surface::Export && owner != html { by_viewer("span", "", html, &owner, html) } else { html.to_string() }
+    }
+
+    /// An experiment's line ("Experiment · open · locked · 15 runs"), each value opening its source (owner, msg 46): its
+    /// state its record's card, where rb says how the state is reached; its runs its runs; "locked" its freeze.
+    fn who_linked(&self, eid: &str, who: &str) -> String {
+        if who.starts_with("experiment \u{b7} ") {
+            let runs = [format!("x-{eid}:runs"), format!("x-{eid}")].into_iter().find(|c| self.ids.contains(&esc(c))).unwrap_or_default();
+            let card = [super::fields::to(eid), format!("x-{eid}")].into_iter().find(|c| self.ids.contains(&esc(c))).unwrap_or_default();
+            return format!("<span class=\"who chips\">{}</span>", who_chips_to(who, &runs, &card));
+        }
+        let said = who_said(who);
+        let parts: Vec<&str> = said.split(" \u{b7} ").collect();
+        let card = [format!("k-{eid}"), format!("x-{eid}")].into_iter().find(|c| self.ids.contains(&esc(c)));
+        let runs = [format!("x-{eid}:runs"), format!("x-{eid}")].into_iter().find(|c| self.ids.contains(&esc(c)));
+        parts
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let to = if p.ends_with(" run") || p.ends_with(" runs") { runs.as_deref() } else if i > 0 { card.as_deref() } else { None };
+                match to {
+                    Some(t) => a(t, &esc(p), ""),
+                    None => esc(p),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(DOT)
+    }
+
+    /// Where a reason's subject opens (G3): a rule its card; a design its experiment; a call that waits its own card,
+    /// else the card of what it is on, else Your call.
+    fn subject_anchor(&self, kind: &str, id: &str) -> Option<String> {
+        let cands: Vec<String> = match kind {
+            "criterion" => vec![format!("c-{id}")],
+            "design" => vec![format!("x-{id}")],
+            "decision" => {
+                let on = list(self.doc, "pending").iter().find(|p| text(p, "id") == id).map(|p| text(p, "subject").to_string()).unwrap_or_default();
+                vec![id.to_string(), format!("call-{on}"), format!("c-{on}"), format!("x-{on}"), "your-call".into()]
+            }
+            _ => vec![],
+        };
+        cands.into_iter().find(|c| self.ids.contains(&esc(c)))
+    }
+
+    /// A question's line on why it is open, each reason a link to what it is about (G3): one subject its card, several
+    /// rules the Rules view showing those alone; then "+n more" where the line leaves reasons out, opening the question.
+    fn reasons_linked(&self, s: &Value, line: &str, qid: &str) -> String {
+        // a question decided says the call that decided it: the line opens the question's decisions (closed form)
+        if list(s, "reasons").is_empty() && !line.starts_with("No answer yet") {
+            return a(&format!("{qid}:rail"), &esc(line), "");
+        }
+        let mut html = esc(line);
+        // "No answer yet" opens the question's rules, where each is said with its state
+        if let Some(rest) = html.strip_prefix("No answer yet") {
+            html = format!("{}{rest}", a(&format!("{qid}:evidence"), "No answer yet", ""));
+        }
+        for r in list(s, "reasons").iter().take(2) {
+            let said = esc(text(r, "text"));
+            if said.is_empty() || !html.contains(&said) {
+                continue;
+            }
+            let subs = list(r, "subjects");
+            let to: Vec<(String, String)> = subs.iter().filter_map(|x| self.subject_anchor(text(x, "kind"), text(x, "id")).map(|a| (text(x, "kind").to_string(), a))).collect();
+            let link = match to.as_slice() {
+                [] => continue,
+                [(_, one)] => a(one, &said, "rsn"),
+                many if many.iter().all(|(k, _)| k == "criterion") => {
+                    let ids: Vec<&str> = many.iter().map(|(_, a)| a.as_str()).collect();
+                    format!("<a class=\"rsn\" href=\"#criteria\" data-ids=\"{}\">{said}</a>", esc(&ids.join(" ")))
+                }
+                // several designs: the list of what waits, where the page holds it
+                many if many.iter().all(|(k, _)| k == "design") && self.ids.contains("to-confirm") => a("to-confirm", &said, "rsn"),
+                [(_, first), ..] => a(first, &said, "rsn"),
+            };
+            html = html.replacen(&said, &link, 1);
+        }
+        let more = count(s, "more").unwrap_or(0);
+        if more > 0 {
+            html.push_str(&format!(" {}", a(qid, &format!("+{more} more"), "rsn")));
+        }
+        html
     }
 
     fn call_card(&self, c: &Value) -> String {
@@ -1709,14 +2033,16 @@ impl<'a> Page<'a> {
             .collect();
         let rows = if rows.is_empty() { String::new() } else { format!("<nav class=\"strip\" aria-label=\"{}\">{rows}</nav>", w::EXPERIMENTS) };
         // a nav label is its page's title (design pass 1, P9)
-        let body = format!("<h1 id=\"h-experiments\">{}</h1><p class=\"lede\">{}</p>{rows}", w::EXPERIMENTS, w::EXPERIMENTS_LEDE);
+        // what waits for a confirmation, folded after the experiments (UX5 1.3: the Overview's "to confirm" goes to
+        // Experiments, its rows to Decisions): listed apart from the calls, never under Your call (AGENTS.md), which
+        // links to it
+        let body = format!("<h1 id=\"h-experiments\">{}</h1>{rows}{}", w::EXPERIMENTS, self.waiting_fold());
         section("experiments", &with_project(self.doc, w::EXPERIMENTS), w::EXPERIMENTS, "insp-none", &body)
     }
 
-    /// An experiment's state word with rb's line for it: "locked" has its own, every other state the experiment's.
+    /// An experiment's state word.
     fn state_term(&self, state: &str) -> String {
-        let key = if state == "locked" || state == "not locked" { state } else { "open (experiment)" };
-        term_as(key, &esc(state))
+        esc(state)
     }
 
     /// An experiment: its who line; its design standing once, with what changed since it was confirmed and what is not
@@ -1727,19 +2053,28 @@ impl<'a> Page<'a> {
         let eid = text(x, "id");
         let xid = format!("x-{eid}");
         let mut h = vec![
-            format!("<p class=\"crumb\">{}<span class=\"sep\">\u{203a}</span>{}</p>", a("experiments", w::EXPERIMENTS, ""), crumb_title(text(x, "title"), eid)),
+            format!("<p class=\"crumb\">{}<span class=\"sep\">\u{203a}</span>{}</p>", a("experiments", w::EXPERIMENTS, ""), a(&xid, &crumb_title(text(x, "title"), eid), "")),
             format!("<h1 id=\"h-{}\">{}</h1>", esc(&xid), au_title(text(x, "title"))),
         ];
         let who = text(x, "who_line");
         if !who.is_empty() {
-            h.push(format!("<p class=\"who\" id=\"{}\">{}</p>", esc(&format!("{xid}:lock")), esc(&who_said(who))));
+            let card = if super::fields::has(eid) { super::fields::to(eid) } else { String::new() };
+            h.push(format!("<p class=\"who chips\" id=\"{}\" aria-label=\"{}\">{}</p>", esc(&format!("{xid}:lock")), esc(&who_said(who)), who_chips_to(who, &format!("{xid}:runs"), &card)));
         }
         // OVERVIEW-V2: what it compares first (rb's line, the baseline labelled as one), with what it varies
         let compares = text(x, "compares");
         if !compares.is_empty() {
             let varies = texts(x, "varies");
             let varies = if varies.is_empty() { String::new() } else { format!("<span> \u{b7} {} </span><span class=\"mono\">{}</span>", w::VARIES, esc(&varies.join(", "))) };
-            h.push(format!("<p class=\"cmpl\"><span>{}</span>{varies}</p>", esc(compares)));
+            // what it compares opens its comparison, where the page draws one
+            let cmp = format!("{xid}:cmp");
+            let said = if self.ids.contains(&esc(&cmp)) { a(&cmp, &esc(compares), "") } else { format!("<span>{}</span>", esc(compares)) };
+            h.push(format!("<p class=\"cmpl\">{said}{varies}</p>"));
+        }
+        // the per-run settings whose words differ across its runs, as a badge (owner, Nov 13 2026)
+        let mixes = nodes::mix_badges(x, &format!("{xid}:runs"));
+        if !mixes.is_empty() {
+            h.push(format!("<p class=\"mixes\">{mixes}</p>"));
         }
         h.push(self.design(x, &xid));
         h.push(self.facts(x));
@@ -1770,7 +2105,25 @@ impl<'a> Page<'a> {
         if !standing.is_empty() && !lines.iter().any(|l| l.starts_with(standing)) {
             out.push_str(&format!("<p class=\"dstd\">{}</p>", esc(standing)));
         }
+        // the line that lists it to confirm, here: a chip and a Confirm action (owner, Nov 13 2026: no CLI prose on
+        // the page); until the browser confirms, the action shows the keys that do it in rb ui
+        let listing = format!("{} \u{b7} list it to confirm: ", w::DESIGN_NOT_CONFIRMED);
+        let own = format!("rb confirm {}", text(x, "id"));
         for l in &lines {
+            // here "rb confirm <id>", at another place "cd <its path> && rb confirm <id>"
+            let cmd = l.strip_prefix(listing.as_str()).filter(|c| *c == own || (c.starts_with("cd ") && c.ends_with(&format!(" && {own}"))));
+            if let Some(cmd) = cmd {
+                // one plain line, opening the design it names, and one action: a prompt for their agent (owner,
+                // msg 47); confirming stays theirs, in their own terminal (G5)
+                let card = [format!("k-{}", text(x, "id")), xid.to_string()].into_iter().find(|c| self.ids.contains(&esc(c))).unwrap_or_else(|| xid.to_string());
+                let chip = format!("<a class=\"fch fch-warn\" href=\"#{}\" title=\"{}\">{}</a>", esc(&card), w::DESIGN_NOT_CONFIRMED_CHIP, esc(w::DESIGN_WAITS));
+                let prompt = placed(&format!("{}\"{}\"{}", w::DESIGN_PROMPT_HEAD, text(x, "title"), w::DESIGN_PROMPT_TAIL), cmd);
+                let act = prompt_button(&prompt);
+                let whole = if self.past { chip.clone() } else { format!("{chip}{act}") };
+                let html = if self.surface == Surface::Export { by_viewer("div", " class=\"dstate\"", &whole, &whole, &chip) } else { format!("<div class=\"dstate\">{whole}</div>") };
+                out.push_str(&html);
+                continue;
+            }
             // a command at the line's end gets a Copy of its own (design pass 1, target 6): the line reads whole, as rb
             // says it, the command held apart for the copy; none on a past version
             let line = match l.rsplit_once(": rb confirm ") {
@@ -1787,7 +2140,17 @@ impl<'a> Page<'a> {
                 }
                 _ => esc(l),
             };
-            out.push_str(&self.said_to_act("p", " class=\"dline\"", l, &line));
+            // a line on what changed in the design opens the experiment's record card, where each part is said
+            let rec = text(x, "id");
+            let line = if !line.contains('<') && super::fields::has(rec) { a(&super::fields::to(rec), &line, "") } else { line };
+            // a reader's line (no command in it) opens the experiment, where its parts are said
+            if self.surface == Surface::Export {
+                let read = esc(&reader_line(l));
+                let read = if self.ids.contains(&esc(xid)) { a(xid, &read, "") } else { read };
+                out.push_str(&by_viewer("p", " class=\"dline\"", &line, &line, &read));
+            } else {
+                out.push_str(&self.said_to_act("p", " class=\"dline\"", l, &line));
+            }
         }
         for part in texts(x, "design.not_recorded") {
             out.push_str(&format!("<p class=\"dline dim\">{}{}</p>", esc(&part), w::NOT_RECORDED));
@@ -1802,12 +2165,17 @@ impl<'a> Page<'a> {
     /// rb's words on the gate.
     fn facts(&self, x: &Value) -> String {
         let mut rows: Vec<(String, String)> = Vec::new();
-        // the hypothesis or purpose on one line, its whole text one click away (OVERVIEW-V2): the text once, folded to a
-        // line until it is opened
+        // the record's own words open its record (closed form): the experiment's card, which says when each was written
+        let rec_to = format!("k-{}", text(x, "id"));
+        let rec_to = if super::fields::has(text(x, "id")) || self.ids.contains(&esc(&rec_to)) { rec_to } else { String::new() };
+        let opened = |html: String| if rec_to.is_empty() || html.contains("<a ") { html } else { a(&rec_to, &html, "") };
+        // the hypothesis or purpose, the experiment's key statement, shown whole
         for (label, key) in [(w::HYPOTHESIS, "hypothesis"), (w::PURPOSE, "purpose")] {
             let t = text(x, key);
             if !t.is_empty() {
-                rows.push((label.to_string(), format!("<details class=\"oneline\" data-fold=\"x-{}:{key}\"><summary>{}</summary></details>", esc(text(x, "id")), self.au_cited(t, "", ""))));
+                // whole, wrapping (owner, Nov 13 2026: "why do i need to click just to expand hypotheses"); past three
+                // lines it fades, and the script adds "more"
+                rows.push((label.to_string(), format!("<div class=\"kst\">{}</div>", self.au_cited(t, &rec_to, ""))));
             }
         }
         // what its variants differ in on purpose, as rb show says it (said once: beside what it compares, where rb says that)
@@ -1818,7 +2186,7 @@ impl<'a> Page<'a> {
         if let Some([label, why]) = at(x, "why_part").and_then(Value::as_list).map(Vec::as_slice) {
             if let (Some(label), Some(why)) = (label.as_str(), why.as_str()) {
                 if !why.is_empty() {
-                    rows.push((if label.is_empty() { w::WHY.to_string() } else { label.to_string() }, self.au_cited(why, "", "")));
+                    rows.push((if label.is_empty() { w::WHY.to_string() } else { label.to_string() }, self.au_cited(why, &rec_to, "")));
                 }
             }
         }
@@ -1827,23 +2195,23 @@ impl<'a> Page<'a> {
             let (Some(k), Some(v)) = (k.as_str(), v.as_str()) else { continue };
             match k {
                 // the document names each branch in rb's words ("if it holds", "if not"); an earlier one by its key
-                "holds" | w::IF_IT_HOLDS => rows.push((w::IF_IT_HOLDS.to_string(), self.au_cited(v, "", ""))),
-                "not" | w::IF_NOT => rows.push((w::IF_NOT.to_string(), self.au_cited(v, "", ""))),
-                _ if !v.is_empty() => rows.push((String::new(), esc(v))),
+                "holds" | w::IF_IT_HOLDS => rows.push((w::IF_IT_HOLDS.to_string(), self.au_cited(v, &rec_to, ""))),
+                "not" | w::IF_NOT => rows.push((w::IF_NOT.to_string(), self.au_cited(v, &rec_to, ""))),
+                _ if !v.is_empty() => rows.push((String::new(), opened(esc(v)))),
                 _ => {}
             }
         }
         let said = text(x, "gate_words_said");
         if !said.is_empty() {
-            rows.push((String::new(), esc(said)));
+            rows.push((String::new(), opened(esc(said))));
         }
         // how it stands to other experiments, in rb's line for each, and the calls made on it, each in rb's line
         for line in texts(x, "relation_lines") {
-            rows.push((w::RELATION.to_string(), esc(&line)));
+            rows.push((w::RELATION.to_string(), opened(esc(&line))));
         }
         let eid = text(x, "id");
         for m in list(self.doc, "made_calls").iter().filter(|m| text(m, "subject") == eid) {
-            rows.push((w::DECISION.to_string(), self.said_with_note(text(m, "line"), text(m, "note"))));
+            rows.push((w::DECISION.to_string(), opened(self.said_with_note(text(m, "line"), text(m, "note")))));
         }
         if rows.is_empty() {
             return String::new();
@@ -2001,7 +2369,9 @@ impl<'a> Page<'a> {
                 let (b, o) = (variants[0], variants[1]);
                 let m = group[0];
                 let base_head = format!("{} <span class=\"tag\">{}</span>", esc(&varied(b.1).0), w::BASELINE_TAG);
-                head = format!("<tr><th></th><th>{base_head}</th><th>{}</th><th>{}</th></tr>", esc(&varied(o.1).0), w::DIFFERENCE);
+                let named = |v: &str, said: String| { let to = format!("{xid}:v:{v}"); if self.ids.contains(&esc(&to)) { a(&to, &said, "") } else { said } };
+                let base_head = named(b.0, base_head);
+                head = format!("<tr><th></th><th>{base_head}</th><th>{}</th><th>{}</th></tr>", named(o.0, esc(&varied(o.1).0)), w::DIFFERENCE);
                 for col in shown_cols.iter().copied() {
                     let label = col_label(col);
                     let bc = value_cell(b.0, col, m);
@@ -2010,13 +2380,17 @@ impl<'a> Page<'a> {
                         (Some(_), Some(c)) => self.difference(x, c, m, &varied(b.1).1, place_of(m).1),
                         _ => String::new(),
                     };
-                    body.push_str(&format!("<tr><th>{}</th>{bc}{oc}<td>{diff}</td></tr>", esc(&label)));
+                    // the set a row is measured under opens the runs under the grid
+                    let label = if self.ids.contains(&esc(&format!("{xid}:runs"))) { a(&format!("{xid}:runs"), &esc(&label), "") } else { esc(&label) };
+                    body.push_str(&format!("<tr><th>{label}</th>{bc}{oc}<td>{diff}</td></tr>"));
                 }
             } else {
                 let heads: String = if cols.len() == 1 {
-                    group.iter().map(|m| format!("<th>{}</th>", esc(&title(m)))).collect()
+                    // a measure's head opens the experiment's rules, where each rule that reads it is (closed form)
+                    let rules = format!("{xid}:criteria");
+                    group.iter().map(|m| if self.ids.contains(&esc(&rules)) { format!("<th>{}</th>", a(&rules, &esc(&title(m)), "")) } else { format!("<th>{}</th>", esc(&title(m))) }).collect()
                 } else {
-                    shown_cols.iter().map(|c| format!("<th>{}</th>", esc(&col_label(c)))).collect()
+                    shown_cols.iter().map(|c| if self.ids.contains(&esc(&format!("{xid}:runs"))) { format!("<th>{}</th>", a(&format!("{xid}:runs"), &esc(&col_label(c)), "")) } else { format!("<th>{}</th>", esc(&col_label(c))) }).collect()
                 };
                 head = format!("<tr><th></th>{heads}</tr>");
                 // a variant with no value for this metric under any set is no row of its grid
@@ -2028,10 +2402,20 @@ impl<'a> Page<'a> {
                     } else {
                         shown_cols.iter().map(|c| value_cell(v, c, group[0])).collect()
                     };
-                    body.push_str(&format!("<tr><th>{}{tag}</th>{cells}</tr>", esc(&label)));
+                    let vto = format!("{xid}:v:{v}");
+                    let label = if self.ids.contains(&esc(&vto)) { a(&vto, &esc(&label), "") } else { esc(&label) };
+                    body.push_str(&format!("<tr><th>{label}{tag}</th>{cells}</tr>"));
                 }
             }
-            let gtitle = if cols.len() == 1 { String::new() } else { format!("<h3 class=\"gt\">{}</h3>", esc(&title(group[0]))) };
+            // the measure's title opens the experiment's rules, where each rule that reads it is (closed form)
+            let rules = format!("{xid}:criteria");
+            let gtitle = if cols.len() == 1 {
+                String::new()
+            } else if self.ids.contains(&esc(&rules)) {
+                format!("<h3 class=\"gt\">{}</h3>", a(&rules, &esc(&title(group[0])), ""))
+            } else {
+                format!("<h3 class=\"gt\">{}</h3>", esc(&title(group[0])))
+            };
             let _ = gi;
             grids.push(format!("{gtitle}<div class=\"wrap\"><table class=\"grid\"><thead>{head}</thead><tbody>{body}</tbody></table></div>"));
         }
@@ -2039,10 +2423,14 @@ impl<'a> Page<'a> {
         if cols.len() > 1 {
             notes.push(if side { w::GRID_ROWS_APART } else { w::GRID_COLUMNS_APART }.to_string());
         }
+        let mut notes: Vec<String> = notes.iter().map(|n| format!("<p class=\"dim sm gnote\">{}</p>", esc(n))).collect();
+        // what it is from opens the runs it counts (closed form)
         if let Some(n) = count(x, "counted") {
-            notes.push(w::from_runs(n));
+            let runs = format!("{xid}:runs");
+            let said = if self.ids.contains(&esc(&runs)) { a(&runs, &esc(&w::from_runs(n)), "") } else { esc(&w::from_runs(n)) };
+            notes.push(format!("<p class=\"dim sm gnote\">{said}</p>"));
         }
-        let notes: String = notes.iter().map(|n| format!("<p class=\"dim sm gnote\">{}</p>", esc(n))).collect();
+        let notes: String = notes.concat();
         let html = format!(
             "<section id=\"{}\" aria-labelledby=\"h-{}\"><h2 id=\"h-{}\">{}</h2>{}{notes}</section>",
             esc(&format!("{xid}:cmp")),
@@ -2206,10 +2594,14 @@ impl<'a> Page<'a> {
             let d: Vec<String> = texts(cell, "differs_in").iter().map(|k| key_words(k, &keys).to_lowercase()).collect();
             said.push_str(&format!("{DOT_TEXT}{} {}", w::ALSO_DIFFERS_IN, d.join(" and ")));
         }
-        let said = esc(&said);
-        let said = match rule.as_deref() {
-            Some(c) => a(&self.criterion_to(c), &said, ""),
-            None => said,
+        let said = esc(&w::plainer(&said));
+        // no rule reads it: the difference opens the runs it is worked out from (closed form)
+        let xid = format!("x-{}", text(x, "id"));
+        let said = match (rule.as_deref(), texts(cell, "run_ids").as_slice()) {
+            (Some(c), _) => a(&self.criterion_to(c), &said, ""),
+            (None, [one]) => a(&self.run_to(one), &said, ""),
+            (None, _) if self.ids.contains(&esc(&format!("{xid}:runs"))) => a(&format!("{xid}:runs"), &said, ""),
+            (None, _) => said,
         };
         format!("<span class=\"gd\">{said}</span>")
     }
@@ -2257,7 +2649,18 @@ impl<'a> Page<'a> {
     fn experiment_runs(&self, x: &Value, xid: &str) -> String {
         let runs: Vec<(&str, &Value)> = texts(x, "run_ids").iter().filter_map(|r| self.doc.get("runs").and_then(|m| m.get(r)).filter(|v| v.is_dict()).map(|v| (text(v, "run_id"), v))).collect();
         if runs.is_empty() {
-            return String::new();
+            // shown, not written (the UX lead's rule, Nov 13 2026): a chip, the runs table's outline, and in your view
+            // the Next step that runs it
+            let title = text(x, "title");
+            let named = if title.is_empty() { text(x, "id").to_string() } else { format!("\"{title}\"") };
+            return format!(
+                "<section class=\"xruns\" id=\"{0}\" aria-labelledby=\"h-{0}\"><h2 id=\"h-{0}\">{1}</h2><p class=\"roll\">{2}</p>{3}{4}</section>",
+                esc(&format!("{xid}:runs")),
+                w::RUNS,
+                empty_chip(w::NO_RUNS_CHIP),
+                ghost("table"),
+                self.next_card(&format!("{}{named}{}", w::RUN_PROMPT_HEAD, w::RUN_PROMPT_TAIL))
+            );
         }
         // the same table as Runs (design pass 1, targets 5 and 6), a retracted run struck at its foot
         let (stand, gone): (Vec<_>, Vec<_>) = runs.iter().copied().partition(|(_, r)| !at(r, "retracted").is_some_and(Value::is_dict));
@@ -2266,9 +2669,7 @@ impl<'a> Page<'a> {
         let (baseline, units) = self.baseline_units(text(x, "id"));
         let retracted = if gone_n > 0 { format!(", {gone_n} {}", w::RETRACTED) } else { String::new() };
         format!(
-            "<section class=\"xruns\" id=\"{}\" aria-labelledby=\"h-{}\"><h2 id=\"h-{}\">{} <span class=\"n\">({}{retracted})</span></h2>{}</section>",
-            esc(&format!("{xid}:runs")),
-            esc(&format!("{xid}:runs")),
+            "<section class=\"xruns\" id=\"{0}\" aria-labelledby=\"h-{0}\"><h2 id=\"h-{0}\">{1} <a class=\"n\" href=\"#{0}\">({2}{retracted})</a></h2>{3}</section>",
             esc(&format!("{xid}:runs")),
             w::RUNS,
             stand.len(),
@@ -2283,8 +2684,9 @@ impl<'a> Page<'a> {
         if fs.is_empty() {
             return String::new();
         }
-        let (late, most_late) = late_head(&fs.iter().map(|(_, f)| *f).collect::<Vec<_>>());
-        let late = if late.is_empty() { String::new() } else { format!("<p class=\"quiet late\">{}</p>", term_as("rule written after the results", &esc(&late))) };
+        let flat = fs.iter().map(|(_, f)| *f).collect::<Vec<_>>();
+        let (late, most_late) = late_head(&flat);
+        let late = late_line(&flat, &late);
         // a light row each, opening the rule; its machinery is the rule's own (Rules, its card), never drawn twice
         let rows: String = fs
             .iter()
@@ -2303,12 +2705,11 @@ impl<'a> Page<'a> {
             })
             .collect();
         format!(
-            "<section id=\"{}\" aria-labelledby=\"h-{}\"><h2 id=\"h-{}\">{} <span class=\"n\">({})</span></h2>{late}<div class=\"list\">{rows}</div></section>",
-            esc(&format!("{xid}:criteria")),
-            esc(&format!("{xid}:criteria")),
+            "<section id=\"{0}\" aria-labelledby=\"h-{0}\"><h2 id=\"h-{0}\">{1} <a class=\"n\" href=\"#criteria\" data-ids=\"{3}\">({2})</a></h2>{late}<div class=\"list\">{rows}</div></section>",
             esc(&format!("{xid}:criteria")),
             w::ITS_CRITERIA,
-            fs.len()
+            fs.len(),
+            esc(&fs.iter().map(|(c, _)| format!("c-{c}")).collect::<Vec<_>>().join(" "))
         )
     }
 
@@ -2334,7 +2735,10 @@ impl<'a> Page<'a> {
         let title = if self.ids.contains(&esc(&card)) { a(&card, &title, "") } else { title };
         let reads: Vec<String> = texts(an, "reads").iter().map(|r| a(&self.run_to(r), &esc(&self.named(r)), "")).collect();
         let reads = if reads.is_empty() { String::new() } else { format!(" <span class=\"dim\">\u{b7} {} {}</span>", w::READS, reads.join(", ")) };
-        format!("<li>{title}{reads}<br><span class=\"dim sm\">{}</span></li>", esc(text(an, "recorded")))
+        // when it was recorded opens its card, whose receipt says it in full (closed form)
+        let recorded = esc(text(an, "recorded"));
+        let recorded = if self.ids.contains(&esc(&card)) && !recorded.is_empty() { a(&card, &recorded, "") } else { recorded };
+        format!("<li>{title}{reads}<br><span class=\"dim sm\">{recorded}</span></li>")
     }
 
     /// Reproduce, from the document only: rb's ready line; the whole recipe as one script, as rb wrote it; what it takes
@@ -2408,8 +2812,7 @@ impl<'a> Page<'a> {
                 let from = if from.is_empty() { String::new() } else { format!("<div class=\"from\">{}</div>", esc(from)) };
                 let (what, label) = (text(s, "what"), text(s, "label"));
                 // a label that already leads with what the step is says it once
-                // the glossary's meaning stays on the words where the recipe says them
-                let b = if what == w::COMMAND_AS_GIVEN { term(w::COMMAND_AS_GIVEN, &format!("<b>{}</b>", esc(what))) } else { format!("<b>{}</b>", esc(what)) };
+                let b = format!("<b>{}</b>", esc(what));
                 let head = match label.strip_prefix(what).filter(|rest| !what.is_empty() && (rest.is_empty() || rest.starts_with(" \u{b7} "))) {
                     Some(rest) => format!("{b}{}", self.linked(rest, &texts(s, "refs"))),
                     None => format!("{b} \u{b7} {}", self.linked(label, &texts(s, "refs"))),
@@ -2438,7 +2841,7 @@ impl<'a> Page<'a> {
             Some(i) if !made.is_empty() => steps[i] = format!("{}{made}</li>", steps[i].strip_suffix("</li>").unwrap_or(&steps[i])),
             Some(_) => {}
             None if !given.is_empty() || !made.is_empty() => {
-                steps.push(format!("<li><div class=\"sl\">{}</div>{made}</li>", term(w::COMMAND_AS_GIVEN, &format!("<span class=\"unk\">{}</span>", esc(given)))))
+                steps.push(format!("<li><div class=\"sl\">{}</div>{made}</li>", format!("<span class=\"unk\">{}</span>", esc(given))))
             }
             None => {}
         }
@@ -2462,7 +2865,7 @@ impl<'a> Page<'a> {
         }
         let prompt = text(r, "prompt");
         if !prompt.is_empty() {
-            h.push(format!("<h3>{}</h3>{}", w::NEXT_STEP, self.prompt(prompt)));
+            h.push(format!("<h3>{}</h3>{}", w::NEXT_STEP, self.prompt(prompt, &format!("{xid}:reproduce"))));
         }
         format!(
             "<section class=\"repro\" id=\"{}\" aria-labelledby=\"h-{}\"><details class=\"fold rfold\" data-fold=\"{}\">{head}{}</details></section>",
@@ -2566,14 +2969,13 @@ impl<'a> Page<'a> {
         let settings = at(x, "reproduce.settings");
         if let Some(s) = settings {
             let row = |scope: &str, v: &Value| {
-                let status = text(v, "status");
-                let status = if status == "verified" { term("verified", &esc(status)) } else { esc(status) };
                 format!(
-                    "<tr><td>{}</td><td class=\"mono\">{}</td><td class=\"mono\">{}</td><td>{status}</td><td class=\"mono dim\">{}</td></tr>",
+                    "<tr><td>{}</td><td class=\"mono\">{}</td><td class=\"mono\">{}</td><td>{}</td><td>{}</td></tr>",
                     esc(scope),
                     esc(text(v, "name")),
                     esc(text(v, "value")),
-                    esc(text(v, "source"))
+                    status_mark(text(v, "status"), text(v, "said")),
+                    self.source_chip(text(v, "source"))
                 )
             };
             let mut rows: String = list(s, "shared").iter().map(|v| row(w::SHARED, v)).collect();
@@ -2586,7 +2988,7 @@ impl<'a> Page<'a> {
                 rows.push_str(&format!("<tr><td></td><td class=\"mono\">{}</td><td></td><td>{}</td><td></td></tr>", esc(&u), w::UNKNOWN));
             }
             // OVERVIEW-V2: settings and config values sit under Source details
-            let line = text(x, "settings_line");
+            let line = status_words(text(x, "settings_line"));
             let head = if line.is_empty() { w::SOURCE_DETAILS.to_string() } else { format!("{} \u{b7} {line}", w::SOURCE_DETAILS) };
             if !rows.is_empty() {
                 out.push_str(&format!(
@@ -2609,8 +3011,7 @@ impl<'a> Page<'a> {
                 .iter()
                 .map(|(id, n)| {
                     // named by what it is on, never by its id (Look 7); the id stays the item's own, for rb retract
-                    let at = if id.is_empty() { String::new() } else { format!(" data-id=\"{}\"", esc(id)) };
-                    format!("<li class=\"note\"{at}><span class=\"nd2\">{}{}:</span> {}</li>", w::NOTE_ON, esc(text(x, "id")), self.au_cited(n, "", ""))
+                    self.note_item(id, &format!("{}{}", w::NOTE_ON, esc(text(x, "id"))), n, "")
                 })
                 .collect();
             out.push_str(&format!("<details class=\"fold\" data-fold=\"{}\"><summary>{} ({})</summary><ul class=\"notes plain\">{items}</ul></details>", esc(&format!("{xid}:notes")), w::NOTES, notes.len()));
@@ -2739,26 +3140,34 @@ impl<'a> Page<'a> {
         if !when.is_empty() {
             quiet.push(when.join(", "));
         }
-        let quiet = if quiet.is_empty() { String::new() } else { format!("<p class=\"dim sm rq\">{}</p>", esc(&quiet.join(". "))) };
+        // what every run shares, and when they were recorded, opens History, where each run's write is (closed form)
+        let quiet = if quiet.is_empty() { String::new() } else { format!("<p class=\"dim sm rq\"><a href=\"#history\">{}</a></p>", esc(&quiet.join(". "))) };
         // fix 3: each metric's title once, as the grid says it, over its arms by their plain names ("Plain", "Step by
         // step", "FP32"), never a variant's key glued to it; a table with no arm column keeps one row of heads
         let two = cols.iter().any(|(arm, _)| !arm.is_empty());
         let span = if two { " rowspan=\"2\"" } else { "" };
         let mut head: String = vary.iter().map(|k| format!("<th scope=\"col\"{span}>{}</th>", esc(&key_words(k, &shown)))).collect();
         let mut under = String::new();
+        // a metric's and an arm's head opens the experiment's comparison, where the page draws one (closed form)
+        let xid = runs.first().map(|(_, r)| format!("x-{}", text(r, "experiment_id"))).unwrap_or_default();
+        let cmp = [format!("{xid}:cmp"), xid.clone()].into_iter().find(|t| !xid.is_empty() && self.ids.contains(&esc(t)));
+        let opened = |said: &str| match &cmp {
+            Some(t) => a(t, &esc(said), ""),
+            None => esc(said),
+        };
         // each metric's arms, then its difference (the comparison's order)
         for m in &metrics {
             let label = metric_label(m, unit(m));
             let arms: Vec<&String> = cols.iter().filter(|(_, x)| x == m).map(|(a, _)| a).collect();
             let ds: Vec<&String> = diffs.iter().filter(|(x, _)| x == m).map(|(_, o)| o).collect();
             if arms.iter().all(|a| a.is_empty()) && ds.is_empty() {
-                head.push_str(&format!("<th scope=\"col\" class=\"num\"{span}>{}</th>", esc(&label)));
+                head.push_str(&format!("<th scope=\"col\" class=\"num\"{span}>{}</th>", opened(&label)));
                 continue;
             }
-            head.push_str(&format!("<th scope=\"colgroup\" class=\"num mh\" colspan=\"{}\">{}</th>", arms.len() + ds.len(), esc(&label)));
+            head.push_str(&format!("<th scope=\"colgroup\" class=\"num mh\" colspan=\"{}\">{}</th>", arms.len() + ds.len(), opened(&label)));
             for arm in arms {
                 let said = if arm.is_empty() { label.clone() } else { plain_value(arm, true) };
-                under.push_str(&format!("<th scope=\"col\" class=\"num\">{}</th>", esc(&said)));
+                under.push_str(&format!("<th scope=\"col\" class=\"num\">{}</th>", opened(&said)));
             }
             for other in ds {
                 under.push_str(&format!("<th scope=\"col\" class=\"num\" title=\"{} {} {}\">{}</th>", esc(&plain_value(other, true)), w::AGAINST, esc(&plain_value(baseline, false)), w::DIFFERENCE));
@@ -2818,7 +3227,7 @@ impl<'a> Page<'a> {
 
     fn runs(&self) -> String {
         let d = self.doc;
-        let mut h = vec![format!("<h1 id=\"h-runs\">{}</h1><p class=\"lede\">{}</p>", w::RUNS, w::RUNS_LEDE)];
+        let mut h = vec![format!("<h1 id=\"h-runs\">{}</h1>", w::RUNS)];
         let all: Vec<(&str, &Value)> = match d.get("runs") {
             Some(Value::Dict(m)) => m.iter().filter(|(_, v)| v.is_dict()).map(|(k, v)| (k.as_str(), v)).collect(),
             _ => Vec::new(),
@@ -2826,7 +3235,10 @@ impl<'a> Page<'a> {
         let is_gone = |r: &Value| at(r, "retracted").is_some_and(Value::is_dict);
         let gone = all.iter().filter(|(_, r)| is_gone(r)).count() as i64;
         if !all.is_empty() {
-            h.push(format!("<p class=\"counts\">{}</p>", esc(&w::runs_stand(all.len() as i64 - gone, gone))));
+            // the count opens the runs it counts, the first group's table right under it
+            h.push(format!("<p class=\"counts\"><a href=\"#runs\">{}</a></p>", esc(&w::runs_stand(all.len() as i64 - gone, gone))));
+        } else {
+            h.push(format!("<p class=\"roll\">{}</p>{}", empty_chip(w::NO_RUNS_CHIP), ghost("table")));
         }
         let mut order: Vec<String> = list(d, "experiments").iter().map(|x| text(x, "id").to_string()).collect();
         for (_, r) in &all {
@@ -2847,8 +3259,11 @@ impl<'a> Page<'a> {
             let n = format!("{}{}", plural((mine.len() - g) as i64, "run", "runs"), if g > 0 { format!(" \u{b7} {g} {}", w::RETRACTED) } else { String::new() });
             let (baseline, units) = self.baseline_units(eid);
             h.push(format!(
-                "<div data-group><div class=\"grouphd\"><h2>{title}</h2> {}<span class=\"dim sm\">{n}</span></div>{}</div>",
+                "<div data-group><div class=\"grouphd\"><h2>{}</h2> {}<a class=\"fch fch-use\" href=\"#{}\">{n}</a></div>{}</div>",
+                a(self.to(&format!("x-{eid}"), "experiments"), &title, ""),
                 a(self.to(&format!("x-{eid}"), "experiments"), &format!("<span class=\"cid\">{}</span>", esc(eid)), ""),
+                // the count opens the experiment's own runs (owner, Nov 13 2026: counts click)
+                esc(self.to(&format!("x-{eid}:runs"), "runs")),
                 self.run_table(&mine, &baseline, &units, true)
             ));
         }
@@ -2856,7 +3271,7 @@ impl<'a> Page<'a> {
         if !ans.is_empty() {
             let n = analyses(d).len() as i64;
             h.push(format!(
-                "<section id=\"runs-analyses\" aria-labelledby=\"h-runs-analyses\"><h2 id=\"h-runs-analyses\">{} <span class=\"n\">\u{b7} {}</span></h2><ul class=\"plain\">{ans}</ul></section>",
+                "<section id=\"runs-analyses\" aria-labelledby=\"h-runs-analyses\"><h2 id=\"h-runs-analyses\">{} <a class=\"n\" href=\"#runs-analyses\">\u{b7} {}</a></h2><ul class=\"plain\">{ans}</ul></section>",
                 w::ANALYSES,
                 plural(n, "analysis", "analyses")
             ));
@@ -2872,28 +3287,25 @@ impl<'a> Page<'a> {
             Some(Value::Dict(m)) => m.iter().filter(|(_, v)| v.is_dict()).map(|(id, r)| self.resource_row(id, r)).collect(),
             _ => String::new(),
         };
-        let rows = if rows.is_empty() { String::new() } else { format!("<div class=\"list\">{rows}</div>") };
-        let body = format!("{}<h1 id=\"h-resources\">{}</h1><p class=\"lede\">{}</p>{rows}", record_row(d, "resources"), w::RESOURCES, w::RESOURCES_LEDE);
+        let rows = if rows.is_empty() { format!("<p class=\"roll\">{}</p>{}", empty_chip(w::NO_RESOURCES_YET), ghost("table")) } else { format!("<div class=\"list\">{rows}</div>") };
+        let body = format!("{}<h1 id=\"h-resources\">{}</h1>{rows}", record_row(d, "resources"), w::RESOURCES);
         section_in("record", "resources", &with_project(d, w::RESOURCES), w::RESOURCES, "insp-none", &body)
     }
 
     fn resource_row(&self, id: &str, r: &Value) -> String {
-        let read = list(r, "read_by.runs").len() as i64;
-        let rest = list(r, "rests_on.criteria").len() as i64;
-        let mut facts: Vec<String> = [text(r, "type"), text(r, "role")].into_iter().filter(|s| !s.is_empty()).map(esc).collect();
-        if read > 0 {
-            facts.push(format!("{} {}", w::READ_BY, plural(read, "run", "runs")));
-        }
-        if rest > 0 {
-            facts.push(format!("{} {}", plural(rest, "rule depends", "rules depend"), "on it"));
-        }
-        let availability = text(r, "availability");
-        let availability = if availability == "reconstructible" { term("reconstructible", &esc(availability)) } else { esc(availability) };
+        // a type icon and the name, then its chips (where a reader gets it, its runs, its rules: each a link), no
+        // sentence (owner, Nov 13 2026); its identity, places and recipe under the fold
+        let chips = nodes::Doc::new(self.doc, self.surface).resource_chips(id, r);
+        let kind = text(r, "type");
+        let role = text(r, "role");
+        let role = if role.is_empty() || role == kind { String::new() } else { format!("<span class=\"kind\">{}</span>", esc(role)) };
+        let kind = if kind.is_empty() { String::new() } else { format!("<span class=\"kind\">{}</span>", esc(kind)) };
+        let kind = kind + &role;
         // a recipe's command as code; rb's sentence for one with no command as text
         let command = text(r, "acquisition.command");
         let again = if !command.is_empty() && !self.past {
             format!("<span class=\"cg\">{} \u{b7} <code>{}</code></span>", w::HOW_TO_GET_IT_AGAIN, esc(command))
-        } else if !self.said_past(text(r, "how")).is_empty() {
+        } else if !command.is_empty() && !self.said_past(text(r, "how")).is_empty() {
             format!("<span class=\"cg\">{} \u{b7} {}</span>", w::HOW_TO_GET_IT_AGAIN, esc(&self.said_past(text(r, "how"))))
         } else {
             String::new()
@@ -2908,12 +3320,8 @@ impl<'a> Page<'a> {
             body.push((w::WHERE.into(), format!("<span class=\"mono\">{}</span>", esc(&wheres.join(" \u{b7} ")))));
         }
         let from = text(r, "acquisition.from");
-        if !from.is_empty() {
+        if !from.is_empty() && !text(r, "acquisition.command").is_empty() {
             body.push((w::HOW_TO_GET_IT_AGAIN.into(), format!("<span class=\"mono\">{}</span>", esc(from))));
-        }
-        let runs: Vec<String> = list(r, "read_by.runs").iter().map(|x| a(&self.run_to(text(x, "run")), &esc(&self.run_said(text(x, "run"))), "")).collect();
-        if !runs.is_empty() {
-            body.push((w::READ_BY.into(), runs.join(" ")));
         }
         let made: Vec<String> = list(r, "made_by").iter().map(|x| a(&self.run_to(text(x, "run")), &esc(&self.run_said(text(x, "run"))), "")).collect();
         if !made.is_empty() {
@@ -2925,14 +3333,14 @@ impl<'a> Page<'a> {
         }
         let body: String = body.iter().map(|(k, v)| format!("<dt>{}</dt><dd>{v}</dd>", esc(k))).collect();
         format!(
-            "<details class=\"nd resrow\" data-row data-for=\"r-{}\" data-fold=\"rs-{}\"><summary class=\"cr\" id=\"rs-{}\"><span class=\"cs\"><span class=\"cid\">{}</span>{}</span>\
-             <span class=\"cw\">{availability}</span><span class=\"cv\">{}</span>{again}</summary><div class=\"cbody\"><dl class=\"ax\">{body}</dl></div></details>",
+            "<details class=\"nd resrow\" data-row data-for=\"r-{}\" data-fold=\"rs-{}\"><summary class=\"cr\" id=\"rs-{}\"><span class=\"cs\">{}{}{kind}<span class=\"cid\">{}</span></span>\
+             <span class=\"cw rchips\">{chips}</span>{again}</summary><div class=\"cbody\"><dl class=\"ax\">{body}</dl></div></details>",
             esc(id),
             esc(id),
             esc(id),
-            esc(id),
+            nodes::resource_icon(text(r, "type")),
             au(text(r, "name")),
-            facts.join(" \u{b7} ")
+            esc(id),
         )
     }
 
@@ -2940,7 +3348,9 @@ impl<'a> Page<'a> {
     /// keeps it, with no writer: its time and rb's sentence, each object it names a link.
     fn history(&self) -> String {
         let d = self.doc;
-        let mut h = vec![format!("<h1 id=\"h-history\">{}</h1><p class=\"lede\">{}</p>", w::HISTORY, w::HISTORY_LEDE)];
+        let mut h = vec![format!("<h1 id=\"h-history\">{}</h1>", w::HISTORY)];
+        // what the Overview held before round 1, one click away (UX5 1.3)
+        h.push(format!("<div class=\"about-record\">{}</div>", self.about_record()));
         // H's sittings (with their summary) where the document holds them, each record linked only where the page holds it
         let sittings = super::history_view::sittings(d, &|id| self.ids.contains(&esc(id)));
         let summary = text(d, "history.summary");
@@ -3063,9 +3473,8 @@ impl<'a> Page<'a> {
             None => w::ALL_CRITERIA.to_string(),
         };
         let body = format!(
-            "<h1 id=\"h-research\">{}</h1><p class=\"lede\">{}</p><p class=\"rlink\"><a href=\"#criteria\">{rules} \u{2192}</a></p>{cards}{}",
+            "<h1 id=\"h-research\">{}</h1><p class=\"rlink\"><a href=\"#criteria\">{rules} \u{2192}</a></p>{cards}{}",
             w::RESEARCH,
-            w::RESEARCH_LEDE,
             self.unfiled(),
         );
         section("research", &with_project(d, w::RESEARCH), w::RESEARCH, "insp-none", &body)
@@ -3086,7 +3495,7 @@ impl<'a> Page<'a> {
         }
         let xs: String = xs
             .iter()
-            .map(|x| format!("<div class=\"xrow\">{}<div class=\"dim sm\">{}</div></div>", a(self.to(&format!("x-{}", text(x, "id")), "experiments"), &au_title(text(x, "title")), ""), esc(text(x, "who_line"))))
+            .map(|x| format!("<div class=\"xrow\">{}<div class=\"dim sm\">{}</div></div>", a(self.to(&format!("x-{}", text(x, "id")), "experiments"), &au_title(text(x, "title")), ""), self.who_linked(text(x, "id"), text(x, "who_line"))))
             .collect();
         let rows = if criteria.is_empty() { String::new() } else { self.ev_list(&criteria, "unfiled") };
         // each call and each item once: one a row leads to, or that is about a row's criterion alone, is said there
@@ -3135,15 +3544,20 @@ impl<'a> Page<'a> {
         let crumbs = format!(
             "<p class=\"crumb\">{}{above}<span class=\"sep\">\u{203a}</span>{}</p>",
             a("research", w::RESEARCH, ""),
-            crumb_title(text(q, "text"), id)
+            a(&format!("q-{id}"), &crumb_title(text(q, "text"), id), "")
         );
         // its state names its subject, as the card's does (plain words pass 3): "Open question"
         let status = text(q, "status");
         let state = list(doc, "home.standing").iter().find(|s| text(s, "question") == id).map(|s| text(s, "state_word")).filter(|t| !t.is_empty()).unwrap_or(status.split(' ').next().unwrap_or(""));
         let said = w::question_state(state);
-        let status = if status.split(' ').next().is_some_and(|s| s.eq_ignore_ascii_case("open")) { term_as("open (question)", &esc(&said)) } else { esc(&said) };
+        let status = if status.split(' ').next().is_some_and(|s| s.eq_ignore_ascii_case("open")) { esc(&said) } else { esc(&said) };
         let status = status + &took_state(q);
         let mine: Vec<String> = texts(q, "findings").into_iter().filter(|c| self.finding(c).is_some()).collect();
+        // the state opens why it stands so: rb's line on it, under the title, its words on hover (closed form)
+        let why = list(doc, "home.standing").iter().find(|s| text(s, "question") == id).map(|s| text(s, "line")).unwrap_or("");
+        // where rb gives no line, the state opens the question's rules
+        let to = if why.is_empty() { format!("{qid}:evidence") } else { format!("{qid}:why") };
+        let status = format!("<a href=\"#{}\" title=\"{}\">{status}</a>", esc(&to), esc(why));
         let mut h = vec![crumbs, format!("<h1 id=\"h-{}\">{}</h1><p class=\"meta\">{status}</p>", esc(&qid), au_title(text(q, "text")))];
         // a question no rule is linked to says one thing under its status (plain words pass 4), never a headline and a
         // box that say it again
@@ -3157,7 +3571,7 @@ impl<'a> Page<'a> {
         if !kids.is_empty() {
             h.push(format!("<h2 class=\"subq\">{}</h2><div class=\"cards\" aria-label=\"{}\">{kids}</div>", w::SUB_QUESTION, w::SUB_QUESTION));
         }
-        h.push(self.question_folds(q, id, &qid, &mine));
+        h.push(self.question_folds(id, &qid, &mine));
         format!(
             "<article class=\"view obj\" id=\"{}\" data-nav=\"research\" {} data-title=\"{}\" data-root=\"{}\" aria-labelledby=\"h-{}\">{}</article>",
             esc(&qid),
@@ -3169,20 +3583,16 @@ impl<'a> Page<'a> {
         )
     }
 
-    /// rb's headline on the evidence, with its hint, and each qualification linked to where it is held; then what is
-    /// linked here, each count of a reading linked to its group.
+    /// rb's line on why the question stands as it does; then what is linked here, each count of a reading linked to
+    /// its group.
     fn evidence_line(&self, q: &Value, qid: &str) -> String {
         // as the question's card says it (design pass 1, target 1): rb's line on why, then the rules linked here led by
         // what they are ("Rules: 4 met · 4 not tested"), each linked to its group; the qualifications are in the folds
         let id = text(q, "id");
         let s = list(self.doc, "home.standing").iter().find(|s| text(s, "question") == id);
         let line = s.map(|s| text(s, "line")).filter(|l| !l.is_empty());
-        let headline = text(q, "overview.headline");
-        let lead = match line {
-            Some(l) => format!("<p class=\"roll\"><span class=\"hl\">{}</span></p>", self.voiced(&esc(l))),
-            None if !headline.is_empty() => format!("<p class=\"roll\">{}</p>", term_as("headline", &format!("<span class=\"hl\">{}</span>", esc(headline)))),
-            None => String::new(),
-        };
+        // rb's headline on the evidence is never drawn: the tallies and the chart show the same
+        let lead = line.map_or(String::new(), |l| format!("<p class=\"roll\" id=\"{}:why\"><span class=\"hl\">{}</span></p>", esc(qid), self.voiced(&s.map(|s| self.reasons_linked(s, l, qid)).unwrap_or_else(|| esc(l)))));
         let tallies = self.tallies(q, s, qid).replacen("class=\"stt\"", "class=\"roll stt\"", 1);
         format!("{lead}{tallies}")
     }
@@ -3207,12 +3617,15 @@ impl<'a> Page<'a> {
             .filter(|d| !d.is_empty())
             .map(|d| self.act(self.cmd(d)))
             .unwrap_or_default();
+        let _ = next;
         let notes = self.notes_naming(q);
-        // rb's one reading of it, the line its Overview card says too (M's request 135): a parent whose rules are linked to
-        // its sub-questions says so, never that no rule tests it
-        let said = Some(text(q, "no_rule")).filter(|t| !t.is_empty()).unwrap_or(w::NO_RULE_TESTS);
-        // in each viewer's voice on the export, as its Overview card says it
-        format!("<p class=\"roll\" id=\"{}\"><span class=\"hl\">{}</span></p>{next}{notes}", esc(&format!("{qid}:evidence")), self.voiced(&esc(said)))
+        // shown, not written (the UX lead's rule, Nov 13 2026): a chip on the question, where its rules would sit an
+        // outline of them, and in your view one Next step, a prompt written from the record for this question; a parent
+        // whose rules are linked to its sub-questions is tested there
+        let below = !text(q, "no_rule").is_empty() && !text(q, "no_rule").starts_with(w::NO_RULE_TESTS);
+        let chip = empty_chip(if below { w::TESTED_BELOW } else { w::NOT_TESTED_YET });
+        let next = if below { String::new() } else { self.next_card(&format!("{}\"{}\"{}", w::PLAN_PROMPT_HEAD, text(q, "text"), w::PLAN_PROMPT_TAIL)) };
+        format!("<p class=\"roll\" id=\"{}\"><span id=\"{}\"></span>{chip}</p>{}{next}{notes}", esc(&format!("{qid}:evidence")), esc(&format!("{qid}:why")), if below { String::new() } else { ghost("card") })
     }
 
     /// The notes whose words name question `q` (its `cited_by`, each a note: a project note by its id, an experiment's
@@ -3272,11 +3685,10 @@ impl<'a> Page<'a> {
             format!("<details class=\"fold\" data-fold=\"{}\"><summary>{}</summary>{decls}</details>", esc(&format!("{qid}:rel:declared")), w::DECLARATION_AND_SCOPE)
         };
         format!(
-            "<section class=\"rel\" id=\"{}\"><p class=\"by\">{}</p><h2 class=\"said\">{}</h2><div class=\"pairs\">{pairs}</div><p class=\"dim sm\">{}</p>{decls}</section>",
+            "<section class=\"rel\" id=\"{}\"><p class=\"by\">{}</p><h2 class=\"said\">{}</h2><div class=\"pairs\">{pairs}</div>{decls}</section>",
             esc(&format!("{qid}:rel")),
-            term(w::COMPUTED_COMPARISON, w::COMPUTED_COMPARISON),
-            esc(said),
-            w::DIRECTIONS_ALIGNED
+            w::COMPUTED_COMPARISON,
+            esc(said)
         )
     }
 
@@ -3308,7 +3720,7 @@ impl<'a> Page<'a> {
         self.most_late.set(most_late);
         let out = self.evidence_groups(q, id, qid, mine);
         self.most_late.set(false);
-        let late = if late.is_empty() { String::new() } else { format!("<p class=\"quiet late\">{}</p>", term_as("rule written after the results", &esc(&late))) };
+        let late = late_line(&fs, &late);
         out.replacen("<!--tags-->", &late, 1)
     }
 
@@ -3327,13 +3739,23 @@ impl<'a> Page<'a> {
             let confirmed = at(ip, "confirmed").is_some_and(Value::truthy);
             // a recorded interpretation is a note (plain words pass 3, D3): "A note, not confirmed: <its words>." with
             // its state in the line, then whether its rule holds as a sentence of its own; never a tag
-            let said = self.note_line("said note", text(ip, "text"), text(ip, "holds"), confirmed, "").replacen("<p ", "<h3 ", 1);
-            let said = format!("{}</h3>", said.strip_suffix("</p>").unwrap_or(&said));
+            // each part opens its source (closed form): the note's label and words its declaration (when and why), the
+            // sentence on its rule the rule's card
             let declared = text(ip, "declared");
+            let when_id = format!("{qid}:ip:{}:when", i + 1);
+            let to = if declared.is_empty() { String::new() } else { when_id.clone() };
+            let said = self.note_line("said note", text(ip, "text"), text(ip, "holds"), confirmed, &to).replacen("<p ", "<h3 ", 1);
+            let said = format!("{}</h3>", said.strip_suffix("</p>").unwrap_or(&said));
+            let said = if to.is_empty() { said } else { said.replacen("<span class=\"k\">", &format!("<a class=\"k\" href=\"#{}\">", esc(&to)), 1).replacen(": </span>", ": </a>", 1) };
+            let said = match cs.first().filter(|_| said.contains("<span class=\"hs\">")) {
+                Some(c) => said.replacen("<span class=\"hs\">", &format!("<a class=\"hs\" href=\"#{}\">", esc(&self.criterion_to(c))), 1).replacen("</span></h3>", "</a></h3>", 1),
+                None => said,
+            };
             let when = if declared.is_empty() {
                 String::new()
             } else {
-                format!("<details class=\"ipm\" data-fold=\"{}\"><summary>{}</summary><p>{}</p></details>", esc(&format!("{qid}:ip:{}:when", i + 1)), w::WHEN_AND_WHY, esc(declared))
+                // the link lands on the fold's summary (no id on a fold itself)
+                format!("<details class=\"ipm\" data-fold=\"{0}\"><summary id=\"{0}\">{1}</summary><p>{2}</p></details>", esc(&when_id), w::WHEN_AND_WHY, esc(declared))
             };
             // the calls on its criteria, each in rb's line, beside the interpretation, which a call does not change
             // (a call made on the question's work is said here once, its session's note drawn as its words, and its rail's
@@ -3341,8 +3763,18 @@ impl<'a> Page<'a> {
             let calls: String = texts(ip, "calls")
                 .iter()
                 .map(|c| match self.made_in_group(id, c).filter(|m| !text(m, "note").is_empty()) {
-                    Some(m) => format!("<p class=\"ipcall\"><span>{}</span>{}</p>", esc(&format!("Call on {}: ", text(m, "subject"))), self.said_with_note(text(m, "line"), text(m, "note"))),
-                    None => format!("<p class=\"ipcall\">{}</p>", esc(c)),
+                    // the call opens what it was made on, where the call is said with its reason
+                    Some(m) => {
+                        let said = self.said_with_note(text(m, "line"), text(m, "note"));
+                        let to = self.story_to(text(m, "subject"));
+                        let lead = esc(&format!("Call on {}: ", text(m, "subject")));
+                        if said.contains("<a ") { format!("<p class=\"ipcall\">{}{said}</p>", a(&to, &lead, "")) } else { format!("<p class=\"ipcall\">{}</p>", a(&to, &format!("{lead}{said}"), "")) }
+                    }
+                    // rb's line "Call on x1-c1: accepted ...": it opens what the call is on
+                    None => match c.strip_prefix("Call on ").and_then(|r| r.split_once(": ")).map(|(on, _)| self.story_to(on)).filter(|t| !t.is_empty()) {
+                        Some(to) => format!("<p class=\"ipcall\">{}</p>", a(&to, &esc(c), "")),
+                        None => format!("<p class=\"ipcall\">{}</p>", esc(c)),
+                    },
                 })
                 .collect();
             groups.push_str(&format!(
@@ -3357,17 +3789,17 @@ impl<'a> Page<'a> {
         if !rest.is_empty() {
             let head = if !ips.is_empty() {
                 format!("<h3 class=\"by\">{}</h3>", w::NOT_IN_AN_INTERPRETATION)
-            } else if list(q, "overview.relations").is_empty() {
-                format!("<h3 class=\"said none\">{}</h3>", w::NO_INTERPRETATION_YET)
             } else {
+                // no note on them: nothing is said of what is not there (the UX lead's rule, Nov 13 2026)
                 String::new()
             };
             groups.push_str(&format!("<section class=\"igroup rest\">{head}{}</section>", self.ev_list(&rest, id)));
         }
         format!(
-            "<h2 class=\"evh2\" id=\"{}\">{} <span class=\"n\">({})</span></h2><!--tags-->{groups}",
+            "<h2 class=\"evh2\" id=\"{}\">{} <a class=\"n\" href=\"#criteria\" data-ids=\"{}\">({})</a></h2><!--tags-->{groups}",
             esc(&format!("{qid}:evidence")),
             w::ITS_CRITERIA,
+            esc(&mine.iter().map(|c| format!("c-{c}")).collect::<Vec<_>>().join(" ")),
             mine.len()
         )
     }
@@ -3423,9 +3855,9 @@ impl<'a> Page<'a> {
     /// rb's reading: the estimate, its interval and unit as rb hands them apart, then the result word dim after it; with
     /// no parts, rb's numbers as they are. An integrity problem follows in rb's words.
     fn reading_line(&self, cid: &str, f: &Value) -> String {
-        let value = value_html(f);
-        let value = if value.is_empty() { value } else { a(&self.criterion_part(cid, "reading"), &value, "v") };
-        value + &result_after(f)
+        // the result word after the number sits in the same link: it is the reading's (closed form)
+        let value = value_html(f) + &result_after(f);
+        if value.is_empty() { value } else { a(&self.criterion_part(cid, "reading"), &value, "v") }
     }
 
     /// The units the reading rests on, in plain words, linked to the runs; on a miss, rb's reason; and, while a call on
@@ -3517,20 +3949,14 @@ impl<'a> Page<'a> {
         let mut r = Vec::new();
         if !calls.is_empty() {
             let rows: String = calls.iter().map(|c| call_li(c, &self.call_card(c))).collect();
-            r.push(format!("<h2 id=\"calls-{}\">{} ({})</h2>", esc(id), self.calls_name(), calls.len()));
-            let how = if self.surface == Surface::Export {
-                by_viewer("p", " class=\"honest\"", w::OPEN_CALLS_LEDE, w::OWNER_CALLS_LEDE, w::READER_CALLS_LEDE)
-            } else {
-                format!("<p class=\"honest\">{}</p>", w::CALL_IN_YOUR_TERMINAL)
-            };
-            r.push(format!("<div class=\"calls-in\">{rows}</div>{how}"));
+            // the count opens the list it counts, right under it (owner, msg 31)
+            r.push(format!("<h2 id=\"calls-{0}\" class=\"callh\"><a href=\"#your-call\">{1}</a> <a class=\"n\" href=\"#calls-in-{0}\">({2})</a></h2>", esc(id), self.calls_name(), calls.len()));
+            // no line that explains where a call is made: each call carries its command (no glossary, show instead)
+            r.push(format!("<div class=\"calls-in\" id=\"calls-in-{}\">{rows}</div>", esc(id)));
         } else if !self.anything_waits() {
-            r.push(format!("<h2 id=\"calls-{}\">{} (0)</h2>", esc(id), self.calls_name()));
-            r.push(if self.surface == Surface::Export {
-                by_viewer("p", " class=\"dim sm\"", w::NO_CALL_OPEN, w::NOTHING_WAITS_HERE, w::NO_CALL_OPEN)
-            } else {
-                format!("<p class=\"dim sm\">{}</p>", w::NOTHING_WAITS_HERE)
-            });
+            r.push(format!("<h2 id=\"calls-{}\" class=\"callh\"><a href=\"#your-call\">{} (0)</a></h2>", esc(id), self.calls_name()));
+            // shown, not written (the UX lead's rule, Nov 13 2026): the state as a chip
+            r.push(format!("<p class=\"roll\">{}</p>", empty_chip(w::NOTHING_WAITS.trim_end_matches('.'))));
         }
 
         let in_groups: Vec<String> = list(q, "overview.interpretations").iter().flat_map(|ip| texts(ip, "calls")).collect();
@@ -3554,23 +3980,24 @@ impl<'a> Page<'a> {
                 format!(
                     "<div class=\"xrow\">{}<div class=\"dim sm\">{}</div>{repro}</div>",
                     a(self.to(&format!("x-{eid}"), "experiments"), &au_title(text(x, "title")), ""),
-                    esc(&who_said(text(x, "who_line")))
+                    self.who_linked(eid, text(x, "who_line"))
                 )
             })
             .collect();
         let lead = r.is_empty();
         r.push(if lead { format!("<h2 id=\"calls-{}\">{}</h2>", esc(id), w::EXPERIMENTS_BEHIND) } else { format!("<h3>{}</h3>", w::EXPERIMENTS_BEHIND) });
-        r.push(if xs.is_empty() { format!("<p class=\"dim sm\">{}</p>", w::NO_EXPERIMENT_HERE) } else { xs });
+        r.push(if xs.is_empty() { ghost("card") } else { xs });
         let next = text(q, "next_step");
         if !next.is_empty() {
-            r.push(format!("<h3>{}</h3>{}", w::NEXT_STEP, self.prompt(next)));
+            r.push(format!("<h3>{}</h3>{}", w::NEXT_STEP, self.prompt(next, &format!("{qid}:evidence"))));
         }
         format!(
             "<section class=\"qrail\" id=\"{}\" data-rail data-rootname=\"{rail}\" aria-label=\"{rail}\">{}</section>",
             esc(&format!("{qid}:rail")),
             r.concat(),
             // headed by what it shows (plain words pass 4): the calls while one waits here, else the question
-            rail = esc(&if calls.is_empty() { cut_title(text(q, "text")) } else { format!("{} \u{b7} {id}", self.calls_word()) })
+            // the question by its words, never its id (closed form)
+            rail = esc(&if calls.is_empty() { cut_title(text(q, "text")) } else { format!("{} \u{b7} {}", self.calls_word(), cut_title(text(q, "text"))) })
         )
     }
 
@@ -3593,36 +4020,20 @@ impl<'a> Page<'a> {
             self.object_to(s).or_else(|| s.split_once('/').map(|(e, _)| format!("x-{e}:settings")).filter(|t| self.ids.contains(&esc(t))))
         };
         let chip = format!("<span class=\"cid\">{}</span>", esc(s));
-        let on = match to {
-            Some(to) => a(&to, &chip, ""),
-            None => chip,
-        };
         let said = self.said_with_note(text(m, "line"), text(m, "note"));
-        format!("<li>{said} {on}</li>")
+        // the call's own line opens what it is on, by its words (closed form: ids off screens)
+        match to {
+            Some(to) if !said.contains("<a ") => format!("<li>{}</li>", a(&to, &said, "")),
+            // a line that holds a link of its own (a cite) opens what it is on as a row
+            Some(to) => format!("<li data-go=\"{}\">{said} {}</li>", esc(&to), a(&to, &chip, "")),
+            None => format!("<li>{said} {chip}</li>"),
+        }
     }
 
-    /// The folds under a question: each qualification with what it means and the criteria that carry it; each reading
-    /// with its criteria. A card C's nodes draw for one stands in its place.
-    fn question_folds(&self, q: &Value, id: &str, qid: &str, mine: &[String]) -> String {
+    /// The folds under a question: each reading
+    /// with its criteria. A card the nodes draw for one stands in its place.
+    fn question_folds(&self, id: &str, qid: &str, mine: &[String]) -> String {
         let mut out = String::new();
-        let quals: String = list(q, "overview.limits")
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| !self.card_ids.contains(&esc(&format!("{qid}:lim:{i}"))))
-            .map(|(i, l)| {
-                let label = &w::plain_word(text(l, "label"));
-                let means = w::hint(label).map(|h| format!("<p class=\"dim sm\">{}</p>", esc(h))).unwrap_or_default();
-                format!(
-                    "<div class=\"qual\" id=\"{}\"><p class=\"qh\">{}</p>{means}{}</div>",
-                    esc(&format!("{qid}:lim:{i}")),
-                    term(label, &esc(label)),
-                    self.criteria_links(&texts(l, "criteria"), id)
-                )
-            })
-            .collect();
-        if !quals.is_empty() {
-            out.push_str(&format!("<details class=\"fold\" data-fold=\"{}\"><summary>{}</summary>{quals}</details>", esc(&format!("{qid}:quals")), w::WHICH_COMPARISONS));
-        }
         let mut readings: Vec<(String, String, Vec<String>)> = Vec::new();
         for c in mine {
             let state = self.finding(c).map(|f| text(f, "standing").split(" \u{b7} ").next().unwrap_or("").to_string()).unwrap_or_default();
@@ -3640,8 +4051,9 @@ impl<'a> Page<'a> {
             .filter(|(k, _, _)| !self.card_ids.contains(&esc(&format!("{qid}:rd:{k}"))))
             .map(|(k, state, cs)| {
                 format!(
-                    "<div class=\"rdg\" id=\"{}\"><p class=\"qh\">{} <span class=\"n\">\u{b7} {}</span></p>{}</div>",
+                    "<div class=\"rdg\" id=\"{}\"><p class=\"qh\"><a href=\"#criteria\" data-ids=\"{}\">{} <span class=\"n\">\u{b7} {}</span></a></p>{}</div>",
                     esc(&format!("{qid}:rd:{k}")),
+                    esc(&cs.iter().map(|c| format!("c-{c}")).collect::<Vec<_>>().join(" ")),
                     said_plain(state),
                     cs.len(),
                     self.criteria_links(cs, id)
@@ -3661,8 +4073,11 @@ impl<'a> Page<'a> {
             .map(|c| {
                 let row = format!("f-{c}:{qid}");
                 let to = if self.ids.contains(&esc(&row)) { row } else { self.criterion_to(c) };
-                let statement = self.finding(c).map(|f| format!(" {}", self.au_cited(text(f, "statement"), "", ""))).unwrap_or_default();
-                format!("<li>{}{statement}</li>", a(&to, &esc(c), "mono"))
+                // the rule by its words, which open it; its id only where it has none (closed form: ids off screens)
+                match self.finding(c).map(|f| text(f, "statement")).filter(|t| !t.is_empty()) {
+                    Some(t) => format!("<li>{}</li>", self.au_cited(t, &to, "")),
+                    None => format!("<li>{}</li>", a(&to, &esc(c), "mono")),
+                }
             })
             .collect();
         format!("<ul class=\"plain\">{items}</ul>")
@@ -3672,10 +4087,10 @@ impl<'a> Page<'a> {
     /// order, each a row folding what rb says of it.
     fn criteria(&self) -> String {
         let d = self.doc;
-        let n = count(d, "home.counts.criteria").map(|n| format!(" <span class=\"n\">({n})</span>")).unwrap_or_default();
+        let n = count(d, "home.counts.criteria").map(|n| format!(" <a class=\"n\" href=\"#criteria\" data-rule=\"\">({n})</a>")).unwrap_or_default();
         let crumb = format!("<p class=\"crumb\">{}<span class=\"sep\">\u{203a}</span>{}</p>", a("research", w::RESEARCH, ""), w::ALL_CRITERIA);
         // the display noun with its line: commands call a rule a criterion (plain words pass 1)
-        let mut h = vec![crumb, format!("<h1 id=\"h-criteria\">{}{n}</h1>", term_as("rule", w::ALL_CRITERIA)), self.tally_words()];
+        let mut h = vec![crumb, format!("<h1 id=\"h-criteria\">{}{n}</h1>", w::ALL_CRITERIA), self.tally_words()];
         // rules written after their results, counted once here; a row carries the tag only as the exception (P6)
         let all: Vec<&Value> = match d.get("findings") {
             Some(Value::Dict(m)) => m.values().collect(),
@@ -3683,7 +4098,7 @@ impl<'a> Page<'a> {
         };
         let (late, most_late) = late_head(&all);
         if !late.is_empty() {
-            h.push(format!("<p class=\"quiet late\">{}</p>", term_as("rule written after the results", &esc(&late))));
+            h.push(late_line(&all, &late));
         }
         if self.surface != Surface::Export {
             h.push(format!(
@@ -3719,13 +4134,14 @@ impl<'a> Page<'a> {
         }
         for (eid, title, cs) in &groups {
             let title = if title.is_empty() { esc(eid) } else { au(title) };
-            let title = if title.is_empty() { String::new() } else { format!("<h2>{title}</h2>") };
+            // the group's title opens its experiment (closed form)
+            let title = if title.is_empty() { String::new() } else if eid.is_empty() { format!("<h2>{title}</h2>") } else { format!("<h2>{}</h2>", a(self.to(&format!("x-{eid}"), "experiments"), &title, "")) };
             let id = if eid.is_empty() { String::new() } else { a(self.to(&format!("x-{eid}"), "experiments"), &esc(eid), "id") };
             let rows: String = cs.iter().filter_map(|c| self.finding(c).map(|f| self.criterion_row(c, f, most_late, &format!("cr-{c}")))).collect();
-            h.push(format!(
-                "<div data-group><div class=\"grouphd\">{title}{id}<span class=\"dim sm\">{}</span></div><div class=\"list\">{rows}</div></div>",
-                plural(cs.len() as i64, "rule", "rules")
-            ));
+            // the count opens the experiment's own rules (owner, Nov 13 2026: counts click)
+            let n = plural(cs.len() as i64, "rule", "rules");
+            let n = if eid.is_empty() { format!("<span class=\"dim sm\">{n}</span>") } else { format!("<a class=\"fch fch-use\" href=\"#{}\">{n}</a>", esc(self.to(&format!("x-{eid}:criteria"), "experiments"))) };
+            h.push(format!("<div data-group><div class=\"grouphd\">{title}{id}{n}</div><div class=\"list\">{rows}</div></div>"));
         }
         section_in("research", "criteria", &with_project(d, w::ALL_CRITERIA), w::ALL_CRITERIA, "insp-none", &h.concat())
     }
@@ -3746,9 +4162,11 @@ impl<'a> Page<'a> {
         let plain = plain_reading(f);
         let plain = if plain.is_empty() { esc(text(f, "reading_short")) } else { esc(&plain) };
         format!(
-            "<details class=\"nd krow\" data-row data-for=\"c-{}\" data-fold=\"{}\"><summary class=\"cr\" id=\"{}\"><span class=\"cs\">{}</span>\
+            "<details class=\"nd krow\" data-row data-rule=\"{}\" data-outcome=\"{}\" data-for=\"c-{}\" data-fold=\"{}\"><summary class=\"cr\" id=\"{}\"><span class=\"cs\">{}</span>\
              <span class=\"cw\"><span class=\"sw {}\">{}</span></span><span class=\"cv\"><span class=\"pr\">{plain}</span>{} <span class=\"cid\">{}</span></span></summary>\
              <div class=\"cbody\">{}{}<p class=\"evu\">{}</p></div></details>",
+            esc(text(f, "state")),
+            outcome_of(text(f, "state")),
             esc(cid),
             esc(key),
             esc(key),
@@ -3765,8 +4183,26 @@ impl<'a> Page<'a> {
 
     /// The tally alone: rb's standing words with their counts, coloured.
     fn tally_words(&self) -> String {
-        let said = rule_tally(list(self.doc, "home.tally"), &texts(self.doc, "home.muted"), super::at(self.doc, "home.tally_on_estimate"));
-        if said.is_empty() { String::new() } else { format!("<p class=\"quiet\">{said}</p>") }
+        // each count a chip that filters the rules to its state, "All" first (owner, Nov 13 2026: counts click); with
+        // no script the chips say the counts and filter nothing
+        let pairs = list(self.doc, "home.tally");
+        let total: i64 = pairs.iter().filter_map(|t| t.as_list().and_then(|p| super::whole(p.get(1)?))).sum();
+        if total == 0 {
+            return String::new();
+        }
+        let muted = texts(self.doc, "home.muted");
+        let alone = super::at(self.doc, "home.tally_on_estimate");
+        let mut chips = format!("<button type=\"button\" class=\"rflt\" data-rule=\"\" aria-pressed=\"true\">{} {total}</button>", w::ALL);
+        for t in pairs {
+            let Some(pair) = t.as_list() else { continue };
+            let (Some(rule), Some(n)) = (pair.first().and_then(Value::as_str), pair.get(1).and_then(super::whole)) else { continue };
+            let estimate = alone.and_then(|a| a.get(rule)).and_then(Value::as_i64).unwrap_or(0);
+            // rb's plain words for the state, as the tally said them ("1 gate, can't tell yet")
+            let said = said_plain(&format!("{n} {}", w::tally_word(rule, n))) + &esc(&crate::cmds::reading::on_estimate_said(estimate, &n.to_string()));
+            let cls = crate::surface::part_class(&format!("{n} {}", crate::assess::rule_label(rule, n)), &muted);
+            chips += &format!("<button type=\"button\" class=\"rflt {}\" data-rule=\"{}\" aria-pressed=\"false\">{said}</button>", esc(&cls), esc(rule));
+        }
+        format!("<div class=\"rflts\" id=\"rule-filters\" role=\"group\" aria-label=\"{}\">{chips}</div>", w::ALL_CRITERIA)
     }
 
     /// What the calls are called on this surface: "Your call", or on the export "Open calls" (polish 1, Oct 22 00:10).
@@ -3784,6 +4220,10 @@ impl<'a> Page<'a> {
     /// "Your call (3)", its count the user's calls (your_call.n); on the export "Open calls (3)" (polish 1: a page that
     /// leaves the machine cannot know who reads it).
     fn your_call_head(&self) -> String {
+        // one badge: what Decisions holds, every call and every confirmation that waits (rulings, Nov 12 07:15 +08)
+        if let Some(n) = self.doc.get("overview").map(|o| list(o, "decisions").len()) {
+            return format!("{} ({n})", self.calls_word());
+        }
         match count(self.doc, "your_call.n") {
             Some(n) => format!("{} ({n})", self.calls_word()),
             None => self.calls_word().to_string(),
@@ -3792,8 +4232,12 @@ impl<'a> Page<'a> {
 
     /// The same head as markup: on the export, each viewer's name for the calls (OWNER-READER).
     fn your_call_head_html(&self) -> String {
+        // the count opens the list it counts (owner, msg 31)
+        if let Some(n) = self.doc.get("overview").map(|o| list(o, "decisions").len()) {
+            return format!("{} {}", self.calls_name(), a("yc-list", &format!("({n})"), "n"));
+        }
         match count(self.doc, "your_call.n") {
-            Some(n) => format!("{} ({n})", self.calls_name()),
+            Some(n) => format!("{} {}", self.calls_name(), a("yc-list", &format!("({n})"), "n")),
             None => self.calls_name(),
         }
     }
@@ -3812,22 +4256,20 @@ impl<'a> Page<'a> {
     /// one queue; the research questions, a row each; the record's line (WITNESS); then, folded, how rb reads this
     /// repository, the recent changes and the project's notes. Its inspector shows its empty state, never a second copy of the queue.
     fn overview(&self) -> String {
-        let d = self.doc;
-        let title = text(d, "project.title");
-        let mut h = vec![format!("<h1 id=\"h-overview\">{}</h1>", au_title(title)), self.overview_line()];
-        h.extend(self.standings());
-        h.push(self.integrity());
-        h.push(self.queue_section());
-        h.push(self.waiting_fold());
-        h.push(self.question_rows());
-        // the record's line under the questions, above how rb reads it: quiet, and never between the head and the
-        // queue, whose first row stays on a phone's first screen
-        h.push(witness(d));
+        self.story()
+    }
+
+    /// What the Overview held before round 1 (UX5 1.3's table): the record's line, what weakens the whole body of
+    /// evidence, how rb reads the repository and the project's notes, now one click away, at the head of History (the
+    /// record's line is About's too).
+    fn about_record(&self) -> String {
+        // the standing cards are Research's, the recent changes History's own sittings, the record's line About's
+        // the record's line first (WITNESS), as About says it too
+        let mut h = vec![witness(self.doc), self.integrity()];
         h.push(self.how_rb_reads());
-        h.push(self.recent_fold());
         h.push(self.notes());
         h.push(self.reproduce());
-        section("overview", title, w::OVERVIEW, "insp-none", &h.concat())
+        h.concat()
     }
 
     /// "22 recorded runs · changed 2026-10-20 01:09 UTC": the runs, and when the record last changed, linked to
@@ -3859,21 +4301,6 @@ impl<'a> Page<'a> {
         format!("<p class=\"counts ovh\">{}{owner}</p>", parts.join(DOT))
     }
 
-    /// One standing card per top-level question: the question in the user's words, rb's state word, rb's line on why,
-    /// the non-zero tallies (each linked to its readings), and a recorded interpretation in one line. Never the
-    /// interpretation's prose beyond that line, hypotheses, settings or sub-question detail. The document's
-    /// `home.standing` where it gives one (contract 1.6); otherwise drawn from the question as rb gives it.
-    fn standings(&self) -> Vec<String> {
-        let given = list(self.doc, "home.standing");
-        let tops: Vec<&Value> = list(self.doc, "questions").iter().filter(|q| count(q, "depth").unwrap_or(0) == 0).collect();
-        tops.iter()
-            .map(|q| {
-                let id = text(q, "id");
-                let s = given.iter().find(|s| text(s, "question") == id);
-                self.standing_card(q, s, "st")
-            })
-            .collect()
-    }
 
     /// One question's card, the same on the Overview, Research and a question's sub-questions (design pass 1, target
     /// 1), its anchor `{prefix}-{id}`: rb's standing for it where the document gives one, else drawn from the question.
@@ -3891,19 +4318,18 @@ impl<'a> Page<'a> {
         let word = s.map(|s| text(s, "state_word")).filter(|t| !t.is_empty()).map(str::to_string).unwrap_or_else(|| capitalised(status.split(' ').next().unwrap_or("")));
         // the state names its subject (plain words pass 3): "Open question", "Answered question"
         let said = w::question_state(&word);
-        let word = if status.split(' ').next().is_some_and(|s| s.eq_ignore_ascii_case("open")) { term_as("open (question)", &esc(&said)) } else { esc(&said) };
+        let word = if status.split(' ').next().is_some_and(|s| s.eq_ignore_ascii_case("open")) { esc(&said) } else { esc(&said) };
         let word = word + &took_state(q);
         let head = format!("<p class=\"sth\"><span class=\"stw\">{word}</span></p>");
         let question = format!("<p class=\"stq\">{}</p>", a(&qid, &au_title(text(q, "text")), "sq"));
-        // rb's line on why: the document's reason, else rb's headline on the question's evidence, as the question's
-        // view says it
-        let reason = s.map(|s| text(s, "line")).filter(|t| !t.is_empty());
-        let reason = match reason {
-            Some(r) => format!("<p class=\"str\">{}</p>", self.voiced(&esc(r))),
-            None => {
-                let hl = text(q, "overview.headline");
-                if hl.is_empty() { String::new() } else { format!("<p class=\"str\">{}</p>", term_as("headline", &esc(hl))) }
-            }
+        // rb's line on why, as the question's view says it; rb's headline on the evidence is never drawn: its tallies
+        // and the chart show the same (no glossary, show instead)
+        // a question nothing tests yet is shown so, as its own view shows it (the UX lead's rule, Nov 13 2026): a chip
+        let reason = match s.map(|s| text(s, "line")).filter(|t| !t.is_empty()) {
+            Some(r) if r.starts_with(w::NO_RULE_TESTS) => format!("<p class=\"str\">{}</p>", empty_chip(w::NOT_TESTED_YET)),
+            Some(r) if r.starts_with("No rule is linked to this question itself") => format!("<p class=\"str\">{}</p>", empty_chip(w::TESTED_BELOW)),
+            Some(r) => format!("<p class=\"str\">{}</p>", self.voiced(&s.map(|s| self.reasons_linked(s, r, &qid)).unwrap_or_else(|| esc(r)))),
+            None => String::new(),
         };
         let tallies = self.tallies(q, s, &qid);
         let interp = self.interpretation_line(q, s, &qid);
@@ -3935,7 +4361,7 @@ impl<'a> Page<'a> {
             .iter()
             .filter(|(_, n)| *n > 0)
             .map(|(word, n)| {
-                let said = said_plain(&format!("{n} {}", w::short_rule(word))) + &esc(&crate::cmds::reading::on_estimate_said(alone(word), &n.to_string()));
+                let said = said_plain(&format!("{n} {}", w::tally_word(word, *n))) + &esc(&crate::cmds::reading::on_estimate_said(alone(word), &n.to_string()));
                 let full = format!("{n} {}", crate::assess::rule_label(word, *n));
                 let to = format!("{qid}:rd:{}", reading_key(&full));
                 let cls = crate::surface::part_class(&full, &muted);
@@ -3991,7 +4417,7 @@ impl<'a> Page<'a> {
                     let declared = if n == 0 { String::new() } else { format!("<span> \u{b7} {}</span>", plural(n as i64, "declared comparison", "declared comparisons")) };
                     return format!(
                         "<p class=\"sti\">{}<span>: </span>{}{declared}</p>",
-                        term(w::COMPUTED_COMPARISON, &format!("<span class=\"k\">{}</span>", esc(w::COMPUTED_COMPARISON))),
+                        format!("<span class=\"k\">{}</span>", esc(w::COMPUTED_COMPARISON)),
                         a(&to, &esc(said), "ans")
                     );
                 }
@@ -4013,6 +4439,37 @@ impl<'a> Page<'a> {
 
     /// A recorded interpretation as a note (plain words pass 3): "A note, not confirmed: <its words>." (or "Note: ..."
     /// once confirmed), its words linked to `to`, then whether its rule holds as a sentence of its own.
+    /// A note as one line (owner, Nov 13 2026: "how to read and understand these ai slop?"): a kind chip where rb can
+    /// tell one (`source`: it cites a file's line rb resolved), the note's opening clause, a "not confirmed" chip for a
+    /// session's note; the whole note, word for word with its citations as chips, opens under it on a click. A note
+    /// short enough to be its opening clause is the line alone. `lead` is rb's "note on <what>" label.
+    fn note_item(&self, id: &str, lead: &str, said: &str, extra_class: &str) -> String {
+        let (said, unconfirmed) = match said.strip_suffix(" \u{b7} not confirmed") {
+            Some(rest) => (rest, true),
+            None => (said, false),
+        };
+        let at = if id.is_empty() { String::new() } else { format!(" data-id=\"{}\"", esc(id)) };
+        let cites = matches!(self.doc.get("citations"), Some(Value::Dict(cs)) if cs.keys().any(|k| said.contains(k.as_str())));
+        let mut chips = String::new();
+        if cites {
+            chips += &format!("<span class=\"fch fch-use nk\">{}</span>", w::NOTE_SOURCE);
+        }
+        let (n, cut) = opening_clause(said);
+        let tail = if unconfirmed { format!("<span class=\"fch fch-warn\">{}</span>", w::NOT_CONFIRMED) } else { String::new() };
+        let lead = format!("<span class=\"nd2\">{lead}:</span>");
+        if n >= said.len() {
+            return format!("<li class=\"note nl{extra_class}\"{at}>{lead}{chips} {}{tail}</li>", self.note_words(said));
+        }
+        // the line, its opening clause; the whole note, word for word in one element, under it on a click
+        let open = format!("{}{}", &said[..n], if cut { "\u{2026}" } else { "" });
+        format!(
+            "<li class=\"note nl{extra_class}\"{at}><details class=\"nfold\" data-fold=\"note:{}\"><summary>{lead}{chips} <span class=\"nop\">{}</span>{tail}</summary><div class=\"nall\">{}</div></details></li>",
+            esc(if id.is_empty() { &open } else { id }),
+            esc(&open),
+            self.note_words(said)
+        )
+    }
+
     fn note_line(&self, class: &str, said: &str, holds: &str, confirmed: bool, to: &str) -> String {
         let said = said.trim_end();
         let stop = if said.ends_with(['.', '!', '?']) { "" } else { "." };
@@ -4021,7 +4478,7 @@ impl<'a> Page<'a> {
         let holds = if holds.is_empty() { String::new() } else { format!(" <span class=\"hs\">{}</span>", esc(&holds)) };
         format!(
             "<p class=\"{class}\">{}{words}{stop}{holds}</p>",
-            term_as(w::RECORDED_INTERPRETATION, &format!("<span class=\"k\">{}: </span>", w::note_label(confirmed)))
+            format!("<span class=\"k\">{}: </span>", w::note_label(confirmed))
         )
     }
 
@@ -4070,7 +4527,7 @@ impl<'a> Page<'a> {
                             }
                             // "command (as given)" keeps rb's line for it
                             match said.strip_suffix(w::COMMAND_AS_GIVEN) {
-                                Some(head) => format!("<span>{}</span>{}", esc(head), term(w::COMMAND_AS_GIVEN, &esc(w::COMMAND_AS_GIVEN))),
+                                Some(head) => format!("<span>{}</span>{}", esc(head), esc(w::COMMAND_AS_GIVEN)),
                                 None => esc(&said),
                             }
                         })
@@ -4086,110 +4543,13 @@ impl<'a> Page<'a> {
             return String::new();
         }
         let lines: String = parts.iter().map(|p| format!("<p>{p}</p>")).collect();
-        let affects = if affects.is_empty() { String::new() } else { format!("<p class=\"ia\">{}</p>", esc(&affects)) };
+        let affects = if affects.is_empty() { String::new() } else { format!("<p class=\"ia\"><a href=\"#criteria\" data-rule=\"\">{}</a></p>", esc(&affects)) };
         format!(
             "<section class=\"integ\" id=\"integrity\" aria-labelledby=\"h-integrity\"><h2 id=\"h-integrity\">{}<span class=\"wsign\" aria-hidden=\"true\">\u{26a0}</span></h2>{lines}{affects}</section>",
             w::EVIDENCE_INTEGRITY
         )
     }
 
-    /// The one queue: everything rb cannot settle and the user can, in the plan's fixed order. Each row a verb phrase,
-    /// one line of numbers or names, and one action, which opens the place it names (rb open's script opens the
-    /// inspector there); never a command, hash or path. Its heading counts nothing: the line under it does. On the export, "Needs judgment" with
-    /// its lead line: a page that leaves the machine cannot know who reads it, and "Open calls" there names the nav item,
-    /// which counts calls only (the lexicon's D3).
-    fn queue_section(&self) -> String {
-        let items = self.queue();
-        let export = self.surface == Surface::Export;
-        // on the export each viewer reads its own words (OWNER-READER): the owner's working view says rb open's, the
-        // reader's says the rows are still open, as status, not tasks
-        let head = if export { by_viewer("span", "", w::NEEDS_JUDGMENT, w::NEEDS_YOUR_JUDGMENT, w::STILL_OPEN) } else { w::NEEDS_YOUR_JUDGMENT.to_string() };
-        // the heading carries no number (FIX4, proposal 1): the line under it counts what the rows stand for, and the
-        // nav's Your call counts the calls; a count of rows beside them read as a third total that added up to neither
-        // fix 3: each number names what it counts and counts things, never rows: one row confirms two designs, so the
-        // waiting part counts the list of what waits by its kinds, and the repository part what rb found and the files
-        let calls = items.iter().filter(|it| matches!(it.kind.as_str(), "call" | "baseline") || matches!(it.src, QSrc::Call(_))).count();
-        let found_rows = items.iter().filter(|it| it.kind == "found").count();
-        let uncited_rows = items.iter().filter(|it| it.kind == "uncited").count();
-        let confirm_rows = items.len() - calls - found_rows - uncited_rows;
-        let mut parts: Vec<String> = Vec::new();
-        if calls > 0 {
-            parts.push(plural(calls as i64, w::QN_CALL, w::QN_CALLS));
-        }
-        if confirm_rows > 0 {
-            let pending = list(self.doc, "pending.rows");
-            let known: Vec<&str> = w::QN_WAITS.iter().map(|(k, _, _)| *k).collect();
-            let mut kinds: Vec<String> = w::QN_WAITS
-                .iter()
-                .map(|(k, one, many)| (pending.iter().filter(|r| text(r, "kind") == *k).count(), one, many))
-                .filter(|(n, _, _)| *n > 0)
-                .map(|(n, one, many)| plural(n as i64, one, many))
-                .collect();
-            let other = pending.iter().filter(|r| !known.contains(&text(r, "kind"))).count();
-            if other > 0 {
-                kinds.push(plural(other as i64, w::QN_WAITS_OTHER.0, w::QN_WAITS_OTHER.1));
-            }
-            // a queue that names what waits where the list of it is not given still says its rows
-            let said = if kinds.is_empty() { confirm_rows.to_string() } else { and_said(&kinds) };
-            parts.push(format!("{said} {}", w::QN_CONFIRM));
-        }
-        let mut repo: Vec<String> = Vec::new();
-        if found_rows > 0 {
-            let n = count(self.doc, "home.found_total").map_or(0, |n| n.max(0) as usize).max(list(self.doc, "home.found").len()).max(found_rows);
-            repo.push(plural(n as i64, w::QN_RESULT.0, w::QN_RESULT.1));
-        }
-        if uncited_rows > 0 {
-            let n = (count(self.doc, "home.uncited").unwrap_or(0).max(0) as usize).max(uncited_rows);
-            repo.push(plural(n as i64, w::QN_UNCITED.0, w::QN_UNCITED.1));
-        }
-        if !repo.is_empty() {
-            parts.push(format!("{} {}", and_said(&repo), w::QN_FOUND));
-        }
-        let counted = parts.join(DOT);
-        let counted = if counted.is_empty() { String::new() } else if export { self.voiced(&counted) } else { owner_voice(&counted) };
-        let counted = if counted.is_empty() { String::new() } else { format!("<p class=\"qn sm dim\">{counted}</p>") };
-        // what a row is for, in each viewer's words, where there is a row (plain words pass 4): the owner's view and a file
-        // with no viewer named decide; a reader's makes no call
-        let lede = if export && !items.is_empty() { by_viewer("p", " class=\"lede sm\"", w::QUEUE_LEDE, w::QUEUE_LEDE, w::QUEUE_LEDE_READER) } else { String::new() };
-        let rows: String = items
-            .iter()
-            .map(|it| {
-                let detail = if it.detail.is_empty() { String::new() } else { format!("<span class=\"qd\">{}</span>", it.detail) };
-                // its one action; the export draws none, for any viewer: the row itself opens its item, where the owner's
-                // working view records the call (OWNER-READER, C's composer)
-                let action = if export || it.target.is_empty() {
-                    String::new()
-                } else {
-                    format!("<a class=\"qbtn\" href=\"#{}\" data-decide=\"{}\">{}</a>", esc(&it.target), esc(&it.target), esc(&it.action))
-                };
-                // every row opens its item (design pass 1, P11): the whole row follows its target, its words a link,
-                // so a row opens with no script and takes keyboard focus; on the export too, which has no button
-                let to = it.target.clone();
-                // a reader's row says what stands, never an ask (PIVOT): drawn for the reader's meta, the owner's ask
-                // for the owner and a page with no viewer named; rb open has no reader
-                let said = if it.reader.is_empty() || self.surface == Surface::Open { it.title.clone() } else { by_viewer("span", "", &it.title, &it.title, &it.reader) };
-                let (go, title) = if to.is_empty() {
-                    (String::new(), said)
-                } else {
-                    (format!(" data-go=\"{}\"", esc(&to)), a(&to, &said, "qa"))
-                };
-                format!("<li class=\"qrow\" data-kind=\"{}\"{go}><span class=\"qt\"><span class=\"qv\">{title}</span>{detail}</span>{action}</li>", esc(&it.kind))
-            })
-            .collect();
-        let body = if rows.is_empty() {
-            if export {
-                by_viewer("p", " class=\"dim\"", w::NOTHING_NEEDS_JUDGMENT_EXPORT, w::NOTHING_NEEDS_JUDGMENT, w::READER_NOTHING_OPEN)
-            } else {
-                format!("<p class=\"dim\">{}</p>", w::NOTHING_NEEDS_JUDGMENT)
-            }
-        } else {
-            format!("<ul class=\"queue\">{rows}</ul>")
-        };
-        let open = text(self.doc, "home.open_line");
-        let open = if open.is_empty() { String::new() } else if self.ids.contains("open-items") { format!("<p class=\"openrec sm\">{}</p>", a("open-items", &esc(open), "")) } else { format!("<p class=\"openrec sm dim\">{}</p>", esc(open)) };
-        let all = if export { by_viewer("p", " class=\"sm\"", &a("your-call", w::SEE_OPEN_CALLS, ""), &a("your-call", w::SEE_YOUR_CALLS, ""), &a("your-call", w::SEE_OPEN_CALLS, "")) } else { String::new() };
-        format!("<section class=\"judge\" id=\"queue\" aria-labelledby=\"h-queue\"><h2 id=\"h-queue\">{head}</h2>{counted}{lede}{body}{open}{all}</section>")
-    }
 
     /// What waits for the user's confirmation, folded under the queue: each in its group, in rb's words, ending in the
     /// one command that confirms it in the user's own terminal. Listed apart from the calls, never under Your call
@@ -4205,56 +4565,6 @@ impl<'a> Page<'a> {
         format!("<details class=\"fold waitblk\" data-fold=\"to-confirm\"><summary>{head}</summary>{}</details>", self.waiting())
     }
 
-    /// The research questions below the standing cards, a row each: the question, its state and a compact tally,
-    /// sub-questions indented, at most two levels deep. A top-level question has its card above, so it is not listed
-    /// again; where there are several, each one's sub-questions follow a quiet line naming it.
-    fn question_rows(&self) -> String {
-        let qs = list(self.doc, "questions");
-        let tops = qs.iter().filter(|q| count(q, "depth").unwrap_or(0) == 0).count();
-        let mut rows = String::new();
-        for q in qs {
-            let depth = count(q, "depth").unwrap_or(0);
-            if depth == 0 {
-                if tops > 1 && qs.iter().any(|k| text(k, "parent") == text(q, "id")) {
-                    // the parent named by its words, as the nav names it, never by its bare id (fix 2)
-                    let to = format!("q-{}", text(q, "id"));
-                    let words = au_title(text(q, "text"));
-                    rows.push_str(&format!("<li class=\"qgrp\">{}</li>", if self.ids.contains(&esc(&to)) { a(&to, &words, "") } else { words }));
-                }
-                continue;
-            }
-            let id = text(q, "id");
-            let qid = format!("q-{id}");
-            // its state names its subject and its counts lead with what they count (plain words pass 3): "Open
-            // question · Rules: 4 met · 4 not tested"
-            let status = text(q, "status");
-            let said = w::question_state(status.split(' ').next().unwrap_or(""));
-            let status = if status.split(' ').next().is_some_and(|s| s.eq_ignore_ascii_case("open")) { term_as("open (question)", &esc(&said)) } else { esc(&said) };
-            let status = status + &took_state(q);
-            let muted = self.muted_of(id);
-            let tally: Vec<String> = self.counts_of(q)
-                .iter()
-                .filter(|(_, n)| *n > 0)
-                .map(|(word, n)| {
-                    let full = format!("{n} {}", crate::assess::rule_label(word, *n));
-                    let cls = crate::surface::part_class(&full, &muted);
-                    let said = said_plain(&format!("{n} {}", w::short_rule(word)));
-                    if cls == "dim" { format!("<span>{said}</span>") } else { format!("<span class=\"sw {cls}\">{said}</span>") }
-                })
-                .collect();
-            let tally = if tally.is_empty() { String::new() } else { format!("{DOT}<span class=\"k\">{}</span>{}", w::RULES_LEAD, tally.join(DOT)) };
-            rows.push_str(&format!(
-                "<li class=\"qr{}\" data-go=\"{}\">{}<span class=\"qs\">{status}{tally}</span></li>",
-                if depth > 1 { " d1" } else { "" },
-                esc(&qid),
-                a(&qid, &au_title(text(q, "text")), "sq")
-            ));
-        }
-        if rows.is_empty() {
-            return String::new();
-        }
-        format!("<section class=\"qrows\" id=\"ov-questions\" aria-labelledby=\"h-ov-questions\"><h2 id=\"h-ov-questions\">{}</h2><ul class=\"qlist\">{rows}</ul></section>", w::RESEARCH_QUESTIONS)
-    }
 
     /// How rb reads this repository, folded: rb's scope line, the changed files nothing cites, and what rb found, each
     /// verbatim from rb.
@@ -4282,15 +4592,6 @@ impl<'a> Page<'a> {
         format!("<div class=\"howblk\" id=\"how-made\"><details class=\"fold how\" data-fold=\"how-made\"><summary>{}</summary>{body}</details></div>", w::HOW_RB_READS)
     }
 
-    /// The latest changes and the newest sitting, folded: History holds them whole.
-    fn recent_fold(&self) -> String {
-        let latest = super::history_view::latest(self.doc);
-        let recent = super::history_view::recent(self.doc, &|id| self.ids.contains(&esc(id)));
-        if latest.is_empty() && recent.is_empty() {
-            return String::new();
-        }
-        format!("<details class=\"fold\" data-fold=\"recent\"><summary>{}</summary>{latest}{recent}</details>", w::RECENT_CHANGES)
-    }
 
     /// The queue as drawn: the document's (`home.queue`, contract 1.6) in its rank order where it gives one; else what
     /// the document holds in the plan's order: the calls (rb's order), the designs that wait for a confirmation, the
@@ -4417,11 +4718,23 @@ impl<'a> Page<'a> {
             let items: String = these.iter().map(|r| self.waiting_row(r)).collect();
             // the export's last group in no one's voice but the owner's (fix 2)
             let title = if self.surface == Surface::Export && kind.is_none() { self.voiced(w::WAITING_OTHER_EXPORT) } else { title.to_string() };
-            out.push_str(&format!("<h3>{title} ({})</h3><ul class=\"wl\">{items}</ul>", these.len()));
+            // the count opens the list it counts, right under it
+            let lid = format!("tc-{}", kind.unwrap_or("other"));
+            out.push_str(&format!("<h2><a href=\"#{lid}\">{title} <span class=\"n\">({})</span></a></h2><ul class=\"wl\" id=\"{lid}\">{items}</ul>", these.len()));
         }
+        // rb's line on the designs that wait, without the command it names: the action is a prompt for their
+        // agent (owner, msg 47)
         let designs = text(self.doc, "pending.designs_line");
         if !designs.is_empty() {
-            out.push_str(&self.said_to_act("p", " class=\"sm dim\"", designs, &esc(designs)));
+            let said = designs.split(": rb confirm").next().unwrap_or(designs).trim_end_matches('.');
+            let said = format!("{said}.");
+            // rb's line names no place; a waiting row at another place does ("cd <its path> && rb confirm ...")
+            let cmd = designs.split_once(": ").map(|(_, c)| c).filter(|c| c.starts_with("cd ")).map(str::to_string).or_else(|| {
+                list(self.doc, "pending.rows").iter().map(|r| text(r, "confirm")).find(|c| c.starts_with("cd ")).map(str::to_string)
+            });
+            let prompt = if self.past { String::new() } else { self.act(prompt_button(&placed(w::ALL_PROMPT, cmd.as_deref().unwrap_or("")))) };
+            let said = if self.ids.contains("tc-design") { a("tc-design", &esc(&said), "") } else { esc(&said) };
+            out.push_str(&format!("<p class=\"sm dim\">{said}{prompt}</p>"));
         }
         if !all.iter().any(|r| text(r, "kind") == "design") {
             out.push_str(&self.act(confirm_all(at(self.doc, "pending.confirm_all"), self.past)));
@@ -4438,19 +4751,23 @@ impl<'a> Page<'a> {
         // a design that waits is one line on every surface: its title, linked to its experiment (whose view holds the
         // design and what changed in it), and the command that lists it to confirm (rb confirm <exp>); never its
         // listing here, nor the command that confirms it as listed, which only a reader of that listing should run
+        // the action is a prompt for their agent, never a command to type (owner, msg 47); confirming stays
+        // theirs, in their own terminal (G5)
         if text(r, "kind") == "design" {
-            let listing = listing_of(text(r, "confirm"));
-            let listing = if listing.is_empty() { String::new() } else { self.act(self.cmd(&listing)) };
-            return format!("<li class=\"wd\"><p class=\"wt\">{said}</p>{listing}</li>");
+            let title = list(self.doc, "experiments").iter().find(|x| text(x, "id") == eid).map(|x| text(x, "title")).filter(|t| !t.is_empty()).unwrap_or(eid);
+            let prompt = if self.past || eid.is_empty() || text(r, "confirm").is_empty() { String::new() } else { self.act(prompt_button(&placed(&format!("{}\"{}\"{}", w::DESIGN_PROMPT_HEAD, title, w::DESIGN_PROMPT_TAIL), text(r, "confirm")))) };
+            return format!("<li class=\"wd\"><p class=\"wt\">{said}{prompt}</p></li>");
         }
         let lines: String = texts(r, "lines").iter().map(|l| format!("<p class=\"wp\">{}</p>", esc(l))).collect();
         let confirm = text(r, "confirm");
-        let here = if self.surface == Surface::Export {
-            by_viewer("p", " class=\"cf\"", w::CONFIRM_HERE_EXPORT, w::CONFIRM_HERE_EXPORT, w::READER_NOT_CONFIRMED)
-        } else {
-            format!("<p class=\"cf\">{}</p>", w::CONFIRM_HERE)
-        };
-        let confirm = if confirm.is_empty() || self.past { String::new() } else { format!("{here}{}", self.act(self.cmd(confirm))) };
+        // the action is the prompt alone: no line about a terminal before it; a reader is told it is not confirmed yet
+        let here = if self.surface == Surface::Export { by_viewer("p", " class=\"cf\"", "", "", w::READER_NOT_CONFIRMED) } else { String::new() };
+        let on = text(r, "subject");
+        let on = if on.is_empty() { text(r, "id") } else { on };
+        let confirm = if confirm.is_empty() || self.past { String::new() } else { format!("{here}{}", self.act(prompt_button(&placed(&format!("{}{on}{}", w::CALL_PROMPT_HEAD, w::CALL_PROMPT_TAIL), confirm)))) };
+        // the call's line opens what it is on (closed form)
+        let to = self.story_to(text(r, "subject"));
+        let said = if !text(r, "subject").is_empty() && self.ids.contains(&esc(&to)) { a(&to, &said, "") } else { said };
         format!("<li><p class=\"wt\">{said}</p>{lines}{confirm}</li>")
     }
 
@@ -4469,8 +4786,7 @@ impl<'a> Page<'a> {
     fn note_li(&self, n: &Value) -> String {
         let (id, day, said) = (text(n, "id"), text(n, "at"), text(n, "text"));
         let day = if day.is_empty() || said.starts_with(day) { String::new() } else { format!(" ({})", esc(day)) };
-        let at = if id.is_empty() { String::new() } else { format!(" data-id=\"{}\"", esc(id)) };
-        format!("<li class=\"note pnote\"{at}><span class=\"nd2\">{}{}{day}:</span> {}</li>", w::NOTE_ON, w::THE_PROJECT, self.au_cited(said, "", ""))
+        self.note_item(id, &format!("{}{}{day}", w::NOTE_ON, w::THE_PROJECT), said, " pnote")
     }
 
     /// The record's clone address and its page's, on an export that has one (rb export --url, rb sync --with-record);
@@ -4582,9 +4898,8 @@ impl<'a> Page<'a> {
             return String::new();
         }
         format!(
-            "<section class=\"repro rrun\" id=\"reproduce\" aria-labelledby=\"h-reproduce\"><h2 id=\"h-reproduce\">{}</h2><p>{}</p>{}</section>",
+            "<section class=\"repro rrun\" id=\"reproduce\" aria-labelledby=\"h-reproduce\"><h2 id=\"h-reproduce\">{}</h2>{}</section>",
             w::REPRODUCE,
-            w::REPRODUCE_LEDE,
             self.rerun_button("rrov")
         )
     }
@@ -4597,17 +4912,22 @@ impl<'a> Page<'a> {
         let d = self.doc;
         let export = self.surface == Surface::Export;
         let head = self.your_call_head();
-        let lede = if export {
-            by_viewer("p", " class=\"lede\"", w::OPEN_CALLS_LEDE, w::OWNER_CALLS_LEDE, w::READER_CALLS_LEDE)
+        // rb's quiet line where it has one; no line that explains where a call is made (no glossary, show instead)
+        let quiet = text(d, "home.quiet");
+        // a record with nothing in it is shown so, not written (the UX lead's rule, Nov 13 2026): its chip, and the line
+        // to paste in your view's Next step
+        let lede = if !export && quiet.starts_with(w::NOTHING_RECORDED) {
+            format!("<p class=\"roll\">{}</p>{}", empty_chip(w::NO_QUESTION_YET), self.next_card(crate::skill::PASTE_LINE))
         } else {
-            let said = [text(d, "home.quiet"), w::CALL_IN_YOUR_TERMINAL].into_iter().filter(|s| !s.is_empty()).map(esc).collect::<Vec<_>>().join(" ");
-            format!("<p class=\"lede\">{said}</p>")
+            Some(quiet).filter(|s| !export && !s.is_empty()).map_or(String::new(), |s| format!("<p class=\"lede\">{}</p>", a("yc-list", &esc(s), "")))
         };
         let alias = if export { "<span id=\"open-calls\"></span>" } else { "" };
         let mut h = vec![format!("{alias}<h1 id=\"h-your-call\">{}</h1>{lede}", self.your_call_head_html())];
         if !export {
             h.push(format!("<p class=\"keys app-only sm dim\">{}</p>", w::KEYS_LINE));
         }
+        // the list the pin opens: every row Decisions holds, each with its chip and note (rulings, Nov 12 07:15 +08)
+        h.push(self.your_call_list());
         // the calls in the queue's order, then any the queue does not hold
         let mut calls: Vec<&Value> = self.queue().iter().filter_map(|it| if let QSrc::Call(c) = it.src { Some(c) } else { None }).collect();
         for c in list(d, "calls") {
@@ -4719,16 +5039,19 @@ impl<'a> Page<'a> {
                 None => (format!("{} ({})", given, rows.len()), text(g, "under").to_string(), String::new()),
             };
             let under = if under.is_empty() { String::new() } else { format!(" <span class=\"dim\">{}</span>", esc(&under)) };
-            body.push_str(&format!("<h4 class=\"ogh\">{}{under}</h4><ul class=\"oi chk\">{}</ul>{raw}", esc(&head), rows.concat()));
+            // the group's count opens its list, right under it
+            let gid = format!("oi-{code}");
+            body.push_str(&format!("<h4 class=\"ogh\"><a href=\"#{0}\">{1}{under}</a></h4><ul class=\"oi chk\" id=\"{0}\">{2}</ul>{raw}", esc(&gid), esc(&head), rows.concat()));
         }
         let unfiled = list(self.doc, "unfiled.open_items");
         if !unfiled.is_empty() {
             total += unfiled.len();
             body.push_str(&format!(
-                "<h4 class=\"ogh\">{} ({})</h4><ul class=\"oi chk\">{}</ul>",
+                "<h4 class=\"ogh\"><a href=\"#oi-unfiled\">{} ({})</a></h4><ul class=\"oi chk\" id=\"oi-unfiled\">{}</ul>",
                 esc(text(self.doc, "unfiled.line")),
                 unfiled.len(),
-                unfiled.iter().map(|o| format!("<li>{}</li>", esc(text(o, "what")))).collect::<String>()
+                // each opens what it is about, as every open item's row does (closed form)
+                unfiled.iter().flat_map(|o| self.open_rows_of("", o)).collect::<String>()
             ));
         }
         (total, body)
@@ -4737,6 +5060,19 @@ impl<'a> Page<'a> {
     /// An open item's rows: one per rule, setting, folder or run it names where the shell can say each in a short
     /// sentence ("Per-channel INT8 at 512 calibration images: no runs yet" c-pc-512), else rb's line once.
     fn open_rows(&self, code: &str, o: &Value) -> Vec<String> {
+        // what git took out that it may rest on (MP-1111-0952's F1): said on each row, as rb status's item says it; a
+        // row drawn from rb's own sentence already holds it
+        let taken = esc(text(o, "taken_out"));
+        let rows = self.open_rows_of(code, o);
+        if taken.is_empty() {
+            return rows;
+        }
+        rows.into_iter()
+            .map(|r| if r.contains(&taken) { r } else { r.strip_suffix("</li>").map_or(r.clone(), |b| format!("{b} <span class=\"dim\">\u{b7} {taken}</span></li>")) })
+            .collect()
+    }
+
+    fn open_rows_of(&self, code: &str, o: &Value) -> Vec<String> {
         let what = text(o, "what");
         let subjects: Vec<&str> = text(o, "subject").split(", ").filter(|s| !s.is_empty()).collect();
         let chip = |id: &str, to: &str| {
@@ -4750,7 +5086,8 @@ impl<'a> Page<'a> {
                     let f = self.finding(c).unwrap();
                     let n = count(f, "reading.n").unwrap_or(0);
                     let state = if n == 0 { w::NO_RUNS_YET.to_string() } else { format!("{} so far", units_said(n, text(f, "reading.unit"))) };
-                    format!("<li>{}<span class=\"dim\">: {}</span> {}</li>", self.au_cited(text(f, "statement"), &self.criterion_to(c), "ans"), esc(&state), chip(c, ""))
+                    // the whole row opens the rule it names, by its words (closed form: ids off screens)
+                    format!("<li>{}</li>", a(&self.criterion_to(c), &format!("{}<span class=\"dim\">: {}</span>", au(text(f, "statement")), esc(&state)), "ans"))
                 })
                 .collect(),
             "late" if !texts(o, "criteria").is_empty() => texts(o, "criteria")
@@ -4761,7 +5098,7 @@ impl<'a> Page<'a> {
                     let units = text(o, "units").split(" \u{b7} ").find_map(|u| u.strip_prefix(&format!("{c} "))).unwrap_or("");
                     let came = units.strip_suffix(" units").or_else(|| units.strip_suffix(" unit")).and_then(|u| u.split_once(" of ")).map(|(k, n)| w::came_first(k, n)).unwrap_or_default();
                     let came = if came.is_empty() { String::new() } else { format!("<span class=\"dim\">: {}</span>", esc(&came)) };
-                    format!("<li>{}{came} {}</li>", self.au_cited(text(f, "statement"), &self.criterion_to(c), "ans"), chip(c, ""))
+                    format!("<li>{}</li>", a(&self.criterion_to(c), &format!("{}{came}", au(text(f, "statement"))), "ans"))
                 })
                 .collect(),
             "provisional" => {
@@ -4776,17 +5113,36 @@ impl<'a> Page<'a> {
                         let place = if eid.is_empty() { String::new() } else { format!(" in {eid}") };
                         format!("{}{place}: {}{note}", name, w::given_not_checked(value))
                     }
-                    None => said.to_string(),
+                    // a line in another shape ("cuda in int8: undetermined · ...") keeps the words that name its setting
+                    None => what.to_string(),
                 };
                 let to = subjects.first().and_then(|s| s.split_once('/')).map(|(e, _)| self.to(&format!("x-{e}"), "").to_string()).unwrap_or_default();
-                vec![format!("<li>{} {}</li>", esc(&row), chip(subjects.first().copied().unwrap_or(""), &to))]
+                // the row opens the setting's experiment, where the setting and its source are said; its address last,
+                // small, as rb names it
+                let id = subjects.first().map(|s| format!(" <span class=\"cid\">{}</span>", esc(s))).unwrap_or_default();
+                let row = if to.is_empty() { format!("{}{id}", esc(&row)) } else { a(&to, &format!("{}{id}", esc(&row)), "") };
+                vec![format!("<li>{row}</li>")]
             }
 
             _ => {
-                let to = subjects.first().map(|s| self.object_to(s).unwrap_or_default()).unwrap_or_default();
+                // what it is about: its subject, else the rule it names (an unassigned criterion's item names it there)
+                let crits = texts(o, "criteria");
+                let to = subjects.first().map(|s| self.object_to(s).unwrap_or_default()).filter(|t| !t.is_empty()).or_else(|| crits.first().and_then(|c| self.object_to(c))).unwrap_or_default();
+                // the row opens what it is about; with nowhere to open, its id names it, as before
                 let units = text(o, "units");
                 let units = if units.is_empty() { String::new() } else { format!(" <span class=\"dim\">\u{b7} {}</span>", esc(units)) };
-                vec![format!("<li>{}{units}{}</li>", esc(what), subjects.first().map(|s| format!(" {}", chip(s, &to))).unwrap_or_default())]
+                // a folder or a file opens Files at its folder
+                let setting = subjects.first().and_then(|s| s.split_once('/')).map(|(x, _)| format!("x-{x}")).filter(|x| self.ids.contains(&esc(x)));
+                let to = if to.is_empty() { setting.unwrap_or_default() } else { to };
+                let folder = subjects.first().filter(|s| s.contains('/')).map(|s| s.trim_end_matches('/').rsplit_once('/').map_or("", |(d, _)| d).to_string() + "/");
+                if !to.is_empty() {
+                    vec![format!("<li>{}</li>", a(&to, &format!("{}{units}", esc(what)), ""))]
+                } else if let Some(folder) = folder {
+                    let folder = if folder == "/" { String::new() } else { folder };
+                    vec![format!("<li><a href=\"#files\" data-folder=\"{}\">{}{units}</a></li>", esc(&folder), esc(what))]
+                } else {
+                    vec![format!("<li>{}{units}{}</li>", esc(what), subjects.first().map(|s| format!(" {}", chip(s, &to))).unwrap_or_default())]
+                }
             }
         }
     }
@@ -4949,18 +5305,6 @@ fn reading_key(part: &str) -> String {
     word.split(|c: char| !c.is_ascii_alphanumeric()).filter(|s| !s.is_empty()).collect::<Vec<_>>().join("-").to_lowercase()
 }
 
-/// The command that lists a design to confirm, from the one rb gives to confirm it as listed: the same command, where it
-/// runs included (`cd <its checkout> && `), without the hash; none where rb gives none (a past version offers none).
-fn listing_of(confirm: &str) -> String {
-    match confirm.rfind("rb confirm ") {
-        Some(i) => {
-            let (head, tail) = confirm.split_at(i + "rb confirm ".len());
-            let exp = tail.split('@').next().unwrap_or(tail);
-            format!("{head}{exp}")
-        }
-        None => confirm.to_string(),
-    }
-}
 
 /// Whether open item `o` is rb's line that criterion `cid` is linked to no question, and about `cid` alone.
 fn unlinked_item(o: &Value, cid: &str) -> bool {
@@ -4995,19 +5339,6 @@ fn is_comparison(lead: &Value) -> bool {
     matches!(text(lead, "kind"), "comparison" | "relation")
 }
 
-/// rb's line that confirms everything waiting at once, as the document gives it: a line, or a line and its command.
-fn confirm_all(v: Option<&Value>, past: bool) -> String {
-    match v {
-        Some(Value::Str(s)) if !s.is_empty() => format!("<p class=\"sm\">{}</p>", esc(s)),
-        Some(v @ Value::Dict(_)) => {
-            let line = Some(text(v, "line")).filter(|s| !s.is_empty()).unwrap_or(text(v, "head"));
-            let cmd = Some(text(v, "confirm")).filter(|s| !s.is_empty()).unwrap_or(text(v, "command"));
-            let line = if line.is_empty() { String::new() } else { format!("<p class=\"sm\">{}</p>", esc(line)) };
-            line + &if cmd.is_empty() || past { String::new() } else { cmdbox(cmd) }
-        }
-        _ => String::new(),
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -5170,9 +5501,11 @@ mod tests {
         };
         let (none, owner, reader) = (views("none"), views("owner"), views("reader"));
         for (said, has, lacks) in [
-            (&none, [w::OPEN_CALLS, w::NEEDS_JUDGMENT, w::OPEN_CALLS_LEDE], [">Your call", w::STILL_OPEN, w::OWNER_CALLS_LEDE]),
-            (&owner, [w::YOUR_CALL, w::NEEDS_YOUR_JUDGMENT, w::OWNER_CALLS_LEDE], [">Open calls<", w::STILL_OPEN, w::READER_CALLS_LEDE]),
-            (&reader, [w::OPEN_CALLS, w::STILL_OPEN, w::READER_CALLS_LEDE], [">Your call", ">Needs judgment", w::OWNER_CALLS_LEDE]),
+            // (since UX5 1.3 the Overview's queue is its Decisions, which says neither "Needs judgment" form)
+            // no viewer reads a line that explains where a call is made (no glossary, show instead)
+            (&none, [w::OPEN_CALLS], [">Your call", w::STILL_OPEN, "Calls are made with rb"]),
+            (&owner, [w::YOUR_CALL], [">Open calls<", w::STILL_OPEN, "Calls are made with rb"]),
+            (&reader, [w::OPEN_CALLS], [">Your call", ">Needs judgment", "Calls are made with rb"]),
         ] {
             for h in has {
                 assert!(said.contains(h), "{h}");
@@ -5184,7 +5517,8 @@ mod tests {
         // the owner and the export opened from disk keep the calls' actions and the commands that confirm; the reader
         // reads each call's row, and the state in words
         for said in [&none, &owner] {
-            assert!(said.contains("rb decide c4 accept") && said.contains("rb confirm d1"));
+            // closed form (owner, msg 47): a call that waits is offered as a prompt for their agent
+            assert!(said.contains("rb decide c4 accept") && said.contains("cpprompt") && !said.contains("rb confirm d1"));
         }
         assert!(!reader.contains("rb decide") && !reader.contains("rb confirm") && !reader.contains("data-decide=") && !reader.contains("data-copybtn"), "{reader}");
         assert!(reader.contains("INT8 answers in 7 ms or less") && reader.contains(w::READER_NOT_CONFIRMED) && reader.contains("The design of 1 experiment is not confirmed."));
@@ -5203,25 +5537,18 @@ mod tests {
         .unwrap()
     }
 
-    /// A design that waits lists itself to confirm with rb's own command, where it runs kept, and the hash cut.
-    #[test]
-    fn a_designs_row_lists_it_with_rbs_command() {
-        assert_eq!(listing_of("rb confirm e1@94f795b7"), "rb confirm e1");
-        assert_eq!(listing_of("cd /p/wt-b && rb confirm e1@94f795b7"), "cd /p/wt-b && rb confirm e1");
-        assert_eq!(listing_of(""), "");
-    }
-
-    /// One count, one meaning (D3): the export's empty queue is "Needs judgment" with no count and says "Nothing needs
-    /// judgment."; rb page and rb open keep "Needs your judgment" and their own empty line.
+    /// One count, one meaning (D3), on the Decisions since UX5 1.3: an empty Decisions has no count and says "Nothing
+    /// waits." on every surface, the export's in no one's voice; "Needs judgment" and "Needs your judgment" are said
+    /// nowhere on the Overview.
     #[test]
     fn an_exports_empty_queue_needs_no_judgment() {
         let export = as_viewer(&page(&doc("owner"), Surface::Export), "none");
-        assert!(export.contains("<h2 id=\"h-queue\"><span>Needs judgment</span></h2>"), "{export}");
-        assert!(export.contains(w::NOTHING_NEEDS_JUDGMENT_EXPORT) && !export.contains(w::NOTHING_NEEDS_JUDGMENT));
-        for (surface, tier) in [(Surface::Page, "owner"), (Surface::Open, "live")] {
-            let html = page(&doc(tier), surface);
-            assert!(html.contains("<h2 id=\"h-queue\">Needs your judgment</h2>") && html.contains(w::NOTHING_NEEDS_JUDGMENT), "{surface:?}");
-            assert!(!html.contains(w::NOTHING_NEEDS_JUDGMENT_EXPORT), "{surface:?}");
+        for (surface, html) in [(Surface::Export, export), (Surface::Page, page(&doc("owner"), Surface::Page)), (Surface::Open, page(&doc("live"), Surface::Open))] {
+            let o = overview_of(&html);
+            assert!(o.contains(&format!("id=\"decisions\">{}</h2>", w::DECISIONS)) && o.contains(&format!("<span class=\"echip\">{}</span>", w::NOTHING_WAITS.trim_end_matches('.'))), "{surface:?}");
+            for bad in [w::NEEDS_JUDGMENT, w::NEEDS_YOUR_JUDGMENT, w::NOTHING_NEEDS_JUDGMENT, w::NOTHING_NEEDS_JUDGMENT_EXPORT] {
+                assert!(!o.contains(bad), "{surface:?}: {bad}");
+            }
         }
     }
 
@@ -5239,10 +5566,11 @@ mod tests {
             let html = page(&d, surface);
             let top = &html[html.find("<header").unwrap()..];
             let top = &top[..top.find("</header>").unwrap()];
-            assert!(top.contains("<span class=\"ttl\"><span class=\"au\">INT8 ") && top.contains("<span class=\"vcrumb\"></span>") && top.contains("2026-10-25 01:12 UTC"), "{surface:?}: {top}");
+            assert!(top.contains("<a class=\"ttl\" href=\"#overview\"><span class=\"au\">INT8 ") && top.contains("<span class=\"vcrumb\"></span>") && top.contains("2026-10-25 01:12 UTC"), "{surface:?}: {top}");
             assert!(!top.contains("int8-resnet50") && !top.contains("0.6.0") && !top.contains("research record"), "{surface:?}: {top}");
             let about = &html[html.find("id=\"about\"").unwrap()..];
-            assert!(about.contains("Research record <span class=\"mono\">int8-resnet50</span> \u{b7} rb 0.6.0"), "{surface:?}");
+            // About's strip (owner, Nov 13 2026): rb's version as a badge, the record's id as a chip
+            assert!(about.contains("<span class=\"abadge\">rb 0.6.0</span>") && about.contains("title=\"Research record\">int8-resnet50</a>"), "{surface:?}");
             let nav = &html[html.find("<nav class=\"nav\"").unwrap()..];
             let nav = &nav[..nav.find("</nav>").unwrap()];
             assert_eq!(top.contains("href=\"#about\""), surface != Surface::Export, "{surface:?}");
@@ -5397,32 +5725,33 @@ mod tests {
         assert!(!outside.contains("/home/ana/int8-resnet50/.worktrees/b"), "a worktree's path outside the fold");
     }
 
-    /// Look 3, film pass 4: the Overview carries one count of what waits, the queue's; Your call's is in the nav only,
-    /// and the fold of what waits for a confirmation counts nothing of its own. Fix 2: under its count of rows, what
-    /// they are, counted, its calls the same number as the nav's Your call.
+    /// Look 3, film pass 4, on the Decisions since UX5 1.3: the Overview carries one count of what waits, on the
+    /// Decisions heading, and the pin says the same number; the fold of what waits for a confirmation counts nothing of
+    /// its own and is not on the Overview (it is folded in Experiments, never under Your call); the Overview never says
+    /// Your call, nor "Needs your judgment".
     #[test]
     fn the_overview_counts_only_its_queue() {
         let (live, html) = live_open();
         let o = overview_of(&html);
-        assert!(o.contains("<summary>Waiting for your confirmation</summary>"), "the fold has no count");
-        let n = list(&live, "home.queue").len();
-        let yours = count(&live, "your_call.n").unwrap();
-        assert_ne!(yours as usize, n);
-        // FIX4 (proposal 1): the heading counts nothing, so it never reads as a third total beside the line and the nav
-        assert!(n > 0 && o.contains(&format!("<h2 id=\"h-queue\">{}</h2>", w::NEEDS_YOUR_JUDGMENT)), "the queue's heading is its words alone");
-        let export = page(&live, Surface::Export);
-        let head = &export[export.find("<h2 id=\"h-queue\">").expect("the export's queue") + 18..];
-        let head = &head[..head.find("</h2>").unwrap()];
-        assert!(!head.contains("class=\"n\"") && !head.chars().any(|c| c.is_ascii_digit()), "{head}");
-        let counted = &o[o.find("<p class=\"qn sm dim\">").expect("the queue says what its rows are")..];
-        let counted = &counted[..counted.find("</p>").unwrap()];
-        // fix 3: things, never rows, each named, so the line agrees with the list of what waits (4 there: rb status's
-        // 1 proposed call, 1 past call and 2 designs, which one row confirms) and with what rb found
-        assert_eq!(list(&live, "pending.rows").len(), 4);
-        assert_eq!(counted, format!("<p class=\"qn sm dim\">{yours} calls{DOT}1 proposed call, 1 past call and 2 designs waiting for your confirmation{DOT}1 result and 1 changed file from the repository"));
+        let n = list(&live, "overview.decisions").len();
+        // the count is the kinds' chips now (the UX lead's Still open, Nov 13 2026): the decisions' chip counts its rows,
+        // and every row is listed, each its kind's, so the chips filter them
+        let rows = list(&live, "overview.decisions");
+        let decide = rows.iter().filter(|r| text(r, "kind") == "decide").count();
+        assert!(n > 0 && o.contains(&format!("id=\"decisions\">{}", w::DECISIONS)) && !o.contains(&format!("id=\"decisions\">{} <span class=\"n\">", w::DECISIONS)), "the heading carries no count of its own");
+        assert!(decide == 0 || o.contains(&format!("data-filter=\"decide\" aria-pressed=\"false\">{decide} decision{}</button>", if decide == 1 { "" } else { "s" })), "the decisions' chip counts them");
+        assert_eq!(o.matches("<li class=\"dr dl1\" data-kind=").count(), n.min(12));
         let nav = &html[html.find("<nav class=\"nav\"").unwrap()..];
-        assert!(nav.contains(&format!("{}<span class=\"n\">{yours}</span>", w::YOUR_CALL.to_string() + " ")), "the nav's badge counts the same calls");
-        for bad in [format!("({yours})"), "Your call".to_string()] { assert!(!o.contains(&bad), "{bad}: {}", &o[o.find(&bad).unwrap().saturating_sub(300)..][..400]); }
+        assert!(nav.contains(&format!("{} <span class=\"n\">{n}</span>", w::YOUR_CALL)), "the pin's badge is the same number");
+        assert!(!o.contains("<summary>Waiting for your confirmation") && !o.contains("id=\"to-confirm\""), "the fold is not on the Overview");
+        let x = &html[html.find("<section class=\"view\" id=\"experiments\"").unwrap()..];
+        let x = &x[..x.find("</section>").unwrap()];
+        assert!(x.contains("<summary>Waiting for your confirmation</summary>"), "the fold has no count");
+        let yc = &html[html.find("<section class=\"view\" id=\"your-call\"").unwrap()..];
+        assert!(!yc[..yc.find("</section>").unwrap()].contains("id=\"to-confirm\""), "never under Your call");
+        for bad in [w::YOUR_CALL, w::NEEDS_YOUR_JUDGMENT] {
+            assert!(!o.contains(bad), "{bad}");
+        }
     }
 
     /// Rerun this research (REPRODUCE-WORDS.md): only an export with a clone address draws it, for every viewer and never
@@ -5457,7 +5786,7 @@ mod tests {
         // the bar's button, at the right before the time, and the Overview's, each opening the one panel
         let bar = &html[html.find("<header class=\"top\"").unwrap()..];
         let bar = &bar[..bar.find("</header>").unwrap()];
-        assert!(bar.contains(&format!("<span class=\"end\"><a class=\"rrb rrun rrbar\" href=\"#rerun\" data-rerun>{}</a><span class=\"stamp\"", w::RERUN)), "{bar}");
+        assert!(bar.contains(&format!("<span class=\"end\"><a class=\"rrb rrun rrbar\" href=\"#rerun\" data-rerun>{}</a><a class=\"stamp\" href=\"#in-git\"", w::RERUN)), "{bar}");
         assert_eq!(html.matches("href=\"#rerun\" data-rerun>").count(), 2);
         assert_eq!(html.matches("id=\"rerun\"").count(), 1);
         let panel = &html[html.find("<aside class=\"rerun rrun\" id=\"rerun\"").unwrap()..];
@@ -5701,41 +6030,44 @@ mod tests {
         d.get_mut("findings").unwrap().as_dict_mut().unwrap().insert("c0".into(), diff);
         d.get_mut("findings").unwrap().as_dict_mut().unwrap().insert("c9".into(), level);
         let html = page(&live, Surface::Open);
-        assert!(html.contains(">onnx_top1 (%)</th>"), "the runs table's head");
+        assert!(html.contains(">onnx_top1 (%)</th>") || html.contains(">onnx_top1 (%)</a></th>"), "the runs table's head");
         assert!(!html.contains(">ONNX top-1</th>"));
     }
 
-    /// Fix 3 (M's request 135): a question's own view says rb's questions[].no_rule, the line its Overview card says, so
-    /// a parent whose rule is linked to its sub-question never reads "No rule tests this question yet." there.
+    /// Fix 3 (M's request 135), shown since the UX lead's empty states (Nov 13 2026): a parent whose rule is linked to
+    /// its sub-question never reads as untested: its chip says it is tested there, with no outline and no Next step; a
+    /// question no rule tests has its chip, the outline of its rules, and in your view a Next step that names it, which
+    /// a reader of the export is not shown.
     #[test]
     fn a_question_s_view_says_its_overview_line() {
         let mut live = crate::pyjson::loads(include_str!("../../../tests/fixtures/shell/int8-demo.live.view.json")).unwrap();
-        let line = "No rule is linked to this question itself; 1 rule is linked to its sub-questions.";
-        for q in live.as_dict_mut().unwrap().get_mut("questions").unwrap().as_list_mut().unwrap() {
-            let q = q.as_dict_mut().unwrap();
-            if q.get("id").and_then(Value::as_str) == Some("q1") {
-                q.insert("findings".into(), Value::List(Vec::new()));
-                q.insert("no_rule".into(), Value::Str(line.into()));
+        let set = |live: &mut Value, line: &str| {
+            for q in live.as_dict_mut().unwrap().get_mut("questions").unwrap().as_list_mut().unwrap() {
+                let q = q.as_dict_mut().unwrap();
+                if q.get("id").and_then(Value::as_str) == Some("q1") {
+                    q.insert("findings".into(), Value::List(Vec::new()));
+                    q.insert("no_rule".into(), Value::Str(line.into()));
+                }
             }
-        }
-        let html = page(&live, Surface::Open);
-        let at = html.find("id=\"q-q1\"").expect("q1's view");
-        let view = &html[at..];
-        let view = &view[..view[1..].find("<section class=\"view\"").map_or(view.len(), |e| e + 1)];
-        assert!(view.contains(&format!("<span class=\"hl\">{line}</span>")), "{view}");
-        assert!(!view.contains(w::NO_RULE_TESTS));
-        // on the export, in each viewer's voice, as the Overview card says it (review: the owner's "your confirmation")
-        let waits = "No rule tests this question yet. 1 experiment design waits for a confirmation.";
-        for q in live.as_dict_mut().unwrap().get_mut("questions").unwrap().as_list_mut().unwrap() {
-            let q = q.as_dict_mut().unwrap();
-            if q.get("id").and_then(Value::as_str) == Some("q1") {
-                q.insert("no_rule".into(), Value::Str(waits.into()));
-            }
-        }
-        let html = page(&live, Surface::Export);
-        let view = &html[html.find("id=\"q-q1:evidence\"").expect("q1's line")..];
-        let view = &view[..view.find("</p>").unwrap()];
-        assert!(view.contains(&format!("<span data-vw=\"owner\">{}</span>", owner_voice(waits))) && view.contains(&format!("<span data-vw=\"none reader\">{waits}</span>")), "{view}");
+        };
+        let view_of = |html: &str| {
+            let at = html.find("id=\"q-q1\"").expect("q1's view");
+            let view = &html[at..];
+            view[..view[1..].find("<section class=\"view\"").map_or(view.len(), |e| e + 1)].to_string()
+        };
+        set(&mut live, "No rule is linked to this question itself; 1 rule is linked to its sub-questions.");
+        let view = view_of(&page(&live, Surface::Open));
+        assert!(view.contains(&format!("<span class=\"echip\">{}</span>", w::TESTED_BELOW)), "{view}");
+        assert!(!view.contains(w::NO_RULE_TESTS) && !view.contains(w::NOT_TESTED_YET) && !view.contains("class=\"nextc\""), "{view}");
+        set(&mut live, "No rule tests this question yet. 1 experiment design waits for a confirmation.");
+        let q1 = list(&live, "questions").iter().find(|q| text(q, "id") == "q1").map(|q| text(q, "text").to_string()).unwrap();
+        let view = view_of(&page(&live, Surface::Open));
+        assert!(view.contains(&format!("<span class=\"echip\">{}</span>", w::NOT_TESTED_YET)) && view.contains("class=\"ghost g-card\""), "{view}");
+        assert!(view.contains(&format!("{}&quot;{}&quot;{}", w::PLAN_PROMPT_HEAD, esc(&q1), esc(w::PLAN_PROMPT_TAIL))), "the prompt names the question: {view}");
+        assert!(!view.contains(w::NO_RULE_TESTS) && !view.contains("waits for"), "no sentence: {view}");
+        // on the export the Next step is for your view alone
+        let view = view_of(&page(&live, Surface::Export));
+        assert!(view.contains("<div data-vw=\"none owner\"><section class=\"nextc\">"), "{view}");
     }
 
     /// Look 3, film pass 5: rb open's top bar shows no absolute path at any width: what it says, its hidden parts too,
@@ -5954,27 +6286,36 @@ mod tests {
         assert!(none.contains("not in the record") && !none.contains("not recorded"), "{none}");
     }
 
-    /// The timing glossary says what M's rb context says: a rule whose baseline's runs alone came first is read on its
-    /// subject's runs.
+    /// No glossary, show instead (the ruling of Nov 12 20:35 +08): no surface draws a list of what its words or marks
+    /// mean, a hover that defines a word, or a line under a heading that explains its page.
     #[test]
-    fn the_timing_glossary_says_how_a_baseline_first_reads() {
-        let (_, said) = w::HINTS.iter().find(|(k, _)| *k == "timing").unwrap();
-        assert!(said.starts_with("declared before the evidence (before its runs, when only its baseline's runs came first: timing is read on the subject's runs);"), "{said}");
+    fn no_page_explains_its_words() {
+        for name in ["owner", "away", "live"] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../tests/fixtures/shell/int8-demo.{name}.view.json"));
+            let doc = crate::pyjson::loads(&std::fs::read_to_string(path).unwrap()).unwrap();
+            let viewer = name;
+            for surface in [Surface::Page, Surface::Open, Surface::Export] {
+                let html = page(&doc, surface);
+                for said in ["What the words on this page mean", "data-hint", "class=\"term\"", "class=\"gloss\"", "figkey", "dot: estimate", "these qualifications", "Each run keeps when", "Calls are made with rb", "commands call it a criterion", "How to read this record"] {
+                    assert!(!html.contains(said), "{viewer} {surface:?}: {said}");
+                }
+            }
+        }
     }
 
-    /// Fix 2, item 4: no bare id heads a group of sub-questions on the Overview; the parent is named by its words, as the
-    /// nav names it.
+    /// Fix 2, item 4, on Other questions since UX5 1.3: no bare id names another question on the Overview; each is
+    /// named by its words, as the nav names it, and links to it.
     #[test]
     fn a_group_of_sub_questions_is_headed_by_its_parent_s_words() {
         let (mut live, _) = live_open();
-        let qs = live.as_dict_mut().unwrap().get_mut("questions").unwrap();
-        let q2 = crate::pyjson::loads(r#"{"id": "q2", "text": "Is INT8 fast enough to serve on one A100?", "depth": 0, "status": "open"}"#).unwrap();
-        if let Value::List(l) = qs { l.push(q2) }
+        let q2 = crate::pyjson::loads(r#"{"id": "q2", "text": "Is INT8 fast enough to serve on one A100?", "strip": {"groups": [], "said": ""}}"#).unwrap();
+        let ov = live.as_dict_mut().unwrap().get_mut("overview").unwrap().as_dict_mut().unwrap();
+        ov.insert("others".into(), Value::List(vec![q2]));
         let html = page(&live, Surface::Open);
         let o = overview_of(&html);
-        let grp = &o[o.find("<li class=\"qgrp\">").expect("a group line")..];
-        let grp = &grp[..grp.find("</li>").unwrap()];
-        assert!(grp.contains("href=\"#q-q1\"") && grp.contains("ImageNet"), "{grp}");
-        assert!(!grp.contains(">q1</a>"), "{grp}");
+        let grp = &o[o.find("<ul class=\"oq\">").expect("Other questions")..];
+        let grp = &grp[..grp.find("</ul>").unwrap()];
+        assert!(grp.contains("href=\"#q-q2\"") && grp.contains("A100"), "{grp}");
+        assert!(!grp.contains(">q2</a>"), "{grp}");
     }
 }

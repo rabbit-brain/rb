@@ -109,7 +109,7 @@ def test_an_analysis_counting_more_units_than_the_runs_form_is_a_problem(rb):
 def test_a_comparison_no_criterion_reads_is_listed(rb):
     rb("analysis", "add", "e1", "--compare", "new/old:score=0.01[-0.02,0.04]", "--compare", "new/alt:score=0.05[0.02,0.08]",
        "--id", "a1")
-    [it] = [i for i in rb("status").data["open"] if i["code"] == "unread_comparison"]
+    [it] = [i for i in rb("status", "--full").data["open"] if i["code"] == "unread_comparison"]
     assert "new vs alt" in it["what"] and "new vs old" not in it["what"]
     assert it["do"] == ""                                  # no rule nobody stated is suggested
 
@@ -127,7 +127,7 @@ def test_a_level_an_analysis_reports_is_said_without_a_sign(rb, capsys):
     for compare, what in (("new:score=0.91[0.88,0.94]", "score 0.91 [0.88, 0.94]"), ("new/old:score=0.03[0.01,0.05]", "score +0.03 [+0.01, +0.05]")):
         assert main(["analysis", "add", "e1", "--compare", compare, "--source", "rep.md"]) == 2
         assert f"rep.md has no line that states {what}." in capsys.readouterr().err
-    [it] = [i for i in rb("status").data["open"] if i["code"] == "unread_comparison"]
+    [it] = [i for i in rb("status", "--full").data["open"] if i["code"] == "unread_comparison"]
     assert it["what"].startswith("e1: score: new 0.81 [0.78, 0.84] (a1): no recorded criterion reads it")
 
 
@@ -243,6 +243,6 @@ def test_a_retracted_resource_is_missing_from_what_a_rerun_needs(rb):
 
 def test_a_line_someone_decided_is_not_listed_as_planned(rb):
     rb("experiment", "add", "a proof", "--id", "thm", "--purpose", "a proof, not a run")
-    assert any(i["code"] == "planned" and i["subject"] == "thm" for i in rb("status").data["open"])
+    assert any(i["code"] == "planned" and i["subject"] == "thm" for i in rb("status", "--full").data["open"])
     rb("decide", "thm", "accept", "--why", "the proof was checked")
-    assert not any(i["code"] == "planned" and i["subject"] == "thm" for i in rb("status").data["open"])
+    assert not any(i["code"] == "planned" and i["subject"] == "thm" for i in rb("status", "--full").data["open"])

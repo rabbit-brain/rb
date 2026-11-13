@@ -39,7 +39,7 @@ doc.pop("digest", None)
 doc.pop("places", None)                                      # place line, pickers, scope bar, Elsewhere: Live only
 c = doc["checkout"]                                          # a page's checkout: its words and commit, no branch or rule
 doc["checkout"] = {"state": c["state"], "said": c["said"], "commit": c["commit"], "line": c["page_line"]}
-for k in ("record_files", "page_evidence"):                  # About's block; the evidence, check and names: Live only
+for k in ("record_files", "chip", "page_evidence"):          # About's block and the header's git chips; the evidence, check and names: Live only
     if k in c:
         doc["checkout"][k] = c[k]
 for f in doc["findings"].values():
@@ -63,6 +63,10 @@ for r in doc["runs"].values():
             r[k] = None
     r["receipt_rows"] = [row for row in r["receipt_rows"] if row[0] != "platform"]  # the OS string: Live only
     r["receipt_rows"] = page_rows(r["receipt_rows"])         # a run's evidence as of when the page was made (E5)
+    # where a resource stood on the recording machine is the owner's own (getit.rs then_said): a page says what it read
+    r["receipt_rows"] = [[f, t.replace(" · no copy was on the machine that recorded it", "").replace(" · the copy there held other bytes", "")
+                          .replace(" · nothing recorded where to get it then", ""), refs] if f in ("inputs", "outputs") else [f, t, refs]
+                         for f, t, refs in r["receipt_rows"]]
 for x in doc["experiments"]:                                 # your checkout against the code a step names: rb open only
     for st in x["reproduce"]["steps"]:
         st.pop("checkout", None)
@@ -74,6 +78,8 @@ for c in doc.get("citations", {}).values():
     c["open_url"] = ""                                       # a link to the file on this machine: rb open only
 for res in doc["resources"].values():
     res.pop("where_short", None)
+    res.pop("copies", None)                                  # a local copy and its path: the owner's own screen only
+    res.pop("asks", None)                                    # rb's ask for a download link: the chip says it on a page
     res["url"] = ""                                          # a download address only with rb export --url
 
 
@@ -93,6 +99,8 @@ for row in doc["pending"]["rows"]:
     row["text"] = page_words(row["text"])
     if "lines" in row:
         row["lines"] = [page_words(l) for l in row["lines"]]
+# Files (UX5 1.4): a page lists only the files the record names; rb open lists the whole project
+doc["files"] = [f for f in doc.get("files", []) if f.get("named")]
 doc["reproduce_url"] = ""                                    # rb export --url <address> sets it; Reproduce this project
 json.dump(doc, sys.stdout, ensure_ascii=False, indent=1)
 print()

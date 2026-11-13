@@ -6,7 +6,7 @@ document, or none) gets the hub's own page, a bar ("Shared, read-only", when it 
 in a sandboxed frame, and only the frame's own request (Sec-Fetch-Dest: iframe) gets the latest upload's page. As the hub
 does (HOSTED-VIEW.md, 4), a page whose <html> carries data-shell (rb export strips its script and names it there) gets
 the host's own copy of rb's shell script inline, allowed by its hash alone, so the page draws rb's three panes; the copy is
-rust/src/shell/assets/script.js beside this tool (--shell-script names another). It keeps what came (when, and its bytes'
+rust/src/shell/assets/script.min.js (the squeezed script rb page inlines) beside this tool (--shell-script names another). It keeps what came (when, and its bytes'
 length).
 
     python tools/demo/share_standin.py [--port N] [--shell-script <script.js>]      # prints the hub's address and the share link, then serves
@@ -32,7 +32,7 @@ from pathlib import Path
 # its words (a reader's browser, and the share beat, reads them inside the frame)
 SANDBOX = "allow-scripts allow-popups allow-popups-to-escape-sandbox"
 # the host's copy of rb's shell script: the one this tool's own repository builds rb with
-SHELL_SCRIPT = Path(__file__).resolve().parents[2] / "rust" / "src" / "shell" / "assets" / "script.js"
+SHELL_SCRIPT = Path(__file__).resolve().parents[2] / "rust" / "src" / "shell" / "assets" / "script.min.js"
 
 
 def hosted(page: bytes, script: bytes) -> tuple[bytes, str | None]:

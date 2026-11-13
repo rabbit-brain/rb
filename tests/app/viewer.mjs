@@ -13,7 +13,7 @@
 import { findChrome, launchChrome, parseArgs, progress, run, sleep } from './cdp.mjs';
 
 const a = parseArgs(process.argv.slice(2));
-if (!a.prose && !a.framed && !a.yours && !a.rows && !a.ownerexp && (!a.none || !a.owner || !a.reader)) { process.stderr.write('give --none, --owner and --reader, or --prose, or --framed\n'); process.exit(2); }
+if (!a.prose && !a.framed && !a.yours && !a.rows && !a.cards && !a.ownerexp && (!a.none || !a.owner || !a.reader)) { process.stderr.write('give --none, --owner and --reader, or --prose, or --framed\n'); process.exit(2); }
 const results = [];
 const check = (name, pass, detail = '') => { results.push({ name, pass: !!pass, detail }); progress(name); if (!pass) process.stderr.write(`FAIL ${name}: ${detail}\n`); };
 const j = x => JSON.stringify(x);
@@ -45,14 +45,22 @@ const YOURS = `(() => {
   for (let n = w.nextNode(); n; n = w.nextNode()) { const e = n.parentElement; if (e && !e.closest('aside, .guide, .help, script, style') && /\\byours?\\b/i.test(n.textContent) && e.checkVisibility() && e.getBoundingClientRect().width > 0) out.push(n.textContent.trim().slice(0, 80)); }
   return Array.from(new Set(out));
 })()`;
-// what must stay for every viewer: the queue's rows, the trust line, the Overview's headings and the open items
+// what must stay for every viewer: the queue's rows (the Overview's Decisions since UX5 1.3), the trust line, the Overview's headings and the open items
 const KEPT = `(() => {
   const vis = e => e.checkVisibility() && e.getBoundingClientRect().height > 0;
   const v = document.querySelector('#main .view.on');
-  return { rows: Array.from(document.querySelectorAll('#overview .queue > li')).filter(vis).length, integ: !!(document.querySelector('#integrity') && vis(document.querySelector('#integrity'))),
+  return { rows: Array.from(document.querySelectorAll('#overview [data-queue] > li')).filter(vis).length,
+    state: Array.from(document.querySelectorAll('#overview .dstate')).filter(vis).map(e => e.textContent.trim()), integ: !!(document.querySelector('#integrity') && vis(document.querySelector('#integrity'))),
     heads: Array.from(v.querySelectorAll('h1, h2, h3, summary')).filter(vis).map(h => h.textContent.trim().slice(0, 40)) };
 })()`;
 const WIDTH = `[document.documentElement.scrollWidth, innerWidth]`;
+// a Decisions row opens its rule's card at Result, read before it is decided: its Decide tab, by a real click, and on
+// the export, where a call is recorded from its call card, the link there to that card's Decide
+async function toDecide(p) {
+  const shown = `(() => { const b = document.querySelector('.ibody .decide .seg button'); return !!b && b.checkVisibility(); })()`;
+  await p.clickEl(`Array.from(document.querySelectorAll('.ibody [role="tab"][href$=":decide"]')).find(e => e.checkVisibility())`); await sleep(300);
+  if (!(await p.ev(shown))) { await p.clickEl(`Array.from(document.querySelectorAll('.ibody a[href^="#call-"][href$=":decide"]')).find(e => e.checkVisibility())`); await sleep(300); }
+}
 
 async function open(p, url, w, scheme, hash = 'overview') {
   await p.blank(); await p.viewport(w, w < 600 ? 844 : 900); await p.media({ type: '', scheme });
@@ -101,15 +109,51 @@ await run(async () => {
   }
   // --rows <url>: a reader's page whose queue rows have their own link beside their Review button (as design pass 1
   // draws them): no Review button shows, and each row's link opens its item to read
+  // --cards <url>: a page as a share link's reader reads it (the reader meta): no field card shows an rb command. Every
+  // text in a card.fc that holds `rb confirm` sits in an element the reader's view holds back (display none), and the
+  // card that holds one, opened in the inspector, shows no command and no sentence that names one
+  if (a.cards) {
+    for (const w of [1440, 390]) {
+      await open(p, a.cards, w, 'light');
+      const shown = await p.ev(`(() => {
+        const out = []; let held = 0; let cards = 0, first = null;
+        document.querySelectorAll('.card.fc').forEach(c => {
+          cards++;
+          const w = document.createTreeWalker(c, NodeFilter.SHOW_TEXT);
+          for (let n = w.nextNode(); n; n = w.nextNode()) {
+            if (!/rb confirm/.test(n.textContent)) continue;
+            let e = n.parentElement, hid = false;
+            for (; e && e !== c.parentElement; e = e.parentElement) if (getComputedStyle(e).display === 'none' && e !== c) { hid = true; break; }
+            if (hid) { held++; first = first || c.id; } else out.push(c.id + ': ' + n.textContent.trim().slice(0, 60));
+          }
+        });
+        return { out, held, cards, first };
+      })()`);
+      check(`reader: no field card shows an rb command [${w} light]`, shown.cards > 0 && !shown.out.length, j(shown));
+      if (shown.first) {
+        await p.ev(`location.hash = ${j('#' + shown.first)}`); await sleep(400);
+        const card = await p.ev(`(() => { const c = document.querySelector('.ibody > .card'); return c ? c.dataset.id || c.id : null })()`);
+        const o = await p.ev(ACTIONS), prose = await p.ev(PROSE);
+        check(`reader: the card that gives rb confirm, opened, shows none [${w} light]`, card === shown.first && !o.cmds.length && !prose.some(t => /rb confirm/.test(t)), j({ card, cmds: o.cmds, prose }));
+      }
+    }
+    const failed = results.filter(r => !r.pass);
+    if (failed.length) throw Object.assign(new Error(`${failed.length} of ${results.length} checks failed: ${failed.map(f => f.name).join('; ')}`), { results });
+    return { checks: results };
+  }
   if (a.rows) for (const w of [1440, 390]) {
     await open(p, a.rows, w, 'light');
-    const n = await p.ev(`document.querySelectorAll('#overview .queue > li').length`);
+    // a reader is shown the record's state, no row, chip or button of the owner's list; a row's own link, followed by
+    // its address, opens its item to read
+    const n = await p.ev(`Array.from(document.querySelectorAll('#overview [data-queue] > li, #overview .dchip')).filter(e => e.checkVisibility()).length`);
+    const state = await p.ev(`Array.from(document.querySelectorAll('#overview .dstate')).filter(e => e.checkVisibility()).map(e => e.textContent.trim())`);
     const o = await p.ev(ACTIONS);
-    const row = await p.clickEl(`Array.from(document.querySelectorAll('#overview .queue a')).find(e => e.checkVisibility())`);
-    await sleep(300);
+    const href = await p.ev(`(document.querySelector('#overview [data-queue] a') || {}).hash || null`);
+    if (href) { await p.ev(`location.hash = ${j(href)}`); await sleep(300); }
     const card = await p.ev(`(() => { const c = document.querySelector('.ibody > .card'); return c ? c.dataset.id || c.id : null })()`);
     const after = await p.ev(ACTIONS);
-    check(`reader: a queue row's own link stands in for its Review button, and opens its item to read [${w} light]`, n > 0 && NONE(o) && !!row && !!card && NONE(after), j({ n, o, row: row && row.href, card, after }));
+    check(`reader: no queue row or button shows, only the record's state, and a row's own link opens its item to read [${w} light]`,
+      n === 0 && state.length === 1 && NONE(o) && !!href && !!card && NONE(after), j({ n, state, o, href, card, after }));
   }
   if (a.rows) {
     const failed = results.filter(r => !r.pass);
@@ -124,12 +168,17 @@ await run(async () => {
       const name = who === 'owner' ? 'Your call' : 'Open calls', other = who === 'owner' ? 'Open calls' : 'Your call';
       await open(p, url, 1440, 'light', 'your-call');
       const title = await p.ev(`document.title`);
+      const on = await p.ev(`(document.querySelector('#main .view.on') || {}).id || null`);
       const left = await p.ev(`Array.from(document.querySelectorAll('[data-title], [data-crumb], [data-rootname], [aria-label]')).flatMap(e => ['data-title', 'data-crumb', 'data-rootname', 'aria-label'].map(k => e.getAttribute(k) || '')).filter(t => t.startsWith(${j(other)}))`);
       const q = await p.ev(`(Array.from(document.querySelectorAll('main .view')).find(v => /^q-/.test(v.id)) || {}).id || null`);
       if (q) { await p.ev(`location.hash = ${j('#' + q)}`); await sleep(250); }
       const root = await p.ev(`(document.querySelector('.crumbs .rootname') || {}).textContent || ''`);
-      check(`${who} export: the calls are "${name}" in the tab's title, the crumbs and a question's rail [1440 light]`,
+      // the owner reads "Your call" in the tab's title, the crumbs and a question's rail; a reader, shown state and never
+      // the owner's actions, is taken from #your-call to the Overview, and reads "Your call" nowhere
+      if (who === 'owner') check(`owner export: the calls are "Your call" in the tab's title, the crumbs and a question's rail [1440 light]`,
         title.startsWith(name) && !left.length && (!q || root.startsWith(name)), j({ title, left: left.slice(0, 4), q, root }));
+      else check(`reader export: #your-call opens the Overview, and "Your call" is said nowhere [1440 light]`,
+        on === 'overview' && !title.startsWith(other) && !left.length && !root.startsWith(other), j({ on, title, left: left.slice(0, 4), q, root }));
     }
     const failed = results.filter(r => !r.pass);
     if (failed.length) throw Object.assign(new Error(`${failed.length} of ${results.length} checks failed: ${failed.map(f => f.name).join('; ')}`), { results });
@@ -174,10 +223,10 @@ await run(async () => {
           check(`reader: the Overview lands with the inspector folded until something is picked [${at}]`, rail, j(rail));
         }
       }
-      // a queue's row by a real click: the owner at Record a call, the reader on the card to read
+      // a queue's row (a Decisions row, UX5 1.3) by a real click: the owner at Record a call, the reader on the card to read
       await p.hookClipboard();
       // (a reader is shown no Review button: the row's own link then)
-      const row = await p.clickEl(`Array.from(document.querySelectorAll('#overview .queue a[data-decide], #overview .queue a')).find(e => e.checkVisibility())`);
+      const row = await p.clickEl(`Array.from(document.querySelectorAll('#overview [data-queue] a')).find(e => e.checkVisibility())`);
       await sleep(300);
       const card = await p.ev(`(() => { const c = document.querySelector('.ibody > .card'), f = document.activeElement; return c ? { id: c.dataset.id || c.id, hash: location.hash,
         focus: !!(f && f.closest('.ibody') && f.checkVisibility() && f.getBoundingClientRect().height > 0) } : null; })()`);
@@ -185,14 +234,21 @@ await run(async () => {
       if (who === 'reader') {
         // the card itself, from its top: its address names the card, never the Decide part a reader is not shown, and
         // focus is on something that shows
-        check(`reader: a queue's row opens its item to read, with no command, button or reason field [${at}]`,
-          !!row && !!card && NONE(acts) && !/:decide$/.test(card.hash) && card.focus, j({ row: row && row.href, card, acts }));
-        // j on the calls' view opens the next call to read, focus on what shows
+        // no row of the owner's list shows (the click above found none); the card a row links to, opened by its
+        // address, is read from its top: its address names the card, never the Decide part a reader is not shown, and
+        // focus is on something that shows
+        const href = await p.ev(`(document.querySelector('#overview [data-queue] a') || {}).hash || null`);
+        if (href) { await p.ev(`location.hash = ${j(href)}`); await sleep(300); }
+        const read = await p.ev(`(() => { const c = document.querySelector('.ibody > .card'), f = document.activeElement; return c ? { id: c.dataset.id || c.id, hash: location.hash,
+          focus: !!(f && f !== document.body && f.checkVisibility() && f.getBoundingClientRect().height > 0) } : null; })()`);
+        const racts = await p.ev(ACTIONS);
+        check(`reader: no queue row shows, and the item a row links to opens to read, with no command, button or reason field [${at}]`,
+          !row && !!href && !!read && NONE(racts) && !/:decide$/.test(read.hash) && read.focus, j({ row: row && row.href, href, read, acts: racts }));
+        // the calls' view is the owner's: its address opens the Overview, and j there opens nothing to act on
         await p.ev(`location.hash = '#your-call'`); await sleep(300);
         await p.key('j', 'KeyJ', 74, 'j'); await sleep(300);
-        const jk = await p.ev(`(() => { const f = document.activeElement, c = document.querySelector('.ibody > .card'); return { card: c ? c.dataset.id || c.id : null, hash: location.hash,
-          focus: !!(f && f !== document.body && f.checkVisibility() && f.getBoundingClientRect().height > 0), acts: ${ACTIONS} } })()`);
-        check(`reader: j on the calls' view opens a call to read, focus on what shows [${at}]`, !!jk.card && jk.focus && !/:decide$/.test(jk.hash) && NONE(jk.acts), j(jk));
+        const jk = await p.ev(`(() => ({ on: (document.querySelector('#main .view.on') || {}).id || null, acts: ${ACTIONS} }))()`);
+        check(`reader: the calls' view opens the Overview, and j there offers no action [${at}]`, jk.on === 'overview' && NONE(jk.acts), j(jk));
         // the keys that make or copy a call make nothing here
         for (const [k, code, kc] of [['i', 'KeyI', 73], ['a', 'KeyA', 65], ['c', 'KeyC', 67]]) await p.key(k, code, kc, k);
         const after = await p.ev(`(() => { const d = document.querySelector('.ibody .decide'); return { chosen: d ? d.dataset.chosen || null : null, copied: window.__copied } })()`);
@@ -203,8 +259,12 @@ await run(async () => {
         check(`reader: the keys list offers no call and no copy [${at}]`, keys.includes('Keyboard') && !/accept, reject|copy the card|\byou\b|\byour\b/i.test(keys), keys.slice(0, 300));
         await p.key('Escape', 'Escape', 27);
       } else {
+        // the row opens its rule's card at Result; its Decide tab, picked, is Record a call
+        const atResult = !!card && !/:decide$/.test(card.hash);
+        await toDecide(p);
+        const dacts = await p.ev(ACTIONS);
         const dec = await p.ev(`(() => { const d = document.querySelector('.ibody .decide'); return d ? d.checkVisibility() : false })()`);
-        check(`${who}: a queue's row opens its call at Record a call, its commands shown [${at}]`, !!row && !!card && dec && acts.choices > 0, j({ row: row && row.href, card, acts }));
+        check(`${who}: a queue's row opens its card at Result, and its Decide tab at Record a call, its commands shown [${at}]`, !!row && atResult && dec && dacts.choices > 0, j({ row: row && row.href, card, acts: dacts }));
         // the composer by real input: a choice, a reason typed, its line copied
         await p.clickEl(sel('.ibody .decide .seg button'));
         await p.clickEl(sel('.ibody .decide input.why'));
@@ -231,11 +291,13 @@ await run(async () => {
       }
       const said = titles.join(' | ');
       check(`${who}: the guide ${who === 'reader' ? "says where the calls stand, by no word of whose judgment" : 'asks for a call where one waits'} [${at}]`,
-        titles.length >= 3 && (who === 'reader' ? said.includes('Still open:') && !/your judgment|your call|Your call|ready for/.test(said) : said.includes('Needs your judgment:')), said);
+        titles.length >= 3 && (who === 'reader' ? said.includes('Still open:') && !/your judgment|your call|Your call|ready for/.test(said) : said.includes('Decisions:')), said);
     }
     // a reader is shown every warning, open item and trust line the owner is
-    check(`reader: every row that is still open, the trust line and every heading still show [${at}]`,
-      kept.reader.rows > 0 && kept.reader.rows === kept.owner.rows && kept.reader.integ === kept.owner.integ && j(kept.reader.heads) === j(kept.owner.heads) && j(kept.owner.heads) === j(kept.none.heads), j(kept));
+    // a reader is shown what stands, never the owner's list: the count of results not decided in place of its rows
+    check(`reader: what is still open is said as state, and the trust line and every heading still show [${at}]`,
+      kept.owner.rows > 0 && kept.none.rows === kept.owner.rows && kept.reader.rows === 0 && kept.reader.state.length === 1 && !kept.owner.state.length &&
+      kept.reader.integ === kept.owner.integ && j(kept.reader.heads) === j(kept.owner.heads) && j(kept.owner.heads) === j(kept.none.heads), j(kept));
     // rb export's page as the hub serves a share link
     if (a.export) {
       await open(p, a.export, w, scheme);

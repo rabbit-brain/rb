@@ -29,7 +29,7 @@ SCHEMA_NAMES = ["project", "question", "experiment", "metric", "criterion", "run
 LEDGER_COMMANDS = ["init", "project title", "question add", "question move", "question reword", "experiment add", "experiment file", "experiment relate",
                    "experiment gate", "variant add", "note add", "metric add", "spec set", "spec verify", "spec vary",
                    "criterion add", "criterion file", "criterion relate", "run add", "analysis add", "resource add", "resource locate", "resource expose",
-                   "freeze", "decide", "confirm", "retract", "status", "show", "compare", "log", "context", "fmt", "journal",
+                   "freeze", "decide", "confirm", "retract", "status", "files", "show", "compare", "log", "context", "fmt", "journal",
                    "journal scan", "journal run", "reconcile", "compile", "page", "export", "clone", "sync", "login",
                    "logout", "env check"]
 COMMANDS = [*LEDGER_COMMANDS, "doctor", "remove", "ui", "open", "mcp", "skill", "tour", "docs", "schema", "version", "feedback", "config auto-update",
@@ -392,13 +392,28 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser) -> None:
     s.add_argument("--all", action="store_true", help="confirm every call, gate and design that waits as it reads now, after saying each (the command rb confirm ends with confirms them as listed)")
     s.set_defaults(func="cmd_confirm")
 
-    s = sub.add_parser("status", parents=rc, help="each criterion on its axes, and what is open, with who usually acts")
+    s = sub.add_parser("status", parents=rc, help="the record on one screen: each question, its checks by state, its results against what each check accepts, what they rest on, and the decisions that wait",
+                       epilog="key: \u25a0 passed, \u25b2 failed, \u25e7 can't tell yet, \u25a1 no results yet; \u25cf a result and \u251c\u2500\u2524 its range, \u25cb a result with no range yet; "
+                              "\u2591 what passes, \u2506 the check's number; \u203e written after its results; \u2713 holds for all, \u2717 holds for none. "
+                              "With --ascii: # ^ % . for the states, * |-| o for a result, ~ and : for the check, + and x.")
     s.add_argument("experiment", nargs="?", default=None, help="only this experiment")
+    s.add_argument("--full", action="store_true", help="everything, in words: the question tree, Needs judgment, Can be done now, each criterion on its axes, the experiments, runs, analyses, notes and resources")
+    s.add_argument("--words", action="store_true", help="under each figure, the words it shows (for a screen reader)")
+    s.add_argument("--ascii", action="store_true", help="draw the figures in ASCII")
     s.add_argument("--fail-on", action="append", default=None, metavar="GATE", help=f"exit 1 when any of: {', '.join(GATES)} (repeatable or comma-separated); an edit made outside rb that a finding depends on fails any of them")
     s.set_defaults(func="cmd_status")
 
-    s = sub.add_parser("show", parents=rc, help="one record: a criterion with its finding, an experiment with its spec, a run with its receipt, e1/lr with its history; or a .yaml record file as canonical JSON")
-    s.add_argument("id", help="an id, <experiment>/<setting>, or a path to an Rabbit Brain YAML file")
+    s = sub.add_parser("files", parents=rc, help="the project's files with their marks: what the record cites, what changed since a run read it or is not committed, and each folder; a file's path shows what cites it and the lines it cites",
+                       epilog="marks: \u275d n cited n times, \u2699 n the source of n settings, \u25a3 a run's output, \u25b3 changed since the run that named it, "
+                              "\u00b1 not committed, \u2298 ignored by git, \u2205 not in this clone.")
+    s.add_argument("path", nargs="?", default=None, help="a folder (its files) or a file (its marks, what cites it and the lines it cites)")
+    s.add_argument("--all", action="store_true", help="every file of every folder, not only each folder's marks")
+    s.set_defaults(func="cmd_files")
+
+    s = sub.add_parser("show", parents=rc, help="one record as a card of fields: a check, a run, a setting, a decision, an experiment; a file the record cites (path:3, path#key, path@commit), a folder or a commit; or a .yaml record file as canonical JSON")
+    s.add_argument("id", help="an id, <experiment>/<setting>, a path (path:3, path:3-9, path#key, path@commit, folder/), a commit, or a path to an Rabbit Brain YAML file")
+    s.add_argument("--long", action="store_true", help="the long form: a check on its axes with every observation, a run with its receipt, a setting with its history")
+    s.add_argument("--words", action="store_true", help="each field of the card with its words under it, as a screen reader says it")
     s.set_defaults(func="cmd_show")
 
     s = sub.add_parser("compare", parents=rc, help="an experiment's own table: variants by metrics, with changes against the baseline")
@@ -473,6 +488,7 @@ def add_parsers(sub: Any, common: argparse.ArgumentParser) -> None:
 
     s = sub.add_parser("login", parents=rc, help="rabbitbrain.ai, optional: sign this machine in with a short code, approved on any device where you are signed in")
     s.add_argument("--hub", default=None, help="the hub's address (default RB_HUB_URL, else rabbitbrain.ai)")
+    s.add_argument("--wait", action="store_true", help="wait here until the code is approved or expires, instead of returning once the code is shown")
     s.set_defaults(func="cmd_login")
 
     s = sub.add_parser("logout", parents=rc, help="revoke this machine's hub credential and remove it from the credentials file")

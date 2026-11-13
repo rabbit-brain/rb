@@ -2442,6 +2442,20 @@ impl Ledger {
                 sha256 = Some(rsha);
                 locs.insert(0, self.location("local", &crate::sys::slashed(&full), &who, &at, "")?);
             }
+            // the same place given twice is recorded once
+            let mut seen: Vec<(String, String)> = Vec::new();
+            locs.retain(|l| {
+                let k = (l.provider.clone(), l.r#ref.clone());
+                let new = !seen.contains(&k);
+                seen.push(k);
+                new
+            });
+            // where rb can see where it comes from, it records that itself, before anyone is asked for it
+            let addressed = locs.iter().any(|l| l.provider != "local") || a.url.as_ref().map_or(false, |u| !u.trim().is_empty());
+            if !addressed {
+                let found = self.origins_of(&locs, &a.r#type, &who, &at)?;
+                locs.extend(found);
+            }
             let acq = if !a.source.is_empty() || a.url.as_ref().map_or(false, |u| !u.is_empty()) || a.recipe.as_ref().map_or(false, |r| !r.is_empty()) {
                 Some(nested(crate::dict! {"source" => a.source.clone(), "url" => a.url.clone(), "recipe" => a.recipe.clone()}, Acquisition::validate)?)
             } else {
@@ -2471,10 +2485,32 @@ impl Ledger {
                 return Err(RBError::msg("E_OBJECT_INVALID", format!("{} already records {provider}:{}.", res.id, loc.r#ref)));
             }
             let lref = loc.r#ref.clone();
+            let addressed = res.locations.iter().any(|l| l.provider != "local") || res.acquisition.as_ref().and_then(|x| x.url.as_ref()).map_or(false, |u| !u.trim().is_empty());
+            let found = if addressed || loc.provider != "local" { Vec::new() } else { self.origins_of(std::slice::from_ref(&loc), &res.r#type, &who, &now())? };
             res.locations.push(loc);
+            for f in found {
+                if !res.locations.iter().any(|x| x.provider == f.provider && x.r#ref == f.r#ref) {
+                    res.locations.push(f);
+                }
+            }
             self.commit(&who, "locate", Obj::Resource(res.clone()), crate::dict! {"provider" => provider, "ref" => lref})?;
             Ok(res)
         })
+    }
+
+    /// The origins rb sees for the local copies in `locs` (getit::origins: the Hugging Face cache, a DVC pointer, a
+    /// config that names the copy beside an address), as locations with rb's note on what it read, each once. Nothing is
+    /// fetched.
+    fn origins_of(&self, locs: &[Location], r#type: &str, who: &Actor, at: &str) -> Res<Vec<Location>> {
+        let mut out: Vec<Location> = Vec::new();
+        for l in locs.iter().filter(|l| l.provider == "local") {
+            for (provider, r, note) in crate::getit::origins(&self.root, &self.local(&l.r#ref), r#type) {
+                if !out.iter().any(|x| x.provider == provider && x.r#ref == r) {
+                    out.push(self.location(&provider, &r, who, at, &note)?);
+                }
+            }
+        }
+        Ok(out)
     }
 
     fn location(&self, provider: &str, r#ref: &str, who: &Actor, at: &str, note: &str) -> Res<Location> {
@@ -2541,7 +2577,8 @@ impl Ledger {
     pub fn availability(&self, res: &Resource) -> Dict {
         let mut checked: Vec<Value> = Vec::new();
         let (mut present, mut changed) = (false, false);
-        for loc in &res.locations {
+        // the same place recorded twice is said once
+        for loc in crate::getit::once(&res.locations) {
             if loc.provider != "local" {
                 checked.push(crate::obj! {"provider" => loc.provider.clone(), "ref" => loc.r#ref.clone(), "state" => "recorded"});
                 continue;
@@ -2575,16 +2612,34 @@ impl Ledger {
         let how = match acq {
             Some(a) if state != "present" && recipe => {
                 if nonempty(&a.recipe) {
-                    a.recipe.clone().unwrap()
+                    crate::getit::typed(a.recipe.as_deref().unwrap_or(""))
                 } else if nonempty(&a.url) {
                     a.url.clone().unwrap()
                 } else {
-                    a.source.clone()
+                    crate::getit::typed(&a.source)
                 }
             }
             _ => String::new(),
         };
-        crate::dict! {"state" => state, "locations" => Value::List(checked), "identity" => Value::Dict(Self::identity(res)), "how" => how}
+        // where a reader gets it, its chips, and the local copies as the owner's own screens say them (additive)
+        let get = crate::getit::get(self, res);
+        let cite = crate::getit::cite(res, &get);
+        let copies: Vec<Value> = checked
+            .iter()
+            .filter(|c| c.get_str("provider") == Some("local"))
+            .map(|c| {
+                let (r, st) = (c.get_str("ref").unwrap_or(""), c.get_str("state").unwrap_or(""));
+                crate::obj! {"ref" => r, "state" => st, "outside" => crate::getit::outside(r), "said" => crate::getit::copy_said(r, st)}
+            })
+            .collect();
+        let said = crate::getit::said(&get, &cite);
+        // as a page anyone may be sent says it: an address with a token in it reads as none there
+        let said_public = crate::getit::said(&crate::getit::for_a_page(&get), &cite);
+        let asks = crate::getit::asks(res, &get);
+        crate::dict! {
+            "state" => state, "locations" => Value::List(checked), "identity" => Value::Dict(Self::identity(res)), "how" => how,
+            "get" => Value::Dict(get), "cite" => Value::list_of_str(cite), "said" => said, "said_public" => said_public, "copies" => Value::List(copies), "asks" => asks
+        }
     }
 
     /// A file a run named: `here` (same bytes), `different bytes`, or `gone`.
@@ -2856,8 +2911,9 @@ impl Ledger {
                 _ => "missing",
             };
             let label = format!("{}{}", res.name, if res.version.is_empty() { String::new() } else { format!(" {}", res.version) });
-            let how = av.get_str("how").unwrap_or("");
-            let mut detail = format!("{label}: {avs}{}", if how.is_empty() { String::new() } else { format!(" ({how})") });
+            let said = crate::view::said_of(&Value::Dict(av.clone()));
+            let recipe = res.acquisition.as_ref().and_then(|a| a.recipe.clone()).filter(|r| !r.trim().is_empty()).unwrap_or_default();
+            let mut detail = format!("{label}: {said}{}", if recipe.is_empty() { String::new() } else { format!(" ({recipe})") });
             if let Some(rt) = &res.retracted {
                 state = "missing";
                 detail = format!("{label}: retracted ({})", rt.why);

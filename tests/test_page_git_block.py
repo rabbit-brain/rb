@@ -1,18 +1,18 @@
-"""About's block under line 2 (PARITY.md 9, PANEL.md, S6): a page's claim of how its checkout held the record opens to
-what rb found, in the words every surface says it (checkout.rs's one table, in its page forms).
+"""About as one strip of facts (owner, Nov 13 2026: "i click About i see all these... human????? can read?????"), at
+`#in-git`, where the phrase that says how a page's checkout held the record links: rb's version as a badge, when the page
+was made, the header's git chips (the branch and the commit with a button that copies the commit, and an amber chip
+counting the record files not committed that opens their list), what git says where it is not a commit (ignored by git,
+not in git, rb could not read git) as a chip, and the record's id. No paragraph on git and no definition.
 
 Pinned here, on pages rb page and rb export write in git repositories in scratch folders:
 
-- Each state's block says what holds, in sentences: all M record files in the commit; N of its M new, changed or
-  deleted since the commit; a commit that does not hold the record; ignored by git (the rule where its file is inside
-  the repository, else "by a rule outside the repository's files"); no commit yet; not in git; git failed. The commit
-  whole, as selectable text; which files; what record files are, where a line says "record file".
-- The phrase links to the block, in About's line 2 and in the owner's header span (the owner's alone).
+- Each state's strip says what holds, as chips.
+- The phrase links to the strip in the owner's header span (the owner's alone).
 - An export published with its record at an address (rb export --with-record --url) gives the address, a host link
   for github.com, gitlab.com and codeberg.org where origin's branches, as git last fetched them, hold the commit, and the
   lines to check it yourself, all in the Rerun panel's own classes (rrun rrx); where they lack it the page says so.
-  rb page and rb export without --url name no address, in the block or in the page's data.
-- Nothing private: no branch, no place path, no credentials, no git message, on any page.
+  rb page and rb export without --url name no address, in the strip or in the page's data.
+- Nothing private: no place path, no credentials, no git message, on any page; the branch only in the git chip.
 """
 import html
 import json
@@ -29,7 +29,8 @@ from rbtest import as_the_user, command, environment
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="the checkout is git's")
 GIT = shutil.which("git")
-BLOCK = re.compile(r'<div id="in-git" tabindex="-1">(.*?)</div>(?=<details|</footer)', re.S)
+BLOCK = re.compile(r'<div class="astrip" id="in-git" tabindex="-1">(.*?)<p class="dim sm honest1">', re.S)
+STRIP = re.compile(r'<div class="astrip" id="in-git" tabindex="-1">(.*?)</div>(?=<p class="dim sm wit"><a |<div class="rrun|<p class="dim sm honest1">)', re.S)
 MADE = re.compile(r"a snapshot of the record at (\d{4}-\d\d-\d\d \d\d:\d\d UTC)")
 DEFINE = "Record files are the files rb keeps for this project next to its code, such as its questions, rules, runs, notes and log."
 
@@ -76,6 +77,19 @@ def block(doc: str) -> str:
     return m.group(1)
 
 
+def chips(doc: str) -> list:
+    """The strip's chips, each as its words, the not-committed chip's list left to `listed`."""
+    m = STRIP.search(doc)
+    assert m, "no strip"
+    t = re.sub(r'<div class="gpop".*?</div>', "", m.group(1), flags=re.S)
+    return [html.unescape(re.sub(r"<[^>]+>", " ", c)).split() for c in re.findall(r'<(?:span|a|summary)[^>]*class="(?:abadge|fch|gref)[^"]*"[^>]*>(.*?)</(?:span|a|summary)>(?=<|$)', t)]
+
+
+def listed(doc: str) -> list:
+    m = re.search(r'<div class="gpop"[^>]*><ul class="gl">(.*?)</ul>', STRIP.search(doc).group(1), re.S)
+    return re.findall(r'<li class="mono">([^<]+)</li>', m.group(1)) if m else []
+
+
 def said(doc: str) -> str:
     """The block as a reader reads it: its text, boxes on lines of their own."""
     t = re.sub(r'<pre class="cmd[^"]*">(.*?)</pre>', r"\n[\1]\n", block(doc))
@@ -91,50 +105,49 @@ def lead(doc: str) -> str:
     return f"when this page was made, {MADE.search(doc).group(1)}"
 
 
-def test_each_state_s_block_says_what_holds(home):
+def test_each_state_s_strip_says_what_holds(home):
     at = home / "int8-resnet50"
     root = record(at)
     doc = page(root, home / "nocommit.html")
-    assert said(doc) == f"rb checked the record with git {lead(doc)}: the repository has no commit yet, so no commit holds the record.", said(doc)
-    # the small page pays for nothing more: no commit, no names, no record-files sentence where no line says "record file"
-    assert '<p class="mono">' not in block(doc) and DEFINE not in doc
+    version = re.search(r'<span class="abadge">rb ([^<]+)</span>', doc).group(1)
+    c0 = chips(doc)
+    assert c0[0] == ["rb", version] and c0[1][0] == "snapshot" and c0[2] == ["main"] and '<span class="gb">main</span><span class="gsha">no commit yet</span>' in block(doc), c0
+    # with no commit, every record file is new: the amber chip counts them; "no commit yet" is said once
+    assert c0[3][1:] == ["not", "committed"] and int(c0[3][0]) == len(listed(doc)) > 0 and block(doc).count("no commit yet") == 1, c0
+    assert "gcopy" not in block(doc) and DEFINE not in doc and "rb checked the record with git" not in block(doc)
 
     git(root, "add", "-A")
     git(root, "commit", "-qm", "the record")
     c = commit(root)
     doc = page(root, home / "committed.html")
-    m = len([p for p in git(root, "ls-files", ".rb").splitlines() if not p.startswith((".rb/cache/", ".rb/journal/"))])
-    assert f"rb checked the record with git {lead(doc)}: all {m} record files are in commit {c[:12]}." in said(doc), said(doc)
-    assert f'<p class="mono">{c}</p>' in block(doc) and DEFINE in said(doc)
+    assert chips(doc)[2] == ["main"] and f'<span class="gsha mono">{c[:7]}</span>' in block(doc) and f'class="gcopy" data-sha="{c}"' in block(doc) and "gunc" not in block(doc), chips(doc)
+    assert ["int8-resnet-50"] in chips(doc) or any(len(x) == 1 for x in chips(doc))
+    # rb's mark of its own page rides on the snapshot chip
+    assert re.search(r'<span class="fch fch-at" title="made with rb page · a snapshot of the record at [^"]+">snapshot ', block(doc))
 
     rb(root, "note", "add", "the held-out set is not in the pretraining data")
     doc = page(root, home / "notcommitted.html")
-    assert (f"2 of its {m + 1} record files are new, changed or deleted since commit {c[:12]}. This page shows the record as it stood"
-            f" on disk; a clone of commit {c[:12]} has the record as that commit holds it.") in said(doc), said(doc)
-    assert re.search(r"Not committed: \.rb/log\.jsonl \(changed\) and \.rb/notes/n\w+\.yaml \(new\)", said(doc)), said(doc)
-    assert '<span class="mono">.rb/log.jsonl</span>' in block(doc)
+    assert ["2", "not", "committed"] in chips(doc), chips(doc)
+    assert listed(doc)[0] == ".rb/log.jsonl" and re.fullmatch(r"\.rb/notes/n\w+\.yaml", listed(doc)[1]), listed(doc)
 
     other = record(home / "notheld")
     (other / "eval.py").write_text("print(1)\n", encoding="utf-8")
     git(other, "add", "eval.py")
     git(other, "commit", "-qm", "code")
     doc = page(other, home / "notheld.html")
-    o = commit(other)
-    assert re.search(rf"all \d+ record files are new, changed or deleted since commit {o[:12]}, which does not hold the record\. This page shows"
-                     rf" the record as it stood on disk; a clone of commit {o[:12]} has no record\.", said(doc)), said(doc)
+    n = len([p for p in (other / ".rb").rglob("*") if p.is_file() and not {"cache", "journal"} & set(p.relative_to(other / ".rb").parts)])
+    assert [str(len(listed(doc))), "not", "committed"] in chips(doc) and len(listed(doc)) >= n - 2, (chips(doc), n)
 
     ign = record(home / "ignored")
     (ign / ".gitignore").write_text(".rb/\n", encoding="utf-8")
     git(ign, "add", ".gitignore")
     git(ign, "commit", "-qm", "ignore")
     doc = page(ign, home / "ignored.html")
-    assert re.search(r"git ignores all \d+ record files \(\.gitignore:1:\.rb/\), so a commit leaves them out\. This page shows the record as"
-                     r" it stood on disk; a clone of commit \w{12} has no record\.", said(doc)), said(doc)
-    assert "Ignored by git: .rb/.gitattributes, .rb/.gitignore, " in said(doc), said(doc)
+    assert any(x[1:] == ["record", "files", "ignored", "by", "git"] for x in chips(doc)), chips(doc)
 
     nogit = record(home / "nogit", repo=False)
     doc = page(nogit, home / "nogit.html")
-    assert said(doc) == f"rb looked for a git repository {lead(doc)}: the project's folder is not in one, so no commit holds the record.", said(doc)
+    assert ["not", "in", "git"] in chips(doc) and "gref" not in block(doc), chips(doc)
 
 
 def test_a_rule_outside_the_repository_says_no_path(home):
@@ -147,7 +160,7 @@ def test_a_rule_outside_the_repository_says_no_path(home):
     git(root, "add", "eval.py")
     git(root, "commit", "-qm", "code")
     doc = page(root, home / "global.html")
-    assert re.search(r"git ignores all \d+ record files by a rule outside the repository's files, so a commit leaves them out\.", said(doc)), said(doc)
+    assert any(x[1:] == ["record", "files", "ignored", "by", "git"] for x in chips(doc)), chips(doc)
     assert str(home) not in doc and home.as_posix() not in doc and "global-ignore" not in doc
 
 
@@ -159,20 +172,19 @@ def test_a_git_that_cannot_be_read_says_no_git_words(home, tmp_path_factory):
     (fake / "git").chmod((fake / "git").stat().st_mode | stat.S_IEXEC)
     env = {**environment(), "PATH": f"{fake}{os.pathsep}{os.environ['PATH']}"}
     doc = page(root, home / "dubious.html", env=env)
-    assert said(doc) == f"rb asked git {lead(doc)}, and git failed, so rb could not say what is committed.", said(doc)
+    assert ["rb", "could", "not", "read", "git"] in chips(doc), chips(doc)
     assert "dubious" not in doc and "fatal" not in doc and str(home) not in doc
 
 
-def test_the_phrase_links_to_the_block_in_line_2_and_in_the_owner_s_span(home):
+def test_the_phrase_links_to_the_strip_in_the_owner_s_span(home):
     root = record(home / "int8-resnet50")
     git(root, "add", "-A")
     git(root, "commit", "-qm", "the record")
     doc = page(root, home / "p.html")
-    assert '<span><a href="#in-git">all record files committed</a> · at commit ' in doc
     # the owner's span: the owner's alone, the phrase its link
     assert re.findall(r'<span class="held" data-vw="([^"]*)"> \u00b7 <a href="#in-git">all record files committed</a></span>', doc) == ["owner"], doc
-    # every tier sees the block: it is drawn for none of them apart
-    assert doc.count('id="in-git"') == 1 and not re.search(r'data-vw="[^"]*"[^>]*><div id="in-git"', doc)
+    # every tier sees the strip: it is drawn for none of them apart
+    assert doc.count('id="in-git"') == 1 and not re.search(r'data-vw="[^"]*"[^>]*><div class="astrip" id="in-git"', doc)
 
 
 def published(root: Path, address: str, home: Path, name: str, *more: str) -> str:
@@ -251,22 +263,26 @@ def test_no_address_where_none_belongs(home):
 
 
 def test_nothing_private_on_pages(home):
-    """No branch, no place path, no credentials and no git message, on a branch named like a session's, at a detached
-    HEAD, and with an origin that carries a user name and a token."""
+    """No place path, no credentials and no git message, on a branch named like a session's, at a detached HEAD, and
+    with an origin that carries a user name and a token; the branch only in the git chip."""
     address = "https://ana:tok-9f2c@github.com/ana/int8.git"
     root = with_origin(home, address)
     git(root, "checkout", "-q", "-b", "claude/try-1")
     for name, doc in (("branch", published(root, address, home, "b1")), ("branch page", page(root, home / "b.html"))):
-        assert "claude/try-1" not in doc and "try-1" not in doc and "tok-9f2c" not in doc and "ana:" not in doc, name
-        assert str(home) not in doc, name
+        # the branch is the git chip's alone (owner, Nov 13 2026: "main · c07560f" in the header and About)
+        rest = re.sub(r'<a class="gref" href="#in-git" title="[^"]*">.*?</span></a>', "", doc)
+        assert "claude/try-1" in doc and "claude/try-1" not in rest and "try-1" not in rest, name
+        assert "tok-9f2c" not in doc and "ana:" not in doc and str(home) not in doc, name
     git(root, "checkout", "-q", "--detach")
     doc = published(root, address, home, "d1")
-    assert "no branch" not in block(doc).split("Then rb status says")[0] and "tok-9f2c" not in doc and str(home) not in doc
+    assert '<span class="gb">no branch</span>' in block(doc)
+    rest = re.sub(r'<a class="gref" href="#in-git" title="[^"]*">.*?</span></a>', "", block(doc))
+    assert "no branch" not in rest.split("Then rb status says")[0] and "tok-9f2c" not in doc and str(home) not in doc
     assert "github.com/ana/int8/tree/" in doc
 
 
 def test_in_a_browser_the_phrase_reaches_the_block_and_a_hub_reader_without_rb_clone_sees_no_address(home, tmp_path):
-    """From About's line 2 the link reaches the block on rb page's file and on a page served as the hub serves one (its
+    """About's strip shows at #about on rb page's file and on a page served as the hub serves one (its
     rb-viewer meta, then rb's script inlined before </head>); from the owner's header span, on the owner's page. A
     reader there sees the block, and its address only where the rb-clone meta lets readers rerun."""
     import test_shell as ts
@@ -275,7 +291,7 @@ def test_in_a_browser_the_phrase_reaches_the_block_and_a_hub_reader_without_rb_c
     plain = home / "plain.html"
     page(root, plain)
     exported = published(root, address, home, "pub")
-    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.js").read_text(encoding="utf-8")
+    script = (Path(__file__).resolve().parents[1] / "rust/src/shell/assets/script.min.js").read_text(encoding="utf-8")
     pages = {"page": plain}
     for viewer, clone in (("owner", True), ("reader", True), ("reader", False)):
         metas = f'<meta name="rb-viewer" content="{viewer}">' + ('<meta name="rb-clone" content="https://pages.example.org/int8/bundle.zip">' if clone else "")
@@ -291,11 +307,10 @@ await cdp.run(async () => {
     await page.viewport(width, 900);
     await page.goto(url); await cdp.sleep(500);
     const probe = `(() => { const b = document.getElementById('in-git'), v = document.querySelector('main .view.on'); const r = b && b.getBoundingClientRect();
-      return { view: v ? v.id : null, shown: !!(r && r.height > 0 && r.top < innerHeight && r.bottom > 0), text: b ? b.innerText : '' }; })()`;
+      return { view: v ? v.id : null, shown: !!(r && r.height > 0 && r.top < innerHeight && r.bottom > 0), text: v ? v.innerText : '' }; })()`;
     const got = { span: await page.ev(`(() => { const a = [...document.querySelectorAll('.ovh .held a[href="#in-git"]')].find(e => e.getBoundingClientRect().width > 0); return !!a; })()`) };
     if (got.span) { await page.clickEl(`[...document.querySelectorAll('.ovh .held a[href="#in-git"]')].find(e => e.getBoundingClientRect().width > 0)`); await cdp.sleep(400); got.fromSpan = await page.ev(probe); }
     await page.goto(url + '#about'); await cdp.sleep(500);
-    await page.clickEl(`document.querySelector('#about .foot a[href="#in-git"]')`); await cdp.sleep(400);
     got.fromLine = await page.ev(probe);
     out[name + '@' + width] = got;
     await cdp.stopAll();
@@ -308,7 +323,7 @@ console.log(JSON.stringify({ ok: true, out }));
     assert code == 0 and got.get("ok"), err[-3000:]
     for name, g in got["out"].items():
         line = g["fromLine"]
-        assert line["view"] == "about" and line["shown"] and "rb checked the record with git" in line["text"], (name, g)
+        assert line["view"] == "about" and line["shown"] and "snapshot" in line["text"], (name, g)
         # the owner's span is the owner's alone, and its link lands on the block too
         assert g["span"] == name.startswith("hub-owner"), (name, g)
         if g["span"]:
@@ -340,6 +355,6 @@ def test_no_lines_to_check_where_the_commit_holds_no_record_and_no_m_after_a_del
     git(root, "commit", "-qm", "the record")
     for n in (root / ".rb/notes").iterdir():
         n.unlink()
-    text = said(page(root, home / "deleted.html"))
-    assert re.search(r"3 of its \d+ record files are new, changed or deleted since commit", text), text
-    assert "(deleted)" in text, text
+    doc = page(root, home / "deleted.html")
+    assert ["3", "not", "committed"] in chips(doc), chips(doc)
+    assert sum(p.startswith(".rb/notes/") for p in listed(doc)) == 3, listed(doc)

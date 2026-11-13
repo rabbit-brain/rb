@@ -805,12 +805,12 @@ fn inquiry_summary(rows: &[Value], calls: &HashMap<String, String>, ranges: &Has
                 }
             }
         }
-        let mut parts = vec![format!("Recorded {}: {interpretation}.", if several { "interpretations" } else { "interpretation" })];
+        let mut parts = vec![format!("{}: {interpretation}.", if several { "Notes" } else { "Note" })];
         if !met.is_empty() {
-            parts.push(format!("Interpretation active for {}.", met.join(", ")));
+            parts.push(format!("Note in force for {}.", met.join(", ")));
         }
         if !inactive.is_empty() {
-            parts.push(format!("Conditional interpretation not active for {}.", inactive.join(", ")));
+            parts.push(format!("Note not in force for {}.", inactive.join(", ")));
         }
         parts.push(readings.join("; ") + ".");
         if !qualifications.is_empty() {

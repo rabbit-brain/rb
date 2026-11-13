@@ -64,6 +64,9 @@ TOOLS: list[dict] = [
                                      "with what it was made on, a resource with where it is, a setting (e1/optim.lr) with its history; "
                                      "or a path to a .yaml record file, given back as canonical JSON."),
      "args": ["id"], "props": {"id": S}, "required": ["id"]},
+    {"name": "files", "description": ("The project's files with their marks (files[]: path, marks, cited_by, lines, git): what the record cites, what "
+                                      "changed since a run read it or is not committed; a folder's files, or one file's."),
+     "args": ["path"], "props": {"path": _d(S, "a folder or a file"), "all": _d(B, "every file of every folder")}},
     {"name": "compare", "description": "An experiment's table: variants by metrics, with the change against the baseline.",
      "args": ["experiment"], "props": {"experiment": S}, "required": ["experiment"]},
     {"name": "log", "description": "Recent writes: who, through what, what changed.", "args": ["id"], "opts": {"n": "-n"},

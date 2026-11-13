@@ -270,10 +270,10 @@ def test_a_dated_narrowing_recorded_as_continue_leaves_the_arms_that_kept_runnin
         monkeypatch.delenv(name)
     monkeypatch.setenv("RB_ACTOR", "human:ana")
     assert rb("confirm", env.data["object"]["id"])[0] == 0
-    code, st = rb("status")
+    code, st = rb("status", "--full")
     assert {e["id"]: e["state"] for e in st.data["experiments"]}["prec"] == "open"
     assert [d["action"] for d in st.data["decisions"]] == ["continue"] and all("runs_after" not in d for d in st.data["decisions"])
-    assert 'call: continued 2026-08-14 (a past call from docs/decisions.md:3, "we drop the fp16 arm; int8 goes on against fp32"' in rb.text("status")
+    assert 'call: continued 2026-08-14 (a past call from docs/decisions.md:3, "we drop the fp16 arm; int8 goes on against fp32"' in rb.text("status", "--full")
 
 
 def test_the_manual_skill_and_llms_txt_point_at_the_protocol():
@@ -381,9 +381,9 @@ def test_an_ordering_a_file_states_is_cited_by_its_words_at_its_line(rb):
     code, env = rb(*rule, "--source", "docs/results.md", "--quote", ORDERING, "--id", "c-ord")
     assert code == 0, env.errors
     assert env.data["object"]["origin"] == "cited" and env.data["object"]["source"]["resolved"]["line"] == 4
-    assert f'cited: docs/results.md:4: "{ORDERING}"' in rb.text("show", "c-ord")
+    assert f'cited: docs/results.md:4: "{ORDERING}"' in rb.text("show", "--long", "c-ord")
     assert rb("run", "add", "cal", "c512.top1=0.70", "c1024.top1=0.71")[0] == 0
-    code, env = rb("show", "c-ord")
+    code, env = rb("show", "--long", "c-ord")
     assert not env.data["finding"]["integrity"]
     # the SDK takes the same route
     import rabbit_brain
@@ -391,7 +391,7 @@ def test_an_ordering_a_file_states_is_cited_by_its_words_at_its_line(rb):
                                                               at_least=0.0, source="docs/results.md", quote=ORDERING)
     assert c.data.origin == "cited" and c.data.source.resolved.line == 4
     Path("docs/results.md").write_text("# Results\n\n512 wins.\n", encoding="utf-8")
-    code, env = rb("show", "c-ord")
+    code, env = rb("show", "--long", "c-ord")
     assert [p["code"] for p in env.data["finding"]["integrity"]] == ["cited_source_changed"]
     assert env.data["finding"]["integrity"][0]["text"] == "the cited ordering's source: the quote is not in docs/results.md"
     # the protocol and the manual give a file's ordering one route, its quote, and never the unchecked reason
@@ -418,7 +418,7 @@ def test_where_the_runs_are_in_a_database_rb_hints_at_reading_a_row_not_typing_o
     code, env = rb(*rule, "--id", "c-row")
     hint = "rb run add int8 --variant <variant> --from results.db --table <table> --where <column>=<value> --set seed=<value>"
     assert code == 0 and env.next == [hint]
-    assert hint in rb.text("status")
+    assert hint in rb.text("status", "--full")
 
 def test_the_protocol_and_rb_compile_take_a_plans_threshold_the_same_way(rb):
     contract = " ".join(rb("compile")[1].data["contract"])
@@ -433,25 +433,25 @@ def test_the_pointer_shows_while_no_question_is_recorded_in_a_repository_with_hi
     git("init", "-q")
     assert rb("init", "INT8 ResNet-50 on ImageNet", "--no-agents")[0] == 0
     # no commit yet, and a commit of the record alone, are no work already done
-    assert pointers(rb("status")[1]) == []
+    assert pointers(rb("status", "--full")[1]) == []
     git("add", ".rb")
     git("commit", "-q", "-m", "start the record")
-    assert pointers(rb("status")[1]) == [] and "rb docs --start" not in rb.text("context")
+    assert pointers(rb("status", "--full")[1]) == [] and "rb docs --start" not in rb.text("context")
     committed("eval.py", "print('top1')\n")
-    item, = pointers(rb("status")[1])
+    item, = pointers(rb("status", "--full")[1])
     assert item["who"] == "agent" and item["commits"] == 1 and item["do"].startswith("rb docs --start")
     assert item["what"] == "No question is recorded, and the repository holds work already done: 1 commit"
-    text = rb.text("status")
+    text = rb.text("status", "--full")
     assert "  - No question is recorded, and the repository holds work already done: 1 commit\n      rb docs --start" in text
     code, env = rb("context")
     assert "rb docs --start" in env.data["markdown"] and env.next[0].startswith("rb docs --start")
     # an experiment with no question is still no question
     assert rb("experiment", "add", "INT8 against FP32", "--id", "int8", "--baseline", "fp32", "--candidate", "int8")[0] == 0
-    assert len(pointers(rb("status")[1])) == 1
+    assert len(pointers(rb("status", "--full")[1])) == 1
     # once a question is recorded, the pointer goes everywhere
     assert rb("question", "add", "Does INT8 cost top-1 accuracy?")[0] == 0
-    assert pointers(rb("status")[1]) == []
-    assert "rb docs --start" not in rb.text("status") and "rb docs --start" not in rb.text("context")
+    assert pointers(rb("status", "--full")[1]) == []
+    assert "rb docs --start" not in rb.text("status", "--full") and "rb docs --start" not in rb.text("context")
 
 
 
@@ -474,7 +474,8 @@ def test_context_opens_with_recording_where_the_work_stands_where_nothing_is_rec
     committed("eval.py", "print('top1')\n")
     said = ("Nothing is recorded yet, and this project holds work already done: 1 commit. Record where the work stands now, "
             "in this turn, from the files, and ask the researcher nothing first. How: rb docs --start.")
-    assert rb.text("context").splitlines()[:5] == ["# The record: INT8 ResNet-50 on ImageNet", "", OPENING, "", said]
+    # its first line sends a person to rb status and rb ui (UX5 2.5); the briefing follows it
+    assert rb.text("context").splitlines()[:6] == ["To read this record yourself: rb status in a terminal, or rb ui.", "# The record: INT8 ResNet-50 on ImageNet", "", OPENING, "", said]
     code, env = rb("context")
     assert code == 0 and env.data["markdown"].startswith(f"# The record: INT8 ResNet-50 on ImageNet\n\n{OPENING}\n\n{said}\n")
     Path("results/int8").mkdir(parents=True)
@@ -497,9 +498,9 @@ def test_a_new_repositorys_readme_license_and_ignore_files_are_no_work_already_d
     git("add", "-A")
     git("commit", "-q", "-m", "Initial commit")
     assert rb("init", "INT8 ResNet-50", "--no-agents")[0] == 0
-    assert pointers(rb("status")[1]) == [] and OPENING not in rb.text("context")
+    assert pointers(rb("status", "--full")[1]) == [] and OPENING not in rb.text("context")
     committed("docs/README.md", "Calibration uses 512 images.\n")
-    [item] = pointers(rb("status")[1])
+    [item] = pointers(rb("status", "--full")[1])
     assert item["commits"] == 1 and OPENING in rb.text("context")
 
 
@@ -515,31 +516,31 @@ def test_a_commit_of_what_rb_init_installs_is_no_work_already_done(rb):
     assert Path(".cursor/rules/rabbit-brain.mdc").is_file()
     git("add", "-A")
     git("commit", "-q", "-m", "start the record")
-    assert pointers(rb("status")[1]) == [] and "rb docs --start" not in rb.text("context")
+    assert pointers(rb("status", "--full")[1]) == [] and "rb docs --start" not in rb.text("context")
     committed("eval.py", "print('top1')\n")
-    assert pointers(rb("status")[1])[0]["commits"] == 1
+    assert pointers(rb("status", "--full")[1])[0]["commits"] == 1
 
 def test_a_database_or_a_results_folder_is_history_too(rb):
     assert rb("init", "INT8 ResNet-50 on ImageNet", "--no-agents")[0] == 0
-    assert pointers(rb("status")[1]) == []
+    assert pointers(rb("status", "--full")[1]) == []
     Path("results.txt").write_text("not a database\n", encoding="utf-8")
     Path("notes.db").write_text("not a database either\n", encoding="utf-8")
-    assert pointers(rb("status")[1]) == []
+    assert pointers(rb("status", "--full")[1]) == []
     con = sqlite3.connect("results.db")
     con.execute("create table evals (precision text, seed integer, top1 real)")
     con.commit()
     con.close()
-    item, = pointers(rb("status")[1])
+    item, = pointers(rb("status", "--full")[1])
     assert item["stores"] == ["results.db"] and "commits" not in item
     assert item["what"].endswith("work already done: a database (results.db)")
     Path("results/int8").mkdir(parents=True)
     Path("results/int8/metrics.json").write_text(json.dumps({"top1": 0.755}), encoding="utf-8")
-    item, = pointers(rb("status")[1])
+    item, = pointers(rb("status", "--full")[1])
     assert item["folders"] == ["results/int8/"] and item["what"].endswith("1 results folder and a database (results.db)")
 
 
 def test_no_record_says_how_to_record_the_work_already_done(rb):
-    code, env = rb("status")
+    code, env = rb("status", "--full")
     assert code == 2 and env.errors[0].code == "E_NO_PROJECT" and "rb docs --start" in env.errors[0].fix
     code, env = rb("docs", "--errors")
     assert "rb docs --start" in env.data["errors"]["E_NO_PROJECT"]["fix"]
@@ -907,12 +908,12 @@ def test_a_clone_s_context_and_status_open_with_what_it_takes_to_rerun_the_paren
     assert block[3].startswith(f"- e1, first, for c1: `{first}`") and block[3].endswith("; no run recorded here yet")
     assert env.next[0] == first and env.data["rerun"]["experiments"][0]["first"] == first
     # rb status says the same block under the title, and the same first step
-    said = rb.text("status")
+    said = rb.text("status", "--full")
     lines = said.splitlines()
     at = lines.index("Rerun the parent")
     assert lines[at + 1:at + 1 + len(block)] == [f"  {line}" for line in block]
     assert at < next(i for i, line in enumerate(lines) if line.startswith("Rules:") or line.startswith("Questions"))
-    code, env = rb("status")
+    code, env = rb("status", "--full")
     assert env.next[0] == first and env.data["rerun"]["code"]["state"] == "here"
 
 
@@ -935,7 +936,7 @@ def test_a_record_that_is_no_clone_says_nothing_of_a_rerun(rb):
     for cmd in ("context", "status"):
         code, env = rb(cmd)
         assert code == 0 and "rerun" not in env.data
-    assert "Rerun the parent" not in rb.text("context") and "Rerun the parent" not in rb.text("status")
+    assert "Rerun the parent" not in rb.text("context") and "Rerun the parent" not in rb.text("status", "--full")
 
 
 def test_a_clone_s_next_says_a_command_two_experiments_share_once(rb, monkeypatch, tmp_path_factory):
@@ -958,9 +959,9 @@ def test_rb_status_of_one_experiment_in_a_clone_gives_that_experiment_s_command(
     assert rb("clone", str(bundle), "r")[0] == 0
     monkeypatch.chdir(fresh / "r")
     e1, e2 = "rb journal run -- python eval.py out/s1", "rb journal run -- python eval.py --per-channel out/s2"
-    code, env = rb("status")
+    code, env = rb("status", "--full")
     assert env.next[:2] == [e1, e2]
-    code, env = rb("status", "e2")
+    code, env = rb("status", "--full", "e2")
     assert env.next[0] == e2 and e1 not in env.next
     # the block still says the whole parent: the rerun is the project's
     assert [e["id"] for e in env.data["rerun"]["experiments"]] == ["e1", "e2"]
@@ -1056,4 +1057,4 @@ def test_a_stepped_back_freeze_is_never_adopted_past_the_write_dated_last(rb):
     _ok(rb, "doctor", "--restore")
     assert _edited(rb) == []
     _ok(rb, "freeze", "e1", "-m", "before the runs")
-    assert _edited(rb) == [] and _ok(rb, "show", "e1").data["object"].get("frozen")
+    assert _edited(rb) == [] and _ok(rb, "show", "--long", "e1").data["object"].get("frozen")

@@ -44,7 +44,9 @@ const STATE = `(() => {
 
 // an element that runs past the screen, outside a box meant to scroll sideways (tables, code, the figure, the crumbs)
 const OVERFLOW = `(() => { const W = document.documentElement.clientWidth, bad = [];
-  const allowed = el => el.closest('pre, svg, table, .ibar .crumbs, .sr, .skip');
+  // a line a box cuts with an ellipsis (a Decisions row's title) is clipped there: what shows is the box, checked itself
+  const cut = el => { for (let a = el.parentElement; a; a = a.parentElement) { const s = getComputedStyle(a); if (s.textOverflow === 'ellipsis' && s.overflowX !== 'visible') return true; } return false; };
+  const allowed = el => el.closest('pre, svg, table, .ibar .crumbs, .sr, .skip') || cut(el);
   for (const el of document.querySelectorAll('body *')) {
     if (allowed(el)) continue;
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden') continue;
@@ -126,9 +128,11 @@ const GUIDE_STEP = `(() => {
     'Where it came from': () => wide ? rectOf(document.querySelector('aside.insp')) : card && rectOf(card.querySelector('.part[data-id$=":runs"]') || card),
     'Your call': () => rectOf(document.querySelector('#nav a[href="#your-call"]')),
     // the Overview v2's parts: the standing cards as one, the integrity section, the judgment queue's section
-    'Where the record stands': () => { const w = v.querySelector('#standing'); if (w) return rectOf(w); const all = Array.from(v.querySelectorAll('section.stand')).filter(e => e.getBoundingClientRect().height > 0); if (!all.length) return null; const a = rectOf(all[0]), b = rectOf(all[all.length - 1]); return { l: Math.min(a.l, b.l), t: a.t, r: Math.max(a.r, b.r), b: b.b }; },
+    // (on the UX5 Overview, the strip of its checks; the Decisions rows, a queue)
+    'Where the record stands': () => { const w = v.querySelector('#standing') || v.querySelector('.ovstrip'); if (w) return rectOf(w); const all = Array.from(v.querySelectorAll('section.stand')).filter(e => e.getBoundingClientRect().height > 0); if (!all.length) return null; const a = rectOf(all[0]), b = rectOf(all[all.length - 1]); return { l: Math.min(a.l, b.l), t: a.t, r: Math.max(a.r, b.r), b: b.b }; },
     'How far to trust it': () => { const e = v.querySelector('#integrity'); return e && rectOf(e); },
     'Needs your judgment': () => { const q = v.querySelector('#queue'); if (!q) return null; const s = q.closest('section'); return rectOf(s && s !== v ? s : q); },
+    'Decisions': () => { const q = v.querySelector('[data-queue]'); return q && rectOf(q); },
   }[title];
   const clip = q => q && { l: Math.max(q.l, 0), t: Math.max(q.t, 0), r: Math.min(q.r, W), b: Math.min(q.b, Hh) };
   const want = clip(part && part()), box = rectOf(g), sp = rectOf(s);
@@ -203,11 +207,13 @@ await run(async () => {
     const shown = steps.filter(g => g.shown);
     // on the Overview v2 (a standing card drawn): where each question stands, what weakens the evidence where rb draws
     // it, what needs the user's judgment, then the inspector, which is the last step
-    const v2 = await p.ev(`!!document.querySelector('#overview section.stand')`);
-    if (v2) {
+    // (the UX5 Overview: its strip of checks, then its Decisions, then the inspector)
+    const v2 = await p.ev(`!!document.querySelector('#overview section.stand')`), ux5 = await p.ev(`!!document.querySelector('#overview .ovstrip')`);
+    if (v2 || ux5) {
       const titles = shown.map(g => g.title), integ = await p.ev(`!!document.querySelector('#overview #integrity')`);
-      check(`${prefix}guide: the Overview v2's steps, in order, the inspector last [${at}]`,
-        j(titles) === j(['Where the record stands', ...(integ ? ['How far to trust it'] : []), 'Needs your judgment', 'Where it came from']), j(titles));
+      const dq = await p.ev(`!!document.querySelector('#overview [data-queue] > li')`);
+      const want = ux5 ? ['Where the record stands', ...(dq ? ['Decisions'] : []), 'Where it came from'] : ['Where the record stands', ...(integ ? ['How far to trust it'] : []), 'Needs your judgment', 'Where it came from'];
+      check(`${prefix}guide: the Overview v2's steps, in order, the inspector last [${at}]`, j(titles) === j(want), j(titles));
     }
     check(`${prefix}guide: each step lights its part, whole on the screen, over neither it nor the view's title and summary [${at}]`,
       shown.length >= 2 && shown.every(g => g.lit && g.whole && !g.covers_part && !g.covers_head), j(steps));
@@ -740,12 +746,12 @@ await run(async () => {
       check(`keys: ']' goes forward [${at}]`, s.top === 'c-c1', j(s));
       await p.key('?', 'Slash', 191, '?');
       const help = await p.ev(`(() => { const h = document.querySelector('.help'); return h ? [!h.hidden, (h.querySelector('a') || {}).getAttribute ? h.querySelector('a').getAttribute('href') : null] : null; })()`);
-      check(`keys: '?' opens the keys, led by what the words mean [${at}]`, j(help) === j([true, '#words']), j(help));
+      check(`keys: '?' opens the keys, with no link to what words mean [${at}]`, j(help) === j([true, null]), j(help));
       // Esc's line names the bar's lists only where the bar has them (rb open), never on a page
       const esc = await p.ev(`(() => { const t = document.querySelector('.help').textContent; return [!!document.querySelector('#where details.pick'), t.includes('close an open list in the bar'), t.includes('close the inspector;')]; })()`);
       check(`keys: Esc's line names the bar's lists only where there are some [${at}]`, esc[0] ? esc[1] : (!esc[1] && esc[2]), j(esc));
       const opened = await p.ev(`[document.activeElement.getAttribute('href'), document.querySelector('button[data-keys]').getAttribute('aria-expanded')]`);
-      check(`keys: the keys list opens on what the words mean, and says it is open [${at}]`, j(opened) === j(['#words', 'true']), j(opened));
+      check(`keys: the keys list opens on its first control, and says it is open [${at}]`, j(opened) === j([null, 'true']), j(opened));
       await p.key('j', 'KeyJ', 74, 'j');
       check(`keys: single keys do nothing while the keys list is open [${at}]`, (await st()).top === 'c-c1', '');
       await p.clickEl(sel('.help .keys-on'));
@@ -1073,9 +1079,15 @@ await run(async () => {
       // the page's own theme and keys controls, and none added
       await open(w, 'light');
       const ctl = await p.ev(`[document.querySelectorAll('button[data-theme]').length, document.querySelectorAll('button[data-keys]').length]`);
+      // under 600 the theme and keys buttons are in the "..." menu: it opens first (the theme keeps it open, ? closes it)
+      const viaMore = async () => {
+        if (await p.ev(`(() => { const m = document.querySelector('button[data-more]'); return !!m && m.getBoundingClientRect().width > 0 && m.getAttribute('aria-expanded') !== 'true'; })()`)) await p.clickEl(sel('button[data-more]'));
+      };
+      await viaMore();
       await p.clickEl(sel('button[data-theme]'));
       const th = await p.ev(`[document.documentElement.dataset.theme || null, document.querySelector('button[data-theme]').getAttribute('aria-label'), document.querySelector('button[data-theme]').dataset.state]`);
       await p.clickEl(sel('button[data-theme]')); await p.clickEl(sel('button[data-theme]'));
+      await viaMore();
       await p.clickEl(sel('button[data-keys]'));
       const help = await p.ev(`[!document.querySelector('.help').hidden, document.querySelector('button[data-keys]').getAttribute('aria-expanded')]`);
       await p.key('Escape', 'Escape', 27);
@@ -1144,7 +1156,7 @@ await run(async () => {
       return { where: s ? s.textContent.trim() : null, version: v ? v.textContent.trim() : null, failed: (document.querySelector('#where .failed') || {}).textContent || '',
         hash: decodeURIComponent(location.hash.slice(1)), view: (document.querySelector('main .view.on') || {}).id || null, title: document.title,
         scope: (document.querySelector('#scope .bar') || {}).textContent || '', withheld: (document.querySelector('#withheld .withheld') || {}).textContent || '',
-        copies: document.querySelectorAll('main .cp').length }; })()`;
+        copies: document.querySelectorAll('main .cp, main .cpp').length }; })()`;   // a command's copy, or a prompt's (cf-2)
     // the top bar from 960 up: its parts side by side, none over another, the project's id and the clock on one line
     // each, the pickers below the bar's first line under 1280 and cut short beside it from there
     const BAR = `(() => { const t = document.querySelector('header.top'), tr = t.getBoundingClientRect();
@@ -1165,7 +1177,7 @@ await run(async () => {
     const WORDS = `(() => { const g = document.querySelector('#where details.pick[data-pick="where"] > summary .gs'), s = g && g.parentElement;
       if (!g) return null; const r = g.getBoundingClientRect(), b = s.getBoundingClientRect(), lab = s.querySelector('.lab');
       return { text: g.textContent, whole: g.scrollWidth <= g.clientWidth + 1 && r.right <= b.right + 0.5 && r.right <= document.documentElement.clientWidth + 0.5,
-        labCut: lab.scrollWidth > lab.clientWidth + 1 }; })()`;
+        labCut: lab.scrollWidth > lab.clientWidth + 1, sr: g.classList.contains('sr') }; })()`;
     for (const w of [960, 1000, 1050, 1100, 1279, 1280, 1440]) {
       await open(w, 'light');
       const bar = await p.ev(BAR);
@@ -1179,15 +1191,18 @@ await run(async () => {
       // from 1280 the pickers share the clock's line: a space after the Version picker's ▾ (D's take at 1440)
       if (w >= 1280) check(`places: a space between the Version picker and the clock [${w}]`, bar.gap !== null && bar.gap >= 6, j(bar));
       // the bar names the place once, in the Where button, with its words; nothing of it is cut at a usual length
-      const cut = await p.ev(`Array.from(document.querySelectorAll('header.top .where *')).filter(e => e.getBoundingClientRect().width > 0 && e.scrollWidth > e.clientWidth + 1 && !e.closest('ul.picks')).map(e => e.className || e.tagName)`);
+      // (text a screen reader alone reads, .sr, is no cut: the git chip says it, owner Nov 13 2026)
+      const cut = await p.ev(`Array.from(document.querySelectorAll('header.top .where *')).filter(e => e.getBoundingClientRect().width > 0 && e.scrollWidth > e.clientWidth + 1 && !e.closest('ul.picks') && !e.closest('.sr')).map(e => e.className || e.tagName)`);
       const said = await p.ev(`[document.querySelectorAll('header.top .where .pl').length, (document.querySelector('#where details.pick[data-pick="where"] .lab') || {}).textContent, ${WORDS}]`);
-      check(`places: the bar names the place once, with its words, and cuts nothing of it [${w}]`, cut.length === 0 && said[0] === 0 && !/\//.test(said[1] || '/') && !!said[2] && said[2].whole, j({ cut, said }));
+      // its words: whole on the bar, or, where the git chip shows them (committed, not committed), said to a screen reader
+      const wordsOk = x => !!x && (x.whole || (x.sr && /record files? (not )?committed/.test(x.text)));
+      check(`places: the bar names the place once, with its words, and cuts nothing of it [${w}]`, cut.length === 0 && said[0] === 0 && !/\//.test(said[1] || '/') && wordsOk(said[2]), j({ cut, said }));
       // a long branch and a long title: the title gives way, then the branch with an ellipsis; the words are never cut,
       // and the space before the clock holds
       await p.ev(`(() => { const t = document.querySelector('header.top .ttl'); t.textContent = t.textContent + ' calibration across 512, 1024, 2048 and 4096 images per class';
         document.querySelector('#where details.pick[data-pick="where"] > summary .lab').textContent = 'exp/int8-per-channel-calibration-sweep-with-a-long-name'; return true; })()`);
       const long = await p.ev(`[${BAR}, ${WORDS}]`);
-      check(`places: a long branch and title cut the branch, never the words [${w}]`, long[1] && long[1].whole && !long[0].over.length && (w < 1280 || (long[0].gap !== null && long[0].gap >= 6)), j(long));
+      check(`places: a long branch and title cut the branch, never the words [${w}]`, wordsOk(long[1]) && !long[0].over.length && (w < 1280 || (long[0].gap !== null && long[0].gap >= 6)), j(long));
       // a long place (a deep checkout path): the Version list, opened, stays on the screen
       await p.ev(`(() => { const s = document.querySelector('#where details.pick[data-pick="where"] > summary'), v = document.querySelector('#where details.pick[data-pick="version"] > summary');
         const W = document.documentElement.clientWidth; for (let n = 0; n < 400 && v.getBoundingClientRect().right < W - 30 && v.getBoundingClientRect().top < 80; n++) (s.querySelector('.lab') || s).append('x'); return true; })()`);

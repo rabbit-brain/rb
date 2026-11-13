@@ -103,7 +103,7 @@ def test_a_project_manifest_is_no_result(rb):
 
 def test_the_journal_looks_in_folders_named_for_results(rb):
     rb("init", "INT8 ResNet-50", "--no-agents")
-    env = rb("status")
+    env = rb("status", "--full")
     scope = env.data["scope"]
     assert "reports/" in scope["folders"] and "artifacts/" in scope["folders"]
     assert "reports/" in scope["said"] and "artifacts/" in scope["said"]

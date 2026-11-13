@@ -82,7 +82,7 @@ def test_a_run_recorded_from_uncommitted_code_keeps_its_exact_code(repo, capsys)
     code, env2 = repo("run", "add", "e1", "top1=0.71")
     assert state().get(env2.data["object"]["id"], "run").receipt.attached["tree"] == tree
     # and rb show says where it is and how to see it
-    assert main(["show", env.data["object"]["id"]]) == 0
+    assert main(["show", "--long", env.data["object"]["id"]]) == 0
     text = capsys.readouterr().out
     assert f"git tree {tree[:12]}" in text and f"git diff {attached['commit']} {tree}" in text
 

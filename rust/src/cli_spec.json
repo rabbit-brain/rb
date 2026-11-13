@@ -4721,6 +4721,7 @@
      "status",
      {
       "prog": "rb status",
+      "epilog": "key: ■ passed, ▲ failed, ◧ can't tell yet, □ no results yet; ● a result and ├─┤ its range, ○ a result with no range yet; ░ what passes, ┆ the check's number; ‾ written after its results; ✓ holds for all, ✗ holds for none. With --ascii: # ^ % . for the states, * |-| o for a result, ~ and : for the check, + and x.",
       "actions": [
        {
         "kind": "help",
@@ -4751,6 +4752,39 @@
         "help": "only this experiment"
        },
        {
+        "kind": "store_true",
+        "options": [
+         "--full"
+        ],
+        "dest": "full",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "everything, in words: the question tree, Needs judgment, Can be done now, each criterion on its axes, the experiments, runs, analyses, notes and resources"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--words"
+        ],
+        "dest": "words",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "under each figure, the words it shows (for a screen reader)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--ascii"
+        ],
+        "dest": "ascii",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "draw the figures in ASCII"
+       },
+       {
         "kind": "append",
         "options": [
          "--fail-on"
@@ -4772,12 +4806,82 @@
         "actions": [
          0,
          1,
-         3
+         3,
+         4,
+         5,
+         6
         ]
        }
       ],
       "defaults": {
        "func": "cmd_status"
+      }
+     }
+    ],
+    [
+     "files",
+     {
+      "prog": "rb files",
+      "epilog": "marks: ❝ n cited n times, ⚙ n the source of n settings, ▣ a run's output, △ changed since the run that named it, ± not committed, ⊘ ignored by git, ∅ not in this clone.",
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": "==SUPPRESS==",
+        "help": "show this help message and exit"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--json"
+        ],
+        "dest": "json",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print one JSON object (the envelope) instead of text"
+       },
+       {
+        "kind": "store",
+        "dest": "path",
+        "nargs": "?",
+        "help": "a folder (its files) or a file (its marks, what cites it and the lines it cites)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--all"
+        ],
+        "dest": "all",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "every file of every folder, not only each folder's marks"
+       }
+      ],
+      "groups": [
+       {
+        "title": "positional arguments",
+        "actions": [
+         2
+        ]
+       },
+       {
+        "title": "options",
+        "actions": [
+         0,
+         1,
+         3
+        ]
+       }
+      ],
+      "defaults": {
+       "func": "cmd_files"
       }
      }
     ],
@@ -4812,7 +4916,29 @@
         "kind": "store",
         "dest": "id",
         "required": true,
-        "help": "an id, <experiment>/<setting>, or a path to an Rabbit Brain YAML file"
+        "help": "an id, <experiment>/<setting>, a path (path:3, path:3-9, path#key, path@commit, folder/), a commit, or a path to an Rabbit Brain YAML file"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--long"
+        ],
+        "dest": "long",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "the long form: a check on its axes with every observation, a run with its receipt, a setting with its history"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--words"
+        ],
+        "dest": "words",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "each field of the card with its words under it, as a screen reader says it"
        }
       ],
       "groups": [
@@ -4826,7 +4952,9 @@
         "title": "options",
         "actions": [
          0,
-         1
+         1,
+         3,
+         4
         ]
        }
       ],
@@ -5804,6 +5932,17 @@
         ],
         "dest": "hub",
         "help": "the hub's address (default RB_HUB_URL, else rabbitbrain.ai)"
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--wait"
+        ],
+        "dest": "wait",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "wait here until the code is approved or expires, instead of returning once the code is shown"
        }
       ],
       "groups": [
@@ -5816,7 +5955,8 @@
         "actions": [
          0,
          1,
-         2
+         2,
+         3
         ]
        }
       ],
@@ -7047,12 +7187,17 @@
     {
      "dest": "status",
      "metavar": "status",
-     "help": "each criterion on its axes, and what is open, with who usually acts"
+     "help": "the record on one screen: each question, its checks by state, its results against what each check accepts, what they rest on, and the decisions that wait"
+    },
+    {
+     "dest": "files",
+     "metavar": "files",
+     "help": "the project's files with their marks: what the record cites, what changed since a run read it or is not committed, and each folder; a file's path shows what cites it and the lines it cites"
     },
     {
      "dest": "show",
      "metavar": "show",
-     "help": "one record: a criterion with its finding, an experiment with its spec, a run with its receipt, e1/lr with its history; or a .yaml record file as canonical JSON"
+     "help": "one record as a card of fields: a check, a run, a setting, a decision, an experiment; a file the record cites (path:3, path#key, path@commit), a folder or a commit; or a .yaml record file as canonical JSON"
     },
     {
      "dest": "compare",

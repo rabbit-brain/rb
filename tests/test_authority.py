@@ -92,16 +92,16 @@ class RB:
         return last["op"], last["id"], last["actor"]
 
     def status(self) -> dict:
-        return self.ok("status").data
+        return self.ok("status", "--full").data
 
     def items(self, code: str) -> list[dict]:
         return [i for i in self.status()["open"] if i["code"] == code]
 
     def finding(self, criterion: str) -> dict:
-        return self.ok("show", criterion).data["finding"]
+        return self.ok("show", "--long", criterion).data["finding"]
 
     def gate(self, *gates: str) -> int:
-        return self("status", "--fail-on", ",".join(gates))[0]
+        return self("status", "--full", "--fail-on", ",".join(gates))[0]
 
 
 @pytest.fixture
@@ -156,7 +156,7 @@ def test_an_agents_freeze_and_amendments_are_recorded_as_the_agents(rb):
     assert rb.logged() == ("spec_set", "e1", AGENT)
     rb.ok("retract", "e1/cache", "--why", "not a setting of this screen")
     assert rb.logged() == ("retract", "e1", AGENT)
-    exp = rb.ok("show", "e1").data
+    exp = rb.ok("show", "--long", "e1").data
     assert [(a["by"], a["change"], a["why"]) for a in exp["object"]["amendments"]] == [
         (AGENT, "setting iters: 24 -> 32", "the config was fixed before any run"),
         (AGENT, "setting cache retracted", "not a setting of this screen")]
@@ -239,10 +239,10 @@ def test_a_question_call_says_which_missed_gate_it_settles_apart_from_what_it_wa
     assert "  settles the missed gate g20: " in said and "made on g20" not in said
     assert "No criterion is linked directly to this question" in said
     [decision] = [d["id"] for d in rb.status()["decisions"] if d["subject"] == "q1"]
-    [line] = [x for x in rb.text("show", decision).splitlines() if "g20" in x]
+    [line] = [x for x in rb.text("show", "--long", decision).splitlines() if "g20" in x]
     assert line.startswith("  settles the missed gate g20: ") and "moved since" not in line
     rb.ok("run", "add", "e1", "saving_pct=17", "--command", "solve b")
-    [line] = [x for x in rb.text("show", decision).splitlines() if "g20" in x]
+    [line] = [x for x in rb.text("show", "--long", decision).splitlines() if "g20" in x]
     assert line.startswith("  settles the missed gate g20: ") and line.endswith("· moved since")
 
 
@@ -256,8 +256,8 @@ def test_a_question_shows_its_call_named_with_the_settled_gate_that_has_moved_as
     decision = rb.human("decide", "q1", "park", "--why", "the saving is below the bar").data["object"]["id"]
 
     def call():
-        [line] = [x for x in rb.text("show", "q1").splitlines() if x.startswith(f"  decision {decision}:")]
-        [shown] = [d for d in rb.ok("show", "q1").data["decisions"] if d["id"] == decision]
+        [line] = [x for x in rb.text("show", "--long", "q1").splitlines() if x.startswith(f"  decision {decision}:")]
+        [shown] = [d for d in rb.ok("show", "--long", "q1").data["decisions"] if d["id"] == decision]
         assert shown["current"] is True and "made on readings that have moved since" not in line
         return line, shown["settled_gates_moved"]
 
@@ -320,7 +320,7 @@ def test_an_agents_retraction_of_a_run_a_criterion_counts_is_recorded_as_the_age
     run = fewer_steps(rb)
     env = rb.ok("retract", run, "--why", "the eval read the wrong split")
     assert env.data["rested_on"] == ["criterion c1 counts it"] and rb.logged() == ("retract", run, AGENT)
-    kept = rb.ok("show", run).data["object"]["retracted"]
+    kept = rb.ok("show", "--long", run).data["object"]["retracted"]
     assert (kept["by"], kept["why"]) == (AGENT, "the eval read the wrong split")
     f = rb.finding("c1")
     assert (f["rule_outcome"], f["n"], f["observations"]) == ("untested", 0, [])
@@ -334,7 +334,7 @@ def test_an_agents_retraction_of_a_criterion_evidence_reads_on_is_recorded_as_th
     rb.ok("run", "add", "e1", "saving_pct=18", "--command", "solve a")
     env = rb.ok("retract", "c1", "--why", "the bar was set after a look at the data")
     assert env.data["rested_on"] == [f"it is a {role} criterion and evidence reads on it"] and rb.logged() == ("retract", "c1", AGENT)
-    assert rb.ok("show", "c1").data["object"]["retracted"]["by"] == AGENT
+    assert rb.ok("show", "--long", "c1").data["object"]["retracted"]["by"] == AGENT
     assert "c1" not in [f["criterion"] for f in rb.status()["findings"]]
 
 

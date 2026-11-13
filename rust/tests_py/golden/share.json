@@ -115,13 +115,14 @@
    "run": "resource add evalset --type dataset --name 'eval set' --file data/eval.txt",
    "exit": 0,
    "out": [
-    "Resource evalset: eval set (dataset) \u00b7 present \u00b7 sha256 911169ddaaf1",
-    "  local:data/eval.txt \u00b7 here",
+    "Resource evalset: eval set (dataset) \u00b7 no download link \u00b7 sha256 911169ddaaf1",
+    "  copy here: data/eval.txt",
     "",
-    "Next: rb run add <experiment> ... --input evalset",
+    "Next: rb resource locate evalset url <its URL>  \u00b7  rb run add <experiment> ... --input evalset",
     ""
    ],
    "err": [
+    "rb resource add: No download link is recorded for evalset: record where it can be downloaded, its URL or Hugging Face id (<org>/<name>), with rb. rb resource locate evalset url <its URL>",
     ""
    ]
   },
@@ -129,8 +130,8 @@
    "run": "resource add far --type checkpoint --name 'far ckpt' --at s3:s3://bucket/ckpt --recipe 'train it again'",
    "exit": 0,
    "out": [
-    "Resource far: far ckpt (checkpoint) \u00b7 remote",
-    "  s3:s3://bucket/ckpt \u00b7 recorded",
+    "Resource far: far ckpt (checkpoint) \u00b7 no download link",
+    "  s3:s3://bucket/ckpt",
     "",
     "Next: rb run add <experiment> ... --input far",
     ""
@@ -143,8 +144,7 @@
    "run": "resource add named --type code --name 'just a name'",
    "exit": 0,
    "out": [
-    "Resource named: just a name (code) \u00b7 lost",
-    "  No copy is recorded anywhere; record where it comes from with --source, --url or --recipe",
+    "Resource named: just a name (code) \u00b7 no download link",
     "",
     "Next: rb run add <experiment> ... --input named",
     ""
@@ -212,13 +212,14 @@
     "  \"page_says\": \"The page says: all record files committed \\u00b7 at commit fdfd01ddeea3.\",",
     "  \"path\": \"@BASE@/work/rb-export\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 137826,",
+    "  \"bytes\": 165607,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
     "    \"name\": \"eval set\",",
     "    \"state\": \"lost\",",
     "    \"here\": \"present\",",
+    "    \"said\": \"get it: data/eval.txt in the repository\",",
     "    \"how\": \"\"",
     "   },",
     "   {",
@@ -226,6 +227,7 @@
     "    \"name\": \"far ckpt\",",
     "    \"state\": \"remote\",",
     "    \"here\": \"remote\",",
+    "    \"said\": \"no download link\",",
     "    \"how\": \"train it again\"",
     "   },",
     "   {",
@@ -233,6 +235,7 @@
     "    \"name\": \"just a name\",",
     "    \"state\": \"lost\",",
     "    \"here\": \"lost\",",
+    "    \"said\": \"no download link\",",
     "    \"how\": \"\"",
     "   }",
     "  ],",
@@ -266,68 +269,14 @@
    "exit": 0,
    "out": [
     "share",
-    "Kept with rb since 2026-10-01. 1 run was recorded afterwards, not as it happened.",
-    "16 record files not committed",
+    "\u2503 Does width help?",
+    "  Open",
+    "  planned first 0 of 0 \u00b7 tries 0 \u00b7 0 runs \u00b7 code kept 0 of 0",
     "",
-    "Does width help? (open)",
-    "  No criterion is linked directly to this question.",
-    "  unassigned (filed here, no question link): c1: cited. top1: 0.74 \u00b7 mean, 1 run (rb); point only: 1 unit: rb gives an interval from 3; criterion undetermined: not comparable: schedule cosine here vs step in the cited source; declared; order unknown: when runp5h4s6 was produced is unknown. Inquiry integrity: schedule cosine here vs step in the cited source. units: 1 run; schedule = cosine is provisional: no check of it is recorded; schedule cosine here vs step in the cited source; typed in, not read from a file or run: runp5h4s6; no run config was compared with the spec (record runs with --config); 1 run: nothing yet shows how it varies. Link it here: rb criterion file c1 q1 --why \"<why it bears on this question>\"",
-    "  unassigned (filed here, no question link): c2: wide gains. change.top1: +0.021 [+0.012, +0.03] \u00b7 95% (a1); gain: the interval clear of 0 on the better side (higher is better); criterion met: estimate +0.021 \u2265 0; declared before the evidence (by record times). schedule = cosine is provisional: no check of it is recorded. Link it here: rb criterion file c2 q1 --why \"<why it bears on this question>\"",
+    "Decisions (1)",
+    "  [decide] \u25e7 c1 \u00b7 cited",
     "",
-    "Rules: 1 met \u00b7 1 can't tell yet",
-    "",
-    "Needs judgment (1)",
-    "  - c1: criterion undetermined: not comparable: schedule cosine here vs step in the cited source",
-    "      rb decide c1 accept|reject|investigate --why \"...\"",
-    "",
-    "Can be done now (2)",
-    "  - c1: declared; order unknown: when runp5h4s6 was produced is unknown: whether it was declared before its evidence cannot be read",
-    "      rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"   (numbers typed with no time are of a time nobody knows)",
-    "  - e1/schedule: schedule = cosine is provisional: no check of it is recorded",
-    "      rb spec set e1 schedule cosine --source <file#key that states it>   (or vouch for it: rb decide e1/schedule accept --why \"...\")",
-    "",
-    "rb looks in out/, outputs/, results/, eval-out/ and metrics/ at the top, in folders named for results (results/, eval/, metrics/, reports/, artifacts/ and the like), down to 4 levels from the top, at the files in the repository's top folder, and at .json, .yaml and .toml files git shows as new or changed. It last looked at 2026-10-01 12:00 UTC. It reads what code, configs, docs and database rows say only where the record points to them, and it sees only the commands run through rb journal run.",
-    "rb checked the record with git at 2026-10-01 12:00 UTC: all 16 record files are new, changed or deleted since commit fdfd01ddeea3, which does not hold the record.",
-    "Not committed: .rb/.gitattributes (new), .rb/.gitignore (new), .rb/experiments/e1/analyses/a1.yaml (new) and 13 more",
-    "To check it yourself, in your terminal: git -C @BASE@/work/rb-export/record status --short --untracked-files=all -- .rb",
-    "",
-    "Rules",
-    "  On every e1 criterion:",
-    "          \u00b7 schedule = cosine is provisional: no check of it is recorded",
-    "  c1      cited",
-    "          criterion undetermined \u00b7 point only \u00b7 top1 = 0.83 \u00b1 0.01",
-    "          reads:     top1: 0.74 \u00b7 mean, 1 run (rb)",
-    "          result:    point only: 1 unit: rb gives an interval from 3",
-    "          rule:      criterion undetermined: not comparable: schedule cosine here vs step in the cited source",
-    "          timing:    declared; order unknown: when runp5h4s6 was produced is unknown",
-    "          units:     1 run",
-    "          integrity: schedule cosine here vs step in the cited source",
-    "          \u00b7 typed in, not read from a file or run: runp5h4s6",
-    "          \u00b7 no run config was compared with the spec (record runs with --config)",
-    "  c2      wide gains",
-    "          criterion met \u00b7 gain \u00b7 change.top1 \u2265 0",
-    "          reads:     change.top1: +0.021 [+0.012, +0.03] \u00b7 95% (a1)",
-    "          result:    gain: the interval clear of 0 on the better side (higher is better)",
-    "          rule:      criterion met: estimate +0.021 \u2265 0",
-    "          timing:    declared before the evidence (by record times)",
-    "          integrity: settings it reads are not verified, as said above",
-    "          history:   was +0.04 \u00b7 paired difference, 1 run (rb), rb's reading of the runs, replaced by a1",
-    "",
-    "Experiments",
-    "  e1      wide vs base \u00b7 open \u00b7 base (baseline) vs wide (candidate) \u00b7 not frozen \u00b7 settings 1 verified \u00b7 1 provisional \u00b7 0 unknown \u00b7 runs 1 \u00b7 analyses 1",
-    "          to run again: code unknown \u00b7 environment unknown \u00b7 eval (evalset) missing",
-    "",
-    "Runs: 1 recorded on 1 experiment \u00b7 every receipt is what rb wrote",
-    "",
-    "Analyses",
-    "  a1      on e1 \u00b7 1 comparison (reported)",
-    "",
-    "Resources",
-    "  evalset      dataset \u00b7 eval set \u00b7 lost \u00b7 sha256 911169ddaaf1",
-    "  far          checkpoint \u00b7 far ckpt \u00b7 remote \u00b7 name only: no hash, digest or version recorded \u00b7 how to get it again: train it again",
-    "  named        code \u00b7 just a name \u00b7 lost \u00b7 name only: no hash, digest or version recorded",
-    "",
-    "Next: rb decide c1 accept|reject|investigate --why \"...\"  \u00b7  rb run add e1 <the same numbers and per-run values> --produced-at <when> --replaces runp5h4s6 --why \"<when they were made>\"   (numbers typed with no time are of a time nobody knows)  \u00b7  rb spec set e1 schedule cosine --source <file#key that states it>   (or vouch for it: rb decide e1/schedule accept --why \"...\")",
+    "rb show <id> opens one \u00b7 rb status --full prints everything",
     ""
    ],
    "err": [
@@ -409,7 +358,7 @@
     "git has fetched no branch of origin, so rb could not tell whether origin holds commit fdfd01ddeea3.",
     "Cited sources no longer on disk, so not included: papers/gone.txt.",
     "Publish the directory at the address you gave; page.html is the reading surface and anyone reproduces it with: rb clone https://example.org/share/bundle.zip",
-    "Not in this bundle, so a reader cannot rerun with them from it alone: evalset (present here; in the bundle lost); far (remote, train it again); named (lost).",
+    "Not in this bundle, so a reader cannot rerun with them from it alone: evalset (get it: data/eval.txt in the repository); far (no download link); named (no download link).",
     ""
    ],
    "err": [
@@ -428,13 +377,14 @@
     "  \"page_says\": \"The page says: all record files committed \\u00b7 at commit fdfd01ddeea3.\",",
     "  \"path\": \"@BASE@/work/pub.zip\",",
     "  \"file_count\": 21,",
-    "  \"bytes\": 143009,",
+    "  \"bytes\": 170645,",
     "  \"resources_not_included\": [",
     "   {",
     "    \"id\": \"evalset\",",
     "    \"name\": \"eval set\",",
     "    \"state\": \"lost\",",
     "    \"here\": \"present\",",
+    "    \"said\": \"get it: data/eval.txt in the repository\",",
     "    \"how\": \"\"",
     "   },",
     "   {",
@@ -442,6 +392,7 @@
     "    \"name\": \"far ckpt\",",
     "    \"state\": \"remote\",",
     "    \"here\": \"remote\",",
+    "    \"said\": \"no download link\",",
     "    \"how\": \"train it again\"",
     "   },",
     "   {",
@@ -449,6 +400,7 @@
     "    \"name\": \"just a name\",",
     "    \"state\": \"lost\",",
     "    \"here\": \"lost\",",
+    "    \"said\": \"no download link\",",
     "    \"how\": \"\"",
     "   }",
     "  ],",
@@ -467,7 +419,9 @@
     "   \"origin_unfetched\": true,",
     "   \"changed\": [",
     "    \"notours/file.txt\"",
-    "   ]",
+    "   ],",
+    "   \"branch\": \"main\",",
+    "   \"record_uncommitted\": []",
     "  },",
     "  \"with_record\": true",
     " },",
@@ -936,17 +890,17 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 123060,",
+   " \"bytes\": 150523,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"00ff5b07d13eaa71001615da1d8117dd69732061617a6898916a1490d8362eff\"",
+   "  \"page.html\": \"7e24a777a594303fd34413cfab58a13ada269ae015d6ce502eab7c4989594aea\"",
    " }",
    "}",
    ""
   ],
   "bundles/b1/page.html": {
-   "sha256": "00ff5b07d13eaa71001615da1d8117dd69732061617a6898916a1490d8362eff",
-   "bytes": 122469
+   "sha256": "7e24a777a594303fd34413cfab58a13ada269ae015d6ce502eab7c4989594aea",
+   "bytes": 149932
   },
   "configs/train.json": [
    "{\"optim\": {\"lr\": 0.0003, \"betas\": [0.9, 0.999]}, \"model\": {\"depth\": 18, \"width\": 64}, \"name\": \"base\"}",
@@ -995,21 +949,21 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 2,",
-   " \"bytes\": 123060,",
+   " \"bytes\": 150523,",
    " \"files\": {",
    "  \"README.md\": \"c7b41e7696e1660580f45c0063bdfe2acc2160b088c84698ef4a89f2697e2095\",",
-   "  \"page.html\": \"00ff5b07d13eaa71001615da1d8117dd69732061617a6898916a1490d8362eff\"",
+   "  \"page.html\": \"7e24a777a594303fd34413cfab58a13ada269ae015d6ce502eab7c4989594aea\"",
    " }",
    "}",
    ""
   ],
   "plain/page.html": {
-   "sha256": "00ff5b07d13eaa71001615da1d8117dd69732061617a6898916a1490d8362eff",
-   "bytes": 122469
+   "sha256": "7e24a777a594303fd34413cfab58a13ada269ae015d6ce502eab7c4989594aea",
+   "bytes": 149932
   },
   "pub.zip": {
-   "sha256": "920948ddc3db106e626072fa094e5bf9dde02580c0ad408ca8a5dc3595885d40",
-   "bytes": 146620
+   "sha256": "a9712627b3fd6077f660b616fb4072a6d434b313405aaa43bacb803740814994",
+   "bytes": 174304
   },
   "published/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1074,8 +1028,8 @@
    ""
   ],
   "published/bundle.zip": {
-   "sha256": "af941fe24641bf20ddaffa97515d4d39cae21bac2909a0b6c6e69347a9b8c0aa",
-   "bytes": 146715
+   "sha256": "967eddeb0a6f25effcf5260f38071f3444e85f4e4cb1b4abba8afde34166a769",
+   "bytes": 174399
   },
   "published/manifest.json": [
    "{",
@@ -1090,10 +1044,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 143053,",
+   " \"bytes\": 170689,",
    " \"files\": {",
    "  \"README.md\": \"fb3d38898e893f4588356c9f5015eca9d468bcd5f12881be5ac63effc32759cf\",",
-   "  \"page.html\": \"09201df5b6c4d085394463af9078ccbd8b2f93becb68f69a3524f00a115a060d\",",
+   "  \"page.html\": \"adb978caa815bfb301a72652b4884bba017b90fee50a6a508505905993b0a027\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
@@ -1130,15 +1084,17 @@
    "  \"origin_unfetched\": true,",
    "  \"changed\": [",
    "   \"notours/file.txt\"",
-   "  ]",
+   "  ],",
+   "  \"branch\": \"main\",",
+   "  \"record_uncommitted\": []",
    " },",
    " \"url\": \"https://example.org/share/bundle.zip\"",
    "}",
    ""
   ],
   "published/page.html": {
-   "sha256": "09201df5b6c4d085394463af9078ccbd8b2f93becb68f69a3524f00a115a060d",
-   "bytes": 127615
+   "sha256": "adb978caa815bfb301a72652b4884bba017b90fee50a6a508505905993b0a027",
+   "bytes": 155251
   },
   "published/record/.rb/.gitattributes": [
    "* -text",
@@ -1496,8 +1452,8 @@
    ""
   ],
   "rb-export.zip": {
-   "sha256": "3388b420796bd87367fd213bda44a46a642d64e2cd3425cea0e060f970039b4b",
-   "bytes": 123568
+   "sha256": "77d3cf2b24104c45ebf7486b7b801cc9a299e1eeb85d79f9c2db56a749895a84",
+   "bytes": 151031
   },
   "rb-export/README.md": [
    "This is an rb bundle: one project's record of experiments, exported whole with",
@@ -1570,10 +1526,10 @@
    " },",
    " \"written\": \"2026-10-01 12:00 UTC\",",
    " \"file_count\": 21,",
-   " \"bytes\": 137826,",
+   " \"bytes\": 165607,",
    " \"files\": {",
    "  \"README.md\": \"7b203460d74a5199822b953f29e5b96f134284608c2ec08de71465649917cd7b\",",
-   "  \"page.html\": \"2dc3b166ea7880fe0f7d7ab338d05d09a45338aafff753dd1e9c10a0aa945dfd\",",
+   "  \"page.html\": \"bb93fdd97e46cb0419224e23177cea25cba6b1b0c4ab7b6103400e2493008ff6\",",
    "  \"record/.rb/.gitattributes\": \"daf0fb4563f5fb4a6e7d8b23cd542cda2442823f814486157d275cc21f8f7719\",",
    "  \"record/.rb/.gitignore\": \"14f4cb57b0b3662f6a99558cd2559ab0ed8bed7332b536561656d229a82f02e8\",",
    "  \"record/.rb/experiments/e1/analyses/a1.yaml\": \"33b9187dc752101cd1d5323bd2635aa341f207dc300c6610812950e7261102b4\",",
@@ -1608,8 +1564,8 @@
    ""
   ],
   "rb-export/page.html": {
-   "sha256": "2dc3b166ea7880fe0f7d7ab338d05d09a45338aafff753dd1e9c10a0aa945dfd",
-   "bytes": 122487
+   "sha256": "bb93fdd97e46cb0419224e23177cea25cba6b1b0c4ab7b6103400e2493008ff6",
+   "bytes": 150268
   },
   "rb-export/record/.rb/.gitattributes": [
    "* -text",

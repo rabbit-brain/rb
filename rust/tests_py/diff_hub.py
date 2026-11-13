@@ -187,20 +187,20 @@ def steps_for(origin: str, dead: str) -> list:
     hub = lambda mode: f"{origin}/m/{mode}"  # noqa: E731
     login_modes = ["ok", "complete", "slow", "denied", "expired", "described", "undescribed", "notoken", "nohandle", "nullhandle",
                    "code500", "code404", "codejunk", "nocode", "nousercode", "expiresnow", "strinterval"]
-    steps: list = [("login", ["login", "--hub", hub(m)], {}, False) for m in login_modes]
+    steps: list = [("login", ["login", "--hub", hub(m), "--wait"], {}, False) for m in login_modes]
     steps += [
-        ("login unreachable", ["login", "--hub", dead], {}, False),
-        ("login no scheme", ["login", "--hub", "rabbitbrain"], {}, False),
-        ("login odd scheme", ["login", "--hub", "localhost:1"], {}, False),
-        ("login no host", ["login", "--hub", "https://"], {}, False),
-        ("login nowhere", ["login", "--hub", "http://rb-nowhere.invalid"], {}, True),       # the resolver's words
-        ("login json", ["login", "--hub", hub("ok") + "/", "--json"], {}, False),
-        ("login env", ["login"], {"RB_HUB_URL": hub("complete")}, False),
+        ("login unreachable", ["login", "--hub", dead, "--wait"], {}, False),
+        ("login no scheme", ["login", "--hub", "rabbitbrain", "--wait"], {}, False),
+        ("login odd scheme", ["login", "--hub", "localhost:1", "--wait"], {}, False),
+        ("login no host", ["login", "--hub", "https://", "--wait"], {}, False),
+        ("login nowhere", ["login", "--hub", "http://rb-nowhere.invalid", "--wait"], {}, True),       # the resolver's words
+        ("login json", ["login", "--hub", hub("ok") + "/", "--json", "--wait"], {}, False),
+        ("login env", ["login", "--wait"], {"RB_HUB_URL": hub("complete")}, False),
         ("logout", ["logout", "--hub", hub("ok")], {}, False),
         ("logout again", ["logout", "--hub", hub("ok")], {}, False),
-        ("login for norevoke", ["login", "--hub", hub("norevoke")], {}, False),
+        ("login for norevoke", ["login", "--hub", hub("norevoke"), "--wait"], {}, False),
         ("logout norevoke", ["logout", "--hub", hub("norevoke"), "--json"], {}, False),
-        ("login for revokejunk", ["login", "--hub", hub("revokejunk")], {}, False),
+        ("login for revokejunk", ["login", "--hub", hub("revokejunk"), "--wait"], {}, False),
         ("logout revokejunk", ["logout", "--hub", hub("revokejunk")], {}, False),
         ("logout nothing", ["logout", "--hub", hub("never")], {}, False),
         ("sync no credential", ["sync", "--hub", hub("ok")], {}, False),
@@ -224,15 +224,22 @@ def steps_for(origin: str, dead: str) -> list:
         ("clone no host", ["clone", "https:///bundle.zip", "x4"], {}, False),
         # answers that are almost the hub's: a token that is not one, an error status that carries one, an expiry no
         # clock can hold, a revoke answered with no body, a place to publish that is not an address
-        ("login nulltoken", ["login", "--hub", hub("nulltoken")], {}, False),
-        ("login emptytoken", ["login", "--hub", hub("emptytoken")], {}, False),
-        ("login token500", ["login", "--hub", hub("token500")], {}, False),
-        ("login hugeexpiry", ["login", "--hub", hub("hugeexpiry")], {}, False),
-        ("login for revoke204", ["login", "--hub", hub("revoke204")], {}, False),
+        ("login nulltoken", ["login", "--hub", hub("nulltoken"), "--wait"], {}, False),
+        ("login emptytoken", ["login", "--hub", hub("emptytoken"), "--wait"], {}, False),
+        ("login token500", ["login", "--hub", hub("token500"), "--wait"], {}, False),
+        ("login hugeexpiry", ["login", "--hub", hub("hugeexpiry"), "--wait"], {}, False),
+        ("login for revoke204", ["login", "--hub", hub("revoke204"), "--wait"], {}, False),
         ("logout revoke204", ["logout", "--hub", hub("revoke204"), "--json"], {}, False),
         ("sync relpublish", ["sync", "--hub", hub("relpublish")], {"RB_HUB_TOKEN": "rb_stub_env"}, False),
         ("sync unsendable", ["sync", "--hub", hub("ok")], {"RB_HUB_TOKEN": "rb_stub\rsplit"}, False),
         ("logout no address", ["logout"], {"RB_HUB_URL": ""}, False),
+        # rb login that does not wait (login-2): it shows its code and returns; rb login again or rb sync finishes it
+        ("login pending", ["login", "--hub", hub("later")], {}, False),
+        ("login again pending", ["login", "--hub", hub("later")], {}, False),
+        ("sync finishes sign-in", ["sync", "--hub", hub("later")], {}, False),
+        ("login pending json", ["login", "--hub", hub("waiting"), "--json"], {}, False),
+        ("sync while pending", ["sync", "--hub", hub("waiting")], {}, False),
+        ("logout pending", ["logout", "--hub", hub("waiting"), "--json"], {}, False),
     ]
     return steps
 
@@ -266,6 +273,8 @@ def played(head: list, steps: list, base: str) -> tuple:
         # a bundle fetched lands under a temporary name of its own: say it as TMP
         err = re.sub(rb"/[^ ]*/rb-clone-[^/ ]+/", b"TMP/", r.stderr)
         outp = re.sub(rb"/[^ \"]*/rb-clone-[^/ \"]+/", b"TMP/", r.stdout)
+        # a sign-in left pending expires by the wall clock: say it as EXPIRES
+        outp = re.sub(rb'"expires": "\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"', b'"expires": "EXPIRES"', outp)
         results.append((label, r.returncode, outp, err, creds(cfg)))
     landed = os.path.join(clones, "fromhub")
     return results, (golden.snapshot(landed) if os.path.isdir(landed) else {})

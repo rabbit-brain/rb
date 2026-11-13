@@ -57,7 +57,7 @@ def test_a_run_card_gives_rbs_own_digits(rb):
        "--tolerance", "0.0000005")
     rb("run", "add", "solo", "cosine=0.999349", "--set", "seed=0", "--produced-at", "2026-05-01")
     html = page_text(rb)
-    cards = re.findall(r'<dl class="ax mets">(.*?)</dl>', html)
+    cards = re.findall(r'<dl class="ax mets"[^>]*>(.*?)</dl>', html)  # closed form: the results open the receipt (data-go)
     assert cards and all("0.999349" in c and "1.00" not in c for c in cards), cards
 
 
@@ -65,10 +65,10 @@ def test_a_tally_says_the_rules_met_on_the_estimate_alone(rb):
     rb("criterion", "add", "INT8 averages at least 0.9", "-e", "solo", "--metric", "cosine", "--subject", "int8", "--at-least", "0.9")
     for seed, x in ((0, 0.95), (1, 0.85), (2, 0.96)):
         rb("run", "add", "solo", f"cosine={x}", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
-    code, out = rb("status", text=True)
+    code, out = rb("status", "--full", text=True)
     assert "Rules: 1 met, on the estimate alone" in out, out
-    assert rb("status").data["tally_on_estimate"] == {"meets": 1}
-    assert "1 met, on the estimate alone" in re.sub("<[^>]+>", "", page_text(rb))
+    assert rb("status", "--full").data["tally_on_estimate"] == {"meets": 1}
+    assert "1 holds, on the estimate alone" in re.sub("<[^>]+>", "", page_text(rb))
 
 
 def test_a_rule_met_across_its_whole_interval_is_not_said_met_on_the_estimate_alone(rb):
@@ -78,7 +78,7 @@ def test_a_rule_met_across_its_whole_interval_is_not_said_met_on_the_estimate_al
     rb("criterion", "add", "INT8 loses at most a point", "-e", "two", "--metric", "change.cosine", "--at-least", "-1")
     for seed, (a, b) in enumerate([(0.95, 0.96), (0.95, 0.94), (0.95, 0.95)]):
         rb("run", "add", "two", f"fp32.cosine={a}", f"int8.cosine={b}", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
-    f = rb("status").data
+    f = rb("status", "--full").data
     assert [x["result"] for x in f["findings"]] == ["unresolved"]
-    code, out = rb("status", text=True)
+    code, out = rb("status", "--full", text=True)
     assert "Rules: 1 met" in out and "on the estimate alone" not in out, out

@@ -95,8 +95,8 @@ def test_rb_page_names_no_writer_and_says_none_of_the_users_words(rec, tmp_path,
     html = (tmp_path / "page.html").read_text(encoding="utf-8")
     page_checks(html, platform)
     assert "Run it in your terminal; rb records the call and your reason." in html
-    assert "Each call keeps its reason and its date. A call does not change a finding." in html
-    assert "Each run keeps when its output was produced and when it was recorded, the repository's state when it was recorded, and what it read and made." in html
+    # no line under a heading explains its page (no glossary, show instead, Nov 12 20:35 +08)
+    assert "Each call keeps its reason and its date." not in html and "Each run keeps when its output was produced" not in html
     # the two runs rb found and nobody recorded, one of them in a worktree removed since, with how to record each
     found = "in the repository, not in the record · found by rb watching the repository · record it from your screen, or with the command rb reconcile gives for it"
     assert html.count(found) == 2, html.count(found)
@@ -178,6 +178,54 @@ def test_rb_open_names_no_writer_in_its_tab_or_its_data(rec, copy, platform):
         server.close()
 
 
+def test_every_route_rb_open_serves_names_no_writer(rec, copy, platform):
+    """Every route rb open serves, walked as its page leads: the tab (/ and /index.html), /digest.json, /state.json,
+    /page.html, /card.json for every record and everything found, each card the page holds (/o/<id>.html) and each
+    field card its links reach (/o/k-<subject>.html), through every card served. None names a writer or a role. And
+    what no link reaches is not served: git's own folder (its config and logs name whoever committed) and rb's."""
+    server = Open(copy.root)
+    try:
+        status, tab = _get(server.url + "/")
+        assert status == 200
+        state = json.loads(_get(server.url + "/state.json")[1])
+        st = copy.json(Writers.HUMAN, "status")["data"]
+        ids = {r["id"] for key in ("runs", "experiments", "resources", "analyses", "decisions") for r in st.get(key, [])} | {f["criterion"] for f in st["findings"]}
+        ids |= {q["id"] for q in st.get("questions", [])} | {n["id"] for n in st.get("notes", [])}
+        routes = ["/", "/index.html", "/digest.json", "/state.json", "/page.html"]
+        routes += [f"/card.json?ref=o:{i}" for i in sorted(ids)] + [f"/card.json?ref={x['request_id']}" for x in state["home"]["found"]]
+        routes += [f"/o/{urllib.request.quote(html_mod.unescape(i), safe='')}.html" for i in sorted(set(re.findall(r'<div class="card[^"]*" id="([^"]+)"', tab)))]
+        todo, seen = sorted(set(re.findall(r'href="#(k-[^"]+)"', tab))), set()
+        served = 0
+        for route in routes:
+            status, body = _get(server.url + route)
+            assert status in (200, 404), (route, status)
+            if status == 200:
+                served += 1
+                if route == "/page.html":
+                    page_checks(body, platform)
+                elif route.endswith(".html") or route in ("/", "/index.html"):
+                    assert not on_screen(html_mod.unescape(body)), (route, on_screen(html_mod.unescape(body)))
+                else:
+                    assert not in_data(json.loads(body), ("home", "you")), (route, in_data(json.loads(body), ("home", "you")))
+        while todo:
+            anchor = todo.pop()
+            if anchor in seen:
+                continue
+            seen.add(anchor)
+            status, body = _get(server.url + "/o/" + urllib.request.quote(html_mod.unescape(anchor), safe="") + ".html")
+            assert status in (200, 404), (anchor, status)
+            if status == 200:
+                served += 1
+                assert not on_screen(html_mod.unescape(body)), (anchor, on_screen(html_mod.unescape(body)))
+                todo += [a for a in set(re.findall(r'href="#(k-[^"]+)"', body)) if a not in seen]
+        assert served > len(routes) // 2 and len(seen) > 5, (served, len(seen))
+        for path in (".git/config", ".git/logs/HEAD", ".git", ".git/HEAD", ".rb/log.jsonl", ".rb/project.yaml"):
+            status, body = _get(server.url + "/o/" + urllib.request.quote("k-" + path, safe="") + ".html")
+            assert status == 404 and not writer_marks(body), (path, status, body[:200])
+    finally:
+        server.close()
+
+
 def test_rb_opens_data_reads_the_same_whoever_wrote(rec, copy):
     """In rb open's /state.json, a question link and a relation declaration the user made and those an agent made
     carry the same keys, and the same "" in every field that kept who wrote, how rb knew, the channel or the session,
@@ -225,6 +273,7 @@ def test_rb_ui_names_no_writer(rec, copy):
     subjects = [rec.ids["run_claude"], "c2", "e1", "q2", "holdout"]
     found = [item.request_id for item in home_view(copy.root).found]
     drawn: dict = {}
+    badge: list = []                                           # the pinned Your call, and len(overview.decisions)
 
     async def drive():
         app = RBApp(copy.root)
@@ -235,6 +284,21 @@ def test_rb_ui_names_no_writer(rec, copy):
                 await pilot.pause(0.1)
             await pilot.pause(0.5)
             drawn["home"] = _drawn(app.screen)
+            dl = app.screen.query_one("#decisions-list")
+            rows = lambda: [str(dl.get_option_at_index(i).prompt) for i in range(dl.option_count)]
+            drawn["decisions"] = rows()
+            badge.append((str(app.screen.query_one("#pin").render()), app.screen.home.ui.your_call.count))
+            app.screen.query_one("#chart-list").focus()
+            await pilot.press("y")                                  # Your call's key: its full list
+            for _ in range(50):
+                if not any(r.lstrip().startswith("+") and r.rstrip().endswith(("more decision", "more decisions")) for r in rows()):
+                    break
+                await pilot.pause(0.1)
+            drawn["your call"] = rows() + _drawn(app.screen)
+            full = rows()
+            drawn["full list"] = full
+            await pilot.press("escape")
+            await pilot.pause(0.3)
             for subject in subjects:
                 app.push_screen(ObjectScreen(copy.root, subject))
                 await pilot.pause(0.3)
@@ -255,7 +319,8 @@ def test_rb_ui_names_no_writer(rec, copy):
                 await pilot.pause(0.2)
                 app.pop_screen()
                 await pilot.pause(0.2)
-            await pilot.press("a")
+            app.screen.query_one("#observed").focus()       # OBSERVED's list (TUI-PARITY X10)
+            await pilot.press("enter")
             for _ in range(100):
                 if isinstance(app.screen, OpenItemsScreen):
                     break
@@ -263,17 +328,57 @@ def test_rb_ui_names_no_writer(rec, copy):
             drawn["open in the record"] = _drawn(app.screen)
 
     asyncio.run(drive())
+    # then the user makes the calls that wait on them in their own terminal, so the rows that wait for a confirmation
+    # are among the home's first: the home draws each with its note, as Your call's full list does (MP-1112-1030 S6)
+    made: set = set()
+    for _ in range(3):
+        calls = [x for x in copy.json(Writers.HUMAN, "status")["data"]["overview"]["decisions"] if x["kind"] == "decide"]
+        if len(calls) <= 1:
+            break
+        for x in calls:
+            if x["subject"] not in made:
+                made.add(x["subject"])
+                copy.rb(Writers.HUMAN, "decide", x["subject"], "continue" if x["subject"][0] in "qe" else "accept", "--why", "settled here")
+
+    async def again():
+        app = RBApp(copy.root)
+        async with app.run_test(size=(160, 48)) as pilot:
+            for _ in range(150):
+                if isinstance(app.screen, HomeScreen) and app.screen.query_one("#tree-list").option_count:
+                    break
+                await pilot.pause(0.1)
+            await pilot.pause(0.5)
+            dl = app.screen.query_one("#decisions-list")
+            drawn["decisions, once the calls are made"] = [str(dl.get_option_at_index(i).prompt) for i in range(dl.option_count)]
+
+    asyncio.run(again())
     leaks = [(where, line, on_screen(line)) for where, lines in drawn.items() for line in lines if on_screen(line)]
     assert not leaks, leaks
     home = "\n".join(drawn["home"])
     day = copy.json(Writers.HUMAN, "log", "-n", "1")["data"]["entries"][-1]["at"][:10]
-    assert f"Since you last looked: 2 writes, 1 run recorded · last {day}" in home
-    assert re.search(r"\d+ still open in the record", home) and "open in the record" in [b.description for b in HomeScreen.BINDINGS]
+    # what was written since the user last looked heads OBSERVED's list; the home says no "still open" (TUI-PARITY G3)
+    assert any(f"Since you last looked: 2 writes, 1 run recorded · last {day}" in line for line in drawn["open in the record"])
+    assert "still open" not in home and "also open" in [b.description for b in HomeScreen.BINDINGS]
     assert any(line.startswith("Open in the record") for line in drawn["open in the record"])
     assert any(line.endswith(' · words (as given): "make it -0.5"') for line in drawn["c2"])
     # the call that still waits, and each design a session wrote, which waits with its gate
     designs = copy.json(Writers.HUMAN, "status")["data"]["counts"]["design_pending_count"]
-    assert designs and f"TO CONFIRM ({1 + designs})" in drawn["home"] and any("park e2 · note: waiting on data" in line for line in drawn["home"])
+    # they wait as rows of Your call's one list, one row per design (TUI-PARITY section 5 item 10), each one line with
+    # its state in a word and no writer, no tag, no note (F3.3); the home's rows are that list's first rows, then "+n more"
+    [(pin, n)] = badge
+    full, shown = drawn["full list"], drawn["decisions"]
+    rows = [row for row in full if row.rstrip().endswith("›")]
+    assert designs and "TO CONFIRM" not in home and pin == f"Your call {n}  y" and len(rows) == n, (pin, n, full)
+    assert not any("[decide]" in row or "[confirm]" in row or "\n" in row for row in full), full
+    assert sum(row[1:].startswith("to confirm") for row in rows) >= 1, full
+    assert sum(row[1:].startswith("design ") for row in rows) == designs, full
+    head_rows = [row for row in shown if row.rstrip().endswith("›")]
+    strip = lambda rs: [r[1:] for r in rs]          # `▌` marks the focused row, wherever it is
+    assert strip(head_rows) == strip(rows[:len(head_rows)]), (shown, full)
+    if len(head_rows) < n:
+        assert shown[-1].strip() == f"+{n - len(head_rows)} more", shown
+    later = drawn["decisions, once the calls are made"]
+    assert any(row[1:].startswith("to confirm") for row in later), later
     gone = [request_id for request_id in found if any(" in a worktree removed since · exit 0 · " in line for line in drawn[f"found {request_id}"])]
     assert len(found) == 2 and len(gone) == 1, found
     assert all(any("recorded as a run, with this note" in line for line in drawn[f"found {request_id}: y"]) for request_id in found)

@@ -316,16 +316,16 @@ def test_after_an_upgrade_a_synced_project_re_syncs_once_in_the_background(hub, 
     assert hub("sync")[0] == 0
     state = json.loads((workdir / ".rb" / "cache" / "sync.json").read_text(encoding="utf-8"))
     assert state["version"] == "0.6.0" and state["with_record"] is False and state["hub"].startswith("http://127.0.0.1:")
-    assert hub("status")[0] == 0
+    assert hub("status", "--full")[0] == 0
     time.sleep(2)
     assert len(_Hub.puts) == 1, "the same rb starts no sync"
     monkeypatch.setenv("RB_TEST_VERSION", "0.6.1")
     started = time.monotonic()
-    assert hub("status")[0] == 0
+    assert hub("status", "--full")[0] == 0
     assert time.monotonic() - started < 20
     assert _puts_reach(2), "the first command after the upgrade starts one sync"
     assert hub("show", "c1")[0] == 0
-    assert hub("status")[0] == 0
+    assert hub("status", "--full")[0] == 0
     time.sleep(3)
     assert len(_Hub.puts) == 2, "once: the next commands start none"
     for _ in range(50):
@@ -343,7 +343,7 @@ def test_an_older_rb_than_the_one_that_wrote_the_page_starts_no_sync(hub, monkey
     monkeypatch.setenv("RB_TEST_VERSION", "0.7.0")
     assert hub("sync")[0] == 0
     monkeypatch.setenv("RB_TEST_VERSION", "0.6.0")
-    assert hub("status")[0] == 0
+    assert hub("status", "--full")[0] == 0
     time.sleep(2)
     assert len(_Hub.puts) == 1
 
@@ -357,14 +357,14 @@ def test_an_agent_session_or_ci_starts_no_re_sync_and_the_users_next_command_doe
     assert hub("sync")[0] == 0
     monkeypatch.setenv("RB_TEST_VERSION", "0.6.1")
     monkeypatch.setenv("CLAUDECODE", "1")
-    assert hub("status")[0] == 0
+    assert hub("status", "--full")[0] == 0
     monkeypatch.delenv("CLAUDECODE")
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
-    assert hub("status")[0] == 0
+    assert hub("status", "--full")[0] == 0
     monkeypatch.delenv("GITHUB_ACTIONS")
     time.sleep(2)
     assert len(_Hub.puts) == 1
-    assert hub("status")[0] == 0
+    assert hub("status", "--full")[0] == 0
     assert _puts_reach(2)
 
 
@@ -393,7 +393,7 @@ def test_a_project_never_synced_starts_no_sync_after_an_upgrade(hub, monkeypatch
     from test_sync import _Hub
     monkeypatch.setenv("RB_HUB_TOKEN", "rb_testtoken")
     monkeypatch.setenv("RB_TEST_VERSION", "0.6.1")
-    assert hub("status")[0] == 0
+    assert hub("status", "--full")[0] == 0
     time.sleep(2)
     assert _Hub.puts == []
 
@@ -405,7 +405,7 @@ def test_the_re_sync_keeps_what_the_last_sync_sent(hub, monkeypatch):
     monkeypatch.setenv("RB_TEST_VERSION", "0.6.0")
     assert hub("sync", "--with-record")[0] == 0
     monkeypatch.setenv("RB_TEST_VERSION", "0.6.1")
-    assert hub("status")[0] == 0
+    assert hub("status", "--full")[0] == 0
     assert _puts_reach(2)
     import time
     for _ in range(50):
@@ -515,13 +515,13 @@ def test_rb_installed_with_pip_says_a_newer_rb_is_out_once_a_day_and_touches_not
     assert _state(tmp_path).get("installed") is None, "pip's environment is never upgraded"
 
 
-def _uv_tool(tmp_path, upgrades_to):
+def _uv_tool(tmp_path, upgrades_to, tools="uv/tools"):
     """rb installed as a uv tool: its environment with uv's receipt, rb in its bin/ (the copy that runs, and the real
     program beside it), and a uv on PATH that notes what it was asked and, given a version, puts in place an rb that
-    says it, as an upgrade replaces the program."""
+    says it, as an upgrade replaces the program. `tools` is uv's folder of tools; one not named tools is UV_TOOL_DIR."""
     import os
     import shutil
-    tool = tmp_path / "uv" / "tools" / "rabbit-brain"
+    tool = tmp_path / tools / "rabbit-brain"
     (tool / "bin").mkdir(parents=True)
     (tool / "uv-receipt.toml").write_text("[tool]\nrequirements = [{ name = \"rabbit-brain\" }]\n", encoding="utf-8")
     (tool / "pyvenv.cfg").write_text("home = /usr/bin\n", encoding="utf-8")
@@ -536,17 +536,23 @@ def _uv_tool(tmp_path, upgrades_to):
     if upgrades_to:
         swap = f'rm -f "{exe}"\nprintf \'#!/bin/sh\\nRB_TEST_VERSION={upgrades_to} exec "{real}" "$@"\\n\' > "{exe}"\nchmod 755 "{exe}"\n'
     if os.name == "nt":
-        # a shell script does not run on Windows, where rb looks for uv.exe, then uv.cmd: a batch file that notes
-        # what it was asked (it cannot put a program in rb's place)
-        (bindir / "uv.cmd").write_text(f'@echo off\n>>"{called}" echo %*\nexit /b 0\n', encoding="utf-8")
+        # a shell script does not run on Windows, where rb looks for uv.exe, then uv.cmd: a batch file that notes what
+        # it was asked and, given a version, takes the program away and puts a copy in its place that says it (rb reads
+        # a pinned version from rb.test-version beside it). As uv's own upgrade, it cannot while any process runs it.
+        swap = ""
+        if upgrades_to:
+            swap = (f'del /f /q "{exe}" 2>nul\nif exist "{exe}" exit /b 1\ncopy /y "{real}" "{exe}" >nul || exit /b 1\n'
+                    f'>"{exe}.test-version" echo {upgrades_to}\n')
+        (bindir / "uv.cmd").write_text(f'@echo off\n>>"{called}" echo %*\n{swap}exit /b 0\n', encoding="utf-8")
     else:
         (bindir / "uv").write_text(f'#!/bin/sh\nprintf "%s " "$@" >> "{called}"\n{swap}exit 0\n', encoding="utf-8")
         (bindir / "uv").chmod(0o755)
     env = {**os.environ, "PATH": f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}"}
+    if tools != "uv/tools":
+        env["UV_TOOL_DIR"] = str(tmp_path / tools)
     return str(exe), env, called
 
 
-@pytest.mark.xfail(sys.platform == "win32", reason="the fake uv cannot put a program in rb's place on Windows (issue #2)", strict=False)
 def test_rb_installed_as_a_uv_tool_upgrades_itself_through_uv_and_a_screen_says_restart(updates, tmp_path, monkeypatch):
     exe, env, called = _uv_tool(tmp_path, "0.7.0")
     r = _rb(exe, "version", env=env)
@@ -564,6 +570,17 @@ def test_rb_installed_as_a_uv_tool_upgrades_itself_through_uv_and_a_screen_says_
     assert update_line(tmp_path, None) == ("", "0.7.0"), "a screen opened after it runs the new rb"
     monkeypatch.setenv("RB_BIN", project_rb)
     assert update_line(tmp_path, "0.6.0")[0] == "", "an rb of another environment (pip in a project) says nothing of it"
+
+
+def test_rb_in_a_uv_tool_dir_of_any_name_upgrades_itself_through_uv(updates, tmp_path):
+    """UV_TOOL_DIR names uv's folder of tools whatever its name (the Windows proof's uv-tools): rb there is a uv tool."""
+    exe, env, called = _uv_tool(tmp_path, "0.7.0", tools="uv-tools")
+    assert env["UV_TOOL_DIR"].endswith("uv-tools")
+    r = _rb(exe, "version", env=env)
+    assert r.returncode == 0 and "is out" not in r.stderr, r.stderr
+    assert _until(lambda: _state(tmp_path).get("installed") == "0.7.0"), _state(tmp_path)
+    assert called.read_text(encoding="utf-8").split() == ["tool", "upgrade", "rabbit-brain"]
+    assert _rb(exe, "version", env=env).stdout.strip() == "rabbit-brain 0.7.0"
 
 
 def test_an_upgrade_that_installs_nothing_newer_is_not_said_as_installed(updates, tmp_path):
@@ -715,7 +732,7 @@ def test_a_question_reworded_keeps_its_id_evidence_and_calls_and_the_log_keeps_b
     assert shown["text"] == "Does INT8 lose accuracy on the ImageNet validation set?"
     exp = rb("show", "e1")[1].data["object"]
     assert "q-acc" in exp["questions"], "its experiments stay filed under it"
-    status = rb("status")[1].data
+    status = rb("status", "--full")[1].data
     codes = {i["code"] for i in status["open"]}
     assert "question_link_outdated" in codes, "a criterion linked to the old wording is declared on it again"
     # the same wording again writes nothing
@@ -759,12 +776,12 @@ def test_a_reword_makes_a_call_on_the_question_one_made_on_an_earlier_reading_ev
     monkeypatch.setenv("CLAUDECODE", "1")
     assert rb("question", "reword", "q2", "Should we ship B instead?", "--why", "the plan changed")[0] == 0
     monkeypatch.delenv("CLAUDECODE")
-    status = rb("status")[1].data
+    status = rb("status", "--full")[1].data
     outdated = [i for i in status["open"] if i["code"] == "decision_outdated"]
     assert outdated and "q2" in outdated[0]["subject"], status["open"]
     assert main(["status", "--fail-on", "undecided"]) == 1
     capsys.readouterr()
-    main(["status"])
+    main(["status", "--full"])
     said = capsys.readouterr().out
     assert 'parked: "Should we ship A?"' in said, "the call is said with the wording it was made on"
     assert 'parked: "Should we ship B instead?"' not in said
@@ -775,10 +792,10 @@ def test_a_rewordings_words_about_who_wrote_it_are_its_writers(rb, monkeypatch):
     monkeypatch.setenv("CLAUDECODE", "1")
     assert rb("question", "reword", "q5", "Does INT8 cost accuracy, written by Claude from session memory?", "--why", "x")[0] == 0
     monkeypatch.delenv("CLAUDECODE")
-    texts = [t for i in rb("status")[1].data["open"] if i["code"] == "writer_words" for t in i.get("texts", [])]
+    texts = [t for i in rb("status", "--full")[1].data["open"] if i["code"] == "writer_words" for t in i.get("texts", [])]
     assert any("q5" in str(t) for t in texts), texts
     assert rb("question", "reword", "q5", "Does INT8 cost accuracy on ImageNet?", "--why", "plain")[0] == 0
-    texts = [t for i in rb("status")[1].data["open"] if i["code"] == "writer_words" for t in i.get("texts", [])]
+    texts = [t for i in rb("status", "--full")[1].data["open"] if i["code"] == "writer_words" for t in i.get("texts", [])]
     assert not any("q5" in str(t) for t in texts), texts
 
 

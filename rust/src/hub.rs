@@ -127,10 +127,7 @@ fn write_creds(data: &Dict) -> Res<PathBuf> {
 }
 
 fn save_token(hub: &str, token: &Value, handle: &Value) -> Res<PathBuf> {
-    let p = creds_path();
-    if let Some(parent) = p.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| RBError::could_not_write(&e, parent))?;
-    }
+    config_folder()?;
     let mut data = read_all();
     let created = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     data.insert(key(hub), crate::obj! {"token" => token.clone(), "handle" => handle.clone(), "created" => created});
@@ -261,15 +258,30 @@ fn post_once(url: &str, body: &Value) -> Res<Result<(u16, Answer), http::Why>> {
     }
 }
 
-/// What the device flow ends in: the token and the handle (when the hub names one), or why there is none.
-fn approval(hub: &str, device_code: &Value, mut interval: u64, lasts: u64) -> Res<(String, Option<String>)> {
-    let expired = || RBError::msg_fix("E_HUB_REFUSED", "The code expired before it was approved.", "Run rb login again.");
-    let deadline = Instant::now() + Duration::from_secs(lasts);
+/// What one answered check of a code says: approved (the token, and the handle when the hub names one), not approved
+/// yet, or over (the code expired, or was declined on the hub).
+enum Poll {
+    Token(String, Option<String>),
+    Waiting,
+    Expired,
+    Declined,
+    /// the hub refused the code itself (invalid_grant for a code used or unknown, ...), in its own words
+    Refused(String),
+}
+
+/// Ask the hub once whether a code is approved: `before` is waited first, and `interval` (at most `most`) before each
+/// time it is asked again; a slow_down adds 5 s to `interval`, a minute at most. With `dots`, a dot on standard error
+/// for each request.
+fn poll(hub: &str, device_code: &Value, interval: &mut u64, before: Duration, most: Duration, dots: bool) -> Res<Poll> {
+    let url = format!("{hub}/api/hub/device/token");
     let mut unavailable = 0;
-    while Instant::now() < deadline {
-        std::thread::sleep(Duration::from_secs(interval));
-        stderr_write(".");
-        let url = format!("{hub}/api/hub/device/token");
+    let mut wait = before;
+    loop {
+        std::thread::sleep(wait);
+        wait = Duration::from_secs(*interval).min(most);
+        if dots {
+            stderr_write(".");
+        }
         // a gateway or a hub that is down for a moment (502, 503, 504), or a connection that drops or times out, is
         // asked again, three times in a row at most: the code may be approved already, and the next answer gives the
         // token. The fourth in a row ends it as it came.
@@ -287,24 +299,27 @@ fn approval(hub: &str, device_code: &Value, mut interval: u64, lasts: u64) -> Re
             unavailable += 1;
             continue;
         }
-        unavailable = 0;
         let err = ans.get("error")?.cloned().unwrap_or(Value::Null);
         match err.as_str() {
-            Some("authorization_pending") => continue,
+            Some("authorization_pending") => return Ok(Poll::Waiting),
             Some("slow_down") => {
-                interval += 5;
-                continue;
+                *interval = (*interval + 5).min(INTERVAL_MOST);
+                return Ok(Poll::Waiting);
             }
-            Some("access_denied") => return Err(RBError::msg("E_HUB_REFUSED", "Declined on the hub. Nothing was created.")),
-            Some("expired_token") => return Err(expired()),
+            Some("access_denied") => return Ok(Poll::Declined),
+            Some("expired_token") => return Ok(Poll::Expired),
             _ => {}
         }
         if err.truthy() {
             let said = ans.get("error_description")?.map(py_str).unwrap_or_else(|| py_str(&err));
+            // a refusal of the code itself (4xx) ends it; a hub failing (5xx) leaves the code to be asked about again
+            if (400..500).contains(&status) {
+                return Ok(Poll::Refused(said));
+            }
             return Err(RBError::msg("E_HUB_REFUSED", format!("The hub answered: {said}")));
         }
         if !(200..300).contains(&status) {
-            return Err(RBError::msg_fix("E_HUB_REFUSED", format!("The hub answered {status} and gave no reason."), "Run rb login again; nothing was stored on this machine."));
+            return Err(RBError::msg_fix("E_HUB_REFUSED", format!("The hub answered {status} and gave no reason."), "Run rb login again; no credential was stored."));
         }
         // a credential is text, and there is some of it: anything else is not one to keep
         let token = match ans.item("token")? {
@@ -316,9 +331,304 @@ fn approval(hub: &str, device_code: &Value, mut interval: u64, lasts: u64) -> Re
             Some(Value::Str(h)) if !h.is_empty() => Some(h.clone()),
             _ => None,
         };
-        return Ok((token, handle));
+        return Ok(Poll::Token(token, handle));
     }
-    Err(expired())
+}
+
+/// The longest a slow_down makes the interval.
+const INTERVAL_MOST: u64 = 60;
+/// The longest one check (rb login again, rb sync) waits before it asks, and between two asks: a command that returns
+/// says what it found within seconds. The hub slows a code down only past 30 asks a minute.
+const CHECK_WAIT: Duration = Duration::from_secs(5);
+
+/// The folder of the credentials file, made readable by its owner alone where rb makes it.
+fn config_folder() -> Res<PathBuf> {
+    let p = creds_path();
+    let dir = p.parent().map(PathBuf::from).unwrap_or_default();
+    if !dir.as_os_str().is_empty() && !dir.exists() {
+        let mut b = std::fs::DirBuilder::new();
+        b.recursive(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            b.mode(0o700);
+        }
+        b.create(&dir).map_err(|e| RBError::could_not_write(&e, &dir))?;
+    }
+    Ok(dir)
+}
+
+/// One sign-in step at a time on this machine (rb login, rb sync and rb logout, in any terminal): a code is asked
+/// about and its outcome kept before another command reads it. Held until dropped.
+fn signing_in() -> Res<Option<std::fs::File>> {
+    Ok(crate::sys::lock(&config_folder()?.join("pending-login.lock")))
+}
+
+/// Write the pending file whole, readable by its owner alone: a reader never sees it half written, and a link at its
+/// name is replaced, never followed.
+fn write_pending(all: &Dict) -> Res<()> {
+    let p = pending_path();
+    config_folder()?;
+    let text = pyjson::dumps_with(&Value::Dict(all.clone()), &Dumps::indent(1)).unwrap_or_default() + "\n";
+    let tmp = p.with_file_name(format!("pending-login.json.{:08x}", crate::rng::os_randbits(32)));
+    crate::sys::write_private(&tmp, text.as_bytes()).map_err(|e| RBError::could_not_write(&e, &p))?;
+    std::fs::rename(&tmp, &p).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        RBError::could_not_write(&e, &p)
+    })
+}
+
+/// A sign-in that waits for its code to be approved on the hub: what rb login keeps between commands, so that rb login
+/// again or rb sync can finish it. The device code becomes a token once approved, so it is kept as the credential is
+/// (mode 0600, beside credentials.json) and never shown: only the user's code and the link are.
+struct Pending {
+    device_code: Value,
+    code: String,
+    link: String,
+    expires: chrono::DateTime<chrono::Utc>,
+    interval: u64,
+    /// when the hub was last asked about this code (or gave it): the next check waits out the interval from here
+    asked: chrono::DateTime<chrono::Utc>,
+}
+
+/// The pending sign-ins, one per hub, beside the credentials file. Older rbs never read it.
+pub fn pending_path() -> PathBuf {
+    PathBuf::from(crate::cmds::pathlib_str(&format!("{}/pending-login.json", config_dir())))
+}
+
+/// The pending file as a mapping of hub to entry; a file that is not what rb login writes reads as none.
+fn pending_all() -> Dict {
+    match std::fs::read(pending_path()).ok().and_then(|bytes| String::from_utf8(bytes).ok()).and_then(|text| pyjson::loads(&text).ok()) {
+        Some(Value::Dict(d)) => d,
+        _ => Dict::new(),
+    }
+}
+
+fn time_of(v: Option<&Value>) -> Option<chrono::DateTime<chrono::Utc>> {
+    chrono::DateTime::parse_from_rfc3339(v?.as_str()?).ok().map(|t| t.with_timezone(&chrono::Utc))
+}
+
+fn stamp(t: chrono::DateTime<chrono::Utc>) -> String {
+    t.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+impl Pending {
+    fn of(hub: &str) -> Option<Pending> {
+        let all = pending_all();
+        let Some(Value::Dict(e)) = all.get(&key(hub)) else { return None };
+        let text = |k: &str| e.get(k).and_then(Value::as_str).filter(|s| !s.is_empty()).map(str::to_string);
+        let device_code = e.get("device_code").filter(|v| v.truthy())?.clone();
+        let interval = match e.get("interval") {
+            Some(Value::Int(i)) => (*i).clamp(0, INTERVAL_MOST as i64) as u64,
+            _ => 5,
+        };
+        Some(Pending { device_code, code: text("code")?, link: text("link")?, expires: time_of(e.get("expires"))?, interval, asked: time_of(e.get("asked"))? })
+    }
+
+    fn keep(&self, hub: &str) -> Res<()> {
+        let mut all = pending_all();
+        all.insert(
+            key(hub),
+            crate::obj! {"device_code" => self.device_code.clone(), "code" => self.code.clone(), "link" => self.link.clone(),
+                         "expires" => stamp(self.expires), "interval" => self.interval as i64, "asked" => self.asked.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()},
+        );
+        write_pending(&all)
+    }
+
+    /// Ask the hub once, waiting out what is left of the interval since it was last asked, and keep what the check
+    /// changed (when it was asked, a slower interval). A code past its expiry is over without asking.
+    fn check(&mut self, hub: &str) -> Res<Poll> {
+        let now = chrono::Utc::now();
+        if now >= self.expires {
+            return Ok(Poll::Expired);
+        }
+        let since = (now - self.asked).to_std().unwrap_or_default();
+        let before = Duration::from_secs(self.interval).saturating_sub(since).min(CHECK_WAIT);
+        let polled = poll(hub, &self.device_code, &mut self.interval, before, CHECK_WAIT, false);
+        self.asked = chrono::Utc::now();
+        if let Ok(Poll::Waiting) = polled {
+            self.keep(hub)?;
+        }
+        polled
+    }
+
+    /// Wait until the code is approved, declined or expires, a dot on standard error for each check.
+    fn wait(&mut self, hub: &str) -> Res<Poll> {
+        while chrono::Utc::now() < self.expires {
+            let before = Duration::from_secs(self.interval);
+            match poll(hub, &self.device_code, &mut self.interval, before, Duration::MAX, true)? {
+                Poll::Waiting => continue,
+                over => return Ok(over),
+            }
+        }
+        Ok(Poll::Expired)
+    }
+}
+
+/// Remove a hub's pending sign-in (the file too, once it holds none): whether there was one.
+fn drop_pending(hub: &str) -> Res<bool> {
+    let mut all = pending_all();
+    let had = all.shift_remove(&key(hub)).is_some();
+    let p = pending_path();
+    if all.is_empty() {
+        match std::fs::remove_file(&p) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(RBError::could_not_write(&e, &p)),
+        }
+    } else if had {
+        write_pending(&all)?;
+    }
+    Ok(had)
+}
+
+/// A command named for the hub it was asked of: `rb sync`, or `rb sync --hub <address>` for a hub other than
+/// rabbitbrain.ai, as rb sync's own fix names rb login.
+fn on_hub(cmd: &str, hub: &str) -> String {
+    if key(hub) == DEFAULT_HUB { cmd.to_string() } else { format!("{cmd} --hub {hub}") }
+}
+
+/// Ask the hub for a new code and keep it as this machine's pending sign-in.
+fn new_code(hub: &str) -> Res<Pending> {
+    let (_, start) = post(&format!("{hub}/api/hub/device/code"), &Value::empty_dict())?;
+    if !start.fields()?.contains_key("device_code") {
+        let detail = start.get("error")?.map(py_str).unwrap_or_else(|| "no detail".into());
+        return Err(RBError::msg("E_HUB_REFUSED", format!("The hub did not start a sign-in: {detail}")));
+    }
+    // the whole answer is read before anything is shown: a code is only shown when the flow it starts can finish
+    let code = py_str(start.item("user_code")?);
+    let fallback = py_str(start.item("verification_uri")?);
+    let link = start.get("verification_uri_complete")?.map(py_str).unwrap_or(fallback);
+    // what is shown is what the hub sent: a short code, and a web address with nothing a terminal would act on
+    if code.is_empty() || code.len() > 32 || !code.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return Err(start.odd("its user_code is not a short code of letters, digits and dashes"));
+    }
+    if !http::is_address(&link) || link.chars().any(|c| c.is_control() || c.is_whitespace()) || link.len() > 2048 {
+        return Err(start.odd("its verification_uri is not a web address"));
+    }
+    let interval = start.seconds("interval", 5)?.min(INTERVAL_MOST);
+    let lasts = start.seconds("expires_in", 600)?;
+    let device_code = start.item("device_code")?.clone();
+    if !device_code.truthy() {
+        return Err(start.odd("its device_code is empty"));
+    }
+    let now = chrono::Utc::now();
+    let p = Pending { device_code, code, link, expires: now + chrono::Duration::seconds(lasts as i64), interval, asked: now };
+    p.keep(hub)?;
+    Ok(p)
+}
+
+/// Keep the token an approved code gave, and remove the pending sign-in: the lines that say who is signed in, and
+/// where the token lives.
+fn signed_in(hub: &str, token: String, handle: &Option<String>) -> Res<(Vec<String>, String)> {
+    let path = save_token(hub, &Value::Str(token), &Value::Str(handle.clone().unwrap_or_default()))?;
+    drop_pending(hub)?;
+    let shown = crate::sys::slashed(&path);
+    // elsewhere the file is readable by its owner alone because rb sets it so; on Windows the profile it sits in is
+    let kept = if cfg!(windows) { "" } else { " (mode 0600)" };
+    let said = vec![
+        format!("Signed in as {} on {}.", handle.as_deref().unwrap_or("you"), crate::cli::address_said(hub)),
+        format!("The token lives in {shown}{kept}, not in your environment; RB_HUB_TOKEN still overrides it for CI."),
+    ];
+    Ok((said, shown))
+}
+
+/// What a code that is over says, in one line, as rb login starts a new one.
+fn over_words(p: &Pending, over: &Poll) -> String {
+    match over {
+        Poll::Declined => format!("The code {} was declined on the hub; this is a new one.", p.code),
+        Poll::Refused(said) => format!("The hub refused the code {}: {}; this is a new one.", p.code, said.trim_end_matches('.')),
+        _ => format!("The code {} expired before it was approved; this is a new one.", p.code),
+    }
+}
+
+/// How a code that is over is named in --json: expired, declined or refused.
+fn over_word(over: &Poll) -> &'static str {
+    match over {
+        Poll::Declined => "declined",
+        Poll::Refused(_) => "refused",
+        _ => "expired",
+    }
+}
+
+pub fn cmd_login(hub_flag: Option<String>, wait: bool, out: &mut Out) -> Res<i32> {
+    let hub = address(hub_flag)?;
+    not_open(&hub, "login")?;
+    let _held = signing_in()?;
+    let mut replaced: Option<(String, &str)> = None;
+    let mut known = Pending::of(&hub);
+    // a sign-in already pending is asked about once (or waited on, with --wait), never replaced while it can finish
+    if let Some(p) = known.as_mut().filter(|_| !wait) {
+        match p.check(&hub)? {
+            Poll::Token(token, handle) => return login_done(&hub, token, handle, out),
+            Poll::Waiting => return login_pending(&hub, p, true, None, out),
+            over => {
+                let said = over_words(p, &over);
+                drop_pending(&hub)?;
+                replaced = Some((said, over_word(&over)));
+                known = None;
+            }
+        }
+    }
+    let mut p = match known {
+        Some(p) if chrono::Utc::now() < p.expires => p,
+        _ => new_code(&hub)?,
+    };
+    if !wait {
+        return login_pending(&hub, &p, false, replaced, out);
+    }
+    // the wait holds no lock: rb sync in another terminal may finish this sign-in meanwhile
+    drop(_held);
+    if let Some((said, _)) = &replaced {
+        eprintln_err(said);
+    }
+    eprintln_err(&format!("\n  First, this terminal gets a code:\n\n      {}\n", p.code));
+    eprintln_err(&format!("  Open {} on any device; it signs you in first if needed, and approve the code.", p.link));
+    stderr_write("  Waiting (Ctrl-C stops; nothing is created until you approve) ");
+    let approved = p.wait(&hub);
+    eprintln_err(""); // the line of dots ends here, whatever the wait ended in
+    let _held = signing_in()?;
+    match approved? {
+        Poll::Token(token, handle) => login_done(&hub, token, handle, out),
+        Poll::Declined => {
+            drop_pending(&hub)?;
+            Err(RBError::msg("E_HUB_REFUSED", "Declined on the hub. Nothing was created."))
+        }
+        Poll::Refused(said) => {
+            drop_pending(&hub)?;
+            Err(RBError::msg("E_HUB_REFUSED", format!("The hub answered: {said}")))
+        }
+        _ => {
+            drop_pending(&hub)?;
+            Err(RBError::msg_fix("E_HUB_REFUSED", "The code expired before it was approved.", "Run rb login again."))
+        }
+    }
+}
+
+/// rb login with the code approved: the token kept, and said as signed in.
+fn login_done(hub: &str, token: String, handle: Option<String>, out: &mut Out) -> Res<i32> {
+    let (said, shown) = signed_in(hub, token, &handle)?;
+    out.say_all(said);
+    out.say("rb sync now works here. rb logout revokes and removes it.");
+    out.data = crate::dict! {"hub" => hub.to_string(), "state" => "signed_in", "handle" => handle.map(Value::Str).unwrap_or(Value::Null), "credentials" => shown};
+    Ok(0)
+}
+
+/// rb login with the code not approved yet: the code and the link, and what to run once it is approved. rb returns
+/// here, so whoever runs it (a coding agent included) sees the link at once.
+fn login_pending(hub: &str, p: &Pending, again: bool, replaced: Option<(String, &str)>, out: &mut Out) -> Res<i32> {
+    let mut gone = Value::Null;
+    if let Some((said, why)) = replaced {
+        out.say(said);
+        gone = Value::Str(why.to_string());
+    }
+    let lead = if again { "This terminal's code is not approved yet:" } else { "First, this terminal gets a code:" };
+    out.say(format!("\n  {lead}\n\n      {}\n", p.code));
+    out.say(format!("  Open {} on any device; it signs you in first if needed, and approve the code.", p.link));
+    out.say(format!("Approve it there, then run {} (or {} again) here.", on_hub("rb sync", hub), on_hub("rb login", hub)));
+    out.data = crate::dict! {"hub" => hub.to_string(), "state" => "pending", "code" => p.code.clone(), "link" => p.link.clone(),
+                             "expires" => stamp(p.expires), "replaced" => gone};
+    Ok(0)
 }
 
 /// Ask the hub to revoke a credential: whether it said it did. A success status counts when it comes as the hub's
@@ -333,40 +643,15 @@ fn revoke(hub: &str, token: &Value) -> bool {
     }
 }
 
-pub fn cmd_login(hub_flag: Option<String>, out: &mut Out) -> Res<i32> {
-    let hub = address(hub_flag)?;
-    not_open(&hub, "login")?;
-    let (_, start) = post(&format!("{hub}/api/hub/device/code"), &Value::empty_dict())?;
-    if !start.fields()?.contains_key("device_code") {
-        let detail = start.get("error")?.map(py_str).unwrap_or_else(|| "no detail".into());
-        return Err(RBError::msg("E_HUB_REFUSED", format!("The hub did not start a sign-in: {detail}")));
-    }
-    // the whole answer is read before anything is shown: a code is only shown when the flow it starts can finish
-    let user_code = py_str(start.item("user_code")?);
-    let fallback = py_str(start.item("verification_uri")?);
-    let open = start.get("verification_uri_complete")?.map(py_str).unwrap_or(fallback);
-    let interval = start.seconds("interval", 5)?;
-    let lasts = start.seconds("expires_in", 600)?;
-    let device_code = start.item("device_code")?.clone();
-    eprintln_err(&format!("\n  First, this terminal gets a code:\n\n      {user_code}\n"));
-    eprintln_err(&format!("  Open {open} on any device; it signs you in first if needed, and approve the code."));
-    stderr_write("  Waiting (Ctrl-C stops; nothing is created until you approve) ");
-    let approved = approval(&hub, &device_code, interval, lasts);
-    eprintln_err(""); // the line of dots ends here, whatever the wait ended in
-    let (token, handle) = approved?;
-    let path = save_token(&hub, &Value::Str(token), &Value::Str(handle.clone().unwrap_or_default()))?;
-    let shown = crate::sys::slashed(&path);
-    // elsewhere the file is readable by its owner alone because rb sets it so; on Windows the profile it sits in is
-    let kept = if cfg!(windows) { "" } else { " (mode 0600)" };
-    out.say(format!("Signed in as {} on {}.", handle.as_deref().unwrap_or("you"), crate::cli::address_said(&hub)));
-    out.say(format!("The token lives in {shown}{kept}, not in your environment; RB_HUB_TOKEN still overrides it for CI."));
-    out.say("rb sync now works here. rb logout revokes and removes it.");
-    out.data = crate::dict! {"hub" => hub.clone(), "handle" => handle.map(Value::Str).unwrap_or(Value::Null), "credentials" => shown};
-    Ok(0)
-}
-
 pub fn cmd_logout(hub_flag: Option<String>, out: &mut Out) -> Res<i32> {
     let hub = key(&named(hub_flag)?);
+    // a sign-in still waiting for its code to be approved goes first, whatever the credentials file holds: its code
+    // would become a token once approved
+    let _held = signing_in()?;
+    let unpended = drop_pending(&hub)?;
+    if unpended {
+        out.say(format!("The sign-in waiting for approval on {} is removed: approving its code now signs nothing in here.", crate::cli::address_said(&hub)));
+    }
     if stored().is_none() {
         // rb cannot look for this hub in a file it cannot read, and will not say "nothing stored" of one that may hold a token
         let shown = crate::sys::slashed(&creds_path());
@@ -381,14 +666,16 @@ pub fn cmd_logout(hub_flag: Option<String>, out: &mut Out) -> Res<i32> {
     let revoked = token.as_ref().filter(|t| t.truthy()).map_or(false, |t| revoke(&hub, t));
     let dropped = drop_token(&hub)?;
     if !token.as_ref().map_or(false, Value::truthy) && !dropped {
-        out.say(format!("Nothing stored for {}; nothing to do.", crate::cli::address_said(&hub)));
+        if !unpended {
+            out.say(format!("Nothing stored for {}; nothing to do.", crate::cli::address_said(&hub)));
+        }
     } else {
         out.say(
             format!("Logged out of {}: credential removed from {}", crate::cli::address_said(&hub), crate::sys::slashed(&creds_path()))
                 + if revoked { " and revoked on the hub." } else { ". The hub was not reachable to revoke it; revoke at /account if it may have leaked." },
         );
     }
-    out.data = crate::dict! {"hub" => hub, "revoked" => revoked, "removed" => dropped};
+    out.data = crate::dict! {"hub" => hub, "revoked" => revoked, "removed" => dropped, "pending_removed" => unpended};
     Ok(0)
 }
 
@@ -405,6 +692,46 @@ fn token_for(hub: &str) -> Res<Value> {
     // the sentence names the hub that was asked: rabbitbrain.ai, unless --hub or RB_HUB_URL named another
     let (name, login) = if key(hub) == DEFAULT_HUB { ("rabbitbrain.ai".to_string(), "rb login".to_string()) } else { (hub.to_string(), format!("rb login --hub {hub}")) };
     Err(RBError::msg_fix("E_USAGE", format!("No credential for {name} on this machine."), format!("Run {login} once per machine, or set RB_HUB_TOKEN for CI.")))
+}
+
+/// The credential rb sync sends: RB_HUB_TOKEN or the one stored, else the one a pending sign-in gives once its code is
+/// approved, which is kept as rb login keeps it (with the lines that say so, and the handle). A code not approved yet
+/// sends nothing: E_LOGIN_PENDING, with the link.
+fn token_or_pending(hub: &str) -> Res<(Value, Option<(Vec<String>, Option<String>)>)> {
+    let none = match token_for(hub) {
+        Ok(t) => return Ok((t, None)),
+        Err(e) => e,
+    };
+    let _held = signing_in()?;
+    // another command may have finished the sign-in while this one waited for its turn
+    if let Some(t) = load_token(hub).filter(Value::truthy) {
+        return Ok((t, None));
+    }
+    let Some(mut p) = Pending::of(hub) else { return Err(none) };
+    match p.check(hub)? {
+        Poll::Token(token, handle) => {
+            let (said, _) = signed_in(hub, token.clone(), &handle)?;
+            Ok((Value::Str(token), Some((said, handle))))
+        }
+        Poll::Waiting => Err(RBError::msg_fix(
+            "E_LOGIN_PENDING",
+            format!("Not signed in yet: approve the code {} at {}, then run {} again.", p.code, p.link, on_hub("rb sync", hub)),
+            format!("Nothing was sent. {} shows the code again.", on_hub("rb login", hub)),
+        )),
+        over => {
+            drop_pending(hub)?;
+            let what = match &over {
+                Poll::Declined => "was declined on the hub".to_string(),
+                Poll::Refused(said) => format!("was refused by the hub ({})", said.trim_end_matches('.')),
+                _ => "expired before it was approved".to_string(),
+            };
+            Err(RBError::msg_fix(
+                "E_USAGE",
+                format!("The sign-in code {} {what}, so there is no credential for this hub on this machine.", p.code),
+                format!("Run {} for a new code. Nothing was sent.", on_hub("rb login", hub)),
+            ))
+        }
+    }
 }
 
 /// What a refusal says to do when the hub said nothing more.
@@ -529,8 +856,21 @@ pub fn cmd_sync(hub_flag: Option<String>, with_record: bool, out: &mut Out) -> R
     let led = Ledger::open(None)?;
     let hub = address(hub_flag)?;
     not_open(&hub, "sync")?;
-    let token = token_for(&hub)?;
-    let sent = upload(&led, &token, &hub, with_record)?;
+    let (token, signed) = token_or_pending(&hub)?;
+    let completed = signed.is_some();
+    let sent = match upload(&led, &token, &hub, with_record) {
+        Ok(sent) => sent,
+        Err(e) => {
+            // the sign-in was finished all the same: said where a failure is said
+            for line in signed.map(|(said, _)| said).unwrap_or_default() {
+                eprintln_err(&line);
+            }
+            return Err(e);
+        }
+    };
+    if let Some((said, _)) = signed {
+        out.say_all(said);
+    }
     let url = sent.said.get("url").map(py_str).unwrap_or_default();
     out.say(format!("Synced, privately: {url}"));
     for line in synced_words(&led, with_record, sent.code.as_ref(), false) {
@@ -541,6 +881,8 @@ pub fn cmd_sync(hub_flag: Option<String>, with_record: bool, out: &mut Out) -> R
         out.data.insert(k, v);
     }
     out.data.insert("with_record".into(), Value::Bool(with_record));
+    // whether this sync finished a sign-in rb login had left waiting for approval
+    out.data.insert("signed_in".into(), Value::Bool(completed));
     // the code the bundle names, as its manifest's repo says it; none for a page alone
     out.data.insert("repo".into(), sent.code.map(Value::Dict).unwrap_or(Value::Null));
     Ok(0)
@@ -804,7 +1146,11 @@ pub fn cmd_sync_watch(hub_flag: Option<String>, with_record: bool, out: &mut Out
     let led = Ledger::open(None)?;
     let hub = address(hub_flag)?;
     not_open(&hub, "sync")?;
-    token_for(&hub)?;
+    if let (_, Some((said, _))) = token_or_pending(&hub)? {
+        for line in said {
+            eprintln_err(&line);
+        }
+    }
     let root = led.root.clone();
     drop(led);
     eprintln_err("Watching the record: rb sync sends it, privately, each time it changes, at most once a minute. Ctrl-C ends it.");

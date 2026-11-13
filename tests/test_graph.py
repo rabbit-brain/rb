@@ -180,10 +180,10 @@ def test_a_resource_is_read_or_made(graph, graph_docs):
         assert val["rests_on"] == {"criteria": ["c1", "c2", "c3", "c4", "c5"], "by_question": {"q1": ["c1"], "q1a": ["c2", "c3", "c4", "c5"]}}
         assert ckpt["read_by"] == {"runs": [], "analyses": []} and ckpt["made_by"] == [{"run": r1, "experiment": "e1"}]
         assert ckpt["rests_on"] == {"criteria": [], "by_question": {}}
-    shown = graph.rb(Writers.HUMAN, "show", "imagenet-val")
+    shown = graph.rb(Writers.HUMAN, "show", "--long", "imagenet-val")
     assert [line.split()[3] for line in shown.splitlines() if line.startswith("  read by run ")] == [r1, r2, r3, cell, superseded]
     assert "read by analysis a1 (e1), through what it read" in shown and "read by analysis a2 (e1), through what it read" in shown
-    assert f"made by run {r1} (e1" in graph.rb(Writers.HUMAN, "show", "ckpt-int8")
+    assert f"made by run {r1} (e1" in graph.rb(Writers.HUMAN, "show", "--long", "ckpt-int8")
 
 
 def test_a_run_counts_toward_and_holds_the_same_bytes(graph, graph_docs):
@@ -218,7 +218,7 @@ def test_a_finding_carries_its_observations_source_and_cells(graph, graph_docs):
     design cell with its own estimate, its runs and whether it falls outside the rule, judged unit by unit for an
     --each rule, a cell with no complete comparison listed with no estimate."""
     (cell, superseded), half = graph.ids["cells"], graph.ids["half"]
-    shown = graph.json(Writers.HUMAN, "show", "c3")["data"]["finding"]
+    shown = graph.json(Writers.HUMAN, "show", "--long", "c3")["data"]["finding"]
     for tier in ("live", "owner"):
         f = graph_docs[tier]["findings"]
         assert f["c3"]["observations"] == [{"run": o["run"], "arm": o["arm"], "unit": o["unit"], "per_run": {k: said_value(v) for k, v in o["per_run"].items()},
@@ -236,7 +236,7 @@ def test_a_finding_carries_its_observations_source_and_cells(graph, graph_docs):
         # a rule two points wide: no cell outside it
         assert [x["outside"] for x in f["c5"]["design_cells"]] == [False, False, False]
         assert f["c1"]["design_cells"] == []
-    assert "-1.38 to -0.29" in graph.rb(Writers.HUMAN, "show", "c3")
+    assert "-1.38 to -0.29" in graph.rb(Writers.HUMAN, "show", "--long", "c3")
 
 
 def test_what_rests_on_a_finding(graph, graph_docs):
@@ -402,7 +402,7 @@ def test_design_cells_are_judged_as_the_rule_judges_them(tmp_path):
     complete comparison leaves the others judged, and lists only the runs the reading reads; each as rb show says."""
     rec = cells_record(tmp_path / "int8")
     (tmp_path / "dumps").mkdir()
-    shown = {c: rec.json(Writers.HUMAN, "show", c)["data"]["finding"] for c in ("c1", "c2")}
+    shown = {c: rec.json(Writers.HUMAN, "show", "--long", c)["data"]["finding"] for c in ("c1", "c2")}
     assert shown["c1"]["rule_outcome"] == "meets" and shown["c2"]["comparison"]["design"]["meets"] == 1
     for tier, doc in both_tiers(rec.root, tmp_path / "dumps").items():
         f = doc["findings"]

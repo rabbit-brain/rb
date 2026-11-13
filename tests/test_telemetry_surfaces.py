@@ -48,7 +48,7 @@ def test_the_screen_counts_one_inspection_a_session(trial, receiver, monkeypatch
             home.action_refresh()
             home._poll()
             home.query_one("#tree-list").focus()
-            await pilot.press("enter")    # open a record from the catalogue
+            await pilot.press("l")        # open a record from the catalogue, its long form
             for _ in range(50):
                 if isinstance(app.screen, tui.ObjectScreen):
                     break

@@ -136,8 +136,6 @@ a.cite:hover, a.cite:focus-visible { border-color: var(--teal); }
 .kind { font: 600 10.5px/18px var(--sans); color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
 .st { font-size: 11.5px; font-weight: 600; color: var(--dim); }
 .g { display: inline-block; width: 1.3em; text-align: center; color: var(--ink); }
-.gw { white-space: nowrap; margin-right: 6px; }
-.gw .g { width: 1.1em; margin-right: .2em; }
 
 /* ---------- the Overview v2: a projection onto the user's calls (standing, integrity, the queue, the questions) ---------- */
 .ovh { margin: 2px 0 14px; }
@@ -150,7 +148,6 @@ a.cite:hover, a.cite:focus-visible { border-color: var(--teal); }
 .stand .stq a.sq { color: var(--ink); }
 .stand .stq a.sq:hover { color: var(--teal); text-decoration: none; }
 .stand .str { margin-top: 6px; font-size: 14.5px; line-height: 1.45; color: var(--ink); }
-.stand .str .term { text-decoration-color: var(--line); }
 .stand .stt { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 2px 16px; font-size: 14px; font-variant-numeric: tabular-nums; }
 .stand .stt .gap { display: none; }
 .stand .sti { margin-top: 8px; font-size: 13.5px; line-height: 1.45; color: var(--dim); }
@@ -171,7 +168,6 @@ p.late { margin: 4px 0 10px; }
 /* an id trails, small, monospace and copyable (P3) */
 .cid { font: 11.5px var(--mono); color: var(--dim); white-space: nowrap; user-select: all; }
 .ctl.abt { display: inline-flex; color: var(--dim); font-size: 12.5px; }
-.words h2 { font-size: 15px; margin: 24px 0 8px; }
 /* Also open in the record: a checklist, its sentences in ink, never link colour on a whole sentence (P7) */
 ul.oi.chk { list-style: none; padding: 0; margin: 4px 0 14px; }
 ul.oi.chk li { padding: 5px 0; border-top: 1px solid var(--soft); line-height: 1.45; }
@@ -180,7 +176,6 @@ ul.oi.chk a.ans { color: var(--ink); }
 ul.oi.chk a.ans:hover { color: var(--teal); }
 .ogh { font-size: 14px; margin: 18px 0 2px; }
 .ogh .dim { font-weight: 400; }
-.tag.term { text-decoration: none; cursor: help; }
 .integ { border-radius: 10px; padding: 10px 16px 11px; margin: 14px 0 12px; background: color-mix(in srgb, var(--warn) 7%, var(--bg)); }
 .integ h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px !important; font: 600 11px/1.6 var(--sans); color: var(--dim); }
 .integ .wsign { margin-left: auto; color: var(--warn); font-size: 13px; letter-spacing: 0; }
@@ -188,44 +183,14 @@ ul.oi.chk a.ans:hover { color: var(--teal); }
 .integ p a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .integ p a:hover { color: var(--teal); }
 .integ .ia { color: var(--dim); }
-.judge h2, .qrows h2 { display: flex; align-items: baseline; gap: 8px; }
+.judge h2 { display: flex; align-items: baseline; gap: 8px; }
 .judge h2 .n { margin-left: auto; font: 600 13px var(--sans); }
-ul.queue, ul.qlist { list-style: none; margin: 4px 0 6px; padding: 0; border-top: 1px solid var(--soft); }
-li.qrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; align-items: center; padding: 9px 2px 10px; border-bottom: 1px solid var(--soft); }
-li.qrow .qt { display: block; min-width: 0; }
-/* a row opens its item (design pass 1, P11): its words in ink, the whole row answering the pointer */
-li.qrow[data-go] { cursor: pointer; position: relative; }
-/* the whole row opens its item with no script too (the export as served): the words' link covers the row, the row's
-   own button above it */
-li.qrow[data-go] a.qa::after { content: ""; position: absolute; inset: 0; }
-li.qrow .qbtn { position: relative; z-index: 1; }
-li.qrow[data-go]:hover { background: var(--hover); }
-li.qrow a.qa { color: var(--ink); text-decoration: none; }
-li.qrow a.qa:hover { color: var(--teal); }
-li.qrow a.qa:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
-li.qrow .qv { display: block; font-size: 14.5px; line-height: 1.4; }
-li.qrow .qv .rl2 { font-weight: 600; }
-li.qrow .qd { display: block; margin-top: 1px; font-size: 13px; line-height: 1.4; color: var(--dim); font-variant-numeric: tabular-nums; }
-a.qbtn { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink); font: 500 13px var(--sans); white-space: nowrap; }
-a.qbtn:hover { background: var(--hover); text-decoration: none; }
-.openrec { margin: 6px 0 0; }
-.openrec a { color: var(--dim); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
-li.qr { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; padding: 8px 2px 9px; border-bottom: 1px solid var(--soft); }
-li.qr.d1 { padding-left: 20px; }
-li.qr a.sq { flex: 1 1 18em; min-width: 0; color: var(--ink); font-size: 14.5px; line-height: 1.4; }
-li.qr a.sq:hover { color: var(--teal); text-decoration: none; }
-li.qr .qs { font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
-li.qgrp { padding: 10px 2px 2px; font-size: 12.5px; color: var(--dim); border-bottom: 0; }
 details.how > p, details.how > section { font-size: 13.5px; color: var(--dim); }
 details.how > section h2 { font-size: 14px; margin: 12px 0 4px; }
 
 /* an experiment's first screen: what it compares, a line each; the hypothesis folded to one line until opened */
 .cmpl { margin: 2px 0 6px; font-size: 14.5px; }
 .cmpl .mono { font-size: 13px; }
-details.oneline > summary { list-style: none; cursor: pointer; }
-details.oneline > summary::-webkit-details-marker { display: none; }
-details.oneline:not([open]) > summary { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-details.oneline:not([open]) > summary::after { content: ""; }
 section.repro details.rfold > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; color: var(--ink); width: auto; }
 section.repro details.rfold > summary h2 { display: inline; margin: 0; font-size: 18px; }
 section.repro details.rfold > summary .readyline { font-size: 13.5px; color: var(--dim); }
@@ -242,22 +207,8 @@ nav.strip { display: block; border: 1px solid var(--line); border-radius: 10px; 
 .srow .sq { font-weight: 600; font-size: 14.5px; line-height: 1.45; color: var(--ink); min-width: 0; }
 .srow .sq:hover { color: var(--teal); text-decoration: none; }
 .srow .sc { font-size: 13px; white-space: nowrap; flex-shrink: 0; }
-.srow.sg { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; }
-.srow.sg > .r1 { grid-column: 1; grid-row: 1; }
-.srow.sg > .sc { grid-column: 2; grid-row: 1; align-self: start; padding-top: 1px; }
-.srow.sg > .ansp, .srow.sg > .r3 { grid-column: 1 / -1; }
 .ov .srow .sq { font-weight: 500; font-size: 13.5px; color: var(--dim); }
 .ov .srow.d1 .sq { color: var(--ink); }
-.srow .ansp { margin: 1px 0 0; font-size: 16.5px; line-height: 1.32; font-weight: 620; letter-spacing: -0.006em; text-wrap: pretty; }
-.srow .ansp a.ans { color: var(--ink); }
-.srow .ansp a.ans:hover { color: var(--teal); text-decoration: none; }
-.srow .ansp.none { font-weight: 500; font-size: 14.5px; }
-.srow .ansp.none a.ans { color: var(--dim); }
-.srow .ansp .by { font-size: 12.5px; font-weight: 400; letter-spacing: 0; color: var(--dim); }
-.srow .ansp .k { white-space: nowrap; }
-a.term, .by .term, .srow .term { text-decoration-color: var(--line); }
-.srow .ansp .more { color: var(--dim); white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
-.srow .ansp .more:hover { color: var(--teal); }
 .srow .r3 { margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--dim); }
 .ov .srow { padding: 8px 16px 9px; }
 .srow.d1 { padding-left: 34px; }
@@ -270,16 +221,10 @@ a.term, .by .term, .srow .term { text-decoration-color: var(--line); }
 .counts a:hover { color: var(--teal); }
 /* the Latest changes line is one link; it wraps on a phone (SHELL-SPEC 3.1: no line runs past its card) */
 .counts.latest a { white-space: normal; }
-.openrec { color: var(--dim); font-size: 13.5px; }
-.openrec a { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
-.openrec a:hover { color: var(--teal); }
 .pnote .nd2 { color: var(--dim); font-variant-numeric: tabular-nums; }
 .made { color: var(--dim); font-size: 13px; margin: 0 0 5px; }
 .made a { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .made a:hover { color: var(--teal); }
-.made .term { white-space: nowrap; }
-ul.idw { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 3px 16px; font-size: 13px; }
-ul.idw a, ul.idw span { white-space: nowrap; }
 
 /* ---------- objects: questions and experiments ---------- */
 .obj > h1 { margin-top: 2px; font-size: 22px; line-height: 1.3; }
@@ -293,8 +238,8 @@ ul.idw a, ul.idw span { white-space: nowrap; }
 .note { color: var(--dim); font-size: 14px; }
 .xrow { padding: 8px 0; border-bottom: 1px solid var(--soft); font-size: 14px; }
 .xrow:last-child { border-bottom: 0; }
-.qrail, .repro, .ycl { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 16px 0; }
-.qrail h2, .ycl h2 { margin: 0 0 6px; font-size: 16px; }
+.qrail, .repro { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 16px 0; }
+.qrail h2 { margin: 0 0 6px; font-size: 16px; }
 .qrail h3 { margin: 14px 0 4px; font-size: 13px; }
 .empty { border: 1px dashed var(--line); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
 .empty h2 { font-size: 13px; margin: 14px 0 4px; }
@@ -458,6 +403,49 @@ details.nd > .card { margin: 4px 0 14px; }
 .secnav.tabs { gap: 2px 14px; }
 .secnav.tabs a { border: 0; border-radius: 0; padding: 0 1px; border-bottom: 2px solid transparent; color: var(--dim); }
 .secnav.tabs a:hover, .secnav.tabs a:focus-visible, .secnav.tabs a[aria-current] { color: var(--ink); border-bottom-color: var(--teal); }
+/* in the inspector the row is real tabs (the UX lead's card, Nov 13 2026): one line that scrolls sideways when narrow,
+   the open tab underlined, one panel shown; each part's own heading is the tab's, so it is left to print */
+.card.tabbed .secnav[role="tablist"] { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 0 18px; margin: 12px 0 0; padding: 0 1px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.card.tabbed .secnav[role="tablist"]::-webkit-scrollbar { display: none; }
+.card.tabbed .secnav [role="tab"] { flex: none; white-space: nowrap; line-height: 30px; margin-bottom: -1px; }
+.card.tabbed .secnav [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--teal); font-weight: 600; }
+.card.tabbed section.part > h4 { display: none; }
+.card.tabbed section.part[role="tabpanel"] { margin-top: 14px; }
+/* a card's Result: the claim beside rb's number, then the figure and the chips */
+.vs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px; margin: 4px 0 6px; }
+.vs .lb { color: var(--dim); font-size: 12px; font-weight: 500; margin-right: 4px; }
+.vs .cl .n, .vs .rbn .e { font-size: 22px; font-weight: 650; color: var(--ink); }
+.vs .rbn { color: var(--ink); }
+.vs .rbn:hover { text-decoration: none; }
+.vs .rbn .iv { color: var(--dim); font-size: 13px; }
+.vs .vmk { font-size: 20px; font-weight: 700; }
+.vs .vmk.ok { color: var(--good); }
+.vs .vmk.no { color: var(--bad); }
+ul.chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; }
+ul.chips li { margin: 0; }
+.chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px 2px 7px; font-size: 12.5px; line-height: 18px; color: var(--ink); background: var(--card); }
+.chip .ic { width: 14px; height: 14px; flex: none; color: var(--dim); }
+.chip.k-late .ic, .chip.k-unchecked .ic { color: var(--warn); }
+.chip.k-problem { border-color: var(--bad); }
+.chip.k-problem .ic { color: var(--bad); }
+a.chip { color: var(--teal); }
+a.chip:hover { border-color: var(--teal); text-decoration: none; }
+a.chip .ic { color: var(--teal); }
+.ibtn.ico svg, .ibtn .ic { width: 16px; height: 16px; }
+.tbw { margin: 2px 0 8px; }
+.tband { max-width: 100%; height: auto; }
+.tband text { font: 11px var(--sans); fill: var(--dim); }
+.tband .rg { fill: var(--wash); }
+.tband .ax, .tband .tk { stroke: var(--dim); stroke-width: 1; }
+/* a card's Source: the quoted line, its file and line as a chip, its hash short with a copy button; rb's working folded */
+figure.cq { margin: 4px 0 12px; }
+figure.cq blockquote { margin: 0 0 6px; padding: 6px 10px; border-left: 3px solid var(--line); color: var(--ink); }
+figure.cq figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; }
+.fchip { border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+.sha12 { color: var(--dim); }
+ul.notes.how { list-style: none; padding: 0; }
+ul.notes.how li { display: flex; gap: 7px; align-items: flex-start; }
+ul.notes.how .ic { width: 14px; height: 14px; flex: none; margin-top: 3px; color: var(--dim); }
 dl.ax { display: grid; grid-template-columns: 5.6em minmax(0, 1fr); gap: 5px 12px; margin: 4px 0 0; font-size: 13.5px; }
 dl.ax dt { color: var(--dim); }
 dl.ax dd { margin: 0; min-width: 0; overflow-wrap: break-word; }
@@ -623,22 +611,6 @@ ol.sits, ol.hlist { list-style: none; margin: 0; padding: 0; }
 .hev .why { display: block; color: var(--dim); font-size: 13px; }
 .hev .rawl { display: block; font-size: 12.5px; }
 
-/* hints (glossary words), drawn from an attribute, never copied */
-.term { position: relative; cursor: help; text-decoration: underline dotted currentColor; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-a.term { cursor: pointer; }
-.term[data-hint]:hover::after, .term[data-hint]:focus::after {
-  content: attr(data-hint); content: attr(data-hint) / "";
-  position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 60;
-  max-width: 560px; margin-inline: auto; white-space: normal; padding: 9px 12px; border-radius: 9px;
-  background: var(--tip-bg); color: var(--tip-ink); border: 1px solid var(--tip-line);
-  font: 400 13px/1.45 var(--sans); letter-spacing: 0; text-transform: none; text-align: left; box-shadow: var(--shadow); }
-@supports (anchor-scope: all) {
-  .term { anchor-name: --term; anchor-scope: --term; }
-  .term[data-hint]:hover::after, .term[data-hint]:focus::after { inset: auto; position-anchor: --term; position-area: bottom span-right; position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline; margin: 7px 0; width: max-content; max-width: min(320px, calc(100vw - 32px)); }
-}
-.gloss { display: grid; grid-template-columns: minmax(8em, 13em) 1fr; gap: 5px 16px; margin: 0; font-size: 13.5px; }
-.gloss dt { font-weight: 600; }
-.gloss dd { margin: 0; color: var(--dim); }
 .foot { margin-top: 40px; color: var(--dim); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 4px; overflow-wrap: break-word; }
 .foot details > summary { cursor: pointer; width: fit-content; }
 /* a grid item's min-width: auto would take a command's one-line width: the box scrolls instead (S6c) */
@@ -656,7 +628,7 @@ ul.wl li.wd .wt { flex: 1 1 14em; min-width: 0; margin: 0; }
 ul.wl li.wd .cmdbox { flex: 0 1 auto; max-width: 100%; }
 .found, .waiting { margin: 18px 0 0; }
 .found h2, .waiting h2 { font-size: 15px; margin: 0 0 6px; }
-.waiting h3 { font-size: 13px; margin: 12px 0 4px; color: var(--dim); }
+.waiting h2 { font-size: 13px; margin: 12px 0 4px; color: var(--dim); }
 ul.fl, ul.wl, ul.oi { list-style: none; margin: 0; padding: 0; }
 ul.fl li { padding: 5px 0; border-bottom: 1px solid var(--soft); font-size: 14px; }
 ul.fl .fh { display: block; color: var(--dim); font-size: 12.5px; }
@@ -669,8 +641,6 @@ ul.wl > li { padding: 6px 0 4px; border-bottom: 1px solid var(--soft); font-size
 ul.oi li { padding: 3px 0; font-size: 13.5px; overflow-wrap: break-word; }
 .cbody { padding: 4px 8px 12px; }
 .cbody .lab { font-size: 12px; font-weight: 600; color: var(--dim); margin: 0 0 4px; }
-.srow .ansp.note { font-size: 14.5px; font-weight: 400; color: var(--dim); }
-.srow .ansp.note a.ans { color: var(--dim); font-style: italic; }
 .wlink { margin: 18px 0 0; }
 /* plain words pass 4: Your call's line that opens what else is open, in the inspector (P12); a question's notes that name it */
 h2.oilink { font-size: 14px; font-weight: 500; margin: 18px 0 0; }
@@ -784,8 +754,8 @@ h2.qnh { font-size: 15px; margin: 22px 0 6px; }
   .ibody .inone p { margin: 6px 0; }
   .ibody .card .lineage { display: none; }
   .ibody .decide { background: var(--bg); }
-  .ibody .repro, .ibody .qrail, .ibody .ycl { border: 0; padding: 0; margin: 0; background: transparent; }
-  .ibody .rootc > * > h2:first-child, .ibody .rootc .rhd h2, .ibody .rootc .ycl > .lede { display: none; }
+  .ibody .repro, .ibody .qrail { border: 0; padding: 0; margin: 0; background: transparent; }
+  .ibody .rootc > * > h2:first-child, .ibody .rootc .rhd h2 { display: none; }
   .ibody .rootc .rhd { justify-content: flex-end; margin: -2px 0 2px; }
   .ibody .rootc h4:first-of-type { margin-top: 10px; }
   .ibody .flash { animation: flash 1.2s ease-out 1; }
@@ -814,7 +784,6 @@ h2.qnh { font-size: 15px; margin: 22px 0 6px; }
   .help dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 6px 0 8px; }
   .help dd { margin: 0; color: var(--dim); }
   .help label { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; }
-  .help .hw { margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
 }
 
 /* app mode with the rail visible: the working object's action block moves to the inspector root */
@@ -874,11 +843,6 @@ html.app nav.nav a.grp { display: block; padding: 14px 10px 4px; margin: 0; font
   .integ p { display: inline; margin: 0; font-size: 13.5px; line-height: 1.4; }
   .integ p + p::before { content: " "; }
   .srow.d1 { padding-left: 24px; }
-  .srow.sg { grid-template-columns: minmax(0, 1fr); }
-  .srow.sg > .sc { grid-column: 1; grid-row: auto; padding-top: 2px; }
-  .srow .ansp { font-size: 16px; }
-  .srow .ansp .k { white-space: normal; }
-  .srow .ansp .term { white-space: nowrap; }
   .igroup > .said, .rel > .said { font-size: 16px; }
   li.evr { padding: 10px 6px 10px 10px; }
   .evh { display: block; }
@@ -893,7 +857,7 @@ html.app nav.nav a.grp { display: block; padding: 14px 10px 4px; margin: 0; font
   html.app nav.nav { padding: 0 4px; }
   html.app nav.nav a, html.app nav.nav a.grp { padding: 8px 4px 7px; font-size: 13.5px; gap: 3px; }
   html.app nav .n { padding-left: 2px; }
-  html.app main { padding: 16px 16px 72px; }
+  html.app main { padding: 16px 16px 80px; }
   html.app aside.insp { width: 100vw; border-left: 0; }
   nav.nav { margin: 0 -16px; padding: 0 8px; }
   nav.nav a { padding: 7px 4px 6px; font-size: 13.5px; gap: 3px; }
@@ -910,19 +874,6 @@ html.app nav.nav a.grp { display: block; padding: 14px 10px 4px; margin: 0; font
   .pair { grid-template-columns: minmax(0, 1fr); }
   .pv { justify-self: start; }
   .hev { grid-template-columns: 1fr; }
-  table.st2, table.st2 thead, table.st2 tbody, table.st2 tr, table.st2 th, table.st2 td { display: block; }
-  table.st2 thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  table.st2 tbody tr { border-bottom: 1px solid var(--line); padding: 8px 0; }
-  table.st2 td { border: 0; padding: 1px 0; }
-  html:not(.app) table.st2 td[data-k]::before { content: attr(data-k) "  "; color: var(--dim); font: 600 10.5px var(--sans); }
-  .gloss { grid-template-columns: 1fr; gap: 0; }
-  /* an experiment's Runs: the run, its arms and values on a line, its numbers under them across the width */
-  table.xr thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  table.xr, table.xr tbody { display: block; }
-  table.xr tr { display: flex; flex-wrap: wrap; gap: 0 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-  table.xr th, table.xr td { display: block; border: 0; padding: 0; }
-  .gloss dd { margin-bottom: 8px; }
-  .term[data-hint]:hover::after, .term[data-hint]:focus::after { position-area: bottom span-all; margin: 7px 16px; width: auto; max-width: none; }
 }
 @media (max-width: 639px) and (max-height: 500px) { nav.nav { position: static; } html { scroll-padding-top: 8px; } }
 @media (forced-colors: active) {
@@ -961,7 +912,6 @@ html:is([data-viewer], :has(meta[name=rb-viewer])):not(:has(meta[name=rb-clone])
   body { padding: 0; }
   nav.nav, nav.subrow, p.rlink, aside.insp, .ctl, .cp, .filterbar, .help, .skip, .app-only, .seg, .composer { display: none !important; }
   .acts.enh { display: grid !important; }
-  .term::after { content: none; }
   details::details-content { content-visibility: visible; display: contents; }
   .card, .srow, .repro, tr, .callrow, .igroup, .pair, .hev { break-inside: avoid; }
   h1, h2, h3, h4 { break-after: avoid; }
@@ -1013,3 +963,321 @@ ul.struck li { text-decoration: line-through; text-decoration-color: var(--dim);
   html.app nav.nav:has(> .navctl) > ul { flex: 1 0 auto; min-width: 0; }
   html.app .navctl { display: flex; gap: 6px; padding: 0 0 0 6px; align-items: center; margin-left: auto; }
 }
+
+/* the Overview's four blocks (UX5 1.2): shape carries the meaning, colour only repeats it */
+.ovq{font:600 22px/1.35 var(--sans);margin:0 0 6px;border-left:3px solid var(--line);padding-left:10px}
+.ovq a{color:var(--ink)}
+.ovh2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:18px 0 6px}
+.ovh2 .pill,.chip{text-transform:none;letter-spacing:0;border:1px solid var(--line);border-radius:9px;padding:0 7px;font-weight:500}
+.ovh2 .n,.yc .n{background:var(--ink);color:var(--bg);border-radius:9px;padding:0 7px;font-size:11px}
+.ovstrip,.marks{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline}
+.ovstrip .grp{white-space:nowrap}
+.ovstrip .ct{display:inline;margin-left:6px;color:var(--dim);font-size:13px}
+.ovstrip.big a{font-size:20px}
+.sqm,.ovstrip a{text-decoration:none;font-family:var(--mono)}
+.ovstrip .late,tspan.late{text-decoration:overline}
+.s-meets,.ovstrip a.s-meets{color:var(--good);fill:var(--good)}.s-misses,.ovstrip a.s-misses{color:var(--bad);fill:var(--bad)}.s-undetermined,.ovstrip a.s-undetermined{color:var(--warn);fill:var(--warn)}.s-untested,.ovstrip a.s-untested{color:var(--dim);fill:var(--dim)}
+.ovchart{margin:0;max-width:760px}
+.ovp{margin:0 0 10px}.ovp .gh{margin:0 0 2px;font-size:13px;color:var(--dim)}
+.ovr{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"l l l" "t e r";gap:0 10px;align-items:center;color:var(--ink);text-decoration:none;padding:3px 0}
+.ovr.sh{grid-template-columns:9em minmax(0,1fr) auto auto;grid-template-areas:"l t e r"}
+.ovr:hover .ol .au{text-decoration:underline}
+.ol{grid-area:l;font-size:14px}.oe{grid-area:e;white-space:nowrap;font-size:14px}.og{grid-area:r;white-space:nowrap;font-size:12px;color:var(--dim)}
+.oe b{font:20px var(--mono);vertical-align:-2px}.oe b.late{text-decoration:overline}
+.ot{grid-area:t;position:relative;display:block;height:20px;margin:0 6px}
+.ot i{position:absolute;top:0;height:20px;display:block}
+.ot .z{background:color-mix(in srgb,var(--good) 16%,transparent)}
+.ot .e{width:0;border-left:2px solid var(--good)}
+.ot .o{width:0;border-left:1.5px dashed var(--dim)}
+.ot .b{top:5px;height:10px;border:solid var(--ink);border-width:0 1.5px;box-sizing:border-box}
+.ot .b::after{content:"";position:absolute;left:0;right:0;top:4px;border-top:1.5px solid var(--ink)}
+.ot .d{top:5px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--ink)}
+.ot .d.h{background:var(--bg);border:1.5px solid var(--ink);box-sizing:border-box}
+.ovr .oax{grid-area:x;position:relative;display:block;height:15px;margin:0 6px;font-size:12px;color:var(--dim)}
+.ovr:has(.oax){grid-template-areas:"l l l" "t e r" "x . ."}.ovr.sh:has(.oax){grid-template-areas:"l t e r" ". x . ."}
+.oax span{position:absolute;transform:translateX(-50%);white-space:nowrap}.oax .l{transform:none}.oax .r{transform:translateX(-100%)}
+.fd{display:grid;grid-template-columns:minmax(5.5em,auto) minmax(0,1fr);gap:6px 12px;margin:10px 0 0;align-items:baseline}
+.fd dt{font-size:11px;letter-spacing:.06em;color:var(--dim)}.fd dd{margin:0;min-width:0}.fd .fi,.fd dd>a{margin-right:6px}
+.fh{font-size:15px;line-height:1.5}.fh .fl{font-size:11px;letter-spacing:.06em;color:var(--dim)}.fd .fs{grid-column:1/-1;margin:0}
+.ff{display:block;position:relative;margin:2px 0 4px}.ff .oax{position:relative;display:block;height:15px;margin:0 6px;font-size:12px;color:var(--dim)}
+.fmk{font-size:12px;color:var(--dim)}.flines{font-size:12px;overflow:auto;margin:4px 0}.flines b{background:var(--soft)}
+.kl{color:var(--dim)}.rl{list-style:none;padding:0;margin:8px 0;line-height:1.8}
+@media (max-width:639px){.ovr,.ovr.sh{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"l r" "t e";padding:1px 0}.ovp{margin:0 0 4px}.ol{font-size:13px}.ovr .oax{height:13px}
+.ovr:has(.ax),.ovr.sh:has(.oax){grid-template-areas:"l r" "t e" "x ."}}
+.marks{gap:8px}.mk{border:1px solid var(--line);border-radius:6px;padding:2px 10px;color:var(--ink)}
+.mk.ok{border-color:var(--good)}.mk.no{border-color:var(--bad)}
+.dq,.oq{list-style:none;padding:0;margin:0}
+.dq .dr{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--soft)}
+.dq :is(.cmdbox,.dcw){flex-basis:100%}.dn{display:block;font-size:12px;color:var(--dim)}
+.chip{border-radius:4px;font-size:12px;color:var(--dim)}.kd{color:var(--accent)!important}.kc{color:var(--teal)!important}
+
+/* the record's navigation on a phone (the UX lead's call, Nov 13 2026: "on mobile the catalog ui abit ..need ui fix").
+   From 600 the "..." button is hidden and About, the theme and ? stand where they stood; under 600 they fold into it */
+.morebox, .ctls { display: contents; }
+.ctl.more, .ctl.ftab { display: none !important; }
+@media screen and (max-width: 599px) {
+  /* the open tab's name is the row's, never a line of its own above it: the bar drops it, and inside the hub, where the
+     bar said nothing else, the page draws no bar (the hub's own names the record) */
+  html.app header.top .vcrumb { display: none; }
+  html.app:is(.hosted, :has(meta[name=rb-viewer])) { --toph: 0px; }
+  html.app:is(.hosted, :has(meta[name=rb-viewer])) header.top { display: none; }
+  /* one navigation row: the tabs on one line that scrolls sideways, Your call pinned at its right end, then "..." */
+  html.app nav.nav, html.app nav.nav:has(> .navctl) { display: flex; flex-wrap: wrap; align-items: center; padding: 0 4px; }
+  html.app nav.nav > ul, html.app nav.nav:has(> .navctl) > ul { order: 1; flex: 1 1 0; min-width: 0; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; scroll-padding-inline: 4px 8em; }
+  html.app nav.nav > ul::-webkit-scrollbar { display: none; }
+  html.app nav.nav > ul > li { flex: none; }
+  html.app nav li.yc, html.app nav li.yc[data-row] { position: sticky; right: 0; z-index: 1; margin: 0 0 0 auto; padding: 0 0 0 6px; background: var(--bg); box-shadow: -10px 0 8px -6px var(--bg); }
+  html.app nav.nav > .navctl, html.app nav.nav:has(> .navctl) > .navctl { order: 2; flex: none; margin: 0; padding: 0 0 0 4px; }
+  /* the "..." button and its small menu, under it at the screen's right */
+  html.app .morebox { display: block; position: relative; flex: none; }
+  html.app .ctl.more { display: inline-flex !important; width: 36px; height: 32px; }
+  html.app .ctl.more svg { width: 16px; height: 16px; display: block; }
+  html.app .ctl.more[aria-expanded="true"] { color: var(--ink); background: var(--hover2); }
+  html.app .ctls { display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; flex-direction: column; align-items: stretch; min-width: 12em; padding: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+  html.app .ctl.more[aria-expanded="true"] + .ctls { display: flex; }
+  html.app .ctls .ctl, html.app .ctls .ctl.ico, html.app .ctls .ctl.ftab { display: flex !important; width: auto; height: 44px; justify-content: flex-start; gap: 10px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--ink); font-size: 14px; text-decoration: none; }
+  html.app .ctls .ctl:hover, html.app .ctls .ctl:focus-visible { background: var(--hover); }
+  html.app .ctls .ctl[aria-current] { font-weight: 600; }
+  /* the theme and ? say their names beside their marks in the menu */
+  html.app .ctls .ctl[data-theme]::after, html.app .ctls .ctl[data-keys]::after { content: attr(aria-label); font-weight: 400; }
+  html.app .ctls .ctl[data-keys] { font-weight: 600; }
+  html.app .ctls .ctl[data-keys]::after { margin-left: 4px; }
+  /* the hub's "Try it yourself" pill sits over the screen's bottom 72 px: no control stays there. The keys list opens
+     under the bar, and a card's sheet ends with room under its last control */
+  .help { inset: 56px 12px auto 12px; width: auto; max-height: calc(100dvh - 140px); overflow: auto; }
+  html.app .ibody { padding-bottom: 80px; }
+}
+/* what waits on the Overview (the UX lead's Still open, Nov 13 2026): kind chips that filter, rows of one line, each
+   wholly a link, a hover card of its result */
+.dfil { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.dchip { font: 500 13px var(--sans); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.dchip:hover { border-color: var(--teal); background: var(--hover); }
+.dchip[aria-pressed="true"] { border-color: var(--teal); background: var(--wash); color: var(--teal); }
+.dq.dql .dr.dl1 { display: block; padding: 0; }
+.dq.dql .dr.dl1[hidden] { display: none; }
+a.drow { display: flex; align-items: center; gap: 10px; padding: 7px 6px; margin: 0; border-radius: 6px; color: var(--ink); text-decoration: none; min-width: 0; }
+a.drow:hover, a.drow:focus-visible { background: var(--hover); text-decoration: none; }
+a.drow:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+a.drow .st { flex: none; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 1px 9px; border: 1px solid currentColor; white-space: nowrap; }
+a.drow .st.s-misses { color: var(--bad); }
+a.drow .st.s-undetermined { color: var(--warn); }
+a.drow .st.s-untested { color: var(--dim); }
+a.drow .st.s-meets { color: var(--good); }
+a.drow .st.s-design { color: var(--teal); }
+a.drow .dt { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+a.drow .mbar { flex: none; }
+a.drow .mbar .iv { stroke: var(--dim); stroke-width: 2; }
+a.drow .mbar .tk { stroke: var(--ink); stroke-width: 1.4; }
+a.drow .mbar .est { fill: var(--ink); }
+a.drow .chev { flex: none; color: var(--dim); font-size: 18px; line-height: 1; }
+.dstate { margin: 4px 0 0; color: var(--ink); }
+.pv { position: fixed; z-index: 60; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 10px 12px; pointer-events: none; }
+.pv[hidden] { display: none; }
+.pv .vs .cl .n, .pv .vs .rbn .e { font-size: 17px; }
+@media (max-width: 599px) { a.drow .mbar { display: none; } }
+/* empty states, shown not written (the UX lead's rule, Nov 13 2026): a chip on the item, a muted outline where the
+   missing thing would sit, and in your view one Next step card with its prompt to copy */
+.echip { display: inline-block; font-size: 12.5px; font-weight: 600; color: var(--dim); border: 1px dashed var(--dim); border-radius: 999px; padding: 1px 10px; }
+.ghost { border: 1.5px dashed var(--line); border-radius: 8px; padding: 12px 14px; margin: 10px 0; display: grid; gap: 8px; max-width: 520px; }
+.ghost i { display: block; height: 9px; border-radius: 4px; background: var(--soft); }
+.ghost i.gt { width: 55%; height: 12px; }
+.ghost i.gs { width: 35%; }
+.ghost.g-table i { height: 14px; }
+.ghost.g-table i.gh { background: var(--line); height: 10px; width: 100%; }
+.nextc { border: 1px solid var(--line); border-left: 3px solid var(--teal); border-radius: 8px; padding: 10px 14px; margin: 12px 0; max-width: 640px; background: var(--card); }
+.nextc h3 { margin: 0 0 6px; font-size: 13px; }
+.nextc .prompt { margin: 0 0 8px; color: var(--ink); overflow-wrap: break-word; }
+.nextc .cpp { font: 500 13px var(--sans); color: var(--teal); background: none; border: 1px solid var(--teal); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.nextc .cpp:hover { background: var(--wash); }
+/* the card's line icons (nodes.rs icon), each a mask in the text's colour */
+.ic { display: inline-block; width: 14px; height: 14px; flex: none; background: currentColor; -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; vertical-align: -2px; }
+.ic-late { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22/%3E%3Cpath d=%22M8 4.5V8l2.5 1.5%22/%3E%3C/svg%3E"); }
+.ic-problem { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M8 2.5 14 13H2z%22/%3E%3Cpath d=%22M8 6.5v3M8 11.2v.1%22/%3E%3C/svg%3E"); }
+.ic-unchecked { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22/%3E%3Cpath d=%22M6.3 6.3a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1M8 11.2v.1%22/%3E%3C/svg%3E"); }
+.ic-undecided { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 stroke-dasharray=%222.4 2%22/%3E%3C/svg%3E"); }
+.ic-runs { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M3 4h10M3 8h10M3 12h10%22/%3E%3C/svg%3E"); }
+.ic-pair { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%225%22 cy=%228%22 r=%222.5%22/%3E%3Ccircle cx=%2211%22 cy=%228%22 r=%222.5%22/%3E%3Cpath d=%22M7.5 8h1%22/%3E%3C/svg%3E"); }
+.ic-scope { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M2.5 3.5h11l-4 5v4l-3 1v-5z%22/%3E%3C/svg%3E"); }
+.ic-interval { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M2.5 8h11M2.5 5.5v5M13.5 5.5v5%22/%3E%3Ccircle cx=%228%22 cy=%228%22 r=%221.5%22/%3E%3C/svg%3E"); }
+.ic-copy { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%225.5%22 y=%225.5%22 width=%228%22 height=%228%22 rx=%221.5%22/%3E%3Cpath d=%22M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2%22/%3E%3C/svg%3E"); }
+.ic-setting { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22/%3E%3Cpath d=%22M6.3 6.3a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1M8 11.2v.1%22/%3E%3C/svg%3E"); }
+.ic-note { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%221.6%22/%3E%3C/svg%3E"); }
+.vs .vmk.est { color: var(--dim); }
+
+/* the Files tree under Record (owner, Nov 13 2026): "Files (n)" opens it in place; a filter box on top; each row a type
+   icon, the name and its chips. With no script it is not drawn; under 960 it opens as a sheet under the navigator's row */
+html:not(.app) nav li.fls{display:none}
+.ftree{display:none;font-size:13px;margin:2px 0 6px}
+nav li.fls.open > .ftree{display:block}
+.ftree ul{list-style:none;padding:0;margin:0}
+.ftree ul ul{padding-left:12px}
+.ftree .fhead{display:flex;gap:4px;align-items:center}
+.ftree .fclose{display:none;flex:none;width:32px;height:30px;font:14px var(--sans);color:var(--dim);background:none;border:0;border-radius:6px;cursor:pointer}
+.ftree .ffilter{flex:1;min-width:0;width:100%;box-sizing:border-box;margin:4px 0 6px;padding:4px 8px;font:13px var(--sans);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px}
+.ftree summary{display:flex;gap:6px;align-items:center;cursor:pointer;padding:2px 4px;border-radius:6px;color:var(--ink);list-style:none}
+.ftree summary::-webkit-details-marker{display:none}
+.ftree summary::before{content:"\203a";display:inline-block;width:8px;color:var(--dim);transition:transform .1s}
+.ftree details[open] > summary::before{transform:rotate(90deg)}
+html.app nav.nav .ftree a{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;padding:2px 4px;margin:0;font-size:13px;line-height:1.3}
+.ftree .fn{overflow-wrap:break-word;min-width:0}
+.ftree .fcs{display:flex;flex-wrap:wrap;gap:3px;flex-basis:100%;padding-left:20px}
+.ftree .fcs:empty{display:none}
+.ftree .fcs .fch{max-width:15em;overflow:hidden;text-overflow:ellipsis;display:inline-block}
+.ftree li[hidden]{display:none}
+.ftog[aria-expanded="true"]{font-weight:600}
+/* a file's chips: how the record uses it, then git's and this checkout's word on it */
+.fch{display:inline-flex;align-items:center;font:11px/1.5 var(--sans);padding:0 6px;border-radius:9px;border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.fch-use{color:var(--teal);border-color:color-mix(in srgb,var(--teal) 45%,var(--bg))}
+.fch-warn{color:var(--warn,#a16207);border-color:color-mix(in srgb,var(--warn,#a16207) 55%,var(--bg));background:color-mix(in srgb,var(--warn,#a16207) 10%,var(--bg))}
+.fch-bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 55%,var(--bg));background:color-mix(in srgb,var(--bad) 9%,var(--bg))}
+.fch-dim{color:var(--dim);background:var(--hover)}
+.fch-at{color:var(--ink)}
+.fcard .fchips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 10px}
+.fcard .fch,.astrip .fch{white-space:normal;overflow-wrap:break-word}
+.fcard .hd .ic{margin-right:4px}
+/* a file's lines and a citation's: numbered, the cited ones tinted, each line wrapping under its own text */
+pre.srclines{margin:6px 0 10px;padding:6px 0;font:0/0 var(--mono);color:var(--ink);background:var(--hover);border:1px solid var(--line);border-radius:8px;white-space:normal;overflow-x:auto}
+pre.srclines .sl{display:block;font:12px/1.55 var(--mono);white-space:pre-wrap;overflow-wrap:break-word;padding:0 10px 0 4.6em;text-indent:-4.6em}
+pre.srclines .ln{display:inline-block;width:3.4em;padding-right:.5em;text-align:right;text-indent:0;color:var(--dim);user-select:none}
+pre.srclines .cm{color:var(--accent);user-select:none}
+pre.srclines .sl.on{background:color-mix(in srgb,var(--accent) 15%,transparent)}
+pre.srclines .sl.gap .ln{color:var(--dim)}
+.srclines.fwhole{max-height:70vh;overflow:auto}
+.srclines .ctags,.ctags{display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:8px;font-family:var(--sans);text-indent:0;vertical-align:1px}
+p.ctags{margin:2px 0 10px}
+a.ctag{font:11px/1.5 var(--sans);padding:0 6px;border-radius:9px;background:var(--wash,var(--hover));color:var(--teal);text-decoration:none}
+/* a file's type as a small glyph in its colour: a config, a document, code, a log, a table, any other file */
+.fti{display:inline-block;width:18px;flex:none;font:600 10px/16px var(--mono);text-align:center;color:var(--dim)}
+.fti-cfg::before{content:"{}";color:#8b6fd6}.fti-doc::before{content:"\b6";color:var(--teal)}.fti-code::before{content:"</>";letter-spacing:-1px;color:var(--good)}.fti-log::before{content:"\2261";color:var(--accent)}.fti-tab::before{content:"\25a6";color:#c2643f}.fti-file::before{content:"\25ab"}
+.ftree .ic-fold{color:var(--dim)}
+.ic-fold { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M1.5 4.5v8.5h13V5.5H8L6.5 3.5h-5z%22/%3E%3C/svg%3E"); }
+@media screen and (max-width: 959px) {
+  /* the row keeps Record a link; the tree opens as a sheet under the row, from the menu's Files */
+  html.app nav.nav:has(li.fls.open) { position: relative; z-index: 25; }
+  html.app nav .ftree .fclose { display: block; }
+  html.app nav .rec:has(> li.fls.open) { display: block; }
+  html.app nav .rec:has(> li.fls.open) > li:not(.fls), html.app nav li.fls > a.ftog { display: none; }
+  html.app nav li.fls.open > .ftree { position: absolute; left: 0; right: 0; top: 100%; z-index: 30; max-height: 60vh; overflow: auto; margin: 0; padding: 6px 12px 10px; background: var(--bg); border-bottom: 1px solid var(--line); box-shadow: 0 6px 12px -8px rgba(0,0,0,.25); }
+}
+
+/* the header's git chips (owner, Nov 13 2026): the branch and the commit as one chip, a copy button, and only where record
+   files are not committed, an amber chip with their count that opens their list */
+.ic-branch { --ic: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%225%22 cy=%223.5%22 r=%221.6%22/%3E%3Ccircle cx=%225%22 cy=%2212.5%22 r=%221.6%22/%3E%3Ccircle cx=%2211%22 cy=%225.5%22 r=%221.6%22/%3E%3Cpath d=%22M5 5.1v5.8M11 7.1c0 2.4-6 1.6-6 3.8%22/%3E%3C/svg%3E"); }
+.gitc { display: inline-flex; align-items: center; gap: 4px; min-width: 0; font-size: 12.5px; }
+.gref { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 1px 8px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); white-space: nowrap; }
+.gref .gb { overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 16em; }
+.gref .gsha, .where .gsha { color: var(--dim); }
+.gref .gb + .gsha::before { content: "\b7"; margin-right: 5px; color: var(--dim); }
+.gcopy { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--dim); cursor: pointer; }
+.gcopy:hover, .gcopy:focus-visible { color: var(--ink); background: var(--hover); }
+.gcopy.done { color: var(--good); }
+.gunc { position: relative; }
+.gunc > summary { cursor: pointer; list-style: none; font-size: 12px; }
+.gunc > summary::-webkit-details-marker { display: none; }
+.gunc > .gpop { position: absolute; z-index: 70; top: calc(100% + 6px); right: 0; min-width: 240px; max-width: min(460px, calc(100vw - 24px)); max-height: 60vh; overflow: auto; padding: 6px 0; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow, 0 6px 18px rgba(0,0,0,.18)); }
+.gunc .gl { list-style: none; margin: 0; padding: 0; }
+.gunc:not([open]) > .gpop { display: none; }
+@media screen and (max-width: 599px) {
+  /* on a phone the list spans the screen under the header's line, never past its edges */
+  .gunc { position: static; }
+  .gunc > .gpop { left: 8px; right: 8px; top: auto; min-width: 0; max-width: none; margin-top: 6px; }
+}
+.gunc .gl li { padding: 2px 12px; font-size: 12px; color: var(--ink); overflow-wrap: break-word; }
+@media print { .gcopy { display: none !important; } .gunc > .gpop, .gunc:not([open]) > .gpop { display: block !important; position: static; box-shadow: none; border: 0; padding: 2px 0; max-height: none; } }
+/* About as one strip of facts (owner, Nov 13 2026) */
+.astrip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 12px; }
+.astrip .gunc > .gpop { left: 0; right: auto; }
+.abadge { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 12px; font: 600 12px/1.6 var(--sans); color: #fff; background: var(--teal); }
+.astrip .fch { font-size: 12px; }
+.astrip a.fch { text-decoration: none; }
+p.honest1 { margin: 10px 0 0; }
+/* the Resources view and a resource's card (owner, Nov 13 2026): a type glyph and the name, chips that link, rules as
+   chips by question, runs as a small table */
+.rt{display:inline-block;width:20px;flex:none;margin-right:4px;font:600 12px/1 var(--mono);text-align:center;color:var(--teal);vertical-align:1px}
+.rt-dataset::before{content:"\25a4"}.rt-checkpoint::before,.rt-model::before{content:"\25c8"}.rt-code::before{content:"</>";font-size:10px;letter-spacing:-1px}.rt-environment::before{content:"\2699"}.rt-artifact::before{content:"\25a3"}.rt-other::before{content:"\25cf"}
+.rchips{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin:6px 0}
+.rchips a.fch{text-decoration:none}
+.rchips .getit{font-size:12.5px}
+.resrow .cs .kind{margin:0 6px;font-size:11px}
+.rbqs{display:grid;gap:6px;margin:6px 0 10px}
+.rbq{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.rbqh{font-size:12.5px;font-weight:600}
+.rbqc{display:flex;flex-wrap:wrap;gap:4px}
+table.rruns{border-collapse:collapse;font-size:12.5px;margin:4px 0 8px}
+table.rruns th{text-align:left;font-weight:600;color:var(--dim);padding:2px 12px 2px 0;border-bottom:1px solid var(--line)}
+table.rruns td{padding:3px 12px 3px 0;border-bottom:1px solid var(--soft)}
+/* a per-run setting whose words differ across runs (the grader badge, owner Nov 13 2026) */
+.mixb{display:inline-block;padding:1px 8px;line-height:1.5;border-radius:12px;font-size:12.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 11%,var(--bg));border:1px solid color-mix(in srgb,var(--warn) 45%,var(--bg))}
+.mixb b{font-weight:600}
+.chips li:has(>.mixb){display:block}
+p.mixes{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+/* a note as one line, the whole under it on a click (owner, Nov 13 2026) */
+li.note.nl{list-style:none}
+li.note.nl .nfold>summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;gap:2px 6px;align-items:baseline}
+li.note.nl .nfold>summary::-webkit-details-marker{display:none}
+li.note.nl .nfold>summary::after{content:"\203a";color:var(--dim)}
+li.note.nl .nfold[open]>summary::after{content:"\2039"}
+li.note.nl .nall{margin:4px 0 6px;padding-left:10px;border-left:2px solid var(--line);overflow-wrap:break-word}
+li.note.nl .fch{font-size:11px}
+/* a setting's status: an icon and a word, rb's words for it on hover and on keyboard focus (owner, Nov 13 2026) */
+.sst{position:relative;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;cursor:help;border-radius:4px}
+.sst .sm2{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;font:700 10px/1 var(--sans);color:#fff}
+.sst.ok .sm2{background:var(--good)}.sst.nc .sm2{background:var(--warn)}.sst.in .sm2{background:var(--dim)}
+.sst.ok{color:var(--good)}.sst.nc{color:var(--warn)}
+.sst:is(:hover,:focus-visible)::after{content:attr(data-tip);position:absolute;z-index:50;left:0;top:calc(100% + 4px);width:max-content;max-width:min(320px,80vw);white-space:normal;padding:6px 8px;font:12px/1.4 var(--sans);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+/* a key statement shown whole; past three lines it fades until "more" (owner, Nov 13 2026) */
+html.app .kst.clamp:not(.open){display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 60%,transparent);mask-image:linear-gradient(180deg,#000 60%,transparent)}
+.kmore{font:500 12.5px var(--sans);color:var(--teal);background:none;border:0;padding:0;margin-top:2px;cursor:pointer}
+/* the design's standing as a chip, its Confirm action a small popover */
+.dstate{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
+.cfpop{display:inline-block}
+.cfpop{position:relative}
+.cfpop>summary{list-style:none;cursor:pointer;font:500 12.5px var(--sans);color:var(--teal);border:1px solid var(--teal);border-radius:12px;padding:0 10px}
+.cfpop>summary::-webkit-details-marker{display:none}
+.cfpop>.pop{position:absolute;z-index:40;top:calc(100% + 4px);left:0;white-space:nowrap;padding:6px 10px;font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.cfpop:not([open])>.pop{display:none}
+@media print { .cfpop > .pop, .cfpop:not([open]) > .pop { display: block !important; position: static; box-shadow: none; border: 0; padding: 0; } }
+/* a state as a coloured chip with an icon (owner, Nov 13 2026: counts click, statuses are chips) */
+p.who.chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+p.who.chips a.fch{text-decoration:none;font-size:12px}
+.stc{display:inline-flex;align-items:center;gap:4px;padding:0 8px;border-radius:10px;font:500 12px/1.6 var(--sans);border:1px solid var(--line)}
+.sti{font-size:11px}
+.st-open{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,var(--bg));background:color-mix(in srgb,var(--warn) 10%,var(--bg))}
+.st-ok{color:var(--good);border-color:color-mix(in srgb,var(--good) 50%,var(--bg));background:color-mix(in srgb,var(--good) 10%,var(--bg))}
+.st-bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 50%,var(--bg));background:color-mix(in srgb,var(--bad) 9%,var(--bg))}
+.st-dim{color:var(--dim);background:var(--hover)}
+.st-hollow{color:var(--dim);background:none;border-style:dashed}
+.rflts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.rflt{font:500 12.5px var(--sans);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:2px 10px;cursor:pointer}
+.rflt[aria-pressed="true"]{border-color:var(--teal);background:var(--wash);color:var(--teal)}
+.rflt.good{color:var(--good)}.rflt.bad{color:var(--bad)}.rflt.warn{color:var(--warn)}
+html:not(.app) .rflt{cursor:default}
+/* under prefers-reduced-motion nothing on the page moves, whatever drew the motion (issue #1) */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+/* on a phone the header keeps only the amber chip; the branch, the commit and its copy are About's */
+@media screen and (max-width: 599px) { html.app header.top > .gitc .gref, html.app header.top > .gitc .gcopy { display: none; } }
+/* closed form: the bar's title, view name, commit chip and time open what they name */
+header.top a.ttl, header.top a.stamp, header.top .vcrumb a, a.gref { text-decoration: none; color: inherit; }
+header.top a.ttl:hover, header.top a.stamp:hover, header.top .vcrumb a:hover, a.gref:hover { text-decoration: underline; }
+a.ht, .sith a { color: inherit; text-decoration: none; }
+a.ht:hover, .sith a:hover { text-decoration: underline; }
+/* closed form: a row names its record by its words, never its id (the id is in the card's own fields) */
+.xr2 .cid, .evv .cid, .pc .cid, .srow .cid, .cr .cid, .resrow .cid, .card .hd > .id { display: none; }
+.vs a.cl, a.figl, .chips a.chip { color: inherit; text-decoration: none; }
+a.figl { display: block; }
+.vs a.cl:hover .n, .chips a.chip:hover span { text-decoration: underline; }
+.ovp .gh a, .sith a, .lede a, h1 a.n, .meta a, a.pill { color: inherit; text-decoration: none; }
+.ovp .gh a:hover, .lede a:hover, h1 a.n:hover, .meta a:hover, a.pill:hover { text-decoration: underline; }
+.ftip{position:absolute;z-index:60;max-width:min(320px,80vw);padding:6px 8px;font:12px/1.4 var(--sans);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.18);pointer-events:none}
+@media print { .ftip { display: none; } }
+h2 a.n, h3 a.n, .qh a.n, p.late a { color: inherit; text-decoration: none; }
+h2 a.n:hover, h3 a.n:hover, .qh a.n:hover, p.late a:hover { text-decoration: underline; }
+a.stc { color: inherit; text-decoration: none; }
+a.stc:hover { text-decoration: underline; }
+.ibar a.rootname { text-decoration: none; }
+.ibar a.rootname:hover { text-decoration: underline; }
+a.sx { color: inherit; text-decoration: none; }
+a.sx:hover { text-decoration: underline; }
+/* closed form: a value or a label that opens its source reads as it did; its link shows on hover and focus */
+:is(.kst, .facts, p.rq, p.ia, p.wit, .ipcall, .wt, h3.gt, .grid th, .runs2 th, .obs th, .obs td.dim, .ogh, .dline, .retr, .stub, p.mets, p.note, .qh, .who, .meta, .wd .wt, .made li, .citedby, .gnote) a:not(.cite):not(.fch):not(.stc), h2 > a:not(.fch), a.kind, .card .tt > a, .tt.fh a { color: inherit; text-decoration: none; }
+:is(.kst, .facts, p.rq, p.ia, p.wit, .ipcall, .wt, h3.gt, .grid th, .runs2 th, .obs th, .obs td.dim, .ogh, .dline, .retr, .stub, p.mets, p.note, .qh, .who, .meta, .wd .wt, .made li, .citedby, .gnote) a:hover, h2 > a:hover, a.kind:hover, .card .tt > a:hover { text-decoration: underline; }

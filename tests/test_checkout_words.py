@@ -81,7 +81,7 @@ def said_everywhere(root: Path, words: str, line: str = None, branch="?", env: d
     st = rbj(root, "status", env=env)
     repo = st["repository"]
     assert repo["said"] == words.split(" \u00b7 ")[-1], repo
-    assert words in under_title(rb(root, "status", env=env)), rb(root, "status", env=env)
+    assert words in under_title(rb(root, "status", "--full", env=env)), rb(root, "status", "--full", env=env)
     if branch != "?":
         assert repo["branch"] == branch and repo["on_branch"] is (branch is not None), repo
     whole = line or repo["line"]
@@ -107,7 +107,7 @@ def evidence_everywhere(root: Path, env: dict = None) -> list:
     found = ev[0]
     assert found["kind"] == "found" and found["when"].startswith("at ") and found["at"] == repo["checked_at"], found
     after = found["text"].split(found["when"], 1)[1]
-    text = rb(root, "status", env=env).splitlines()
+    text = rb(root, "status", "--full", env=env).splitlines()
     scope = next(i for i, l in enumerate(text) if l.startswith("rb looks in "))
     assert text[scope + 1].endswith(after), (text[scope + 1], after)
     plain = lambda t: t.replace("`", "")
@@ -122,10 +122,15 @@ def evidence_everywhere(root: Path, env: dict = None) -> list:
             mcp.close()
     out = root.parent / f"{root.name}-evidence.html"
     rb(root, "page", "--out", str(out), env=env)
-    block = re.search(r'<div id="in-git" tabindex="-1"><p>(.*?)</p>', out.read_text(encoding="utf-8"), re.S).group(1)
-    shared = html.unescape(re.sub(r"<[^>]+>", "", block))
-    if "rule outside" not in shared and not (repo["ignored_by"] or "").startswith("/"):
-        assert after in shared, (shared, after)
+    # About's strip (owner, Nov 13 2026): what git says, as chips, the same state rb status says
+    strip = about_strip(out.read_text(encoding="utf-8"))
+    n = repo["record_files_not_committed"]
+    if repo["state"] == "not_committed":
+        assert f">{n} not committed</summary>" in strip, strip
+    elif repo["state"] in ("ignored", "not_in_git", "git_not_found", "unreadable"):
+        assert f'<span class="fch fch-warn">{html.escape(repo["said"], quote=False)}</span>' in strip, (strip, repo["said"])
+    elif repo["state"] == "committed":
+        assert f'<span class="gsha mono">{repo["commit"][:7]}</span>' in strip and "not committed" not in strip, strip
     # the command agrees with git: its lines are the files rb counts, nothing where all is committed
     if repo["check"] and env is None:
         ran = subprocess.run(repo["check"], shell=True, cwd=root.parent.parent, capture_output=True, text=True)
@@ -210,7 +215,7 @@ def test_git_not_found(home, tmp_path_factory):
     env = {**environment(), "PATH": str(empty)}
     st = rbj(root, "status", env=env)
     assert (st["repository"]["state"], st["repository"]["said"]) == ("git_not_found", "git not found")
-    assert "git not found" in under_title(rb(root, "status", env=env))
+    assert "git not found" in under_title(rb(root, "status", "--full", env=env))
     assert [e["text"].split(" at ", 1)[0] for e in evidence_everywhere(root, env=env)] == ["rb could not find git"]
     assert "FAIL git_not_found: git not found: rb cannot find git, so it cannot say what is committed" in rb(root, "doctor", env=env, code=1)
     rb(root, "experiment", "add", "INT8 against FP32", "--id", "e1", "--baseline", "fp32", "--candidate", "int8", env=env)
@@ -302,8 +307,8 @@ def test_the_checkout_and_the_next_receipt_agree(home):
     run = json.loads(said)["data"]
     assert run["object"]["receipt"]["attached"]["dirty"] is True
     assert "Changes outside the record not committed when recorded" in rb(root, "run", "add", "e1", "int8.top1=75.3", "fp32.top1=76.0", "--set", "seed=3", "--produced-at", now())
-    assert "repository when recorded: commit " in rb(root, "show", run["object"]["id"])
-    assert ", with changes outside the record not committed" in rb(root, "show", run["object"]["id"])
+    assert "repository when recorded: commit " in rb(root, "show", "--long", run["object"]["id"])
+    assert ", with changes outside the record not committed" in rb(root, "show", "--long", run["object"]["id"])
     # the journal's own flag flipped (a tracked file changed): --json keeps the entry, the text writes no line for it
     entries = rbj(root, "journal", "-n", "0")["entries"]
     flips = [e for e in entries if e["op"] == "git" and e.get("dirty")]
@@ -351,10 +356,20 @@ def test_rb_journal_lists_moves_of_head_in_words(home):
 PAGE_MARK = "made with rb page · a snapshot of the record at "
 
 
+def about_strip(page: str) -> str:
+    """About's strip of facts (owner, Nov 13 2026), its chips' markup."""
+    return re.search(r'<div class="astrip" id="in-git" tabindex="-1">(.*?)</div>(?=<p class="dim sm wit"><a |<div class="rrun|<p class="dim sm honest1">)', page, re.S).group(1)
+
+
 def about_lines(page: str) -> list:
-    """About's footer lines on a page: its snapshot line, then the checkout's line where there is one."""
-    foot = page.split('<footer class="foot">', 1)[1].split("<details", 1)[0]
-    return [html.unescape(re.sub(r"<[^>]+>", "", s)) for s in re.findall(r"<span(?: class=\"held\")?>(.*?)</span>", foot)]
+    """About's strip as words: rb's mark of its page (the snapshot chip's title), then the git chip's branch and commit,
+    and the not-committed chip's count, where there are those."""
+    strip = about_strip(page)
+    mark = html.unescape(re.search(r'<span class="fch fch-at" title="([^"]+)">', strip).group(1))
+    ref = re.search(r'<span class="gb">([^<]*)</span><span class="gsha[^"]*">([^<]*)</span>', strip)
+    unc = re.search(r'>(\d+) not committed</summary>', strip)
+    warn = [html.unescape(w) for w in re.findall(r'<span class="fch fch-warn">([^<]+)</span>', strip)]
+    return [mark] + ([f"{ref.group(1)} {ref.group(2)}"] if ref else []) + ([f"{unc.group(1)} not committed"] if unc else []) + warn
 
 
 def test_a_page_says_in_about_how_its_checkout_held_the_record(home):
@@ -372,34 +387,35 @@ def test_a_page_says_in_about_how_its_checkout_held_the_record(home):
         return out.read_text(encoding="utf-8")
 
     first = about_lines(page())
-    assert first[0].startswith(PAGE_MARK) and first[1:] == ["no commit yet"], first
+    assert first[0].startswith(PAGE_MARK) and first[1] == "main no commit yet" and first[2].endswith(" not committed"), first
     git(root, "add", "-A")
     git(root, "commit", "-qm", "the record")
     head = git(root, "rev-parse", "HEAD")
-    assert about_lines(page())[1:] == [f"all record files committed · at commit {head[:12]}"]
+    assert about_lines(page())[1:] == [f"main {head[:7]}"]
     rb(root, "experiment", "add", "INT8 against FP32", "--id", "e1", "--baseline", "fp32", "--candidate", "int8")
     rb(root, "run", "add", "e1", "int8.top1=75.1", "fp32.top1=76.0", "--produced-at", now())
     git(root, "add", "-A")
     git(root, "commit", "-qm", "a run")
     head = git(root, "rev-parse", "HEAD")
     rb(root, "note", "add", "the held-out set is not in the pretraining data")
-    said = f"2 record files not committed · at commit {head[:12]}"
+    said = [f"main {head[:7]}", "2 not committed"]
     text = page()
-    assert about_lines(text)[1:] == [said]
+    assert about_lines(text)[1:] == said
     # the owner's span ends the Overview's line, its separator inside it; readers and no viewer get nothing there
     ovh = text.split('<p class="counts ovh">', 1)[1].split("</p>", 1)[0]
     assert ovh.endswith('<span class="held" data-vw="owner"> · <a href="#in-git">2 record files not committed</a></span>'), ovh
-    assert text.count("record files not committed") == 2
-    # no branch on a detached HEAD: the page's line names none
+    # the phrase in the owner's span, and the amber chip's title in the header and in About
+    assert text.count("record files not committed") == 3
+    # a detached HEAD: the git chip says no branch
     git(root, "checkout", "-q", "--detach")
-    assert about_lines(page())[1:] == [said]
+    assert about_lines(page())[1:] == [f"no branch {head[:7]}", "2 not committed"]
     git(root, "checkout", "-q", "main")
     # rb export --with-record at its default place, inside the work tree: the checkout's words, never the copy's
     rb(root, "export", "--with-record")
     bundle = (root / "rb-export" / "page.html").read_text(encoding="utf-8")
-    assert about_lines(bundle)[1:] == [said], about_lines(bundle)
+    assert about_lines(bundle)[1:] == said, about_lines(bundle)
     rb(root, "export", "--out", str(home / "plain-export"))
-    assert about_lines((home / "plain-export" / "page.html").read_text(encoding="utf-8"))[1:] == [said]
+    assert about_lines((home / "plain-export" / "page.html").read_text(encoding="utf-8"))[1:] == said
     # outside git
     plain = home / "plain"
     plain.mkdir()

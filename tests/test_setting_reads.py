@@ -62,11 +62,11 @@ class Rec:
 
     def reread(self, run: str, *numbers: str) -> str:
         """The run recorded again under the spec as it is now, as rb says a run recorded before a setting is read."""
-        produced = next(r for r in self.ok("status")["data"]["runs"] if r["id"] == run)["produced_at"]
+        produced = next(r for r in self.ok("status", "--full")["data"]["runs"] if r["id"] == run)["produced_at"]
         return self.ok("run", "add", "prec", *numbers, "--produced-at", produced, "--replaces", run, "--why", "read under the setting")["data"]["object"]["id"]
 
     def finding(self, cid: str) -> dict:
-        return next(f for f in self.ok("status")["data"]["findings"] if f["criterion"] == cid)
+        return next(f for f in self.ok("status", "--full")["data"]["findings"] if f["criterion"] == cid)
 
 
 @pytest.fixture
@@ -96,7 +96,7 @@ def test_a_variants_unknown_setting_bears_only_on_the_findings_that_read_that_va
     fp16, int8 = rec.finding("c-fp16"), rec.finding("c-int8")
     assert {"unknown", "confound"} <= codes(fp16, "integrity")
     assert "unknown" not in codes(int8, "integrity") and "confound" not in codes(int8, "integrity")
-    assert "fp16.calibration" not in rec.text("show", "c-int8")
+    assert "fp16.calibration" not in rec.text("show", "--long", "c-int8")
     # a shared setting still bears on every finding of the experiment
     rec.ok("spec", "set", "prec", "dataset", "--unknown")
     assert "unknown" in codes(rec.finding("c-int8"), "integrity")
@@ -111,7 +111,7 @@ def test_a_count_with_a_suffix_states_the_count_never_its_digits(rec):
     env = rec.ok("spec", "set", "prec", "steps", "30000", "--source", "docs/plan.md:3", "--quote", "over 30K steps", "--term", "steps")
     assert env["data"]["object"]["status"] == "verified"
     rec.ok("spec", "set", "prec", "seq_len", "999", "--source", "docs/plan.md:3", "--quote", quote, "--term", "token")
-    shown = rec.text("show", "prec")
+    shown = rec.text("show", "--long", "prec")
     assert "seq_len                  999            provisional" in shown and "CONFLICT" in shown
     assert "the record says 999, but docs/plan.md:3 says 999000000" in rec.text("spec", "set", "prec", "seq_len", "999", "--source",
                                                                              "docs/plan.md:3", "--quote", quote, "--term", "token")
@@ -137,7 +137,7 @@ def test_a_file_no_commit_held_before_a_past_run_is_said_to_postdate_it(rec):
     said_plan = f"fp16.batch_size is provisional: sweep/next.sh has no commit from before run {may} was produced (2026-05-20): the file postdates the run"
     assert notes("c-int8") == [said_report]                                      # the plan sets fp16 only
     assert notes("c-fp16") == [said_report, said_plan]
-    assert f"  · {said_plan}" in rec.text("show", "prec").splitlines()
+    assert f"  · {said_plan}" in rec.text("show", "--long", "prec").splitlines()
     # a run made since the record began is not a past run
     rec.ok("run", "add", "prec", "fp32.top1=0.762", "int8.top1=0.756", "fp16.top1=0.761")
     rec.ok("retract", may, "--why", "made with the old eval script")
@@ -201,17 +201,17 @@ def test_a_setting_only_a_postdating_line_states_reads_provisional_and_one_at_an
     said = f"epochs is provisional: docs/report.md has no commit from before run {run} was produced (2026-05-20): the file postdates the run"
     out = rec.text("spec", "set", "prec", "epochs", "90", "--source", "docs/report.md:3", "--quote", "for 90 epochs", "--term", "epochs")
     assert out.startswith('prec/epochs = 90 · provisional · source docs/report.md:3 "for 90 epochs"\n') and f"  {said}\n" in out, out
-    count = lambda: next(e for e in rec.ok("status")["data"]["experiments"] if e["id"] == "prec")["settings_count"]
+    count = lambda: next(e for e in rec.ok("status", "--full")["data"]["experiments"] if e["id"] == "prec")["settings_count"]
     assert count()["verified"] == 0 and count()["provisional"] == 1
-    assert "settings 0 verified · 1 provisional · 0 unknown" in rec.text("status")
-    shown = rec.text("show", "prec")
+    assert "settings 0 verified · 1 provisional · 0 unknown" in rec.text("status", "--full")
+    shown = rec.text("show", "--long", "prec")
     assert "    epochs                   90             provisional · docs/report.md:3" in shown and f"  · {said}" in shown, shown
     assert "| epochs | 90 | provisional | (given: docs/report.md:3 \"for 90 epochs\") |" in rec.text("context"), rec.text("context")
     # the line at a commit from before the run verifies, as before
     out = rec.text("spec", "set", "prec", "epochs", "90", "--source", "sweep/train.py:1", "--commit", may_commit, "--term", "EPOCHS")
     assert out.startswith("prec/epochs = 90 · verified in sweep/train.py:1") and "postdates" not in out, out
     assert count()["verified"] == 1 and count()["provisional"] == 0
-    assert "    epochs                   90             verified · sweep/train.py:1" in rec.text("show", "prec")
+    assert "    epochs                   90             verified · sweep/train.py:1" in rec.text("show", "--long", "prec")
     # the SDK says the postdating line as an RBWarning, as MCP and the command line say it in data.warnings
     import warnings
     import rabbit_brain
@@ -244,7 +244,7 @@ def test_a_setting_only_a_postdating_line_states_reads_provisional_on_its_own_vi
     run = rec.ok("run", "add", "prec", "fp32.top1=0.761", "int8.top1=0.755", "--produced-at", "2026-05-20T10:00:00Z")["data"]["object"]["id"]
     said = f"epochs is provisional: docs/report.md has no commit from before run {run} was produced (2026-05-20): the file postdates the run"
     rec.ok("spec", "set", "prec", "epochs", "90", "--source", "docs/report.md:3", "--quote", "for 90 epochs", "--term", "epochs")
-    shown = rec.text("show", "prec/epochs")
+    shown = rec.text("show", "--long", "prec/epochs")
     assert shown.startswith("prec/epochs = 90 · provisional\n") and f"  · {said}\n" in shown, shown
     out = rec.text("spec", "verify", "prec", "epochs")
     assert out.startswith("  epochs: provisional, docs/report.md:3") and "but it postdates a run (below)\n" in out, out
@@ -252,7 +252,7 @@ def test_a_setting_only_a_postdating_line_states_reads_provisional_on_its_own_vi
     env = rec.ok("spec", "verify", "prec", "epochs")
     assert env["data"]["verified_count"] == 0 and said in env["data"]["warnings"]
     assert env["data"]["results"][0]["ok"] is True                    # the file states it; the record keeps what rb read
-    assert rec.ok("show", "prec/epochs")["data"]["object"]["status"] == "verified"
+    assert rec.ok("show", "--long", "prec/epochs")["data"]["object"]["status"] == "verified"
 
 
 def test_the_users_vouch_for_a_setting_only_a_postdating_line_states_shows_as_any_vouch_does(rec):
@@ -263,14 +263,14 @@ def test_the_users_vouch_for_a_setting_only_a_postdating_line_states_shows_as_an
     run = rec.ok("run", "add", "prec", "fp32.top1=0.761", "int8.top1=0.755", "--produced-at", "2026-05-20T10:00:00Z")["data"]["object"]["id"]
     rec.ok("spec", "set", "prec", "epochs", "90", "--source", "docs/report.md:3", "--quote", "for 90 epochs", "--term", "epochs")
     rec.reread(run, "fp32.top1=0.761", "int8.top1=0.755")
-    assert "postdates the run" in rec.text("show", "prec")
+    assert "postdates the run" in rec.text("show", "--long", "prec")
     rec.ok("decide", "prec/epochs", "accept", "--why", "we trained for 90 epochs")
-    shown = rec.text("show", "prec")
+    shown = rec.text("show", "--long", "prec")
     assert '    epochs                   90             provisional · docs/report.md:3 "for 90 epochs" · vouched\n' in shown, shown
     assert "postdates the run" not in shown and "epochs = 90 is provisional · vouched for (" in shown, shown
     codes = [c["code"] for c in rec.finding("c-int8")["caveats"]]
     assert "vouched" in codes and "source_postdates_run" not in codes, codes
-    assert "settings it reads are not verified" not in rec.text("show", "c-int8")
+    assert "settings it reads are not verified" not in rec.text("show", "--long", "c-int8")
 
 
 def test_a_setting_read_from_the_working_tree_is_as_old_as_its_line_and_a_run_add_says_so(rec):

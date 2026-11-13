@@ -9,7 +9,7 @@ use crate::errors::Res;
 pub const LEDGER_COMMANDS: &[&str] = &[
     "init", "project title", "question add", "question move", "question reword", "experiment add", "experiment file", "experiment relate", "experiment gate", "variant add",
     "note add", "metric add", "spec set", "spec verify", "spec vary", "criterion add", "criterion file", "criterion relate", "run add", "analysis add", "resource add",
-    "resource locate", "resource expose", "freeze", "decide", "confirm", "retract", "status", "show", "compare", "log", "context", "fmt",
+    "resource locate", "resource expose", "freeze", "decide", "confirm", "retract", "status", "files", "show", "compare", "log", "context", "fmt",
     "journal", "journal scan", "journal run", "reconcile", "compile", "page", "export", "clone", "sync", "login", "logout",
     "env check",
 ];
@@ -48,6 +48,7 @@ pub fn handler(func: &str) -> Option<Handler> {
         "cmd_decide" => r::cmd_decide,
         "cmd_confirm" => r::cmd_confirm,
         "cmd_status" => crate::cmds::reading::cmd_status,
+        "cmd_files" => crate::cmds::reading::cmd_files,
         "cmd_show" => crate::cmds::reading::cmd_show,
         "cmd_compare" => crate::cmds::reading::cmd_compare,
         "cmd_log" => crate::cmds::reading::cmd_log,

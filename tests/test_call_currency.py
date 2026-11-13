@@ -57,13 +57,13 @@ def call(record, action="accept"):
 
 def outdated(record):
     """The calls status reads as made on an earlier reading; a snapshot this rb made never reads as a newer rb's."""
-    status = record("status")
+    status = record("status", "--full")
     assert not [item for item in status["open"] if item["code"] == "state_newer"]
     return [item["what"] for item in status["open"] if item["code"] == "decision_outdated"]
 
 
 def codes(record, code):
-    return [item["subject"] for item in record("status")["open"] if item["code"] == code]
+    return [item["subject"] for item in record("status", "--full")["open"] if item["code"] == code]
 
 
 def notes(record, criterion="c1"):
@@ -218,7 +218,7 @@ def test_a_snapshot_from_a_newer_rb_reads_as_newer_never_as_outdated(record, new
             doc["inquiry_basis"]["criteria"]["c1"]["finding"]["population"] = {"unit": "seed"}
 
     rewrite(record, f".rb/decisions/{decision['id']}.yaml", "decision", decision["id"], future)
-    status = record("status")
+    status = record("status", "--full")
     [item] = [i for i in status["open"] if i["code"] == "state_newer"]
     assert item["what"].startswith(f"1 record here has a part only a newer rb reads: .rb/decisions/{decision['id']}.yaml: ")
     assert item["what"].endswith("which this rb does not know") and "written by a newer rb" not in item["what"]
@@ -238,7 +238,7 @@ def test_a_relation_scope_from_a_newer_rb_reads_as_newer_never_as_outdated(recor
     call(record)
     rewrite(record, ".rb/experiments/e1/criteria/c1.yaml", "criterion", "c1",
             lambda doc: doc["relations"][0]["source_scope"].update(population="seed"))
-    status = record("status")
+    status = record("status", "--full")
     [item] = [i for i in status["open"] if i["code"] == "state_newer"]
     assert item["what"] == ("1 record here has a part only a newer rb reads: .rb/experiments/e1/criteria/c1.yaml: criterion c1 declares a "
                             "relation scope with source_scope.population, which this rb does not know")
@@ -267,7 +267,7 @@ def test_state_a_newer_rb_wrote_elsewhere_leaves_the_call_judged_on_its_own_read
     if moved:
         seeds(record, wide=(1.2, 1.25, 1.3))
     newer_line(record)
-    status = record("status")
+    status = record("status", "--full")
     assert [i for i in status["open"] if i["code"] == "state_newer"] and all(status["gate"].values())
     assert sorted(i["subject"] for i in status["open"] if i["code"] == "decision_outdated") == (["e1", "q1"] if moved else [])
     assert [d["current"] for d in status["decisions"] if d["subject"] == "q1"] == [not moved]
@@ -282,6 +282,6 @@ def test_a_linked_criterion_only_a_newer_rb_reads_is_not_read_as_moved(record):
     seeds(record, "wide.cost=4")
     call(record)
     rewrite(record, ".rb/experiments/e1/criteria/c2.yaml", "criterion", "c2", lambda doc: doc.update(rb=3))
-    status = record("status")
+    status = record("status", "--full")
     assert [i for i in status["open"] if i["code"] == "state_newer"] and all(status["gate"].values())
     assert not [i for i in status["open"] if i["code"] == "decision_outdated"]

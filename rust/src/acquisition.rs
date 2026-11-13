@@ -49,8 +49,9 @@ pub fn split(recipe: &str) -> (String, String) {
 pub fn of(res: &Resource) -> Option<Acquired> {
     let a = res.acquisition.as_ref()?;
     let recipe = a.recipe.as_deref().map(str::trim).filter(|r| !r.is_empty())?;
-    let (command, from) = split(recipe);
-    let from = if from.is_empty() { a.source.trim().to_string() } else { from };
+    // a page says a local path typed into these words as getit::LOCAL_PATH
+    let (command, from) = split(&crate::getit::typed(recipe));
+    let from = if from.is_empty() { crate::getit::typed(a.source.trim()) } else { from };
     Some(Acquired { command, from })
 }
 

@@ -58,17 +58,17 @@ def text(d: Recorder, *argv: str) -> str:
 
 def test_one_reading_one_set_of_digits(tmp_path):
     d = record(tmp_path)
-    shown = text(d, "show", "c1")
+    shown = text(d, "show", "--long", "c1")
     assert "reads:     change.top1: -0.65 [" in shown, shown
     assert "unpaired, the same runs read -0.65 [" in shown, shown
     assert "-0.6500" not in shown
-    status = text(d, "status")
+    status = text(d, "status", "--full")
     assert "unpaired, the same runs read -0.65 [" in status and "-0.6500" not in status
 
 
 def test_a_timing_alike_is_said_once(tmp_path):
     d = record(tmp_path)
-    [line] = [x for x in text(d, "status").splitlines() if x.startswith("  INT8 loses 0.65 points.")]
+    [line] = [x for x in text(d, "status", "--full").splitlines() if x.startswith("  INT8 loses 0.65 points.")]
     assert line.count("declared after the evidence existed") == 1, line
     assert "rule and question link declared after the evidence existed: all 4 units were produced before it was declared" in line
     assert "question link declared after" not in line.replace("rule and question link declared after", "")
@@ -76,7 +76,7 @@ def test_a_timing_alike_is_said_once(tmp_path):
 
 def test_timings_that_differ_are_each_named(tmp_path):
     d = record(tmp_path, link_later=True)
-    [line] = [x for x in text(d, "status").splitlines() if x.startswith("  INT8 loses 0.65 points.")]
+    [line] = [x for x in text(d, "status", "--full").splitlines() if x.startswith("  INT8 loses 0.65 points.")]
     assert "; rule declared before the evidence" in line, line
     assert "question link declared after the evidence existed" in line, line
     assert "rule and question link" not in line
@@ -84,7 +84,7 @@ def test_timings_that_differ_are_each_named(tmp_path):
 
 def test_items_that_ask_for_nothing_are_named_for_what_they_are(tmp_path):
     d = record(tmp_path)
-    status = text(d, "status")
+    status = text(d, "status", "--full")
     assert "Nothing to do" not in status
     lines = status.splitlines()
     at = lines.index("  - int8: 1 criterion was declared after its evidence existed")
@@ -100,7 +100,7 @@ def test_a_bound_rule_says_its_estimate_in_one_way(tmp_path):
     d = record(tmp_path)
     d.rb("criterion", "add", "INT8's interval stays within its band", "-e", "int8", "--metric", "change.top1", "--equals", "-0.65", "--tolerance",
          "0.2658", "--bound", "--id", "c2")
-    shown = text(d, "show", "c2")
+    shown = text(d, "show", "--long", "c2")
     paired = shown.split("reads:     change.top1: ")[1].split(" [")[0]
     unpaired = shown.split("unpaired, the same runs read ")[1].split(" [")[0]
     assert paired == unpaired == "-0.65", (paired, unpaired)

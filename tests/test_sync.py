@@ -38,6 +38,15 @@ class _Hub(BaseHTTPRequestHandler):
     dropped = 0              # how many polls for the token to come are read and then closed with no answer
     refuse = 0               # how many uploads to come are answered 503, as a hub out of service answers
     puts: list = []          # when each upload came, and whether it was taken
+    codes = 0                # how many codes the hub gave (device/code)
+    polled: list = []        # the device code of each answered poll for the token
+    pending_polls = 1        # how many answered polls say the code is not approved yet before the token comes
+    answer = None            # an error every poll answers instead (expired_token, access_denied, slow_down)
+    expires_in = 600         # what a new code's answer says of how long it lasts, and how often to ask
+    interval = 0
+    poll_held = None         # (arrived, release): the next poll is answered as it would be, only once released
+    start = None             # what device/code answers instead, when set
+    USER_CODES = ("ABCD-EFGH", "JKLM-NPQR", "STUV-WXYZ")
 
     def _drain(self):
         """Read the request's body before answering: on Windows, closing a socket with bytes unread resets it, and the
@@ -59,11 +68,15 @@ class _Hub(BaseHTTPRequestHandler):
         self._json(404, {"error": "no"})
 
     def do_POST(self):
-        self._drain()
+        self._body = self._drain()
         origin = f"http://127.0.0.1:{self.server.server_address[1]}"
+        if self.path == "/api/hub/device/code" and _Hub.start:
+            return self._json(200, _Hub.start)
         if self.path == "/api/hub/device/code":
-            return self._json(200, {"device_code": "dev_stub", "user_code": "ABCD-EFGH",
-                                    "verification_uri": f"{origin}/link", "expires_in": 600, "interval": 0})
+            _Hub.codes += 1
+            n = _Hub.codes
+            return self._json(200, {"device_code": "dev_stub" if n == 1 else f"dev_stub{n}", "user_code": _Hub.USER_CODES[(n - 1) % 3],
+                                    "verification_uri": f"{origin}/link", "expires_in": _Hub.expires_in, "interval": _Hub.interval})
         if self.path == "/api/hub/device/token":
             if _Hub.dropped > 0:                       # the connection drops before the answer comes
                 _Hub.dropped -= 1
@@ -73,9 +86,19 @@ class _Hub(BaseHTTPRequestHandler):
                 _Hub.unavailable -= 1
                 return self._json(503, {"error": "Service Unavailable"})
             _Hub.polls += 1
-            if _Hub.polls < 2:
-                return self._json(400, {"error": "authorization_pending"})
-            return self._json(200, {"token": "rb_deviceflowtoken", "handle": "t"})
+            _Hub.polled.append(json.loads(self._body or b"{}").get("device_code"))
+            if _Hub.answer:
+                said = (400, {"error": _Hub.answer, "error_description": f"the hub says {_Hub.answer}."})
+            elif _Hub.polls <= _Hub.pending_polls:
+                said = (400, {"error": "authorization_pending"})
+            else:
+                said = (200, {"token": "rb_deviceflowtoken", "handle": "t"})
+            if _Hub.poll_held:
+                arrived, release = _Hub.poll_held
+                _Hub.poll_held = None
+                arrived.set()
+                release.wait(60)
+            return self._json(*said)
         self._json(404, {"error": "no"})
 
     def do_DELETE(self):
@@ -155,6 +178,8 @@ def hub(workdir, monkeypatch, tmp_path_factory, capsys):
     _Hub.unavailable = 0
     _Hub.dropped = 0
     _Hub.puts = []
+    _Hub.codes, _Hub.polled, _Hub.pending_polls, _Hub.answer = 0, [], 1, None
+    _Hub.expires_in, _Hub.interval, _Hub.poll_held, _Hub.start = 600, 0, None, None
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), _Hub)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     monkeypatch.setenv("RB_HUB_URL", f"http://127.0.0.1:{httpd.server_address[1]}")
@@ -264,7 +289,7 @@ def test_rabbitbrain_ai_while_it_is_not_open_is_said_and_nothing_is_sent(hub, mo
         assert "hosted service is not open yet" in env.errors[0].message and "sent nothing" in env.errors[0].message
         assert all(c in env.errors[0].fix for c in ("rb page", "rb open", "rb export --with-record")), env.errors[0].fix
     assert _Hub.received == {} and _Hub.polls == 0 and refusing_proxy.asked == []
-    code, env = hub("login", "--hub", stub)
+    code, env = hub("login", "--hub", stub, "--wait")
     assert code == 0 and _Hub.polls == 2
 
 
@@ -290,19 +315,21 @@ def test_publish_is_gone_and_says_what_replaced_it(hub, monkeypatch):
 
 
 def test_an_agent_signs_in_and_syncs_like_anyone(hub, monkeypatch):
-    """Inside an agent session rb login and rb sync go through: the device flow still waits until the code is approved
-    on the site, and the upload is still private."""
+    """Inside an agent session rb login and rb sync go through: rb login shows the code and returns, rb sync before the
+    approval sends nothing, and the rb sync after it signs in and uploads, still privately."""
     monkeypatch.setenv("CLAUDECODE", "1")
     code, env = hub("login")
-    assert code == 0 and env.data["handle"] == "t" and _Hub.polls == 2      # it waited for the approval
+    assert code == 0 and env.data["state"] == "pending" and _Hub.polls == 0     # it did not wait for the approval
     code, env = hub("sync")
-    assert code == 0 and "visibility=private" in _Hub.received["path"]
+    assert code == 2 and env.errors[0].code == "E_LOGIN_PENDING" and _Hub.puts == []
+    code, env = hub("sync")
+    assert code == 0 and env.data["signed_in"] is True and "visibility=private" in _Hub.received["path"]
     assert _Hub.received["auth"] == "Bearer rb_deviceflowtoken"
 
 
 def test_login_stores_a_0600_credential_and_sync_uses_it(hub, monkeypatch, tmp_path):
     monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
-    code, env = hub("login")
+    code, env = hub("login", "--wait")
     assert code == 0 and env.data["handle"] == "t"
     p = tmp_path / "cfg" / "credentials.json"
     assert p.exists()
@@ -316,7 +343,7 @@ def test_login_stores_a_0600_credential_and_sync_uses_it(hub, monkeypatch, tmp_p
 
 def test_env_token_overrides_the_credentials_file(hub, monkeypatch, tmp_path):
     monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
-    code, _ = hub("login")
+    code, _ = hub("login", "--wait")
     assert code == 0
     monkeypatch.setenv("RB_HUB_TOKEN", "rb_ci_token")
     code, _ = hub("sync")
@@ -326,7 +353,7 @@ def test_env_token_overrides_the_credentials_file(hub, monkeypatch, tmp_path):
 
 def test_logout_revokes_and_removes(hub, monkeypatch, tmp_path):
     monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
-    code, _ = hub("login")
+    code, _ = hub("login", "--wait")
     assert code == 0
     code, env = hub("logout")
     assert code == 0 and env.data["revoked"] is True and env.data["removed"] is True
@@ -344,7 +371,7 @@ def test_a_sync_ended_by_a_signal_leaves_nothing_behind(hub, monkeypatch, tmp_pa
     for name in ("TMPDIR", "TMP", "TEMP"):
         monkeypatch.setenv(name, str(tmp))
     left = lambda: sorted(q.name for q in tmp.iterdir() if q.name.startswith("rb-sync-"))  # noqa: E731
-    assert hub("login")[0] == 0
+    assert hub("login", "--wait")[0] == 0
     signals = [sig for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP) if signal.getsignal(sig) != signal.SIG_IGN]
     arrived, release = threading.Event(), threading.Event()
     _Hub.held = (arrived, release)
@@ -467,7 +494,7 @@ def test_a_record_synced_names_its_code_only_at_an_https_origin(hub, monkeypatch
             # the Rerun panel in the same words, and About's line 2 of this checkout, never of the copy rb sync built
             # under $TMPDIR, which no git holds
             assert f'The code when this page was made: <a href="{named[origin]}">{named[origin]}</a> at commit <span class="oid">{head[:12]}</span>. The record and' in page
-            assert f'<span><a href="#in-git">all record files committed</a> \u00b7 at commit {head[:12]}</span>' in page and "not in git" not in page
+            assert f'<span class="gsha mono">{head[:7]}</span>' in page and "not in git" not in page and "not committed</summary>" not in page
             assert "without the code" not in said
         else:
             assert "repo" not in man, (origin, man["repo"])
@@ -488,7 +515,7 @@ def test_sync_says_how_the_copy_is_shared_and_login_and_logout_say_where(hub, mo
     share link's readers rerun only a sync made with --with-record. Nothing says to make it public. rb login says the page signs you in first; rb logout
     sends you to /account to revoke a credential it could not."""
     monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
-    assert main(["login"]) == 0
+    assert main(["login", "--wait"]) == 0
     assert "Open " in (err := capsys.readouterr().err) and "on any device; it signs you in first if needed, and approve the code." in err
     assert main(["sync"]) == 0
     said = capsys.readouterr().out
@@ -689,7 +716,7 @@ def test_watch_uploads_only_on_change(hub, monkeypatch):
         # and a results file nobody recorded, which only the journal's look finds
         Path("out").mkdir()
         _put("out/metrics.json", '{"m": 0.71}\n')
-        found = json.loads(subprocess.run([*command(), "status", "--json"], capture_output=True, env=environment(), check=True).stdout)
+        found = json.loads(subprocess.run([*command(), "status", "--full", "--json"], capture_output=True, env=environment(), check=True).stdout)
         assert found["data"]["found_unrecorded"] == 1, found["data"].get("found_unrecorded")
         n2 = _sends_what_it_reads_now(w, "a results file nobody recorded was never sent")
         assert n2 > n
@@ -1011,12 +1038,12 @@ def test_watch_asks_git_again_on_each_look(hub, monkeypatch):
     w = _Watch()
     try:
         w.until(lambda: len(_taken()) == 1, "the first upload never came")
-        assert "settings: 1 provisional" in page()
+        assert "settings: 1 not checked" in page()
         old = {**environment(), "GIT_AUTHOR_DATE": "2025-12-01T00:00:00Z", "GIT_COMMITTER_DATE": "2025-12-01T00:00:00Z"}
         subprocess.run(["git", "add", "train.yaml"], check=True, env=old)
         subprocess.run(["git", "commit", "-qm", "the train config"], check=True, env=old)
         _sends_what_it_reads_now(w, "the commit was never sent")
-        assert "settings: 1 provisional" not in page()
+        assert "settings: 1 not checked" not in page()
     finally:
         w.end()
 
@@ -1026,10 +1053,10 @@ def test_login_asks_again_when_the_hub_is_down_for_a_moment(hub, monkeypatch, tm
     site still signs this machine in; a fourth in a row ends it, saying so."""
     monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
     _Hub.unavailable = 3
-    code, env = hub("login")
+    code, env = hub("login", "--wait")
     assert code == 0 and env.data["handle"] == "t" and _Hub.polls == 2, env.errors
     _Hub.unavailable, _Hub.polls = 4, 0
-    code, env = hub("login", "--hub", os.environ["RB_HUB_URL"])
+    code, env = hub("login", "--hub", os.environ["RB_HUB_URL"], "--wait")
     assert code == 2 and env.errors[0].code == "E_HUB_REFUSED" and "Service Unavailable" in env.errors[0].message
 
 
@@ -1038,7 +1065,7 @@ def test_login_asks_again_when_the_connection_drops_while_it_waits(hub, monkeypa
     already. Two drops, then the token: signed in."""
     monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
     _Hub.dropped = 2
-    code, env = hub("login")
+    code, env = hub("login", "--wait")
     assert code == 0 and env.data["handle"] == "t" and _Hub.dropped == 0 and _Hub.polls == 2, env.errors
     creds = json.loads((tmp_path / "cfg" / "credentials.json").read_text(encoding="utf-8"))
     assert "rb_deviceflowtoken" in json.dumps(creds)
@@ -1048,7 +1075,7 @@ def test_login_ends_after_four_dropped_polls_in_a_row_and_keeps_nothing(hub, mon
     """Four polls in a row whose connection drops end rb login as an unreachable hub, with no credential written."""
     monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
     _Hub.dropped = 4
-    code, env = hub("login")
+    code, env = hub("login", "--wait")
     assert code == 2 and env.errors[0].code == "E_HUB_UNREACHABLE", env.errors
     assert _Hub.dropped == 0 and _Hub.polls == 0
     assert not (tmp_path / "cfg" / "credentials.json").exists()
@@ -1074,8 +1101,288 @@ def test_login_asks_again_when_an_https_connection_drops_while_it_waits(hub, mon
         monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
         monkeypatch.setenv("RB_HUB_URL", f"https://localhost:{httpd.server_address[1]}")
         _Hub.dropped = 2
-        code, env = hub("login")
+        code, env = hub("login", "--wait")
         assert code == 0 and env.data["handle"] == "t" and _Hub.dropped == 0 and _Hub.polls == 2, env.errors
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+# rb login does not wait (0.8.6): it shows the code and the link, keeps the sign-in pending, and returns; rb login again
+# or rb sync finishes it once the code is approved. rb login --wait waits as rb login did before.
+
+def _pending(tmp_path):
+    return tmp_path / "cfg" / "pending-login.json"
+
+
+def test_login_returns_at_once_with_the_code_and_the_link_and_keeps_the_sign_in_pending(hub, monkeypatch, tmp_path, capsys):
+    """rb login asks the hub for a code, shows it with the link and what to run next, and returns without asking
+    whether it is approved. The sign-in waits in a file of its own beside credentials.json, readable by its owner alone;
+    the device code in it (a token once approved) is never shown."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    code, env = hub("login")
+    assert code == 0 and _Hub.codes == 1 and _Hub.polls == 0, env.errors
+    hub_url = os.environ["RB_HUB_URL"]
+    assert env.data["state"] == "pending" and env.data["code"] == "ABCD-EFGH" and env.data["link"] == f"{hub_url}/link"
+    assert env.data["expires"].endswith("Z") and env.data["replaced"] is None and "handle" not in env.data
+    p = _pending(tmp_path)
+    assert p.exists() and not (tmp_path / "cfg" / "credentials.json").exists()
+    if os.name == "posix":
+        assert (p.stat().st_mode & 0o777) == 0o600
+    kept = json.loads(p.read_text(encoding="utf-8"))[hub_url]
+    assert kept["device_code"] == "dev_stub" and kept["code"] == "ABCD-EFGH"
+    assert "dev_stub" not in env.model_dump_json() and "dev_stub" not in hub.last_err
+    _Hub.pending_polls = 9
+    assert main(["login"]) == 0
+    said = capsys.readouterr()
+    assert "ABCD-EFGH" in said.out and f"Open {hub_url}/link on any device" in said.out
+    assert f"Approve it there, then run rb sync --hub {hub_url} (or rb login --hub {hub_url} again) here." in said.out
+    assert "dev_stub" not in said.out + said.err
+
+
+def test_login_again_before_the_approval_shows_the_same_code_and_asks_for_no_new_one(hub, monkeypatch, tmp_path, capsys):
+    """rb login again while the code waits asks the hub once whether it is approved: not yet, so it shows the same
+    code and link, makes no new code, and returns 0."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    _Hub.pending_polls = 9
+    assert hub("login")[0] == 0
+    code, env = hub("login")
+    assert code == 0 and env.data["state"] == "pending" and env.data["code"] == "ABCD-EFGH", env.errors
+    assert _Hub.codes == 1 and _Hub.polled == ["dev_stub"]
+    assert main(["login"]) == 0
+    out = capsys.readouterr().out
+    assert "This terminal's code is not approved yet:" in out and "ABCD-EFGH" in out and _Hub.codes == 1
+    assert _pending(tmp_path).exists() and not (tmp_path / "cfg" / "credentials.json").exists()
+
+
+def test_login_again_after_the_approval_signs_in_and_removes_the_pending_sign_in(hub, monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    _Hub.pending_polls = 0
+    assert hub("login")[0] == 0
+    code, env = hub("login")
+    assert code == 0 and env.data["state"] == "signed_in" and env.data["handle"] == "t", env.errors
+    assert _Hub.codes == 1 and _Hub.polled == ["dev_stub"]
+    creds = tmp_path / "cfg" / "credentials.json"
+    assert "rb_deviceflowtoken" in creds.read_text(encoding="utf-8") and not _pending(tmp_path).exists()
+    if os.name == "posix":
+        assert (creds.stat().st_mode & 0o777) == 0o600
+    code, env = hub("sync")
+    assert code == 0 and _Hub.received["auth"] == "Bearer rb_deviceflowtoken" and env.data["signed_in"] is False
+
+
+def test_sync_finishes_a_pending_sign_in_and_then_syncs(hub, monkeypatch, tmp_path, capsys):
+    """One rb sync after the approval does both: it keeps the token as rb login does, says who is signed in, and
+    uploads."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    assert hub("login")[0] == 0
+    _Hub.pending_polls = 0
+    code, env = hub("sync")
+    assert code == 0 and env.data["signed_in"] is True and env.data["handle"] == "t", env.errors
+    assert _Hub.received["auth"] == "Bearer rb_deviceflowtoken" and _Hub.polled == ["dev_stub"]
+    assert "rb_deviceflowtoken" in (tmp_path / "cfg" / "credentials.json").read_text(encoding="utf-8")
+    assert not _pending(tmp_path).exists()
+    _Hub.pending_polls, _Hub.polls = 0, 0
+    os.remove(tmp_path / "cfg" / "credentials.json")
+    assert hub("login")[0] == 0
+    assert main(["sync"]) == 0
+    out = capsys.readouterr().out
+    assert out.index("Signed in as t on ") < out.index("Synced, privately: ")
+
+
+def test_sync_while_the_code_waits_sends_nothing_and_says_where_to_approve_it(hub, monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    _Hub.pending_polls = 9
+    assert hub("login")[0] == 0
+    code, env = hub("sync")
+    hub_url = os.environ["RB_HUB_URL"]
+    assert code == 2 and env.errors[0].code == "E_LOGIN_PENDING", env.errors
+    assert env.errors[0].message == f"Not signed in yet: approve the code ABCD-EFGH at {hub_url}/link, then run rb sync --hub {hub_url} again."
+    assert _Hub.received == {} and _Hub.puts == [] and _Hub.polled == ["dev_stub"]
+    assert _pending(tmp_path).exists() and _Hub.codes == 1
+    assert main(["sync"]) == 2
+    err = capsys.readouterr().err
+    assert "E_LOGIN_PENDING" not in err and "Not signed in yet: approve the code ABCD-EFGH" in err and "dev_stub" not in err
+
+
+@pytest.mark.parametrize("answer, word", [("expired_token", "expired"), ("access_denied", "declined"), ("invalid_grant", "refused")])
+def test_a_code_that_expired_or_was_declined_gives_a_new_one(hub, monkeypatch, tmp_path, capsys, answer, word):
+    """rb login again finds the code over: it says so in one line, removes it, and starts a new code. rb sync finds it
+    over the same way, removes it and says to run rb login."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    assert hub("login")[0] == 0
+    _Hub.answer = answer
+    code, env = hub("login")
+    assert code == 0 and env.data["state"] == "pending" and env.data["replaced"] == word, env.errors
+    assert env.data["code"] == "JKLM-NPQR" and _Hub.codes == 2
+    assert json.loads(_pending(tmp_path).read_text(encoding="utf-8"))[os.environ["RB_HUB_URL"]]["device_code"] == "dev_stub2"
+    assert main(["login"]) == 0
+    out = capsys.readouterr().out
+    first = {"expired": "The code JKLM-NPQR expired before it was approved; this is a new one.",
+             "declined": "The code JKLM-NPQR was declined on the hub; this is a new one.",
+             "refused": "The hub refused the code JKLM-NPQR: the hub says invalid_grant; this is a new one."}[word]
+    assert out.splitlines()[0] == first
+    code, env = hub("sync")
+    assert code == 2 and env.errors[0].code == "E_USAGE" and "STUV-WXYZ" in env.errors[0].message and "rb login" in env.errors[0].fix
+    assert not _pending(tmp_path).exists() and _Hub.puts == []
+
+
+def test_a_code_past_its_expiry_is_replaced_without_asking_the_hub(hub, monkeypatch, tmp_path):
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    _Hub.expires_in = 0
+    assert hub("login")[0] == 0
+    _Hub.expires_in = 600
+    code, env = hub("login")
+    assert code == 0 and env.data["replaced"] == "expired" and env.data["code"] == "JKLM-NPQR" and _Hub.polls == 0
+
+
+def test_login_again_keeps_the_interval_and_a_slow_down(hub, monkeypatch, tmp_path):
+    """A check waits out what is left of the hub's interval since it was last asked, and a slow_down makes it 5 s
+    longer for the checks after it, as the waiting flow does."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    _Hub.interval, _Hub.pending_polls = 1, 9
+    assert hub("login")[0] == 0
+    began = time.monotonic()
+    assert hub("login")[0] == 0
+    assert time.monotonic() - began >= 0.9 and len(_Hub.polled) == 1
+    _Hub.answer = "slow_down"
+    p = _pending(tmp_path)
+    kept = json.loads(p.read_text(encoding="utf-8"))
+    kept[os.environ["RB_HUB_URL"]]["asked"] = "2000-01-01T00:00:00Z"        # long enough ago: no wait for this check
+    p.write_text(json.dumps(kept), encoding="utf-8")
+    code, env = hub("login")
+    assert code == 0 and env.data["state"] == "pending" and env.data["code"] == "ABCD-EFGH"
+    assert json.loads(p.read_text(encoding="utf-8"))[os.environ["RB_HUB_URL"]]["interval"] == 6
+
+
+def test_logout_removes_a_pending_sign_in(hub, monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    assert hub("login")[0] == 0
+    code, env = hub("logout")
+    assert code == 0 and env.data["pending_removed"] is True and env.data["removed"] is False, env.errors
+    assert not _pending(tmp_path).exists()
+    code, env = hub("sync")
+    assert code == 2 and env.errors[0].code == "E_USAGE" and "No credential" in env.errors[0].message and _Hub.polls == 0
+    assert main(["login"]) == 0 and main(["logout"]) == 0
+    out = capsys.readouterr().out
+    assert "is removed: approving its code now signs nothing in here." in out and "nothing to do" not in out
+
+
+def test_login_wait_waits_for_the_approval_as_rb_login_did(hub, monkeypatch, tmp_path, capsys):
+    """rb login --wait shows the code on standard error and waits until it is approved; a sign-in already pending is
+    waited on with its own code, never a new one."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    code, env = hub("login", "--wait")
+    assert code == 0 and env.data["state"] == "signed_in" and _Hub.polls == 2 and not _pending(tmp_path).exists()
+    assert "Waiting (Ctrl-C stops; nothing is created until you approve)" in hub.last_err and "ABCD-EFGH" in hub.last_err
+    os.remove(tmp_path / "cfg" / "credentials.json")
+    _Hub.polls, _Hub.polled, _Hub.pending_polls = 0, [], 3
+    assert hub("login")[0] == 0 and _Hub.codes == 2
+    code, env = hub("login", "--wait")
+    assert code == 0 and env.data["handle"] == "t" and _Hub.codes == 2 and set(_Hub.polled) == {"dev_stub2"}
+    assert "JKLM-NPQR" in hub.last_err
+
+
+def test_a_single_check_asks_again_when_the_hub_is_down_or_the_connection_drops(hub, monkeypatch, tmp_path):
+    """rb login again and rb sync each ask once, under the same rule as the waiting flow: a 502-504 or a dropped
+    connection is asked again, three in a row at most, and the fourth ends it as it came, with the sign-in kept."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    assert hub("login")[0] == 0
+    _Hub.pending_polls, _Hub.unavailable, _Hub.dropped = 0, 1, 2
+    code, env = hub("login")
+    assert code == 0 and env.data["state"] == "signed_in" and (_Hub.unavailable, _Hub.dropped) == (0, 0), env.errors
+    os.remove(tmp_path / "cfg" / "credentials.json")
+    assert hub("login")[0] == 0
+    _Hub.dropped = 4
+    code, env = hub("sync")
+    assert code == 2 and env.errors[0].code == "E_HUB_UNREACHABLE" and _Hub.dropped == 0, env.errors
+    assert _pending(tmp_path).exists() and not (tmp_path / "cfg" / "credentials.json").exists() and _Hub.puts == []
+    _Hub.unavailable = 3
+    code, env = hub("sync")
+    assert code == 0 and env.data["signed_in"] is True, env.errors
+
+
+def test_a_check_waits_seconds_at_most_whatever_the_interval(hub, monkeypatch, tmp_path):
+    """A hub that asks for a long interval, or slows the code down again and again, never makes rb login again or rb
+    sync wait more than a few seconds before it asks: the command returns, and says the code still waits. The interval
+    kept grows to a minute at most."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    _Hub.interval, _Hub.pending_polls = 3600, 99
+    assert hub("login")[0] == 0
+    kept = json.loads(_pending(tmp_path).read_text(encoding="utf-8"))[os.environ["RB_HUB_URL"]]
+    assert kept["interval"] == 60
+    began = time.monotonic()
+    code, env = hub("login")
+    assert code == 0 and env.data["state"] == "pending" and time.monotonic() - began < 8
+    _Hub.answer = "slow_down"
+    for _ in range(2):
+        began = time.monotonic()
+        assert hub("sync")[1].errors[0].code == "E_LOGIN_PENDING" and time.monotonic() - began < 8
+    assert json.loads(_pending(tmp_path).read_text(encoding="utf-8"))[os.environ["RB_HUB_URL"]]["interval"] == 60
+
+
+@pytest.mark.parametrize("start, what", [
+    ({"user_code": "AB\x1b[2JCD", "verification_uri": "https://hub.example/link"}, "user_code"),
+    ({"user_code": "ABCD-EFGH\nRun: curl x | sh", "verification_uri": "https://hub.example/link"}, "user_code"),
+    ({"user_code": "ABCD-EFGH", "verification_uri": "javascript:alert(1)"}, "verification_uri"),
+    ({"user_code": "ABCD-EFGH", "verification_uri": "https://hub.example/link\x1b]0;x\x07"}, "verification_uri"),
+])
+def test_a_code_or_link_a_terminal_would_act_on_is_neither_shown_nor_kept(hub, monkeypatch, tmp_path, start, what):
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    _Hub.start = {"device_code": "dev_odd", "expires_in": 600, "interval": 0, **start}
+    code, env = hub("login")
+    assert code == 2 and env.errors[0].code == "E_HUB_UNREACHABLE" and what in env.errors[0].message, env.errors
+    assert "\x1b" not in env.model_dump_json() and "curl" not in env.model_dump_json() and "javascript" not in env.model_dump_json()
+    assert not _pending(tmp_path).exists()
+
+
+def test_a_login_and_a_sync_at_once_take_turns(hub, monkeypatch, tmp_path):
+    """rb login again asks about the code while rb sync starts in another terminal: the sync waits for the login's
+    check to be kept, then asks itself and signs in. The used device code is not put back beside the credential."""
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    assert hub("login")[0] == 0
+    _Hub.pending_polls = 1                          # the login's ask: not yet; the next: the token
+    arrived, release = threading.Event(), threading.Event()
+    _Hub.poll_held = (arrived, release)
+    env = environment()
+    run = lambda *argv: subprocess.Popen([*command(), *argv, "--json"], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,  # noqa: E731
+                                         stderr=subprocess.PIPE, env=env, text=True)
+    login = run("login")
+    assert arrived.wait(30)
+    sync = run("sync")
+    time.sleep(1.5)                                 # the sync has started, and asks nothing while the login's check runs
+    assert _Hub.polls == 1 and _Hub.puts == []
+    release.set()
+    out, _ = login.communicate(timeout=60)
+    assert json.loads(out)["data"]["state"] == "pending"
+    out, err = sync.communicate(timeout=60)
+    assert sync.returncode == 0 and json.loads(out)["data"]["signed_in"] is True, err
+    assert not _pending(tmp_path).exists() and (tmp_path / "cfg" / "credentials.json").exists()
+
+
+def test_logout_removes_a_pending_sign_in_whatever_the_credentials_file_holds(hub, monkeypatch, tmp_path):
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    assert hub("login")[0] == 0
+    (tmp_path / "cfg" / "credentials.json").write_text("not json", encoding="utf-8")
+    code, env = hub("logout")
+    assert code == 2 and env.errors[0].code == "E_USAGE"           # the credentials file stays the user's to delete
+    assert not _pending(tmp_path).exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="a folder's mode bits are POSIX's")
+def test_the_folder_rb_makes_for_a_sign_in_is_its_owners_alone(hub, monkeypatch, tmp_path):
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    old = os.umask(0)
+    try:
+        assert hub("login")[0] == 0
+    finally:
+        os.umask(old)
+    assert ((tmp_path / "cfg").stat().st_mode & 0o777) == 0o700 and (_pending(tmp_path).stat().st_mode & 0o777) == 0o600
+
+
+def test_a_sync_that_signs_in_and_then_fails_to_upload_still_says_it_signed_in(hub, monkeypatch, tmp_path):
+    monkeypatch.setenv("RB_CONFIG_DIR", str(tmp_path / "cfg"))
+    assert hub("login")[0] == 0
+    _Hub.pending_polls, _Hub.refuse = 0, 1
+    code, env = hub("sync")
+    assert code == 2 and env.errors[0].code == "E_HUB_REFUSED" and "Signed in as t on " in hub.last_err, hub.last_err
+    assert (tmp_path / "cfg" / "credentials.json").exists() and not _pending(tmp_path).exists()

@@ -89,7 +89,7 @@ class Rec:
         return env["data"]["object"]["id"]
 
     def open_items(self, code: str) -> list:
-        return [o for o in self.ok("status")["data"]["open"] if o["code"] == code]
+        return [o for o in self.ok("status", "--full")["data"]["open"] if o["code"] == code]
 
 
 def started(rec: Rec) -> Rec:
@@ -144,15 +144,15 @@ def test_a_command_given_for_an_old_run_reads_as_given_later_everywhere(rec, mon
     old = rec.run_id(env)
     assert [w for w in env["data"]["warnings"] if w.startswith(LATER)], env["data"]["warnings"]
     now = rec.run_id(rec.ok("run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.8", "--set", "seed=2", "--command", "python eval.py --seed 2"))
-    shown = rec.text("show", old)
+    shown = rec.text("show", "--long", old)
     assert f"  command given later, not observed: {recipe}" in shown.splitlines() and "command (as given)" not in shown
-    data = rec.ok("show", old)["data"]
+    data = rec.ok("show", "--long", old)["data"]
     assert data["command"]["given"] == "later" and data["command"]["text"] == recipe and data["made_before_recorded"] is True
-    assert "  command (as given): python eval.py --seed 2" in rec.text("show", now).splitlines()
-    assert rec.ok("show", now)["data"]["command"]["given"] == "at_the_time"
+    assert "  command (as given): python eval.py --seed 2" in rec.text("show", "--long", now).splitlines()
+    assert rec.ok("show", "--long", now)["data"]["command"]["given"] == "at_the_time"
     context = rec.text("context")
     assert f"command given later, not observed: {recipe}" in context and f"command (as given): {recipe}" not in context
-    rows = {r["id"]: r for r in rec.ok("status")["data"]["runs"]}
+    rows = {r["id"]: r for r in rec.ok("status", "--full")["data"]["runs"]}
     assert rows[old]["command"]["given"] == "later" and rows[now]["command"]["given"] == "at_the_time"
     [item] = rec.open_items("command_later")
     assert item["subject"] == old and item["records"] == [old] and item["what"].startswith(f"1 run gives a command given later, not observed ({old})")
@@ -177,14 +177,14 @@ def test_a_command_rb_watched_or_a_log_line_records_is_the_runs(rec):
     watched = subprocess.list2cmdline(["python3", "-c", report]) if os.name == "nt" else "python3 -c '" + report + "'"
     env = rec.ok("run", "add", "int8", "int8.top1=75.7", "--set", "seed=1", "--command", watched, "--produced-at", "2026-05-07T20:00:00Z")
     assert not [w for w in env["data"].get("warnings", []) if w.startswith(LATER)]
-    assert rec.ok("show", rec.run_id(env))["data"]["command"] == {
+    assert rec.ok("show", "--long", rec.run_id(env))["data"]["command"] == {
         "text": watched, "given": "observed", "how": "rb journal run watched it make these numbers, 2026-05-07"}
     may = time.mktime((2026, 5, 7, 20, 1, 0, 0, 0, -1))
     rec.write("logs/train.log", "20:00 launch: python train.py --precision int8 --seed 3\n", mtime=may)
     env = rec.ok("run", "add", "int8", "int8.top1=75.5", "--set", "seed=3", "--command", "python train.py --precision int8 --seed 3",
                  "--command-source", "logs/train.log:1", "--produced-at", "2026-05-07T20:30:00Z")
     run = rec.run_id(env)
-    assert "  command (as given): python train.py --precision int8 --seed 3 (logs/train.log:1 records this launch)" in rec.text("show", run).splitlines()
+    assert "  command (as given): python train.py --precision int8 --seed 3 (logs/train.log:1 records this launch)" in rec.text("show", "--long", run).splitlines()
     rec.write("logs/rebuilt.log", "launch: python train.py --precision int8 --seed 4\n")
     env = rec.ok("run", "add", "int8", "int8.top1=75.4", "--set", "seed=4", "--command", "python train.py --precision int8 --seed 4",
                  "--command-source", "logs/rebuilt.log", "--produced-at", "2026-05-07T20:30:00Z")
@@ -220,8 +220,8 @@ def test_the_sdk_and_mcp_type_a_command_given_later_as_the_command_line_does(rec
                                                 "command": "python train.py --seed 2", "command_source": "logs/train.log:1",
                                                 "produced_at": "2026-05-07T20:30:00Z"}))
     assert [w for w in added["data"]["warnings"] if w.startswith(LATER)]
-    assert rec.ok("show", added["data"]["object"]["id"])["data"]["command"]["given"] == "later"
-    assert rec.ok("show", logged_mcp["data"]["object"]["id"])["data"]["command"]["given"] == "logged"
+    assert rec.ok("show", "--long", added["data"]["object"]["id"])["data"]["command"]["given"] == "later"
+    assert rec.ok("show", "--long", logged_mcp["data"]["object"]["id"])["data"]["command"]["given"] == "logged"
 
 
 def commit(rec: Rec, path: str, at: str) -> None:
@@ -243,8 +243,8 @@ def test_a_recipe_in_a_document_or_an_old_file_is_never_the_runs_command(rec, mo
     env = rec.ok(*argv, "--command-source", "logs/old.log:1", agent=AGENT)
     [said] = [w for w in env["data"]["warnings"] if w.startswith(LATER)]
     assert "logs/old.log was written 2026-04-01, more than a week before the run" in said
-    shown = rec.ok("show", rec.run_id(env))["data"]["command"]
-    assert shown["given"] == "later" and "command (as given)" not in rec.text("show", rec.run_id(env))
+    shown = rec.ok("show", "--long", rec.run_id(env))["data"]["command"]
+    assert shown["given"] == "later" and "command (as given)" not in rec.text("show", "--long", rec.run_id(env))
     assert [o for o in rec.open_items("command_later") if rec.run_id(env) in o["records"]]
     at_the_users_terminal(rec, monkeypatch)
     exp = rabbit_brain.open().experiment("int8")
@@ -267,7 +267,7 @@ def test_a_watched_command_given_with_other_quotes_is_still_the_runs(rec):
     typed = 'python3 -c "' + report.replace('"', '\\"') + '"'
     env = rec.ok("run", "add", "int8", "int8.top1=75.7", "--set", "seed=1", "--command", typed, "--produced-at", "2026-05-07T20:00:00Z")
     assert not [w for w in env["data"].get("warnings", []) if w.startswith(LATER)], env["data"].get("warnings")
-    assert rec.ok("show", rec.run_id(env))["data"]["command"]["given"] == "observed"
+    assert rec.ok("show", "--long", rec.run_id(env))["data"]["command"]["given"] == "observed"
 
 
 def test_a_recipe_rb_watched_today_is_not_the_command_of_a_may_run(rec, monkeypatch):
@@ -278,7 +278,7 @@ def test_a_recipe_rb_watched_today_is_not_the_command_of_a_may_run(rec, monkeypa
     assert ran.returncode == 0 and json.loads(ran.stdout)["ok"], ran.stderr
     watched = subprocess.list2cmdline(["python3", "-c", write]) if os.name == "nt" else "python3 -c '" + write + "'"
     env = rec.ok("run", "add", "int8", "--from", "r3.json", "--set", "seed=3", "--produced-at", MAY, "--command", watched)
-    given = rec.ok("show", rec.run_id(env))["data"]["command"]
+    given = rec.ok("show", "--long", rec.run_id(env))["data"]["command"]
     assert given["given"] == "later" and "rb's journal saw it run " in given["how"] and given["how"].endswith(", after the run")
     assert [w for w in env["data"]["warnings"] if w.startswith(LATER)]
     at_the_users_terminal(rec, monkeypatch)
@@ -286,7 +286,7 @@ def test_a_recipe_rb_watched_today_is_not_the_command_of_a_may_run(rec, monkeypa
         warnings.simplefilter("always")
         run = rabbit_brain.open().experiment("int8").record_from("r4.json", per_run={"seed": 4}, produced_at=MAY, command=watched)
     assert [w for w in told(caught) if w.startswith(LATER)]
-    assert rec.ok("show", run.id)["data"]["command"]["given"] == "later"
+    assert rec.ok("show", "--long", run.id)["data"]["command"]["given"] == "later"
 
 
 # ---------------------------------------------------------------- a file written after its run
@@ -307,18 +307,18 @@ def test_a_file_written_after_its_run_is_not_its_own_output(rec, monkeypatch, tm
     [said] = [w for w in env["data"]["warnings"] if w.startswith("exports/seed1.json was written ")]
     assert ", after the run (produced 2026-05-07): it is not the run's own output" in said
     day = written_day(rec.root / "exports/seed1.json")
-    assert f"  file written {day}, after the run: the file its numbers were read from is not the run's own output" in rec.text("show", export).splitlines()
-    assert rec.ok("show", export)["data"]["file_written_after"].startswith(day)
+    assert f"  file written {day}, after the run: the file its numbers were read from is not the run's own output" in rec.text("show", "--long", export).splitlines()
+    assert rec.ok("show", "--long", export)["data"]["file_written_after"].startswith(day)
     may = time.mktime((2026, 5, 7, 20, 0, 0, 0, 0, -1))
     rec.write("out/seed2.json", '{"fp32.top1": 76.0, "int8.top1": 75.8}', mtime=may)
     own = rec.run_id(rec.ok("run", "add", "int8", "--from", "out/seed2.json", "--set", "seed=2", "--produced-at", MAY))
-    assert rec.ok("show", own)["data"]["file_written_after"] is None
+    assert rec.ok("show", "--long", own)["data"]["file_written_after"] is None
     [item] = rec.open_items("file_written_after")
     # no database here: rb names none, and points at the run's own output where it is kept
     assert item["records"] == [export] and "<database>" not in item["do"] and f"rb run add int8 --from <its file> --replaces {export}" in item["do"]
     rec.ok("criterion", "add", "INT8 within 0.5", "-e", "int8", "-q", "q1", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
            "--at-least", "-0.5", "--id", "c1")
-    [finding] = [f for f in rec.ok("status")["data"]["findings"] if f["criterion"] == "c1"]
+    [finding] = [f for f in rec.ok("status", "--full")["data"]["findings"] if f["criterion"] == "c1"]
     assert [n["text"] for n in finding["caveats"] if n["code"] == "file_written_after"] == [
         f"read from files written after their runs, not the runs' own output: {export}"]
     at_the_users_terminal(rec, monkeypatch)
@@ -340,17 +340,17 @@ def test_a_file_for_a_run_whose_time_is_unknown_is_not_shown_to_be_its_own(rec, 
     [later] = [w for w in env["data"]["warnings"] if w.startswith(LATER)]
     assert "when it was made is unknown" in later and "made before it was recorded" not in later
     sentence = f"file written {day}; when the run was made is unknown, so rb cannot show the file is its own output"
-    assert f"  {sentence}" in rec.text("show", run).splitlines()
-    data = rec.ok("show", run)["data"]
+    assert f"  {sentence}" in rec.text("show", "--long", run).splitlines()
+    data = rec.ok("show", "--long", run)["data"]
     assert data["file_written"].startswith(day) and data["file_written_after"] is None
-    assert [r["file_written"][:10] for r in rec.ok("status")["data"]["runs"] if r["id"] == run] == [day]
+    assert [r["file_written"][:10] for r in rec.ok("status", "--full")["data"]["runs"] if r["id"] == run] == [day]
     [item] = rec.open_items("file_run_time_unknown")
     assert item["records"] == [run] and "--replaces " + run in item["do"]
     [cl] = rec.open_items("command_later")
     assert "when it was made is unknown" in cl["what"] and "made before it was recorded" not in cl["what"]
     rec.ok("criterion", "add", "INT8 within 0.5", "-e", "int8", "-q", "q1", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
            "--at-least", "-0.5", "--id", "c1")
-    [finding] = [f for f in rec.ok("status")["data"]["findings"] if f["criterion"] == "c1"]
+    [finding] = [f for f in rec.ok("status", "--full")["data"]["findings"] if f["criterion"] == "c1"]
     assert [n["code"] for n in finding["caveats"] if n["code"] == "file_run_time_unknown"] == ["file_run_time_unknown"]
     assert f"file written {day}; when the run was made is unknown" in rec.text("context")
     at_the_users_terminal(rec, monkeypatch)
@@ -376,7 +376,7 @@ def test_a_row_read_from_the_store_is_its_own_output(rec):
     db.close()
     env = rec.ok("run", "add", "int8", "--variant", "int8", "--from", "results.db", "--table", "evals", "--where", "seed=3", "--set", "seed=@seed",
                  "--produced-at", "@ended")
-    assert rec.ok("show", rec.run_id(env))["data"]["file_written_after"] is None and not rec.open_items("file_written_after")
+    assert rec.ok("show", "--long", rec.run_id(env))["data"]["file_written_after"] is None and not rec.open_items("file_written_after")
 
 
 # ---------------------------------------------------------------- notes
@@ -388,18 +388,18 @@ def test_a_note_reads_as_a_note_and_its_numbers_are_never_results(rec):
     rec.ok("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.9", "--set", "seed=1")
     rec.ok("criterion", "add", "INT8 within 0.5", "-e", "int8", "-q", "q1", "--metric", "top1", "--subject", "int8", "--reference", "fp32",
            "--at-least", "-0.5", "--id", "c1")
-    before = rec.ok("show", "c1")["data"]["finding"]
+    before = rec.ok("show", "--long", "c1")["data"]["finding"]
     nid = rec.ok("note", "add", 'int8.top1=99.0 and fp32.top1=12.0, "as the README says"', "-e", "int8")["data"]["object"]["id"]
-    after = rec.ok("show", "c1")["data"]["finding"]
+    after = rec.ok("show", "--long", "c1")["data"]["finding"]
     assert (after["comparison"], after["rule_outcome"], after["observations"]) == (before["comparison"], before["rule_outcome"], before["observations"])
-    status = rec.text("status")
+    status = rec.text("status", "--full")
     assert f'          note {nid}: int8.top1=99.0 and fp32.top1=12.0, "as the README says"' in status.splitlines()
     assert f"- note {nid}: int8.top1=99.0" in rec.text("context")
     # what rb reconcile found holds none of the note's numbers; when it looked is the clock's, here one that holds 99 too
     found = json.dumps(rec.ok("reconcile", extra={"RB_TEST_NOW": "2026-10-18T08:15:08.997+00:00"})["data"])
     assert "99" not in re.sub(r"\d{4}-\d\d-\d\dT[\d:.]+(?:Z|[+-]\d\d:\d\d)", "<time>", found)
     run = rec.run_id(rec.ok("run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.8", "--set", "seed=2", "--note", "the export was rebuilt"))
-    assert "  note: the export was rebuilt" in rec.text("show", run).splitlines()
+    assert "  note: the export was rebuilt" in rec.text("show", "--long", run).splitlines()
     assert f"{run} (typed)" in rec.text("context") and " · note: the export was rebuilt" in rec.text("context")
 
 
@@ -410,7 +410,7 @@ def test_a_run_says_when_it_was_produced_and_when_it_was_recorded(rec, monkeypat
     """rb show and the page say the produced time as reported beside the recording time, and the repository's state as
     the state when recorded, not when run; the page's receipt is lines, not a stored dict."""
     run = rec.run_id(rec.ok("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.9", "--set", "seed=1", "--produced-at", MAY))
-    lines = rec.text("show", run).splitlines()
+    lines = rec.text("show", "--long", run).splitlines()
     assert lines[1].startswith("  produced 2026-05-07 20:07 UTC (as reported) · recorded "), lines
     assert any(line.startswith("  repository when recorded, not when run: ") for line in lines), lines
     assert not any(line.startswith("  produced: ") for line in lines)
@@ -422,11 +422,14 @@ def test_a_run_says_when_it_was_produced_and_when_it_was_recorded(rec, monkeypat
     page = (tmp_path / "page.html").read_text(encoding="utf-8")
     # the run's receipt says it as rb show does, once; its row in Runs says the day it was produced first
     # the card's head says the days once; the time and how rb knows it are its Source details row (DESIGN-PASS-1)
-    assert '<span class="dim sm">in <a href="#x-' in page and " · produced 2026-05-07 · recorded " in page and "produced produced" not in page
+    # closed form (owner, Nov 13 2026): the days open the run's receipt, an element the page holds
+    days = re.search(r' · <a href="#([^"]+)">produced 2026-05-07 · recorded ', page)
+    assert '<span class="dim sm">in <a href="#x-' in page and days and f' id="{days.group(1)}"' in page and "produced produced" not in page
     assert "<dt>produced</dt><dd>2026-05-07 20:07 UTC (as reported)" in page and page.count("2026-05-07 20:07 UTC (as reported)") == 1
     assert "{&#x27;" not in page and "&#x27;at&#x27;:" not in page
     # Runs says both days, once above a table whose runs share them (design pass 1, target 5)
-    assert re.search(r'<p class="dim sm rq">[^<]*Produced 2026-05-07, recorded \d{4}-\d{2}-\d{2}</p>', page)
+    # closed form (owner, Nov 13 2026): the days open History, where their writes are
+    assert re.search(r'<p class="dim sm rq">(?:<a href="#history">)?[^<]*Produced 2026-05-07, recorded \d{4}-\d{2}-\d{2}(?:</a>)?</p>', page)
 
 
 def test_a_file_from_the_last_hour_dates_the_run_and_rb_says_so(rec, monkeypatch):
@@ -452,15 +455,15 @@ def test_status_and_context_say_when_the_record_began(rec, tmp_path, monkeypatch
     line's sentence (0.6.1: one wording in every view), the day as rb's text gives days: in one quiet line, on rb
     status, rb context, rb open's data and rb ui alike. One whose runs all came after says nothing. A page says the
     same fact in the record line's words, its day as a page gives days, and never the old began line."""
-    assert "Kept with rb since" not in rec.text("status") and rec.ok("status")["data"]["record_start"] is None
+    assert "Kept with rb since" not in rec.text("status", "--full") and rec.ok("status", "--full")["data"]["record_start"] is None
     rec.ok("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.9", "--set", "seed=1", "--produced-at", MAY)
     rec.ok("run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.8", "--set", "seed=2", "--produced-at", "2026-05-08")
     rec.ok("run", "add", "int8", "fp32.top1=76.2", "int8.top1=75.7", "--set", "seed=3")
     day = rec.ok("log", "-n", "500")["data"]["entries"][0]["at"][:10]
     line = f"Kept with rb since {day}. 2 runs were recorded afterwards, not as they happened."
-    assert rec.text("status").splitlines()[1] == line
-    assert rec.text("context").splitlines()[2] == line
-    start = rec.ok("status")["data"]["record_start"]
+    assert rec.text("status", "--full").splitlines()[1] == line
+    assert rec.text("context").splitlines()[3] == line         # under rb context's first line, for a person
+    start = rec.ok("status", "--full")["data"]["record_start"]
     assert {k: start[k] for k in ("before", "runs", "unknown")} == {"before": 2, "runs": 3, "unknown": 0}
     rec.ok("page", "--out", str(tmp_path / "page.html"))
     page = (tmp_path / "page.html").read_text(encoding="utf-8")
@@ -468,7 +471,7 @@ def test_status_and_context_say_when_the_record_began(rec, tmp_path, monkeypatch
     y, m, d = day.split("-")
     month = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()[int(m) - 1]
     said = f"Kept with rb since {int(d)} {month} {y}. 2 runs were recorded afterwards, not as they happened."
-    assert page.count(f'<p class="dim sm wit">{said}</p>') == 2         # the Overview and About
+    assert page.count(f'<p class="dim sm wit"><a href="#history">{said}</a></p>') == 2         # the head of History (UX5 1.3) and About
     from rbtest import home
     monkeypatch.chdir(rec.root)
     for k, v in rec.env.items():
@@ -481,10 +484,10 @@ def test_status_and_context_say_when_the_record_began(rec, tmp_path, monkeypatch
 def test_the_record_start_line_counts_two_runs_as_both(rec):
     """The pilot's record said 'after all 2 of its runs were made': two runs made before the record began read as both."""
     rec.ok("run", "add", "int8", "fp32.top1=76.1", "int8.top1=75.9", "--set", "seed=1", "--produced-at", MAY)
-    assert rec.text("status").splitlines()[1].endswith(". 1 run was recorded afterwards, not as it happened.")
+    assert rec.text("status", "--full").splitlines()[1].endswith(". 1 run was recorded afterwards, not as it happened.")
     rec.ok("run", "add", "int8", "fp32.top1=76.0", "int8.top1=75.8", "--set", "seed=2", "--produced-at", "2026-05-08")
-    for screen in ("status", "context"):
-        said = [x for x in rec.text(screen).splitlines() if x.startswith("Kept with rb since ")]
+    for screen in (("status", "--full"), ("context",)):
+        said = [x for x in rec.text(*screen).splitlines() if x.startswith("Kept with rb since ")]
         assert len(said) == 1 and said[0].endswith(". Both runs were recorded afterwards, not as they happened."), screen
 
 
@@ -512,11 +515,11 @@ def test_words_about_who_wrote_it_are_kept_and_pointed_out(rec, monkeypatch):
     line = f"2 texts say who wrote them, or how (note {n1} on int8; note {n2} on int8)"
     assert item["subject"] == "int8" and item["what"] == line
     # rb's own line names where the words are, never the writer ids they hold
-    assert f"  - {line}" in rec.text("status").splitlines()
+    assert f"  - {line}" in rec.text("status", "--full").splitlines()
     assert f"  - {line}" in rec.text("context").splitlines()
     assert [m for t in item["texts"] for m in t["marks"]] == ["UNSUPPORTED", "example-model-7", "recording agent"]
     assert "texts say who wrote them, or how" in rec.text("context")
-    assert text in rec.text("show", "int8")
+    assert text in rec.text("show", "--long", "int8")
     at_the_users_terminal(rec, monkeypatch)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -568,12 +571,12 @@ def test_words_that_name_the_user_or_the_chat_as_a_source_are_pointed_out(rec, m
     line = f"  - 2 texts name the user or the chat as their source (note {nid} on int8; int8 gate why)"
     assert (item["who"], item["subject"], item["what"]) == ("agent", "int8", line[4:])
     assert [m for t in item["texts"] for m in t["marks"]] == ["The researcher's rule", "left to the researcher", "the researcher's rule", "stated in this chat"]
-    assert line in rec.text("status").splitlines() and line in rec.text("context").splitlines()
+    assert line in rec.text("status", "--full").splitlines() and line in rec.text("context").splitlines()
     assert not rec.open_items("writer_words")
     # a reason two gate writes give is one text, read once
     rec.ok("experiment", "gate", "int8", "--if-not", "INT8 waits.", "--why", "the researcher's rule for the next step, stated in this chat", agent=AGENT)
     assert rec.open_items("attributed_words")[0]["what"] == line[4:]
-    assert note in rec.text("show", "int8")
+    assert note in rec.text("show", "--long", "int8")
     at_the_users_terminal(rec, monkeypatch)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -599,7 +602,7 @@ def test_words_that_name_the_user_or_the_chat_clear_once_taken_back_or_replaced(
         rec.ok("retract", nid, "--why", "written in the wrong voice", agent=AGENT)
     [item] = rec.open_items("attributed_words")
     assert item["what"] == "1 text names the user or the chat as its source (int8 gate why)" and item["do"] == "", item
-    assert "  - 1 text names the user or the chat as its source (int8 gate why)" in rec.text("status").split("Facts that ask for nothing")[1]
+    assert "  - 1 text names the user or the chat as its source (int8 gate why)" in rec.text("status", "--full").split("Facts that ask for nothing")[1]
     rec.ok("experiment", "gate", "int8", "--if-holds", "INT8 ships next week.", "--why", "docs/plan.md:6 states the rule", agent=AGENT)
     assert not rec.open_items("attributed_words")
     assert rec.open_items("writer_words")
@@ -625,7 +628,7 @@ def test_late_criteria_ask_for_no_run_where_none_is_expected(rec):
     brownfield(rec)
     [item] = rec.open_items("late")
     assert (item["subject"], item["what"], item["do"], item["criteria"]) == ("int8", "int8: 2 criteria were declared after their evidence existed", "", ["c1", "c2"])
-    lines = rec.text("status").splitlines()
+    lines = rec.text("status", "--full").splitlines()
     at = lines.index("  - int8: 2 criteria were declared after their evidence existed")
     assert not lines[at + 1].startswith("      ")
     # it asks for nothing, so it is listed apart from the work
@@ -644,7 +647,7 @@ def test_late_criteria_name_both_arms_where_runs_are_expected(rec):
     [item] = rec.open_items("late")
     assert item["what"] == "int8: 2 criteria were declared after their evidence existed: a reading of their own needs their subjects' runs made after the declaration"
     assert item["do"].startswith("rb run add int8 --from <the results file a run wrote> --set seed=<value>")
-    assert rabbit_brain.open(rec.root).status()["open"] == rec.ok("status")["data"]["open"]
+    assert rabbit_brain.open(rec.root).status()["open"] == rec.ok("status", "--full")["data"]["open"]
 
 
 @pytest.mark.skipif(not os.environ.get("RB_OLD_BIN"), reason="RB_OLD_BIN names an rb from before these guards")
@@ -654,7 +657,7 @@ def test_writes_that_use_no_new_feature_leave_the_record_as_an_older_rb_reads_it
     rec.write("out/m.json", '{"fp32.top1": 76.1, "int8.top1": 75.9}')
     rec.ok("run", "add", "int8", "--from", "out/m.json", "--set", "seed=1", "--produced-at", MAY, "--command", "python eval.py")
     rec.ok("note", "add", "UNSUPPORTED by the recording agent", "-e", "int8", agent=AGENT)
-    for argv in (["status"], ["show", "int8"], ["doctor"]):
+    for argv in (["status"], ["show", "--long", "int8"], ["doctor"]):
         r = subprocess.run([os.environ["RB_OLD_BIN"], *argv, "--json"], cwd=rec.root, capture_output=True, text=True, env=rec.env)
         env = json.loads(r.stdout)
         assert env["ok"], (argv, env["errors"])

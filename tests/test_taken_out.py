@@ -93,11 +93,11 @@ def test_a_checkout_that_takes_out_records_is_said_never_read_as_edited_and_rest
     t = taken(root)
     assert t and t["count"] == 1 and t["records"] == [{"kind": "run", "id": rid}] and t["said"] == TOOK
     assert "edited_outside_rb" not in codes(root) and "taken_out_by_git" in codes(root)
-    assert TOOK in text(root, "status") and TOOK in text(root, "context")
+    assert TOOK in text(root, "status", "--full") and TOOK in text(root, "context")
     assert not list((root / ".rb").rglob("*.outside-rb"))
     # the record reads as the log on disk has it: the run is not read
     assert run(root, "status")["data"]["runs"] == []
-    shown = run(root, "show", rid)
+    shown = run(root, "show", "--long", rid)
     assert shown["data"]["taken_out"]["said"] == f"run {rid} was taken out of the record by git. rb kept it: rb doctor --restore puts it back."
     d = doctor(root)
     fails = [c for c in d["data"]["outcome"]["failures"]]
@@ -263,7 +263,19 @@ def test_rb_open_mcp_and_the_sdk_say_it(home, monkeypatch):
     assert rabbit_brain.open(root).status()["taken_out"]["said"] == TOOK
 
 
-@pytest.mark.skipif(not os.environ.get("RB_OLD_BIN"), reason="RB_OLD_BIN names an older rb (0.8.3)")
+def _old_rb_keeps_no_copy():
+    """Whether RB_OLD_BIN names an rb that keeps no copy of its writes (before 0.8.5): its note is then in neither the
+    log nor rb's copy. 0.8.5 and later keep one, so their note reads as taken out with the rest."""
+    old = os.environ.get("RB_OLD_BIN")
+    if not old:
+        return False
+    try:
+        return b"kept.jsonl" not in Path(shutil.which(old) or old).read_bytes()
+    except OSError:
+        return False
+
+
+@pytest.mark.skipif(not _old_rb_keeps_no_copy(), reason="RB_OLD_BIN names an older rb that keeps no copy of its writes (0.8.4 or before)")
 def test_a_note_an_older_rb_wrote_between_two_writes_leaves_both_caught(home):
     root = record(home)
     a = add_run(root, "75.1")
@@ -307,16 +319,16 @@ def test_a_finding_never_meets_its_rule_on_what_git_left_and_every_gate_fails_cl
     git(root, "add", "-A")
     git(root, "commit", "-qm", "three seeds")
     missing = [seed(n, 70.0) for n in (4, 5, 6)]
-    assert run(root, "show", "c1")["data"]["finding"]["rule_outcome"] == "misses"
+    assert run(root, "show", "--long", "c1")["data"]["finding"]["rule_outcome"] == "misses"
     git(root, "checkout", "--", ".")
-    f = run(root, "show", "c1")["data"]["finding"]
+    f = run(root, "show", "--long", "c1")["data"]["finding"]
     assert f["rule_outcome"] == "undetermined", f["says"]
     assert not f["says"]["headline"].startswith("criterion met"), f["says"]["headline"]
     took = [p for p in f["integrity"] if p["code"] == "taken_out_by_git"]
     assert took and all(r in took[0]["text"] for r in missing), f["integrity"]
     assert took[0]["text"].startswith("3 runs it rests on were taken out of the record by git: ")
     assert "3 more runs taken out of the record by git" in f["says"]["evidence"], f["says"]["evidence"]
-    shown = text(root, "show", "c1")
+    shown = text(root, "show", "--long", "c1")
     assert "criterion undetermined" in shown and "taken out of the record by git" in shown and "criterion met" not in shown
     for g in ("unestablished", "integrity", "unmet", "late", "stale", "checks", "undecided", "untested", "unresolved", "unknown"):
         out = run(root, "status", "--fail-on", g, code=1)
@@ -336,7 +348,7 @@ def test_a_finding_never_meets_its_rule_on_what_git_left_and_every_gate_fails_cl
     assert "3 runs it rests on were taken out of the record by git" in live
     # put back, the six runs read again and the rule misses
     run(root, "doctor", "--restore")
-    assert run(root, "show", "c1")["data"]["finding"]["rule_outcome"] == "misses"
+    assert run(root, "show", "--long", "c1")["data"]["finding"]["rule_outcome"] == "misses"
 
 
 def test_an_exposure_or_an_eval_run_git_took_out_is_named_and_the_rule_reads_undetermined(home, tmp_path, monkeypatch):
@@ -361,26 +373,26 @@ def test_an_exposure_or_an_eval_run_git_took_out_is_named_and_the_rule_reads_und
         run(root, "run", "add", "int8", "--from", f"out/{f.name}", "--set", f"seed={n}", "--input", "holdout:eval")
     git(root, "add", "-A")
     git(root, "commit", "-qm", "three seeds")
-    assert run(root, "show", "c1")["data"]["finding"]["timing"] == "before"
+    assert run(root, "show", "--long", "c1")["data"]["finding"]["timing"] == "before"
 
     def taken_and_closed(what: str):
-        f = run(root, "show", "c1")["data"]["finding"]
+        f = run(root, "show", "--long", "c1")["data"]["finding"]
         assert f["rule_outcome"] == "undetermined", (what, f["says"])
         took = [p for p in f["integrity"] if p["code"] == "taken_out_by_git"]
         assert took and what in took[0]["text"], f["integrity"]
-        shown = text(root, "show", "c1")
+        shown = text(root, "show", "--long", "c1")
         assert "criterion met" not in shown and "taken out of the record by git" in shown, shown
         for g in ("unestablished", "integrity", "unmet", "late"):
             assert run(root, "status", "--fail-on", g, code=1)["data"]["outcome"]["passed"] is False, g
 
     run(root, "resource", "expose", "holdout", "inspected", "--at", "2020-01-01", "--why", "looked at cases")
-    assert run(root, "show", "c1")["data"]["finding"]["timing"] == "after_exposure"
+    assert run(root, "show", "--long", "c1")["data"]["finding"]["timing"] == "after_exposure"
     git(root, "checkout", "--", ".")
     taken_and_closed("1 write to a resource it rests on was taken out of the record by git: holdout")
     subprocess.run([*command(), "page", "--out", str(tmp_path / "p.html")], cwd=root, env=environment(), check=True, capture_output=True)
     assert "it rests on was taken out of the record by git" in (tmp_path / "p.html").read_text(encoding="utf-8")
     run(root, "doctor", "--restore")
-    assert run(root, "show", "c1")["data"]["finding"]["timing"] == "after_exposure"
+    assert run(root, "show", "--long", "c1")["data"]["finding"]["timing"] == "after_exposure"
     git(root, "add", "-A")
     git(root, "commit", "-qm", "the exposure")
     # another experiment's run that evaluates on holdout is an exposure too
@@ -414,11 +426,11 @@ def test_when_every_run_is_taken_out_no_surface_says_there_is_no_evidence(home, 
         run(root, "run", "add", "int8", "--from", f"out/{f.name}", "--set", f"seed={n}")
     git(root, "checkout", "--", ".")
     gone = ("no evidence recorded yet", "No results yet.", "No recorded run is read yet.")
-    f = run(root, "show", "c1")["data"]["finding"]
+    f = run(root, "show", "--long", "c1")["data"]["finding"]
     assert f["says"]["timing"].endswith("its evidence was taken out of the record by git"), f["says"]["timing"]
     inquiry = json.dumps(run(root, "status")["data"])
     assert "no evidence recorded yet" not in inquiry
-    for argv in (("show", "c1"), ("status",), ("context",), ("show", "q-acc")):
+    for argv in (("show", "--long", "c1"), ("status", "--full"), ("context",), ("show", "--long", "q-acc")):
         said = text(root, *argv)
         assert "taken out of the record by git" in said and not any(g in said for g in gone), (argv, said)
     card = json.dumps(object_card("c1", root))
@@ -463,7 +475,7 @@ def test_spec_set_from_names_the_commit_after_its_at_as_its_lines_do(home):
     head = said.splitlines()[0]
     assert head == f"int8: 2 settings from configs/train.yaml @{full[:7]} · 2 verified", said
     assert f"@{full[:8]}" not in said, said
-    st = run(root, "show", "int8/optim.lr")["data"]
+    st = run(root, "show", "--long", "int8/optim.lr")["data"]
     assert full in json.dumps(st), st
 
 
@@ -523,15 +535,15 @@ def test_every_record_the_reading_reads_is_named_when_git_takes_its_write_out(ho
         argv = ("run", "add", "int4", "int4.top1=70", "fp32.top1=76", "--input", "holdout:eval", "--produced-at", "2020-01-02")
     out = run(root, *argv)
     named = named or out["data"]["object"]["id"]
-    before = run(root, "show", "c1")["data"]["finding"]
+    before = run(root, "show", "--long", "c1")["data"]["finding"]
     git(root, "checkout", "--", ".")
     assert taken(root), case
-    f = run(root, "show", "c1")["data"]["finding"]
+    f = run(root, "show", "--long", "c1")["data"]["finding"]
     took = [p for p in f["integrity"] if p["code"] == "taken_out_by_git"]
     assert took and named in took[0]["text"], (case, f["integrity"], f["says"])
     assert f["rule_outcome"] == "undetermined", (case, f["says"])
     run(root, "doctor", "--restore")
-    assert run(root, "show", "c1")["data"]["finding"]["rule_outcome"] == before["rule_outcome"], case
+    assert run(root, "show", "--long", "c1")["data"]["finding"]["rule_outcome"] == before["rule_outcome"], case
 
 
 def test_a_question_reword_git_took_out_is_said_and_the_interpretation_waits_for_it(home):
@@ -558,7 +570,7 @@ def test_a_question_reword_git_took_out_is_said_and_the_interpretation_waits_for
     assert r["interpretation_active"] is False, r
     took = [p for p in r["integrity"] if p["code"] == "taken_out_by_git"]
     assert took and "q1" in took[0]["text"], r["integrity"]
-    shown = text(root, "show", "q1")
+    shown = text(root, "show", "--long", "q1")
     assert "A write to question q1 was taken out of the record by git" in shown, shown
     assert "question q1 was taken out of the record by git" not in shown.replace("A write to question q1", ""), shown
     assert "Interpretation active for c1" not in shown, shown
@@ -580,16 +592,16 @@ def test_a_catalogue_entry_named_by_an_alias_git_took_out_is_named_and_the_rule_
     git(root, "add", "-A")
     git(root, "commit", "-qm", "three seeds")
     run(root, "metric", "add", "loss", "--minimize", "--alias", "ce")
-    assert run(root, "show", "c1")["data"]["finding"]["result"] == "loss"
+    assert run(root, "show", "--long", "c1")["data"]["finding"]["result"] == "loss"
     git(root, "checkout", "--", ".")
-    f = run(root, "show", "c1")["data"]["finding"]
+    f = run(root, "show", "--long", "c1")["data"]["finding"]
     assert f["rule_outcome"] == "undetermined", f["says"]
     took = [p for p in f["integrity"] if p["code"] == "taken_out_by_git"]
     assert took and took[0]["text"].startswith("1 metric it rests on was taken out of the record by git: loss."), f["integrity"]
     for g in ("unmet", "integrity", "late", "unestablished", "unresolved"):
         assert run(root, "status", "--fail-on", g, code=1)["data"]["outcome"]["passed"] is False, g
     run(root, "doctor", "--restore")
-    f = run(root, "show", "c1")["data"]["finding"]
+    f = run(root, "show", "--long", "c1")["data"]["finding"]
     assert f["result"] == "loss" and not f["integrity"], f
 
 
@@ -613,18 +625,18 @@ def test_with_every_run_taken_out_no_axis_says_untested_or_planned(home, tmp_pat
     for n in (1, 2, 3):
         run(root, "run", "add", "int8", f"int8.top1=75.{n}", f"fp32.top1=76.{n}", "--set", f"seed={n}")
     git(root, "checkout", "--", ".")
-    f = run(root, "show", "c1")["data"]["finding"]
+    f = run(root, "show", "--long", "c1")["data"]["finding"]
     assert f["result"] == "untested" and f["says"]["headline"] == "criterion undetermined · taken out by git", f["says"]
     assert f["says"]["result"] == "its evidence was taken out of the record by git", f["says"]
     st = run(root, "status")["data"]
     e = next(x for x in st["experiments"] if x["id"] == "int8")
     assert e["state"] == "planned" and e["state_said"] == "3 runs taken out by git", e
-    assert "Experiment int8: INT8 against FP32 · 3 runs taken out by git" in text(root, "show", "int8")
-    q = text(root, "show", "q-acc")
+    assert "Experiment int8: INT8 against FP32 · 3 runs taken out by git" in text(root, "show", "--long", "int8")
+    q = text(root, "show", "--long", "q-acc")
     assert "by result: 1 taken out by git" in q and "is planned" not in q and "1 untested" not in q, q
     assert "experiment int8 has 3 runs taken out by git" in q, q
     assert "(3 runs taken out by git)" in text(root, "context")
-    assert "planned" not in text(root, "status").replace("test planned in advance", ""), text(root, "status")
+    assert "planned" not in text(root, "status", "--full").replace("test planned in advance", ""), text(root, "status", "--full")
     card = json.dumps(object_card("int8", root))
     assert "3 runs taken out by git" in card and "· planned ·" not in card, card
     subprocess.run([*command(), "page", "--out", str(tmp_path / "p.html")], cwd=root, env=environment(), check=True, capture_output=True)
@@ -657,13 +669,13 @@ def test_the_timing_never_says_before_the_evidence_while_what_it_reads_is_taken_
         run(root, "run", "add", "int8", "--from", f"out/{f.name}", "--set", f"seed={n}", "--input", "holdout:eval")
     git(root, "add", "-A")
     git(root, "commit", "-qm", "three seeds")
-    assert run(root, "show", "c1")["data"]["finding"]["timing"] == "before"
+    assert run(root, "show", "--long", "c1")["data"]["finding"]["timing"] == "before"
     run(root, "resource", "expose", "holdout", "inspected", "--at", "2020-01-01", "--why", "looked at cases")
     git(root, "checkout", "--", ".")
-    f = run(root, "show", "c1")["data"]["finding"]
+    f = run(root, "show", "--long", "c1")["data"]["finding"]
     assert f["timing"] == "unknown", f["says"]
     assert f["says"]["timing"] == "declared; order unknown: rb cannot read it while what it reads is taken out of the record by git", f["says"]
-    shown = text(root, "show", "c1")
+    shown = text(root, "show", "--long", "c1")
     assert "declared before the evidence" not in shown, shown
     subprocess.run([*command(), "page", "--out", str(tmp_path / "p.html")], cwd=root, env=environment(), check=True, capture_output=True)
     page = (tmp_path / "p.html").read_text(encoding="utf-8")
@@ -676,7 +688,7 @@ def test_the_timing_never_says_before_the_evidence_while_what_it_reads_is_taken_
         server.close()
     assert "declared before the evidence" not in live
     run(root, "doctor", "--restore")
-    assert run(root, "show", "c1")["data"]["finding"]["timing"] == "after_exposure"
+    assert run(root, "show", "--long", "c1")["data"]["finding"]["timing"] == "after_exposure"
 
 
 def test_the_rule_line_says_part_of_its_evidence_and_a_stash_as_the_integrity_line_does(home):
@@ -703,7 +715,7 @@ def test_the_rule_line_says_part_of_its_evidence_and_a_stash_as_the_integrity_li
             for n in (4, 5, 6):
                 run(root, "run", "add", "int8", f"int8.top1=70.{n}", f"fp32.top1=76.{n}", "--set", f"seed={n}")
         git(root, *undo)
-        f = run(root, "show", "c1")["data"]["finding"]
+        f = run(root, "show", "--long", "c1")["data"]["finding"]
         assert f["comparison"] and f["rule_outcome"] == "undetermined", f["says"]
         return f["says"]["rule"], f["says"]["integrity"]
 
@@ -730,11 +742,11 @@ def test_an_analysis_elsewhere_that_supersedes_one_the_reading_reads_is_named(ho
     a1 = run(root, "analysis", "add", "int8", "--compare", "int8/fp32:top1=-0.3[-0.5,-0.1]", "--method", "paired bootstrap")["data"]["object"]["id"]
     git(root, "add", "-A")
     git(root, "commit", "-qm", "an analysis")
-    assert a1 in run(root, "show", "c1")["data"]["finding"]["says"]["comparison"]
+    assert a1 in run(root, "show", "--long", "c1")["data"]["finding"]["says"]["comparison"]
     a2 = run(root, "analysis", "add", "e2", "--compare", "b/a:top1=0.15[0.05,0.25]", "--method", "boot2", "--supersedes", a1, "--why", "redo")["data"]["object"]["id"]
-    assert a1 not in run(root, "show", "c1")["data"]["finding"]["says"]["comparison"]
+    assert a1 not in run(root, "show", "--long", "c1")["data"]["finding"]["says"]["comparison"]
     git(root, "checkout", "--", ".")
-    f = run(root, "show", "c1")["data"]["finding"]
+    f = run(root, "show", "--long", "c1")["data"]["finding"]
     took = [p for p in f["integrity"] if p["code"] == "taken_out_by_git"]
     assert took and a2 in took[0]["text"] and f["rule_outcome"] == "undetermined", (f["integrity"], f["says"])
 
@@ -758,7 +770,7 @@ def test_an_unrelated_write_git_took_out_leaves_a_later_link_s_interpretation_al
     q = next(q for q in run(root, "status")["data"]["questions"] if q["id"] == "q2")
     r = next(r for r in q["inquiry"]["direct"] if r["criterion"] == "c1")
     assert r["interpretation_active"] is True and not r["integrity"], r
-    assert not run(root, "show", "c1")["data"]["finding"]["integrity"]
+    assert not run(root, "show", "--long", "c1")["data"]["finding"]["integrity"]
 
 
 def test_a_link_to_the_question_git_took_out_is_named_on_the_question(home):
@@ -777,4 +789,4 @@ def test_a_link_to_the_question_git_took_out_is_named_on_the_question(home):
     git(root, "checkout", "--", ".")
     q = next(q for q in run(root, "status")["data"]["questions"] if q["id"] == "q1")
     assert "taken_out_by_git" in {p["code"] for p in q["inquiry"]["integrity"]}, q["inquiry"]["integrity"]
-    assert "1 write to a criterion it rests on was taken out of the record by git: c9" in text(root, "show", "q1")
+    assert "1 write to a criterion it rests on was taken out of the record by git: c9" in text(root, "show", "--long", "q1")

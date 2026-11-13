@@ -56,7 +56,7 @@ fn steps() -> Vec<Vec<&'static str>> {
             "run", "add", "drop", "--from", "out/s3/metrics.json", "--set", "seed=3", "--config", "out/s3/config.yaml", "--command",
             "python train.py --dropout 0.1 --seed 3",
         ],
-        vec!["status"],
+        vec!["status", "--full"],
     ]
 }
 

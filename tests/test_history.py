@@ -363,7 +363,7 @@ def owner_example() -> dict:
 
 def test_history_draws_every_sitting_and_the_latest_changes(tmp_path):
     """History holds the summary, every sitting's head and each line's sentence and why, newest first; the Overview holds
-    the Latest changes line and the newest sitting's lines."""
+    the newest sitting's lines first (the Overview holds the story alone since UX5 round 1)."""
     doc = owner_example()
     page = drawn_page(tmp_path, doc)
     history, overview = section(page, "history"), section(page, "overview")
@@ -377,9 +377,10 @@ def test_history_draws_every_sitting_and_the_latest_changes(tmp_path):
             if line["why"]:
                 assert f"why: {line['why']}" in history, line["why"]
     assert at == sorted(at), "sittings read newest first"
-    assert doc["home"]["latest"]["line"] in overview
+    # since UX5 round 1 the Overview holds the story alone: the newest sitting is History's first, never the Overview's
+    assert doc["home"]["latest"]["line"] not in overview
     for line in doc["history"]["sittings"][0]["lines"]:
-        assert line["sentence"] in overview, line["sentence"]
+        assert line["sentence"] in history, line["sentence"]
 
 
 def test_a_sessions_reason_is_drawn_as_rbs_note(tmp_path):

@@ -22,7 +22,8 @@ permissions:
 #   line endings rb keeps and writes, and paths as rb says them (places, worktrees, the home folder as ~)
 #   rb remove's round trip, which touches every file rb wrote
 #   rb updating itself through uv, where Windows keeps a running program's file
-#   the live view's timing checks and the home screen's budget, which a slow runner reads differently
+#   the live view's timing checks, which a slow runner reads differently; the home screen's budget runs in the full
+#   matrix, since it builds the scale record first (about 7 minutes on Windows) and holds a ratio on any machine
 #   Chrome started by the harness and the app runner's deadlines over its process tree, the clipboard Copy prompt
 #   writes, and the inspector's rail settling (the checks GitHub's Windows and macOS runners have failed on); the rest
 #   of tests/app/ and the screenshot runner (half an hour together) run in the full matrix
@@ -33,7 +34,6 @@ env:
     tests/test_surface.py::test_rb_installed_as_a_uv_tool_upgrades_itself_through_uv_and_a_screen_says_restart
     tests/test_surface.py::test_an_upgrade_that_installs_nothing_newer_is_not_said_as_installed
     tests/test_surface.py::test_rb_in_a_uv_tool_dir_of_any_name_upgrades_itself_through_uv
-    tests/test_shell_model.py::test_home_within_budget
     tests/test_live.py::test_a_poll_never_counts tests/test_live.py::test_the_page_polls_less_while_hidden_or_unanswered
     tests/test_live.py::test_a_terminal_write_keeps_what_you_had_open
   RELEASE_CHECK_BROWSER: >-
@@ -47,6 +47,7 @@ env:
 jobs:
   # The release check: Windows and macOS, about 15 minutes from the push (rb built in about 5 with the cache, then the
   # platform tests in 3 to 5, the browser checks in 4 to 6; measured at -n 4 on a 16-core Linux box: 165 s and 229 s).
+  # On GitHub's Windows runner, the steps before the tests took about 12 minutes on 0.8.6's first run.
   release-check:
     if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 30

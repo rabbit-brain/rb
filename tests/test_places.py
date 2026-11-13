@@ -169,7 +169,8 @@ def test_three_worktrees_are_listed_quickly(tmp_path, monkeypatch):
         t = time.perf_counter()
         places(rec.root)
         took.append(time.perf_counter() - t)
-    assert min(took) < (1.5 if sys.platform == "win32" else 0.3), took
+    # GitHub's macOS runners took 0.32 to 0.38 s on 0.8.6's first release check; the Mac gate's full run holds 0.3 s
+    assert min(took) < {"win32": 1.5, "darwin": 0.6}.get(sys.platform, 0.3), took
 
 
 def test_a_single_checkout_says_its_counts_in_the_same_words(tmp_path, monkeypatch):

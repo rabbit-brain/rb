@@ -452,15 +452,12 @@ def test_the_page_is_one_self_contained_file_written_where_asked(repo, capsys, t
     assert code2 == 0
 
 
-def test_views_keep_the_overview_small_and_deep_links_open_only_the_needed_evidence(repo, tmp_path):
+def test_views_keep_the_overview_small_and_every_view_is_in_the_document(repo):
     """The page's views (BP 2c: the shell's, in place of page.rs's tabs): every view is in the document, none hidden, so
     with no script it reads whole; the Overview does not silently become a second copy of the complete evidence or the
-    experiment's design. In a browser the shipped script shows one view at a time from the nav, a deep link opens what
-    it names (an experiment's view; a finding's card beside its question), and Back returns."""
-    import json
+    experiment's design."""
     _, env = repo("page")
-    page = Path(env.data["path"])
-    text = page.read_text(encoding="utf-8")
+    text = Path(env.data["path"]).read_text(encoding="utf-8")
     overview = text.split('<div class="sec" id="sec-overview">', 1)[1].split('<div class="sec" id="sec-research">', 1)[0]
     assert 'id="decisions"' in overview and 'href="#q-q1"' in overview
     assert '<table' not in overview and "by record times" not in overview
@@ -472,6 +469,15 @@ def test_views_keep_the_overview_small_and_deep_links_open_only_the_needed_evide
     assert all(f'href="#{v}"' in nav for v in views if v not in ("overview", "about")) and 'href="#q-q1"' in nav and 'href="#x-e1"' in nav
     # About is reached from the top bar (design pass 1, P10)
     assert 'href="#about"' in text.split('<header class="top"', 1)[1].split("</header>", 1)[0] and 'href="#about"' not in nav
+
+
+def test_in_a_browser_the_nav_shows_one_view_and_deep_links_open_what_they_name(repo, tmp_path):
+    """In a browser the page's shipped script shows one view at a time from the nav, a deep link opens what it names (an
+    experiment's view; a finding's card beside its question), and Back returns. The views as the document holds them
+    are test_views_keep_the_overview_small_and_every_view_is_in_the_document's, which needs no browser."""
+    import json
+    _, env = repo("page")
+    page = Path(env.data["path"])
     import test_shell as shell
     node = shell._node()
     script = shell._cdp_script(tmp_path / "views.mjs", f"""

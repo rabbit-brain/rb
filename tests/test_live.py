@@ -323,10 +323,10 @@ def test_a_write_elsewhere_moves_each_key_once_in_one_poll(placed):
     time.sleep(11)                                                      # the listing as it stands
     before = keys()
     rec.rb("run", "add", "e1", "fp32.top1=0.771", "int8.top1=0.767", cwd=rec.base / "wt-c")
-    wrote = time.monotonic()
-    while (now := keys())[0] == before[0] or now[1] == before[1]:
-        assert time.monotonic() - wrote < POLL, (before, now)
-        time.sleep(0.2)
+    # within one poll, counted in polls and not in seconds (a loaded runner can take longer than POLL to answer one):
+    # every request recomputes the key, so the first poll after the write already says it moved, on both pages
+    now = keys()
+    assert now[0] != before[0] and now[1] != before[1], (before, now)
     time.sleep(12)                                                      # the listing lapses
     assert keys() == now
 
@@ -447,13 +447,29 @@ def test_the_devtools_port_is_read_once_its_line_is_whole(tmp_path):
     assert _devtools_port(f) == 9222
 
 
+def test_on_windows_the_query_for_a_profiles_chromes_leaves_itself_out(tmp_path, monkeypatch):
+    """PowerShell's own command line names the profile it looks for: the query leaves its own process out, so Chrome's
+    close never waits ten seconds for it nor kills an id it had, which Windows may have given another process since."""
+    asked = []
+
+    def run(argv, **kw):
+        asked.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="4321\r\n", stderr="")
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(subprocess, "run", run)
+    assert chromes_on(tmp_path / "profile") == [4321]
+    assert "$_.ProcessId -ne $PID" in asked[0][-1], asked
+
+
 def chromes_on(profile: Path) -> list:
     """The processes whose command line names `profile`: the Chromes running on it, whoever started them."""
     mark, me = str(profile), os.getpid()
     if sys.platform == "win32":
         quoted = mark.replace("'", "''")
+        # the query's own command line names the profile too: PowerShell leaves itself out ($PID), which has exited by
+        # the time its ids are read, so close() never waits for it nor kills its id, which Windows may have given again
         r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
-                            f"Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -and $_.CommandLine.Contains('{quoted}') }} | "
+                            f"Get-CimInstance Win32_Process | Where-Object {{ $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('{quoted}') }} | "
                             "ForEach-Object { $_.ProcessId }"], capture_output=True, text=True, timeout=60)
         pids = [int(x) for x in r.stdout.split() if x.isdigit()]
     elif os.path.isdir("/proc/self"):

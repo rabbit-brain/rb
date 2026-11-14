@@ -388,9 +388,16 @@ def test_a_shared_experiment_opens_from_both_question_rows_and_keeps_its_selecti
             # Mouse selection uses the same mapping as the keyboard's priority binding and the side preview: the card
             # in the evidence pane, the focus on its first citation
             from rabbit_brain.evidence import Cite
-            at = ids().index(occurrences[1])         # rows are two lines (the title, then its marks)
-            line = sum(tree.get_option_at_index(i).prompt.plain.count("\n") + 1 for i in range(at))
-            assert await pilot.click("#tree-list", offset=(10, line - tree.scroll_y))
+            # rows are two lines (the title, then its marks). The row is clicked where the tree shows it once its scroll
+            # to the highlighted row has landed: read before that (a loaded machine lands it a frame later), the line
+            # fell past the tree's foot, and the click hit the list below it, Your call's design row (MP-1114-2234:
+            # trail ['p:e1@<hash>'] against ['e1'])
+            def shown_at():
+                at = ids().index(occurrences[1])
+                y = sum(tree.get_option_at_index(i).prompt.plain.count("\n") + 1 for i in range(at)) - round(tree.scroll_y)
+                return y if 0 <= y < tree.scrollable_content_region.height - 1 else None
+            await until(pilot, lambda: shown_at() is not None)
+            assert await pilot.click("#tree-list", offset=(10, shown_at()))
             await until(pilot, lambda: isinstance(app.focused, Cite))
             assert app.screen.query_one("#side-card").trail == ["e1"] and preview_is_experiment()
 

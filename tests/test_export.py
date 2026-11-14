@@ -1189,19 +1189,33 @@ def _gzipped(text: str) -> int:
     return len(gzip.compress(text.encode("utf-8"), compresslevel=9))
 
 
-def _median_ratio(read, other, n: int = 3) -> float:
-    """How many times `other` `read` takes: the median of `n` rounds, each timing one read of each back to back after
-    one untimed read of each, so load on the box weighs on both sides of a round alike (MP-1026-2341: a busy CI box
-    once made rb open's / read 3.85 s against rb status's 1.27 s, read minutes apart)."""
-    import statistics
-
+def _quickest_ratio(read, other, n: int = 3) -> float:
+    """How many times `other` `read` takes: the quickest of `n` reads of each, one against the other, after one untimed
+    read of each, the two read back to back round by round. Load only ever slows a read, and lands on some rounds of one
+    and not the other's (MP-1026-2341: a busy CI box once made rb open's / read 3.85 s against rb status's 1.27 s), so a
+    round's ratio moves with it while the quickest reads hold; a real slowdown slows every read, the quickest too."""
     def seconds(f):
         start = time.perf_counter()
         f()
         return time.perf_counter() - start
     read()
     other()
-    return statistics.median(seconds(read) / seconds(other) for _ in range(n))
+    rounds = [(seconds(read), seconds(other)) for _ in range(n)]
+    return min(a for a, _ in rounds) / min(b for _, b in rounds)
+
+
+def test_the_size_budgets_timing_takes_load_on_some_rounds(monkeypatch):
+    """Load on three of five rounds of one read (rb open's / read 3 times slower there, rb status quick) leaves the ratio
+    the quiet rounds read; a read slower in every round moves it."""
+    clock = [0.0]
+    monkeypatch.setattr(time, "perf_counter", lambda: clock[0])
+
+    def reads(times):
+        times = iter(times)
+        return lambda: clock.__setitem__(0, clock[0] + next(times))
+    status = reads([1.0] * 6)
+    assert _quickest_ratio(reads([2.0, 6.0, 2.0, 6.0, 2.0, 6.0]), status, n=5) == 2.0
+    assert _quickest_ratio(reads([4.0] * 6), reads([1.0] * 6), n=5) == 4.0
 
 
 def test_the_small_fixtures_pages_are_small(page_repo, monkeypatch, tmp_path):
@@ -1222,7 +1236,7 @@ def test_the_small_fixtures_pages_are_small(page_repo, monkeypatch, tmp_path):
 def test_size_budget(request, tmp_path):
     """The shell's pages stay within their budgets: the scale record's (141 runs, 60 criteria, about 700 writes) under
     2.2 MB raw for now and 170 KB gzip; rb open's / there under 2.2 MB for now, sent as it is though gzip is asked for, within 3.5 times
-    what rb status --json takes on the same record (the median of 5 rounds)."""
+    what rb status --json takes on the same record (the quickest of 5 reads of each)."""
     needs("M0", "R1")
     scale = request.getfixturevalue("scale_record")
     page = _exported(scale.root, scale.env, tmp_path)
@@ -1250,7 +1264,7 @@ def test_size_budget(request, tmp_path):
             ask = urllib.request.Request(m.group(1) + "/", headers={"Accept-Encoding": "gzip, deflate"})
             with opener.open(ask, timeout=120) as resp:
                 got["encoding"], got["body"] = resp.headers.get("Content-Encoding"), resp.read()
-        times = _median_ratio(home, status, n=5)
+        times = _quickest_ratio(home, status, n=5)
         assert got["encoding"] is None and len(got["body"]) < OPEN_RAW, (got["encoding"], len(got["body"]))
         assert times <= OPEN_TIMES_STATUS, times
     finally:

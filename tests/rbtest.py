@@ -113,6 +113,14 @@ def main(argv: Optional[list] = None, typed: bool = False) -> int:
     return r.returncode
 
 
+def users_env(env: Optional[dict] = None) -> dict:
+    """`env` (default this process's, as `environment()` gives it) as the user's own terminal holds it: every variable in
+    AGENT_VARS left out, whatever runs the tests (GitHub's runner sets GITHUB_ACTIONS and GITHUB_RUN_ID, which rb reads
+    as an agent session and a run's session), but for an RB_ACTOR that names a human, which the user may set."""
+    env = dict(environment() if env is None else env)
+    return {k: v for k, v in env.items() if k not in AGENT_VARS or (k == "RB_ACTOR" and v.startswith("human:"))}
+
+
 def as_the_user(monkeypatch: Any, *also: str) -> None:
     """The user at their own terminal, in no chat session, whatever runs the tests: every variable in AGENT_VARS is
     cleared, and each one named in `also`."""
@@ -232,8 +240,9 @@ class Mcp:
 
 
 class Open:
-    """`rb open` running here as its own process, the way the user starts it. `.url` is the address it printed
-    (http://127.0.0.1:<port>), `.printed()` everything it has said so far."""
+    """`rb open` running here as its own process, the way the user starts it: in their own terminal (`users_env`), so
+    it starts on a CI runner and in an agent session alike. `.url` is the address it printed (http://127.0.0.1:<port>),
+    `.printed()` everything it has said so far."""
 
     def __init__(self, root: Any = None) -> None:
         handle, self._said = tempfile.mkstemp(prefix="rb-open-", suffix=".txt")
@@ -242,7 +251,7 @@ class Open:
         # Windows: a process group of its own, so the Ctrl-Break that stops it is not the test run's as well
         own_group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" else {}
         self.proc = subprocess.Popen([*command(), "open", "--port", "0"], cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                     stderr=self._err, env=environment(), **own_group)
+                                     stderr=self._err, env=users_env(), **own_group)
         deadline = time.monotonic() + 60
         while True:
             said = self.printed()

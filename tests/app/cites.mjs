@@ -92,7 +92,9 @@ await run(async () => {
         await p.ev(`(() => { const b = document.querySelector('nav li.fls.open .ftog'); if (b) b.click(); return true; })()`);
         continue;
       }
-      const said = await p.ev(`(${OPEN})(${JSON.stringify(l.to)}, 3000)`);
+      // in rb open a card is drawn when it is asked for, so a link waits as long as a field card does (step 59: the
+      // scale record's cards came after 3 s on a loaded runner, and read as leading nowhere)
+      const said = await p.ev(`(${OPEN})(${JSON.stringify(l.to)}, ${live ? 30000 : 3000})`);
       const at = l.to.split(':')[0];   // `#<card or view>:<part>` opens it at that part (cf-2)
       const real = !said.missing && (said.card === l.to || said.view === l.to || said.card === at || said.view === at);
       if (!real) wrong.push(`${l.from} › ${l.text} (#${l.to}): ${said.text || said.view}`);

@@ -20,14 +20,14 @@ permissions:
 # files drive the installed rb end to end, each in a few seconds: the command line and its errors, rb tour's whole
 # project, the SDK and rb mcp, the environment fingerprint, the skill and the agents' session hooks, a bundle exported
 # and cloned, rb remove, rb journal run's subprocess, the SQLite reader, and the page rb page writes (its one test that
-# drives Chrome is left out). Each check, and the scan, stops after 20 minutes, so a job that hangs stops the release
-# then.
+# drives Chrome is left out). check-sdist builds rb from the source package alone and runs the same tests from it. Each
+# check, and the scan, stops after 20 minutes, so a job that hangs stops the release then.
 env:
   WHEEL_TESTS: >-
     tests/test_cli.py tests/test_failures.py tests/test_tour.py tests/test_sdk_mcp.py tests/test_env.py
     tests/test_skill.py tests/test_session_hooks.py tests/test_clone.py tests/test_remove.py tests/test_journal.py
     tests/test_sqlite.py tests/test_page.py
-    --deselect tests/test_page.py::test_views_keep_the_overview_small_and_deep_links_open_only_the_needed_evidence
+    --deselect tests/test_page.py::test_in_a_browser_the_nav_shows_one_view_and_deep_links_open_what_they_name
 
 jobs:
   packages:
@@ -112,6 +112,35 @@ jobs:
           rabbit-brain version
           python -m pytest -q -n auto --reruns 2 $WHEEL_TESTS
 
+  # The source package, as PyPI gets it: rb built from the sdist alone, on the lowest Python the package takes, then the
+  # tests the sdist carries, run from it against that rb. A machine with no wheel for it installs this. There is no
+  # checkout, so a file the sdist leaves out fails here; it keeps no Rust cache, since a release builds from nothing.
+  check-sdist:
+    needs: packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.10"
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec  # stable branch, 2026-10-16
+        with:
+          toolchain: stable
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: sdist
+          path: dist/
+      - name: Build rb from the source package, then run the tests it carries against it
+        run: |
+          python -m pip install pytest pytest-xdist pytest-rerunfailures pyyaml
+          python -m pip install --no-cache-dir dist/rabbit_brain-*.tar.gz   # a .tar.gz path builds from source
+          rb version
+          rabbit-brain version
+          mkdir "$RUNNER_TEMP/sdist"
+          tar -xzf dist/rabbit_brain-*.tar.gz -C "$RUNNER_TEMP/sdist"
+          cd "$RUNNER_TEMP"/sdist/rabbit_brain-*/
+          python -m pytest -q -n auto --reruns 2 $WHEEL_TESTS
+
   # The denylist reaches this job alone, and in it only the last step. The job installs nothing: GitHub's checkout and
   # artifact download, then the runner's own Python, isolated (-I -S), runs the check's tests and the check over the
   # built files. The jobs that build, pip install and run the suite never receive the secret. It runs when a build
@@ -137,7 +166,7 @@ jobs:
         run: python3 -I -S .github/scripts/check-public-content.py --source . --artifacts dist
 
   publish:
-    needs: [check, check-windows, scan]
+    needs: [check, check-windows, check-sdist, scan]
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -176,10 +205,15 @@ jobs:
           (cd dist && sha256sum * > SHA256SUMS)
           pre=""
           case "$ver" in *a*|*b*|*rc*|*dev*) pre="--prerelease" ;; esac
-          notes="Install with \`pip install rabbit-brain==$ver\`, or download the wheel for your platform below and \`pip install\` it. SHA256SUMS lists the sha256 of every file, and THIRD-PARTY-NOTICES the licenses of the code built into rb. What changed: https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/CHANGELOG.md. Windows is a preview in 0.6: its known issues are https://github.com/$GITHUB_REPOSITORY/issues/2."
+          # the notes: the version's own CHANGELOG entry without its heading (the check job stops a tag whose entry is
+          # undated), then how to install it and what SHA256SUMS and THIRD-PARTY-NOTICES are
+          notes="$RUNNER_TEMP/notes.md"
+          awk -v v="## $ver (" 'index($0, v) == 1 {f = 1; next} f && /^## / {exit} f {print}' tree/CHANGELOG.md > "$notes"
+          test -s "$notes" || { echo "CHANGELOG.md has no entry for $ver"; exit 1; }
+          printf '\nInstall with `pip install rabbit-brain==%s`, or download the wheel for your platform below and `pip install` it. SHA256SUMS lists the sha256 of every file, and THIRD-PARTY-NOTICES the licenses of the code built into rb.\n' "$ver" >> "$notes"
           # a re-run after a partial release adds what is missing instead of failing on the release that exists
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "rabbit-brain $ver" --notes "$notes" $pre
+            gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "rabbit-brain $ver" --notes-file "$notes" $pre
           fi

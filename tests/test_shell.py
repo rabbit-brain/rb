@@ -467,7 +467,10 @@ def _one_browser_at_a_time():
 def _stop_group(proc: subprocess.Popen) -> None:
     """The runner and everything it started, stopped: its process group on Linux and macOS, its tree on Windows."""
     if os.name == "nt":
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
+        # taskkill finds the tree through its root while the root runs; once the runner has exited, its id may be
+        # another process's, so nothing is killed by it (the runner's own exit handler stopped what it started)
+        if proc.poll() is None:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
         return
     for sig in (signal.SIGTERM, signal.SIGKILL):
         try:
@@ -478,6 +481,26 @@ def _stop_group(proc: subprocess.Popen) -> None:
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             pass
+
+
+def test_a_runner_that_exited_is_never_killed_by_its_id_on_windows(monkeypatch):
+    """Windows gives an id again once its process ends: the app runner, ended on its own, is never taskkilled by the id
+    it had; one still running is, with its tree."""
+    asked = []
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: asked.append(argv))
+
+    class Runner:
+        pid, code = 4321, 0
+
+        def poll(self):
+            return self.code
+    _stop_group(Runner())
+    assert asked == []
+    running = Runner()
+    running.code = None
+    _stop_group(running)
+    assert asked == [["taskkill", "/T", "/F", "/PID", "4321"]]
 
 
 def _running(pid: int) -> bool:
@@ -900,70 +923,6 @@ def test_the_screenshot_runner_shoots_every_view(int8_demo, tmp_path):
         if s["mode"] == "no-script":
             assert ("app" in s["html_class"].split()) == s["html_app"], s
     assert sorted(p.name for p in out.iterdir()) == sorted([s["file"] for s in m["shots"]] + ["manifest.json", "page.html"])
-
-
-# the browser step's run line: this file, and A's app harness beside it once the workflow runs both; the release check
-# runs the browser checks it names in RELEASE_CHECK_BROWSER
-RUNNER_STEPS = ("python -m pytest -q -n auto --reruns 2 tests/test_shell.py", "python -m pytest -q -n auto --reruns 2 tests/test_shell.py tests/app/",
-                "python -m pytest -q -n auto --reruns 2 $RELEASE_CHECK_BROWSER")
-# when a job runs: the release check on every push, pull request and tag, the full matrix after the tag, daily and by hand
-WHEN = {"release-check": "github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'",
-        "full": "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')"}
-
-
-def test_ci_runs_the_app_runner_on_every_system_and_never_skips_it():
-    """Each job in tests.yml sets up node 22, then runs the app runner with RB_REQUIRE_BROWSER=1 in a step with no
-    condition, so on Linux, macOS and Windows a missing node or Chrome fails the run instead of skipping the app runner. A
-    job is chosen by when it runs alone (the release check, or the full matrix), and never allowed to fail."""
-    flow = ROOT / ".github" / "workflows" / "tests.yml"
-    if not flow.is_file():
-        pytest.skip("the workflows are not beside the tests")
-    yaml = pytest.importorskip("yaml")
-    systems = set()
-    workflow = yaml.load(flow.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
-    for name, job in workflow["jobs"].items():
-        steps = job["steps"]
-        node = [i for i, s in enumerate(steps) if s.get("uses", "").startswith("actions/setup-node@")]
-        runs = [i for i, s in enumerate(steps) if s.get("env", {}).get("RB_REQUIRE_BROWSER") == "1"]
-        assert len(node) == 1 and len(runs) == 1 and node[0] < runs[0], name
-        assert int(steps[node[0]]["with"]["node-version"].split(".")[0]) >= 22, name
-        step = steps[runs[0]]
-        assert set(step) - {"timeout-minutes"} == {"name", "env", "run"} and step["run"] in RUNNER_STEPS, (name, step)
-        if "$RELEASE_CHECK_BROWSER" in step["run"]:
-            named = workflow["env"]["RELEASE_CHECK_BROWSER"].split()
-            assert "tests/test_shell.py::test_the_app_runner_starts" in named and any(n.startswith("tests/app/") for n in named), named
-        assert "continue-on-error" not in job and job.get("if") in WHEN.values(), name
-        runs_on = job["runs-on"]
-        systems |= set(job["strategy"]["matrix"]["os"]) if runs_on == "${{ matrix.os }}" else {runs_on}
-    assert {s.split("-")[0] for s in systems} == {"ubuntu", "macos", "windows"}
-
-
-def test_the_release_check_is_windows_and_macos_on_every_push_and_the_full_matrix_comes_after():
-    """The release check (tests.yml's release-check job) builds rb on Windows and macOS and runs what differs there on
-    every push to main, pull request and release tag, within half an hour; every other job is the full matrix, which
-    runs after the tag, daily and by hand. Each test the release check names is one that exists."""
-    flow = ROOT / ".github" / "workflows" / "tests.yml"
-    if not flow.is_file():
-        pytest.skip("the workflows are not beside the tests")
-    yaml = pytest.importorskip("yaml")
-    workflow = yaml.load(flow.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
-    on = workflow["on"]
-    assert on["push"]["branches"] == ["main"] and on["push"]["tags"] and "pull_request" in on and "workflow_dispatch" in on and on["schedule"]
-    jobs = workflow["jobs"]
-    check = jobs["release-check"]
-    assert check["if"] == WHEN["release-check"] and sorted(check["strategy"]["matrix"]["os"]) == ["macos-latest", "windows-latest"]
-    assert int(check["timeout-minutes"]) <= 30
-    assert all(job["if"] == WHEN["full"] for name, job in jobs.items() if name != "release-check")
-    # the tests that prove plat-1b's Windows fixes run where those fixes matter (MP-1113-1145 S1)
-    named = workflow["env"]["RELEASE_CHECK_TESTS"].split() + workflow["env"]["RELEASE_CHECK_BROWSER"].split()
-    for proof in ("tests/test_surface.py::test_rb_in_a_uv_tool_dir_of_any_name_upgrades_itself_through_uv",
-                  "tests/test_live.py::test_a_chrome_that_hands_its_start_on_is_waited_for_and_stopped_and_one_that_fails_says_why",
-                  "tests/test_shell.py::test_a_chrome_whose_first_process_hands_its_start_on_is_used_and_stopped"):
-        assert proof in named, proof
-    for node in named:
-        path, _, test = node.partition("::")
-        assert (ROOT / path).exists(), node
-        assert not test or f"def {test}(" in (ROOT / path).read_text(encoding="utf-8"), node
 
 
 FIX = Path(__file__).parent / "fixtures" / "shell"
@@ -5030,25 +4989,31 @@ await cdp.run(async () => {
     await page.goto(%s);
     await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
     await page.goto(%s + '#c-c2');
-    await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await cdp.sleep(500);
+    // each step waits for the state it brings (the tab chosen, the address, the focus), never a fixed time: a slow
+    // runner (GitHub's macOS and Windows, step 59) swapped a panel after a fixed 250 ms and the probe read the one before
+    const T = 60000;
+    await page.waitFor("document.documentElement.classList.contains('ready') && !!document.querySelector('#insp [role=tab]')", T);
     const got = { open: await page.ev(PROBE) };
     const tab = name => "[...document.querySelectorAll('#insp [role=tab]')].find(t => t.textContent.trim() === '" + name + "')";
-    await page.clickEl(tab('Rule')); await cdp.sleep(250); got.rule = await page.ev(PROBE);
-    await page.clickEl(tab('Source')); await cdp.sleep(250); got.source = await page.ev(PROBE);
-    await page.ev("history.back(); true"); await cdp.sleep(500); got.back = await page.ev(PROBE);
-    await page.ev("history.back(); true"); await cdp.sleep(500); got.back2 = await page.ev(PROBE);
+    const on = (name, hash) => "(() => { const t = [...document.querySelectorAll('#insp [role=tab]')].find(t => t.getAttribute('aria-selected') === 'true');"
+      + " return !!t && t.textContent.trim() === '" + name + "'" + (hash === undefined ? "" : " && location.hash === '" + hash + "'") + "; })()";
+    const focused = name => "(document.activeElement && document.activeElement.textContent.trim()) === '" + name + "'";
+    await page.clickEl(tab('Rule')); await page.waitFor(on('Rule', '#c-c2:rule'), T); got.rule = await page.ev(PROBE);
+    await page.clickEl(tab('Source')); await page.waitFor(on('Source', '#c-c2:source'), T); got.source = await page.ev(PROBE);
+    await page.ev("history.back(); true"); await page.waitFor(on('Rule', '#c-c2:rule'), T); got.back = await page.ev(PROBE);
+    await page.ev("history.back(); true"); await page.waitFor(on('Result', '#c-c2'), T); got.back2 = await page.ev(PROBE);
     await page.ev(tab('Result') + ".focus(); true");
-    await page.key('ArrowRight', 'ArrowRight', 39); await cdp.sleep(250); got.arrow = await page.ev(PROBE);
-    await page.key('ArrowLeft', 'ArrowLeft', 37); await cdp.sleep(250);
-    await page.clickEl("document.querySelector('#insp .chip.k-runs')"); await cdp.sleep(250); got.chip = await page.ev(PROBE);
+    await page.key('ArrowRight', 'ArrowRight', 39); await page.waitFor(on('Rule') + " && " + focused('Rule'), T); got.arrow = await page.ev(PROBE);
+    await page.key('ArrowLeft', 'ArrowLeft', 37); await page.waitFor(on('Result') + " && " + focused('Result'), T);
+    await page.clickEl("document.querySelector('#insp .chip.k-runs')"); await page.waitFor(on('Runs', '#c-c2:runs'), T); got.chip = await page.ev(PROBE);
     out[width] = got;
     await cdp.stopAll();
   }
   return {};
-}, { timeoutMs: 120000 });
+}, { timeoutMs: 600000 });
 console.log(JSON.stringify({ ok: true, out }));
 """ % (json.dumps(_CARD_PROBE), json.dumps(page.as_uri()), json.dumps(page.as_uri())))
-    code, said, err = _runner(_node(), js, env=dict(os.environ), timeout=180)
+    code, said, err = _runner(_node(), js, env=dict(os.environ), timeout=660)
     assert code == 0 and said.get("ok"), err[-3000:]
     for width, g in said["out"].items():
         o = g["open"]

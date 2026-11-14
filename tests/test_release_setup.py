@@ -117,3 +117,58 @@ def test_the_package_names_its_homepage_repository_issues_and_changelog():
         "Changelog": "https://github.com/rabbit-brain/rb/blob/main/CHANGELOG.md",
     }
     assert one(r'^repository = "([^"]+)"$', "rust/Cargo.toml") == "https://github.com/rabbit-brain/rb"
+
+
+def release_step() -> str:
+    yaml = pytest.importorskip("yaml")
+    flow = yaml.load(text(".github/workflows/publish.yml"), Loader=yaml.BaseLoader)
+    [release] = [s for s in flow["jobs"]["github-release"]["steps"] if s.get("name") == "Release the tag on GitHub"]
+    return release["run"]
+
+
+def test_the_release_notes_are_the_changelog_entry_and_name_no_version_of_their_own():
+    """The GitHub release's notes are the version's own CHANGELOG.md entry, as the checked-out tree holds it, then the
+    install line: the workflow writes no version, issue or platform note of its own, which would go stale."""
+    run = release_step()
+    awk = "awk -v v=\"## $ver (\" 'index($0, v) == 1 {f = 1; next} f && /^## / {exit} f {print}' tree/CHANGELOG.md > \"$notes\""
+    assert awk in run
+    assert '--notes-file "$notes"' in run and "--notes " not in run
+    assert not re.search(r"\b\d+\.\d+\b", run) and "issues/" not in run and "preview" not in run
+    # what the awk line takes from the changelog: the newest entry's text, between its heading and the next
+    changelog = text("CHANGELOG.md")
+    heading = re.search(r"^## (\S+) \(\d{4}-\d{2}-\d{2}\)$", changelog, re.M)
+    body = changelog[heading.end():].split("\n## ", 1)[0]
+    assert body.strip(), heading[0]
+
+
+def test_only_the_publishing_job_uploads():
+    """PyPI gets files from one place: publish.yml's publish job, in the pypi environment, through the trusted publisher.
+    No workflow uploads with twine or a token."""
+    yaml = pytest.importorskip("yaml")
+    uploads = []
+    for flow_path in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+        flow = yaml.load(flow_path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        for job_name, job in flow["jobs"].items():
+            for step in job.get("steps", []):
+                if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@"):
+                    uploads.append((flow_path.name, job_name, job))
+                assert not re.search(r"\btwine\s+upload\b", step.get("run", "")), (flow_path.name, job_name)
+                assert "password" not in step.get("with", {}) and "PYPI" not in str(step.get("env", {})).upper(), (flow_path.name, job_name)
+    [(name, job_name, job)] = uploads
+    assert (name, job_name) == ("publish.yml", "publish")
+    assert job["environment"]["name"] == "pypi" and job["permissions"] == {"id-token": "write"}
+
+
+def test_releasing_says_the_job_alone_uploads_after_the_reviewer_approves():
+    """RELEASING.md describes the one path to PyPI: the publishing job, approved by the pypi environment's reviewer, with
+    no upload from any other machine; and dates when GitHub stops the daily run."""
+    doc = text("RELEASING.md")
+    assert "only GitHub's publishing job uploads it" in doc
+    assert "No file is uploaded from any other machine" in doc
+    assert "with the maintainer as its required reviewer" in doc
+    # the reviewer and the branch policy were read from GitHub's API; the trusted publisher is PyPI's, which only the owner sees
+    assert "required reviewer, and a deployment branch policy limits the environment: stated, read from GitHub's API on 2026-11-15" in doc
+    assert "the PyPI trusted publisher above is in place for `rabbit-brain`: to confirm" in doc
+    assert "## Before the approval" in doc and "Never upload the files yourself instead" in doc
+    assert "Add reviewer protection there if you want it" not in doc
+    assert "the daily run stops about 2027-01-12" in doc

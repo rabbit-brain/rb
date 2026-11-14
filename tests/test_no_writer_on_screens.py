@@ -95,8 +95,11 @@ def test_rb_page_names_no_writer_and_says_none_of_the_users_words(rec, tmp_path,
     html = (tmp_path / "page.html").read_text(encoding="utf-8")
     page_checks(html, platform)
     assert "Run it in your terminal; rb records the call and your reason." in html
-    # no line under a heading explains its page (no glossary, show instead, Nov 12 20:35 +08)
-    assert "Each call keeps its reason and its date." not in html and "Each run keeps when its output was produced" not in html
+    # no line under a heading explains its page (no glossary, show instead, Nov 12 20:35 +08): Runs and History open on
+    # their rows, as today's page draws them, with no lede, which held the sentences "Each run keeps when its output was
+    # produced ..." and "Each call keeps its reason and its date." until d3516be
+    assert re.search(r'<h1 id="h-runs">[^<]*</h1>', html) and re.search(r'<h1 id="h-history">[^<]*</h1>', html)
+    assert not re.search(r'<h1 id="h-(runs|history)">[^<]*</h1>\s*<p class="lede">', html)
     # the two runs rb found and nobody recorded, one of them in a worktree removed since, with how to record each
     found = "in the repository, not in the record · found by rb watching the repository · record it from your screen, or with the command rb reconcile gives for it"
     assert html.count(found) == 2, html.count(found)

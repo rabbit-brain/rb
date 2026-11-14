@@ -1418,7 +1418,7 @@ def test_home_within_budget(scale_record, monkeypatch):
     """The bridge's home op (what rb ui reads on every change) and rb open's /state.json stay within phase 0's
     figures (20% in size, 25% in time) for this system (tests/shell_baselines.py, to_hold) on the scale record, in size and in time, time
     read against rb status --json on the same record and machine so a faster or slower machine holds the same ratio. The three are read in turn, round
-    by round, so other work on the machine weighs on each alike; the median of the rounds' ratios is held."""
+    by round, and the quickest read of each is held against rb status's quickest (over_budget)."""
     import shell_baselines
     root, then = Path(getattr(scale_record, "root", scale_record)).resolve(), shell_baselines.to_hold()
     as_the_user(monkeypatch)
@@ -1448,15 +1448,16 @@ TIME_MARGIN, SIZE_MARGIN = 1.25, 1.2
 
 
 def over_budget(rounds: list, then) -> list:
-    """For home and state_json, whether a round's size and the median of its time ratios against rb status hold their
-    budget, with what was read against what it may be. `then` is the figures held, or several (shell_baselines.to_hold),
-    of which the most lenient."""
-    import statistics
+    """For home and state_json, whether a round's size and its time against rb status hold their budget, with what was
+    read against what it may be. `then` is the figures held, or several (shell_baselines.to_hold), of which the most
+    lenient. Time is the quickest read of each over the rounds, one against the other: load only ever slows a read, and
+    on a loaded machine it lands on some rounds of one read and not the other's, so a median of ratios, round by round,
+    still fails there (step 59), while a real slowdown slows every read and so the quickest one."""
     out, thens = [], then if isinstance(then, list) else [then]
     for k in ("home", "state_json"):
         size, most = rounds[0][k][1], max(t[k]["bytes_median"] for t in thens)
         out.append((k, size <= SIZE_MARGIN * most, (size, most)))
-        ratio = statistics.median(r[k][0] / r["status"][0] for r in rounds)
+        ratio = min(r[k][0] for r in rounds) / min(r["status"][0] for r in rounds)
         cap = TIME_MARGIN * max(t[k]["seconds_median"] / t["status"]["seconds_median"] for t in thens)
         out.append((k, ratio <= cap, (round(ratio, 3), round(cap, 3))))
     return out
@@ -1472,6 +1473,16 @@ def test_home_budget_takes_a_loaded_machine_and_fails_a_real_slowdown():
         return all(ok for _, ok, _ in over_budget(rs, then))
     assert holds(rounds(1.070)) and holds(rounds(0.89 * 1.24))
     assert not holds(rounds(0.89 * 1.5)) and not holds(rounds(0.89, state=0.75)) and not holds(rounds(0.89, size=1201))
+
+
+def test_home_budget_takes_load_on_most_rounds_of_one_read():
+    """Load on most rounds of /state.json's read and not of rb status's (three of five rounds read 1.6 times slower,
+    rb status quick in each) is no slowdown: the quickest reads hold their ratio. A slowdown in every round still fails."""
+    then = {k: {"bytes_median": 1000, "seconds_median": s} for k, s in (("home", 0.89), ("state_json", 0.5), ("status", 1.0))}
+    loaded = [{"home": (0.89, 1000), "state_json": (0.5 * f, 1000), "status": (1.0, 0)} for f in (1.6, 1.0, 1.6, 1.0, 1.6)]
+    assert all(ok for _, ok, _ in over_budget(loaded, then)), over_budget(loaded, then)
+    slow = [{**r, "state_json": (0.5 * 1.5 * f, 1000)} for r, f in zip(loaded, (1.6, 1.0, 1.6, 1.0, 1.6))]
+    assert not all(ok for _, ok, _ in over_budget(slow, then))
 
 
 def test_a_system_never_measured_holds_the_most_lenient_figures_and_fails_a_real_slowdown():

@@ -39,7 +39,8 @@ await run(async () => {
     const at = `${w} ${scheme}`;
     await p.blank(); await p.viewport(w, w < 600 ? 844 : 900); await p.media({ type: '', scheme });
     await p.goto(a.url + '#overview');
-    if (!(await p.waitFor(`document.documentElement.classList.contains('ready')`, 10000))) throw new Error('never ready');
+    // a loaded runner has taken over 10 s to settle the page (run 43275492449); ready comes before that
+    if (!(await p.waitFor(`document.documentElement.classList.contains('ready')`, 60000))) throw new Error('never ready');
     await p.ev(`(() => { try { localStorage.setItem('rb.guide.1', 'ended'); } catch (e) {} const g = document.querySelector('.guide:not([hidden]) .gskip'); if (g) g.click(); return true; })()`);
     await p.settle({ quietMs: 100 });
     const from = await p.ev(`(n => n >= 320 && n <= 4096 ? n : 960)(parseInt(document.documentElement.getAttribute('data-inspector-from') || '', 10))`);

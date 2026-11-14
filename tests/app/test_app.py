@@ -32,9 +32,10 @@ GUIDE_CSS = ROOT / "rust" / "src" / "shell" / "assets" / "guide.css"
 CONTRACT = ROOT / "tests" / "fixtures" / "shell" / "dom-contract.json"
 EXAMPLE = str(ROOT / "tests" / "fixtures" / "shell" / "int8-demo.{}.view.json")
 REQUIRED = os.environ.get("RB_REQUIRE_BROWSER") == "1"
-# checks that fail on GitHub's macOS and Windows runners and pass on Linux and in Chrome on a Mac (issue #1)
-RUNNER_KNOWN = pytest.mark.xfail(os.environ.get("GITHUB_ACTIONS") == "true" and sys.platform in ("darwin", "win32"),
-                                 reason="fails on GitHub's macOS and Windows runners (issue #1)", strict=False)
+# the two checks that still fail on GitHub's Windows runner (issue #2): a sheet's focus on a cold link, and the guide.
+# rec-2 (ac8cd5c) fixed both for macOS and Linux; the marks stay until L's Windows harness shows them passing (step 59)
+RUNNER_KNOWN = pytest.mark.xfail(os.environ.get("GITHUB_ACTIONS") == "true" and sys.platform == "win32",
+                                 reason="fails on GitHub's Windows runner (issue #2)", strict=False)
 
 
 def _without(why: str) -> None:
@@ -102,7 +103,7 @@ def harness(url, *argv: str, timeout: int = 300, lock: bool = True, env: dict = 
         except subprocess.TimeoutExpired:
             if os.name != "nt":
                 os.killpg(proc.pid, signal.SIGKILL)
-            else:
+            elif proc.poll() is None:       # an id that already exited may be another process's by now
                 subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
             proc.communicate()
             pytest.fail(f"the app harness did not end in {timeout} s")
@@ -195,7 +196,6 @@ def _passes(said: dict, *starts: str, at_least: int = 1) -> None:
     assert all(got.values()), sorted(n for n, ok in got.items() if not ok)
 
 
-@RUNNER_KNOWN
 def test_the_script_works_the_fixture_by_real_clicks(walked):
     """Views, the inspector stack, crumbs, Back, Esc, focus return and cold links, at 390 and 1280, light and dark,
     then print and with the script off: every check of the walk passes."""

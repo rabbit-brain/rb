@@ -13,7 +13,7 @@
 // record, and chooses places and versions by real clicks on its pickers (--copy-only: the past Copy rule alone;
 // --wired: also the scope bar and a past
 // version's withheld commands, which rb open's document carries once places.rs's on_the_shell is wired into it).
-import { findChrome, launchChrome, parseArgs, progress, run, sleep, startRbOpen } from './cdp.mjs';
+import { findChrome, inHalf, launchChrome, parseArgs, progress, run, sleep, startRbOpen, widths } from './cdp.mjs';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -238,7 +238,7 @@ await run(async () => {
   }
   const shot = async name => { if (a.shots) { mkdirSync(a.shots, { recursive: true }); await p.shot(join(a.shots, name + '.png')); } };
 
-  for (const w of WIDTHS) for (const scheme of SCHEMES) {
+  for (const w of widths(WIDTHS)) for (const scheme of SCHEMES) {
     const at = `${w} ${scheme}`;
     // the start: the app's classes, one view shown, the inspector at its root
     if (want('start')) {
@@ -272,7 +272,7 @@ await run(async () => {
         g.shown && g.role === 'dialog' && g.label && g.focus_in && g.title === TITLES[0] && g.lit && g.whole && g.dots === 4 && g.at_dot === 0 && g.back_hidden && g.fixed && g.stored === 'ended', j(g));
       const laidWith = await p.ev(LAYOUT);
       // reduced motion: nothing moves; otherwise the spotlight glides
-      await p.send('Emulation.setEmulatedMedia', { media: '', features: [{ name: 'prefers-color-scheme', value: scheme }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
+      await p.media({ type: '', scheme, motion: 'reduce' });
       const still = (await p.ev(GUIDE_ALL)).motion || ['none shown'];
       await p.media({ type: '', scheme });
       const moving = (await p.ev(GUIDE_ALL)).motion || ['0s'];
@@ -582,7 +582,7 @@ await run(async () => {
   }
 
   // ---------- A2: the address, Your call and the composer, copy, filters, keys and the theme (1280 and 390, light)
-  for (const w of WIDTHS) {
+  for (const w of widths(WIDTHS)) {
     const at = `${w}`;
     if (want('address')) {
       // an extra '#' opens what it names and is written back with one
@@ -805,7 +805,8 @@ await run(async () => {
 
   // what moves under the app: the window across 960, a reload, a typed address, a view link inside a card
   if (want('moves')) {
-    for (const scheme of SCHEMES) {
+    // (it starts at 1280 and narrows across 960: the 1280 half's)
+    if (inHalf(1280)) for (const scheme of SCHEMES) {
       await open(1280, scheme, 'runs');
       await p.clickEl(sel('#runs details[data-for="run-runs1"] > summary'));
       await p.clickEl(sel('.ibody a[href="#c-c1"]'));
@@ -825,7 +826,7 @@ await run(async () => {
       s = await st();
       check(`moves: an address typed into the page opens it and is written in history [${scheme}]`, s.view === 'resources' && !s.top && s.state && s.state.c === 'resources', j(s));
     }
-    for (const w of WIDTHS) {
+    for (const w of widths(WIDTHS)) {
       await open(w, 'light', 'runs');
       await p.clickEl(sel('#runs details[data-for="run-runs1"] > summary'));
       await p.clickEl(sel('.ibody a[href="#x-e1"]'));
@@ -849,7 +850,7 @@ await run(async () => {
       if (drop) { const d = t.content.querySelector('[data-for="' + drop + '"]'); if (d) d.remove(); }
       const main = document.querySelector('#main'); main.replaceChildren(t.content);
       const ev = new CustomEvent('rb:swapped', { cancelable: true }); document.dispatchEvent(ev); return ev.defaultPrevented; })`;
-    for (const w of WIDTHS) {
+    for (const w of widths(WIDTHS)) {
       const at = `${w}`;
       await open(w, 'light', 'runs');
       await p.clickEl(sel('#runs details[data-for="run-runs1"] > summary'));
@@ -925,7 +926,7 @@ await run(async () => {
   // any shell page, by its own markup: every view, its rail as the root, nothing past the screen, the waiting list's
   // copies, the address, the theme and keys controls
   if (want('generic')) {
-    for (const w of WIDTHS) for (const scheme of SCHEMES) {
+    for (const w of widths(WIDTHS)) for (const scheme of SCHEMES) {
       const at = `${w} ${scheme}`;
       await open(w, scheme);
       const cls = await p.ev('document.documentElement.className');
@@ -1013,7 +1014,7 @@ await run(async () => {
       check(`generic: every nav link shown opens its view [${at}]`, links.length > 0 && miss.length === 0, j({ links, miss }));
     }
     // Polish 1: the inspector's state, a call's row, the composer, the guide on rb's own render
-    for (const w of WIDTHS) for (const scheme of SCHEMES) {
+    for (const w of widths(WIDTHS)) for (const scheme of SCHEMES) {
       const at = `${w} ${scheme}`;
       await open(w, scheme);
       // a view shows its own: no card of the document's under it, and from 960 no other view's rail as its root
@@ -1052,7 +1053,7 @@ await run(async () => {
       // a short phone (390 x 667): no room under the Overview's list of the questions, which is lit down to the tooltip
       if (w < 960 && scheme === 'light') await walkGuide(w, scheme, 'generic: ', 667);
     }
-    for (const w of WIDTHS) {
+    for (const w of widths(WIDTHS)) {
       const at = `${w}`;
       let s;
       // what waits for a confirmation copies only its 'rb confirm', and no decide line is copyable anywhere
@@ -1102,7 +1103,7 @@ await run(async () => {
   if (a.shown && want('shown')) {
     const titled = `(() => { const b = document.querySelector('#scope .bar'), pre = b ? b.dataset.title : '';
       return { pre, title: document.title, once: !!pre && document.title.startsWith(pre) && document.title.split(pre).length === 2 }; })()`;
-    for (const w of WIDTHS) for (const scheme of SCHEMES) {
+    for (const w of widths(WIDTHS)) for (const scheme of SCHEMES) {
       const at = `${w} ${scheme}`;
       await open(w, scheme);
       let t = await p.ev(titled);
@@ -1135,7 +1136,7 @@ await run(async () => {
   // place rb open started on, live, saying why; a past version offers no command to copy
   if (a.places && a['copy-only'] && want('places')) {
     const copies = `document.querySelectorAll('.cp').length`;
-    for (const w of WIDTHS) for (const scheme of SCHEMES) {
+    for (const w of widths(WIDTHS)) for (const scheme of SCHEMES) {
       const at = `${w} ${scheme}`;
       await open(w, scheme);
       const before = await p.ev(copies);
@@ -1178,7 +1179,7 @@ await run(async () => {
       if (!g) return null; const r = g.getBoundingClientRect(), b = s.getBoundingClientRect(), lab = s.querySelector('.lab');
       return { text: g.textContent, whole: g.scrollWidth <= g.clientWidth + 1 && r.right <= b.right + 0.5 && r.right <= document.documentElement.clientWidth + 0.5,
         labCut: lab.scrollWidth > lab.clientWidth + 1, sr: g.classList.contains('sr') }; })()`;
-    for (const w of [960, 1000, 1050, 1100, 1279, 1280, 1440]) {
+    for (const w of widths([960, 1000, 1050, 1100, 1279, 1280, 1440])) {
       await open(w, 'light');
       const bar = await p.ev(BAR);
       // 960 to 1279: the navigator beside the working view, the working view the wider (the inspector is a sheet)
@@ -1217,7 +1218,7 @@ await run(async () => {
       return { open: !!(d && d.open), focus: a ? (a.tagName + (a.closest('#where') ? ' in where' : '') + (a.matches('summary') ? ' summary' : '')) : '',
         words: (d.querySelector('summary .gs') || {}).textContent || '', copy: (d.querySelector('button[data-from="where-sha"]') || {}).textContent || '',
         sha: (d.querySelector('#where-sha') || {}).textContent || '' }; })()`;
-    for (const w of [390, 1100, 1280]) {
+    for (const w of widths([390, 1100, 1280])) {
       await open(w, 'light');
       const FLOW = `(() => { const m = document.querySelector('main'), v = document.querySelector('#where details.pick[data-pick="version"] > summary'), l = document.querySelector('#where details.pick[data-pick="where"] > ul.picks');
         return { main: m ? Math.round(m.getBoundingClientRect().top) : -1, version: v ? Math.round(v.getBoundingClientRect().left) : -1, pos: l ? getComputedStyle(l).position : '' }; })()`;
@@ -1261,6 +1262,8 @@ await run(async () => {
       const off = await p.ev(FOLD);
       check(`places: w opens and closes Where [${w}]`, on.open && !off.open, j({ on, off }));
     }
+    // (the three below are walked at 1280: the 1280 half's)
+    if (inHalf(1280)) {
     // once rb open stops answering, "just now" grows older, from when it last answered (live.js)
     await open(1280, 'light');
     await p.ev(`(() => { const t0 = Date.now(); Date.now = () => t0 + 61000; window.fetch = () => Promise.reject(new Error('gone')); return true; })()`);
@@ -1283,7 +1286,8 @@ await run(async () => {
     await p.waitFor(`((document.querySelector('#where summary .gs') || {}).textContent || '') !== ${j(before.words)}`, 15000);
     const after = await p.ev(FOLD);
     check('places: a live redraw keeps the Where list open, focus in it', after.open && after.focus === 'A in where' && after.words !== before.words && /not committed/.test(after.words), j({ before, after }));
-    for (const w of WIDTHS) for (const scheme of SCHEMES) {
+    }
+    for (const w of widths(WIDTHS)) for (const scheme of SCHEMES) {
       const at = `${w} ${scheme}`;
       await open(w, scheme);
       let s = await p.ev(where);
@@ -1371,7 +1375,7 @@ await run(async () => {
   }
 
   // the Overview's "changed <time>": relative on rb open's live view, its exact time kept as the hint; exact on a page
-  if (want('generic')) {
+  if (want('generic') && inHalf(1280)) {
     await open(1280, 'light', '');
     const ch = await p.ev(`(() => { const t = document.querySelector('#overview time[data-changed]'); return t && { text: t.textContent, title: t.title, days: (Date.now() - Date.parse(t.getAttribute('datetime'))) / 864e5, live: !!document.getElementById('rb-live'), past: !!document.querySelector('#withheld .withheld') }; })()`);
     // (past 30 days the live view says the exact time too, its hint the same)
@@ -1386,7 +1390,7 @@ await run(async () => {
     }
   }
   // print: every view in the document, no app chrome
-  if (want('print')) {
+  if (want('print') && inHalf(1280)) {
     await open(1280, 'light', a.generic ? '' : 'run-runs1');
     await p.media({ type: 'print', scheme: 'light' });
     const folds = await p.ev(PRINTED);
@@ -1404,7 +1408,7 @@ await run(async () => {
 
   // no script: the whole document, each view in place, every anchor a plain link
   if (want('noscript')) {
-    for (const w of WIDTHS) {
+    for (const w of widths(WIDTHS)) {
       await p.blank();
       await p.noScript(true);
       await p.viewport(w, 900);

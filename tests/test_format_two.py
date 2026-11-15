@@ -578,7 +578,7 @@ def test_rb_show_of_a_file_reads_its_format_as_it_always_has(repo, capsys):
 
 
 @needs_old
-@pytest.mark.skipif(not OLD_READS_2, reason="RB_OLD_BIN reads format 1 alone, where rb: 2 is newer")
+@pytest.mark.older_rb(from_="0.8", reason="0.7.x reads format 1 alone, where rb: 2 is newer")
 def test_a_file_raised_by_hand_is_the_one_file_0_8_0_and_this_rb_read_apart(repo, capsys):
     """A team on two versions (MP-1107-0443): a question raised to rb: 2 by hand reads as fine in 0.8.0, and this rb
     names it, with its fix; 0.8.1 names it too. A file rb writes reads alike in each."""

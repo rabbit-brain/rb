@@ -263,19 +263,8 @@ def test_rb_open_mcp_and_the_sdk_say_it(home, monkeypatch):
     assert rabbit_brain.open(root).status()["taken_out"]["said"] == TOOK
 
 
-def _old_rb_keeps_no_copy():
-    """Whether RB_OLD_BIN names an rb that keeps no copy of its writes (before 0.8.5): its note is then in neither the
-    log nor rb's copy. 0.8.5 and later keep one, so their note reads as taken out with the rest."""
-    old = os.environ.get("RB_OLD_BIN")
-    if not old:
-        return False
-    try:
-        return b"kept.jsonl" not in Path(shutil.which(old) or old).read_bytes()
-    except OSError:
-        return False
-
-
-@pytest.mark.skipif(not _old_rb_keeps_no_copy(), reason="RB_OLD_BIN names an older rb that keeps no copy of its writes (0.8.4 or before)")
+@pytest.mark.skipif(not os.environ.get("RB_OLD_BIN"), reason="RB_OLD_BIN names an older rb that keeps no copy of its writes")
+@pytest.mark.older_rb(until="0.8.4", reason="0.8.5 and later keep a copy of their writes, so their note reads as taken out with the rest")
 def test_a_note_an_older_rb_wrote_between_two_writes_leaves_both_caught(home):
     root = record(home)
     a = add_run(root, "75.1")

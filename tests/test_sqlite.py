@@ -902,7 +902,7 @@ def test_a_database_row_is_no_cited_number(rbj, capsys):
 
 
 @pytest.mark.skipif(not os.environ.get("RB_OLD_BIN"), reason="RB_OLD_BIN names an rb from before the SQLite reader")
-def test_an_rb_from_before_reads_a_record_that_never_read_a_database(rbj):
+def test_an_rb_from_before_reads_a_record_that_never_read_a_database(rbj, older_show):
     """Writes that read no database (typed numbers, a JSON file, a note) leave the record as an older rb reads it:
     status, show, doctor and log with no problem, and its own writes leave it whole for this rb."""
     Path("metrics.json").write_text(json.dumps({"int8": {"acc1": 0.75}, "fp32": {"acc1": 0.76}}), encoding="utf-8")
@@ -921,8 +921,9 @@ def test_an_rb_from_before_reads_a_record_that_never_read_a_database(rbj):
 
     unsettled = {"state_newer", "edited_outside_rb", "merged_outside_rb"}
     assert not [i for i in older("status")["open"] if i["code"] in unsettled]
-    assert older("show", "--long", "c1")["finding"]["integrity"] == []
-    assert older("show", "--long", read)["object"]["files"][0]["path"] == "metrics.json" and older("show", "--long", typed)["object"]["metrics"] == {"int8.acc1": 0.74}
+    # each older rb's own long form: rb show --long from 0.8.6, rb show before it (older_show, tests/conftest.py)
+    assert older(*older_show, "c1")["finding"]["integrity"] == []
+    assert older(*older_show, read)["object"]["files"][0]["path"] == "metrics.json" and older(*older_show, typed)["object"]["metrics"] == {"int8.acc1": 0.74}
     assert not older("doctor").get("problems")
     older("note", "add", "an older rb's note", "-e", "int8")
     code, env = rbj("doctor")

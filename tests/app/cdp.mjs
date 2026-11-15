@@ -9,6 +9,38 @@ import { basename, delimiter, join } from 'node:path';
 
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// the half of a walk this run takes (RB_APP_VIEWPORT, tests/app/test_app.py's viewport switch, so two Chrome slots each
+// walk one): 390 takes the widths under 960, where the app is one column and a card a sheet; 1280 those from 960 up,
+// where the card stands beside the work. Unset, every width. A block a runner walks at one width, or that starts at
+// one and resizes across 960, is that width's
+export const HALF = process.env.RB_APP_VIEWPORT || '';
+if (!['', '390', '1280'].includes(HALF)) { process.stderr.write(`RB_APP_VIEWPORT is 390 or 1280, or unset; not ${JSON.stringify(HALF)}\n`); process.exit(2); }
+export const inHalf = w => !HALF || (HALF === '390' ? w < 960 : w >= 960);
+export const widths = ws => ws.filter(inHalf);
+
+// how many times slower than this machine every page runs (Emulation.setCPUThrottlingRate): RB_APP_CPU_THROTTLE, a
+// number from 1, or unset
+export const CPU_THROTTLE = Number(process.env.RB_APP_CPU_THROTTLE || 1);
+if (!(CPU_THROTTLE >= 1)) { process.stderr.write(`RB_APP_CPU_THROTTLE is a number from 1, or unset; not ${JSON.stringify(process.env.RB_APP_CPU_THROTTLE)}\n`); process.exit(2); }
+// the machine's own display settings, set on Chrome (RB_APP_MACHINE, round media-1): a comma list of reduced-motion,
+// dark and high-contrast, each a Chrome switch that stands for that setting on the system, as GitHub's macOS image has
+// reduced motion and transparency turned on. A walk then reads what the machine says wherever a page's emulated media
+// leaves a feature to it; media() below sends every one, so none should
+export const MACHINE_SWITCHES = { 'reduced-motion': '--force-prefers-reduced-motion', dark: '--force-dark-mode', 'high-contrast': '--force-high-contrast' };
+export const MACHINE = (process.env.RB_APP_MACHINE || '').split(',').map(x => x.trim()).filter(Boolean);
+for (const m of MACHINE) if (!MACHINE_SWITCHES[m]) { process.stderr.write(`RB_APP_MACHINE is a comma list of ${Object.keys(MACHINE_SWITCHES).join(', ')}; not ${JSON.stringify(m)}\n`); process.exit(2); }
+// the media features a machine can set on its own, and what each reads where nothing asks otherwise: a page's emulated
+// media sends every one, so no walk reads the machine's settings (round media-1: GitHub's macOS runners turn motion
+// down, and a guide that should glide read as still there)
+export const FEATURE_DEFAULTS = { motion: ['prefers-reduced-motion', 'no-preference'], contrast: ['prefers-contrast', 'no-preference'],
+  forcedColors: ['forced-colors', 'none'], transparency: ['prefers-reduced-transparency', 'no-preference'] };
+// Emulation.setEmulatedMedia's features for a colour scheme and, each given or its default, the machine's features
+export function mediaFeatures({ scheme = 'light', ...asked } = {}) {
+  for (const k of Object.keys(asked)) if (!FEATURE_DEFAULTS[k] && asked[k] !== undefined) throw new Error(`media(): no feature ${k}; one of scheme, ${Object.keys(FEATURE_DEFAULTS).join(', ')}`);
+  return [{ name: 'prefers-color-scheme', value: scheme },
+    ...Object.entries(FEATURE_DEFAULTS).map(([k, [name, value]]) => ({ name, value: asked[k] ?? value }))];
+}
+
 // no Chrome on this machine: run() exits 3, so a caller can tell it from a runner that failed
 export class NoChrome extends Error {}
 
@@ -242,7 +274,7 @@ export async function rbJson({ rb, cwd, env = process.env, argv, timeoutMs = 120
 class Connection {
   constructor(sock) {
     this.sock = sock; this.id = 0; this.pending = new Map(); this.listeners = new Set(); this.closed = false;
-    this.sent = new Set();      // each method asked for, once
+    this.sent = new Map();      // each method asked for: the params it was last sent with
     sock.onmessage = ev => {
       const m = JSON.parse(typeof ev.data === 'string' ? ev.data : Buffer.from(ev.data).toString('utf8'));
       if (m.id !== undefined) {
@@ -262,7 +294,7 @@ class Connection {
   }
 
   send(method, params = {}, sessionId) {
-    this.sent.add(method);
+    this.sent.set(method, params);
     if (this.closed) return Promise.reject(new Error(`${method}: the browser closed its connection`));
     return new Promise((resolve, reject) => {
       const id = ++this.id;
@@ -301,6 +333,7 @@ export async function launchChrome({ chrome = findChrome(), timeoutMs = 30000, t
     '--password-store=basic', '--use-mock-keychain', '--force-color-profile=srgb'];
   // Ubuntu's runners refuse Chrome the user namespaces its sandbox needs; the pages it opens are rb's own, on this machine
   if (process.platform === 'linux') args.push('--no-sandbox');
+  for (const m of MACHINE) args.push(MACHINE_SWITCHES[m]);
   args.push('about:blank');
   const env = chromeEnv({ home });
   const proc = track(spawn(chrome, args, { env, stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true }), tree);
@@ -336,7 +369,8 @@ export async function launchChrome({ chrome = findChrome(), timeoutMs = 30000, t
   });
   conn = new Connection(sock);
   const version = await conn.send('Browser.getVersion');
-  return { chrome, version: version.product, proc, page: () => openPage(conn), asked: method => conn.sent.has(method) };
+  return { chrome, version: version.product, proc, page: () => openPage(conn), asked: method => conn.sent.has(method),
+    lastSent: method => conn.sent.get(method) };
 }
 
 async function openPage(conn) {
@@ -355,7 +389,13 @@ async function openPage(conn) {
     if (['Network.responseReceived', 'Network.loadingFinished', 'Network.loadingFailed'].includes(m.method)) { inflight.delete(p.requestId); lastNet = Date.now(); }
   });
   await send('Page.enable'); await send('Runtime.enable'); await send('Network.enable'); await send('DOM.enable');
+  // a slow runner, emulated (RB_APP_CPU_THROTTLE, round cdp-1): every page's CPU slowed by that factor, so a walk reads
+  // a transition as GitHub's macOS and Windows runners do, earlier in its course. Unset, or 1, the machine's own speed
+  if (CPU_THROTTLE > 1) await send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
   let media = { type: '', scheme: 'light' };
+
+  // every page starts with its media said whole: a page no walk sets media on reads no machine setting either
+  await send('Emulation.setEmulatedMedia', { media: '', features: mediaFeatures() });
 
   const page = {
     send, errors, consoleMsgs,
@@ -363,10 +403,13 @@ async function openPage(conn) {
     async viewport(width, height = 900) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
     },
-    // the media type ('' for screen, 'print') and the colour scheme, set together: each call replaces both
-    async media({ type = media.type, scheme = media.scheme } = {}) {
+    // the media type ('' for screen, 'print') and the colour scheme, kept from the call before where not given, and
+    // every feature a machine can set on its own (FEATURE_DEFAULTS), each as asked in this call or else its default:
+    // `motion: 'reduce'` holds for that call alone, and a call without it sends no-preference, never the machine's
+    async media({ type = media.type, scheme = media.scheme, ...features } = {}) {
+      const sent = mediaFeatures({ scheme, ...features });
       media = { type, scheme };
-      await send('Emulation.setEmulatedMedia', { media: type, features: [{ name: 'prefers-color-scheme', value: scheme }] });
+      await send('Emulation.setEmulatedMedia', { media: type, features: sent });
     },
     async noScript(v) { await send('Emulation.setScriptExecutionDisabled', { value: v }); },
     // loads `url`; a page that cannot be loaded, or does not finish loading in `timeoutMs`, is an error
@@ -400,12 +443,18 @@ async function openPage(conn) {
       if (r.exceptionDetails) return { __error: r.exceptionDetails.exception?.description || r.exceptionDetails.text };
       return r.result?.value;
     },
-    async waitFor(expr, timeoutMs = 30000) {
+    // `expr`'s value once it is truthy; at `timeoutMs`, null, or, given the `step` it waits in, an error that names the
+    // step, what `expr` last gave and, given `state`, what that expression reads of the page then
+    async waitFor(expr, timeoutMs = 30000, step = null, state = null) {
       const until = Date.now() + timeoutMs;
       for (;;) {
         const v = await page.ev(expr);
         if (v && !v.__error) return v;
-        if (Date.now() > until) return null;
+        if (Date.now() > until) {
+          if (!step) return null;
+          const seen = state ? await page.ev(state) : undefined;
+          throw new Error(`${step}: not so after ${timeoutMs / 1000} s (last ${JSON.stringify(v)})` + (state ? `; the page then: ${JSON.stringify(seen)}` : ''));
+        }
         await sleep(100);
       }
     },
@@ -442,9 +491,25 @@ async function openPage(conn) {
       const r = await page.rect(selectorExpr);
       if (!r || r.__error) return null;
       await sleep(150);
+      // a target still moving (a sheet sliding in, a card's entrance) is clicked where it stops, never where it was:
+      // its box the same over three reads 50 ms apart (150 ms, several drawn frames even on a slowed CPU), 10 s at most (the card-tabs walk,
+      // round tabs-1: at 390 px the click was measured in the sheet's slide and landed beside the tab). Read from here,
+      // not in a frame callback of the page's, which never runs while the page's scripts are off (round cdp-1)
+      {
+        const box = `(() => { const e = (${selectorExpr}); if (!e) return null; const r = e.getClientRects()[0] || e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].join(); })()`;
+        let was = await page.ev(box), same = 0;
+        for (const until = Date.now() + 10000; same < 3 && Date.now() < until;) {
+          await sleep(50);
+          const now = await page.ev(box);
+          same = now === was ? same + 1 : 0; was = now;
+        }
+      }
       // a link that wraps is clicked on its first line, where its box begins (its whole box's left edge may be another
       // element's)
       const r2 = await page.ev(`(() => { const e = (${selectorExpr}); const r = e.getClientRects()[0] || e.getBoundingClientRect(); return {x: r.x + Math.min(r.width/2, 30), y: r.y + r.height/2}; })()`);
+      // what is under the point as the button goes down: a click that lands on another element says which
+      r.hit = await page.ev(`(() => { const e = document.elementFromPoint(${r2.x}, ${r2.y}); return e ? (e.tagName + (e.id ? '#' + e.id : '') + ' ' + (e.textContent || '').trim().slice(0, 40)) : null; })()`);
+      r.at = r2;
       for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: r2.x, y: r2.y, button: 'left', clickCount: 1 });
       await sleep(300);
       return r;

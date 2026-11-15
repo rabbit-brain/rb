@@ -4962,15 +4962,60 @@ _CARD_PROBE = r"""(() => {
 })()"""
 
 
+# a walk's own steps: `press` is cdp.mjs's clickEl, which clicks a target only once it has stopped moving (round tabs-1:
+# at 390 px the card-tabs walk measured the Rule tab while the sheet slid in and pressed beside it; cdp-1 moved that
+# settle into cdp.mjs, read from node so it ends with the page's scripts off); `step` does an act and waits for the state
+# it brings with cdp.mjs's named waitFor, which, when that never comes, throws naming the step (here with where the
+# click was), what it last read and what `state` reads of the page then
+_WALK_STEPS = r"""
+const press = (page, sel) => page.clickEl(sel);
+const step = async (page, name, act, until, { timeoutMs = 60000, state = null } = {}) => {
+  const did = await act();
+  const where = did && typeof did === 'object' && 'x' in did ? ` (the click was at ${Math.round(did.x)}, ${Math.round(did.y)})` : '';
+  return page.waitFor(until, timeoutMs, name + where, state);
+};
+"""
+
+
+def test_a_click_lands_where_its_target_stops_and_a_named_wait_says_its_step(tmp_path):
+    """A walk's `press` clicks a target only once it has stopped moving, and its `step` throws, naming the step, when the
+    state it waits for never comes (round tabs-1: at 390 px the card-tabs walk measured the Rule tab while the sheet
+    slid in, pressed beside it, and its wait returned null after 60 s without saying where it was). Here a button
+    slides for 1.5 s from the moment the page shows it."""
+    page = tmp_path / "slide.html"
+    page.write_text("<!doctype html><style>#b{position:fixed;left:200px;top:100px;width:60px;height:30px;"
+                    "transition:transform 1.5s linear}html.go #b{transform:translateX(-180px)}</style><button id=b>Go</button>"
+                    "<script>window.down=null;window.got=false;"
+                    "b.addEventListener('mousedown',()=>{window.down={moving:document.getAnimations().length,x:Math.round(b.getBoundingClientRect().x)}});"
+                    "b.addEventListener('click',()=>{window.got=true});"
+                    "requestAnimationFrame(()=>requestAnimationFrame(()=>document.documentElement.classList.add('go')));</script>", encoding="utf-8")
+    script = _cdp_script(tmp_path / "slide.mjs", _WALK_STEPS + """
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  await page.goto(%s);
+  await step(page, 'the slide starts', async () => null, "document.documentElement.classList.contains('go')", { timeoutMs: 10000 });
+  await press(page, "document.getElementById('b')");
+  let said = null;
+  try { await step(page, 'a state that never comes', async () => null, 'false', { timeoutMs: 300, state: '1 + 1' }); } catch (e) { said = e.message; }
+  return { down: await page.ev('window.down'), got: await page.ev('window.got'), said };
+}, { timeoutMs: 120000 });
+""" % json.dumps(page.as_uri()))
+    code, said, err = _runner(_node(), script, env=dict(os.environ))
+    assert code == 0 and said["ok"], err
+    assert said["down"] == {"moving": 0, "x": 20} and said["got"] is True, said
+    assert said["said"] == "a state that never comes: not so after 0.3 s (last false); the page then: 2", said
+
+
 def test_a_card_opens_as_tabs_with_its_result_drawn(int8_demo, tmp_path):
     """The rule card (the UX lead's card, Nov 13 2026; the owner on a cited rule's card: "what am i looking at?", "i
-    click Source details for example, and then how do i go back?"), at 1440 and 390: (1) the inspector's header is
+    click Source details for example, and then how do i go back?"), at 1440, 1280 and 390: (1) the inspector's header is
     icons, a back arrow, the breadcrumb, a link button labelled "Copy a link to this card" and the x, with no text
     button; (2) its parts are real tabs, Result, Rule, Runs, Used by, Source, one panel shown at a time, Result first;
     a click swaps the panel and keeps the part in the address, Back returns to the tab before, the arrow keys move
     between tabs, and a chip of the runs opens Runs; (3) Result draws the claim beside rb's number, with the mark of
     the rule's outcome and chips, its numbers rb's own reading, and no sentence repeating it; (7) Source holds the
-    quoted line and its hash in 12 characters, and rb's working under "How rb worked it out", closed."""
+    quoted line and its hash in 12 characters, and rb's working under "How rb worked it out", closed (1280 is the last
+    width with no sheet)."""
     shown = subprocess.run([*command(), "show", "c2", "--json"], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
                            stdin=subprocess.DEVNULL, env=int8_demo.env)
     assert shown.returncode == 0, shown.stderr
@@ -4979,33 +5024,38 @@ def test_a_card_opens_as_tabs_with_its_result_drawn(int8_demo, tmp_path):
     rp = subprocess.run([*command(), "page", "--out", str(page)], cwd=int8_demo.root, capture_output=True, encoding="utf-8", errors="replace",
                         stdin=subprocess.DEVNULL, env={**int8_demo.env, "RB_TEST_SHELL": "1"})
     assert rp.returncode == 0, rp.stderr
-    js = _cdp_script(tmp_path / "tabs.mjs", """
+    js = _cdp_script(tmp_path / "tabs.mjs", _WALK_STEPS + """
 const out = {};
 const PROBE = %s;
 await cdp.run(async () => {
-  for (const width of [1440, 390]) {
+  for (const width of [1440, 1280, 390]) {
     const page = await (await cdp.launchChrome()).page();
     await page.viewport(width, width < 600 ? 844 : 900);
     await page.goto(%s);
     await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
     await page.goto(%s + '#c-c2');
     // each step waits for the state it brings (the tab chosen, the address, the focus), never a fixed time: a slow
-    // runner (GitHub's macOS and Windows, step 59) swapped a panel after a fixed 250 ms and the probe read the one before
-    const T = 60000;
-    await page.waitFor("document.documentElement.classList.contains('ready') && !!document.querySelector('#insp [role=tab]')", T);
+    // runner (GitHub's macOS and Windows, step 59) swapped a panel after a fixed 250 ms and the probe read the one before.
+    // A click waits for its tab to stop moving: the second goto only changes the address, so the page is ready as the
+    // sheet starts to slide in (round tabs-1). A step that never comes says the page's tabs, address and sheet then
+    const STATE = "(() => { const i = document.getElementById('insp'), t = [...document.querySelectorAll('#insp [role=tab]')];"
+      + " const r = e => { const b = e.getBoundingClientRect(); return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)]; };"
+      + " return { hash: location.hash, sheet: document.documentElement.className, insp: i && [getComputedStyle(i).transform, getComputedStyle(i).visibility, r(i)],"
+      + " tabs: t.map(x => [x.textContent.trim(), x.getAttribute('aria-selected'), r(x)]), focus: document.activeElement && document.activeElement.textContent.trim().slice(0, 30) }; })()";
+    await step(page, 'the card is ready', async () => null, "document.documentElement.classList.contains('ready') && !!document.querySelector('#insp [role=tab]')", { state: STATE });
     const got = { open: await page.ev(PROBE) };
     const tab = name => "[...document.querySelectorAll('#insp [role=tab]')].find(t => t.textContent.trim() === '" + name + "')";
     const on = (name, hash) => "(() => { const t = [...document.querySelectorAll('#insp [role=tab]')].find(t => t.getAttribute('aria-selected') === 'true');"
       + " return !!t && t.textContent.trim() === '" + name + "'" + (hash === undefined ? "" : " && location.hash === '" + hash + "'") + "; })()";
     const focused = name => "(document.activeElement && document.activeElement.textContent.trim()) === '" + name + "'";
-    await page.clickEl(tab('Rule')); await page.waitFor(on('Rule', '#c-c2:rule'), T); got.rule = await page.ev(PROBE);
-    await page.clickEl(tab('Source')); await page.waitFor(on('Source', '#c-c2:source'), T); got.source = await page.ev(PROBE);
-    await page.ev("history.back(); true"); await page.waitFor(on('Rule', '#c-c2:rule'), T); got.back = await page.ev(PROBE);
-    await page.ev("history.back(); true"); await page.waitFor(on('Result', '#c-c2'), T); got.back2 = await page.ev(PROBE);
+    await step(page, 'a click on Rule', () => press(page, tab('Rule')), on('Rule', '#c-c2:rule'), { state: STATE }); got.rule = await page.ev(PROBE);
+    await step(page, 'a click on Source', () => press(page, tab('Source')), on('Source', '#c-c2:source'), { state: STATE }); got.source = await page.ev(PROBE);
+    await step(page, 'Back to Rule', () => page.ev("history.back(); true"), on('Rule', '#c-c2:rule'), { state: STATE }); got.back = await page.ev(PROBE);
+    await step(page, 'Back to Result', () => page.ev("history.back(); true"), on('Result', '#c-c2'), { state: STATE }); got.back2 = await page.ev(PROBE);
     await page.ev(tab('Result') + ".focus(); true");
-    await page.key('ArrowRight', 'ArrowRight', 39); await page.waitFor(on('Rule') + " && " + focused('Rule'), T); got.arrow = await page.ev(PROBE);
-    await page.key('ArrowLeft', 'ArrowLeft', 37); await page.waitFor(on('Result') + " && " + focused('Result'), T);
-    await page.clickEl("document.querySelector('#insp .chip.k-runs')"); await page.waitFor(on('Runs', '#c-c2:runs'), T); got.chip = await page.ev(PROBE);
+    await step(page, 'ArrowRight to Rule', () => page.key('ArrowRight', 'ArrowRight', 39), on('Rule') + " && " + focused('Rule'), { state: STATE }); got.arrow = await page.ev(PROBE);
+    await step(page, 'ArrowLeft to Result', () => page.key('ArrowLeft', 'ArrowLeft', 37), on('Result') + " && " + focused('Result'), { state: STATE });
+    await step(page, 'a click on the runs chip', () => press(page, "document.querySelector('#insp .chip.k-runs')"), on('Runs', '#c-c2:runs'), { state: STATE }); got.chip = await page.ev(PROBE);
     out[width] = got;
     await cdp.stopAll();
   }

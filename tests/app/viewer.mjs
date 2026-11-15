@@ -10,7 +10,7 @@
 // a page with sandbox="allow-scripts" as the hub does and take its probe's report (posted to them) on <body data-probe>.
 // The last line on stdout is JSON: {"ok", "checks": [{"name", "pass", "detail"}]}; exit 0, 1 on a failed check, 3 with
 // no Chrome.
-import { findChrome, launchChrome, parseArgs, progress, run, sleep } from './cdp.mjs';
+import { findChrome, inHalf, launchChrome, parseArgs, progress, run, sleep, widths } from './cdp.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 if (!a.prose && !a.framed && !a.yours && !a.rows && !a.cards && !a.ownerexp && (!a.none || !a.owner || !a.reader)) { process.stderr.write('give --none, --owner and --reader, or --prose, or --framed\n'); process.exit(2); }
@@ -113,7 +113,7 @@ await run(async () => {
   // text in a card.fc that holds `rb confirm` sits in an element the reader's view holds back (display none), and the
   // card that holds one, opened in the inspector, shows no command and no sentence that names one
   if (a.cards) {
-    for (const w of [1440, 390]) {
+    for (const w of widths([1440, 390])) {
       await open(p, a.cards, w, 'light');
       const shown = await p.ev(`(() => {
         const out = []; let held = 0; let cards = 0, first = null;
@@ -141,7 +141,7 @@ await run(async () => {
     if (failed.length) throw Object.assign(new Error(`${failed.length} of ${results.length} checks failed: ${failed.map(f => f.name).join('; ')}`), { results });
     return { checks: results };
   }
-  if (a.rows) for (const w of [1440, 390]) {
+  if (a.rows) for (const w of widths([1440, 390])) {
     await open(p, a.rows, w, 'light');
     // a reader is shown the record's state, no row, chip or button of the owner's list; a row's own link, followed by
     // its address, opens its item to read
@@ -185,13 +185,13 @@ await run(async () => {
     return { checks: results };
   }
   // --failsafe <url>: a reader's page whose app never starts: no rb command box shows
-  if (a.failsafe) {
+  if (a.failsafe && inHalf(1440)) {
     await p.blank(); await p.viewport(1440, 900); await p.goto(a.failsafe + '#overview'); await sleep(1500);
     await p.ev(OPEN_ALL);
     const o = await p.ev(ACTIONS), ready = await p.ev(`document.documentElement.classList.contains('ready')`);
     check(`reader: where the app never starts, no rb command box shows`, !ready && !o.cmds.length && !o.decide, j({ ready, o }));
   }
-  if (a.none) for (const w of [1440, 390]) for (const scheme of ['light', 'dark']) {
+  if (a.none) for (const w of widths([1440, 390])) for (const scheme of ['light', 'dark']) {
     const at = `${w} ${scheme}`;
     const kept = {};
     for (const who of ['none', 'owner', 'reader']) {
@@ -330,7 +330,7 @@ await run(async () => {
     }
   }
   // the hub's sandboxed frame: no storage, no network; the owner's composer composes there, a reader's page offers none
-  for (const [name, url, who] of JSON.parse(a.framed || '[]')) {
+  for (const [name, url, who] of inHalf(1440) ? JSON.parse(a.framed || '[]') : []) {
     await p.blank(); await p.viewport(1440, 900);
     await p.goto(url);
     let got = null;

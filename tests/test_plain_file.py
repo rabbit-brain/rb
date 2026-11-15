@@ -162,6 +162,7 @@ def test_a_hand_written_file_is_read_forgivingly(tmp_path):
 
 
 @pytest.mark.skipif(not os.environ.get("RB_OLD_BIN"), reason="RB_OLD_BIN names an rb from before PLAIN.md")
+@pytest.mark.older_rb(until="0.8.5", reason="0.8.6 reads PLAIN.md, so its status holds the lines once the file is there")
 def test_an_older_rb_reads_the_record_beside_it_unchanged(tmp_path):
     rec = record(tmp_path, "older")
 

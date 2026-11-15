@@ -37,6 +37,29 @@ REQUIRED = os.environ.get("RB_REQUIRE_BROWSER") == "1"
 RUNNER_KNOWN = pytest.mark.xfail(os.environ.get("GITHUB_ACTIONS") == "true" and sys.platform == "win32",
                                  reason="fails on GitHub's Windows runner (issue #2)", strict=False)
 
+# The walks split by viewport (tests/conftest.py's viewport switch, RB_APP_VIEWPORT): a test that takes `viewport` runs
+# once in each half it is for, its walk taking that half's widths (tests/app/cdp.mjs's inHalf), and asks of each half
+# what that half walks: a check whose name ends with a width ([390 light], [1440], [390x667 dark]) is the half of that
+# width, under 960 the 390 half's, and a check with none (print, a frame, a check at one width) the 1280 half's.
+pytestmark = pytest.mark.viewport_split
+TAGGED = re.compile(r"\[(\d+)(?:x\d+)?(?: [^\]]+)?\]$")
+
+
+def _half_of(name: str) -> str:
+    m = TAGGED.search(name)
+    return "390" if m and int(m[1]) < 960 else "1280"
+
+
+def _ats(viewport: str, *ats: str) -> list:
+    """Of the widths a test names ("390 light", "1440"), those its half walks."""
+    return [at for at in ats if _half_of(f"[{at}]") == viewport]
+
+
+def _expect(names: list, viewport: str, *want: str) -> None:
+    """Every check of `want` that this half walks is among `names`."""
+    missing = [n for n in want if _half_of(n) == viewport and n not in names]
+    assert not missing, missing
+
 
 def _without(why: str) -> None:
     if REQUIRED:
@@ -85,10 +108,15 @@ def _one_browser_at_a_time():
 SLOW = float(os.environ.get("RB_APP_SLOW") or 3)
 
 
-def harness(url, *argv: str, timeout: int = 300, lock: bool = True, env: dict = None, runner: str = "app.mjs") -> dict:
+def harness(url, *argv: str, timeout: int = 300, lock: bool = True, env: dict = None, runner: str = "app.mjs",
+            viewport: str = None) -> dict:
     """`node tests/app/app.mjs [--url <url>] <argv>`: its last line, as JSON, with its exit code under `exit`. `lock`
-    False when the caller holds the browser lock already; `env` the environment it runs in (rb open's, with --rb)."""
+    False when the caller holds the browser lock already; `env` the environment it runs in (rb open's, with --rb);
+    `viewport` the half of the walk it takes (RB_APP_VIEWPORT), every width without it."""
     node = _node()
+    env = {k: v for k, v in (os.environ if env is None else env).items() if k != "RB_APP_VIEWPORT"}
+    if viewport:
+        env["RB_APP_VIEWPORT"] = viewport
     # `timeout` is what the walk takes on a quiet machine; a loaded one (a full run, another OS) can take several times
     # that, so the whole deadline is SLOW times it, and a walk that hangs stops sooner: no check for --idle seconds
     timeout = int(timeout * SLOW)
@@ -116,6 +144,7 @@ def harness(url, *argv: str, timeout: int = 300, lock: bool = True, env: dict = 
         pytest.fail(f"the app harness said no JSON (exit {proc.returncode}): {err[-2000:]}")
     said["exit"] = proc.returncode
     said["stderr"] = err
+    said["viewport"] = viewport
     return said
 
 
@@ -133,17 +162,17 @@ def _walk_passed(said: dict) -> bool:
 
 
 @pytest.fixture
-def walked(request) -> dict:
-    """One walk of the fixture by every check, shared by the tests below: a failing check fails each test that names
-    it, and a walk that fails as a whole fails them all. A walk that passed is read by every later test run; one that
-    failed only by this test run's tests at the same try, so a rerun (--reruns) and a later run walk again."""
+def walked(request, viewport) -> dict:
+    """One walk of the fixture by every check in this half, shared by the tests below: a failing check fails each test
+    that names it, and a walk that fails as a whole fails them all. A walk that passed is read by every later test run;
+    one that failed only by this test run's tests at the same try, so a rerun (--reruns) and a later run walk again."""
     # the suite's workers each ask: the first walks, under the browser lock, and the rest read what it found, for the
     # same script, fixture and harness
     key = hashlib.sha256(b"".join(p.read_bytes() for p in (SCRIPT, GUIDE_CSS, FIXTURE, APP / "app.mjs", APP / "cdp.mjs"))).hexdigest()[:16]
     # rb-app-walk2: the walk with the test run and try that made it (rb-app-walk, the walk alone, is an older checkout's)
-    cache = Path(tempfile.gettempdir()) / f"rb-app-walk2-{key}.json"
+    cache = Path(tempfile.gettempdir()) / f"rb-app-walk3-{key}-w{viewport}.json"
     run = os.environ.get("PYTEST_XDIST_TESTRUNUID") or f"pid{os.getpid()}"
-    attempt = getattr(request.node, "execution_count", 1)
+    attempt = (viewport, getattr(request.node, "execution_count", 1))
 
     def kept():
         try:
@@ -153,7 +182,7 @@ def walked(request) -> dict:
         said = got.get("said") if isinstance(got, dict) else None
         if not isinstance(said, dict):
             return None
-        if _walk_passed(said) or (got.get("run") == run and got.get("attempt", 0) >= attempt):
+        if _walk_passed(said) or (got.get("run") == run and got.get("attempt", 0) >= attempt[1]):
             return said
         return None
 
@@ -170,14 +199,14 @@ def walked(request) -> dict:
         if said is not None:
             return said
         try:
-            said = harness(FIXTURE.as_uri(), timeout=1200, lock=False)
+            said = harness(FIXTURE.as_uri(), timeout=1200, lock=False, viewport=viewport)
         except (pytest.skip.Exception, pytest.fail.Exception) as e:     # the next test at this try says the same
             _WALKED[attempt] = ("skip" if isinstance(e, pytest.skip.Exception) else "fail", str(e.msg))
             raise
         _WALKED[attempt] = said
         if said.get("exit") in (0, 1):
             tmp = cache.with_suffix(f".{os.getpid()}.tmp")
-            tmp.write_text(json.dumps({"said": said, "run": run, "attempt": attempt}), encoding="utf-8")
+            tmp.write_text(json.dumps({"said": said, "run": run, "attempt": attempt[1]}), encoding="utf-8")
             os.replace(tmp, cache)
     return said
 
@@ -189,83 +218,109 @@ def _checks(said: dict, *starts: str) -> dict:
     return {n: n not in failed for n in names if n.startswith(starts)}
 
 
-def _passes(said: dict, *starts: str, at_least: int = 1) -> None:
+def _read(said: dict, names) -> str:
+    """Each check of `names` with what it read (its detail), whole, a line each: what a failure says in pytest's
+    message, so a runner's log (GitHub's gives the message alone) says what the check saw, not only its name."""
+    detail = {c["name"]: c.get("detail", "") for c in said.get("checks") or []}
+    return "\n".join(f"{n}: {detail[n]}" if n in detail else n for n in names)
+
+
+def _passes(said: dict, *starts: str, at_least: dict) -> None:
+    """Every check of the walk's half that starts with one of `starts` passes, and there are at least as many as
+    `at_least` says for that half (390, 1280): the two add up to what the walk at every width asked for. A check that
+    fails says what it read."""
     got = _checks(said, *starts)
     assert said["exit"] in (0, 1), said["stderr"][-3000:]
-    assert len(got) >= at_least, (starts, sorted(got), said.get("error"))
-    assert all(got.values()), sorted(n for n, ok in got.items() if not ok)
+    assert len(got) >= at_least[said["viewport"]], (starts, sorted(got), said.get("error"))
+    failed = sorted(n for n, ok in got.items() if not ok)
+    if failed:
+        pytest.fail(f"{len(failed)} of {len(got)} checks failed:\n" + _read(said, failed), pytrace=False)
+
+
+def test_a_failing_check_says_what_it_read_whole_in_pytest_s_message():
+    """Round media-1: GitHub's log of the guide's motion check gave its name alone, so nobody could tell what it read.
+    A failing check's message carries its detail whole, however long, and a passing one's is left out."""
+    long = '{"still": ["0s", "0s", "none", "none"], "moving": ["0s", "0s", "none", "none"], "pad": "%s"}' % ("x" * 4000)
+    said = {"exit": 1, "ok": False, "viewport": "1280", "stderr": "", "checks": [
+        {"name": "guide: no motion under prefers-reduced-motion [1280 light]", "pass": False, "detail": long},
+        {"name": "guide: nothing past the screen at any step [1280 light]", "pass": True, "detail": "[]"}],
+        "error": "1 of 2 checks failed: guide: no motion under prefers-reduced-motion [1280 light]"}
+    with pytest.raises(pytest.fail.Exception) as e:
+        _passes(said, "guide:", at_least={"390": 0, "1280": 2})
+    assert str(e.value.msg) == "1 of 2 checks failed:\nguide: no motion under prefers-reduced-motion [1280 light]: " + long
 
 
 def test_the_script_works_the_fixture_by_real_clicks(walked):
     """Views, the inspector stack, crumbs, Back, Esc, focus return and cold links, at 390 and 1280, light and dark,
     then print and with the script off: every check of the walk passes."""
-    assert walked["exit"] == 0 and walked["ok"], (_failed(walked), walked["stderr"][-3000:])
+    if not (walked["exit"] == 0 and walked["ok"]):
+        pytest.fail(_read(walked, _failed(walked)) + "\n" + walked["stderr"][-3000:], pytrace=False)
     names = [c["name"] for c in walked["checks"]]
     for part in ("start", "views", "stack", "crumbs", "back", "esc", "close", "cold", "root", "moves", "print", "no script",
                  "address", "your call", "composer", "waiting", "copy", "filter", "keys", "theme", "live", "nothing past the screen",
                  "guide"):
         assert any(n.startswith(part) for n in names), part
-    for at in ("390 light", "390 dark", "1280 light", "1280 dark"):
+    for at in _ats(walked["viewport"], "390 light", "390 dark", "1280 light", "1280 dark"):
         assert sum(1 for n in names if n.endswith(f"[{at}]")) >= 30, at
 
 
 def test_the_top_bar_s_about_opens_its_view(walked):
     """Design pass 1, target 11: About in the top bar opens its view, marked there as the nav marks its own, and a
     word's address opens About at the word."""
-    _passes(walked, "about", at_least=12)
+    _passes(walked, "about", at_least={"390": 6, "1280": 6})
 
 
 def test_the_inspector_stack_crumbs_back_and_esc(walked):
-    _passes(walked, "stack", "crumbs", "back", "esc", "close", "moves", at_least=40)
+    _passes(walked, "stack", "crumbs", "back", "esc", "close", "moves", at_least={"390": 18, "1280": 22})
 
 
 @RUNNER_KNOWN
 def test_cold_links_land_on_their_card_and_back_stays_on_the_page(walked):
-    _passes(walked, "cold", at_least=40)
+    _passes(walked, "cold", at_least={"390": 23, "1280": 17})
 
 
 def test_the_address_grammar(walked):
     """An extra '#', a name that is nowhere, rb's old view names and rb open's anchors, its place and version kept."""
-    _passes(walked, "address", at_least=30)
+    _passes(walked, "address", at_least={"390": 15, "1280": 15})
 
 
 def test_your_call_starts_on_the_first_call(walked):
-    _passes(walked, "your call", "root: Your call", at_least=6)
+    _passes(walked, "your call", "root: Your call", at_least={"390": 3, "1280": 3})
 
 
 def test_composer_never_posts(walked):
     """Nothing to copy before an action and a reason; the reason single-quoted; Copy sends nothing and no form exists."""
-    _passes(walked, "composer", at_least=10)
+    _passes(walked, "composer", at_least={"390": 5, "1280": 5})
 
 
 def test_a_past_version_composes_no_command(walked):
     """Guarantee 38: on a past version a choice by key or by click composes no rb decide line, and a call chosen live is
     not put back when the past version is swapped in, at 390 and 1280."""
-    _passes(walked, "composer: a past version", at_least=4)
+    _passes(walked, "composer: a past version", at_least={"390": 2, "1280": 2})
 
 
 def test_a_waiting_item_copies_only_its_confirm(walked):
-    _passes(walked, "waiting", at_least=4)
+    _passes(walked, "waiting", at_least={"390": 2, "1280": 2})
 
 
 def test_copy_filters_keys_and_theme(walked):
-    _passes(walked, "copy", "filter", "keys", "theme", at_least=30)
+    _passes(walked, "copy", "filter", "keys", "theme", at_least={"390": 15, "1280": 15})
 
 
 def test_rb_open_s_live_module_hears_of_cards_and_redraws(walked):
     """rb:card for each card brought to the inspector's top by the user, never on a redraw; after rb:swapped the app
     stands where it stood and says so with preventDefault (L's live.js, BP 4a)."""
-    _passes(walked, "live", at_least=8)
+    _passes(walked, "live", at_least={"390": 4, "1280": 4})
 
 
 def test_no_overflow_at_390(walked):
     """Nothing past the screen at 390 and no line past its box: every view, a card open, a sheet narrowed into, no script."""
     _passes(walked, "nothing past the screen", "no line runs past", "moves: narrowed across 960, nothing", "no script: nothing past",
-           at_least=10)
+           at_least={"390": 6, "1280": 4})
 
 
 def test_print_and_no_script_show_the_whole_document(walked):
-    _passes(walked, "print", "no script", at_least=7)
+    _passes(walked, "print", "no script", at_least={"390": 3, "1280": 4})
 
 
 # ---------------------------------------------------------------- the pointer guide (script.js's last block, guide.css)
@@ -275,21 +330,21 @@ def test_the_guide_shows_on_a_first_load_and_not_the_second(walked):
     Next, Back and Done, kept as ended; the next load shows nothing, and the guide moves no layout and blocks no click."""
     _passes(walked, "guide: a first load", "guide: four steps", "guide: Back", "guide: Done", "guide: not on the second",
             "guide: it moves no layout", "guide: the page behind", "guide: no Your call step", "guide: with no storage",
-            "guide: without its styles", at_least=34)
+            "guide: without its styles", at_least={"390": 16, "1280": 18})
 
 
 def test_esc_ends_the_guide(walked):
     """Esc ends the guide and only it; under 960 a card's sheet hides it and Esc closes the sheet first; the keys list
     opens over it and its own Esc closes the list alone."""
-    _passes(walked, "guide: Esc ends it", "guide: a sheet over it", "guide: the keys list opens over it", at_least=10)
+    _passes(walked, "guide: Esc ends it", "guide: a sheet over it", "guide: the keys list opens over it", at_least={"390": 6, "1280": 4})
 
 
 def test_the_guide_replays_from_the_keys_list(walked):
-    _passes(walked, "guide: \"Show the guide again\"", at_least=4)
+    _passes(walked, "guide: \"Show the guide again\"", at_least={"390": 2, "1280": 2})
 
 
 def test_the_guide_is_never_in_print_no_script_or_a_deep_link(walked):
-    _passes(walked, "guide: never in print", "guide: never in the no-script", "guide: never on a deep link", at_least=12)
+    _passes(walked, "guide: never in print", "guide: never in the no-script", "guide: never on a deep link", at_least={"390": 6, "1280": 6})
 
 
 @RUNNER_KNOWN
@@ -298,7 +353,7 @@ def test_the_guide_fits_390_reads_at_aa_and_keeps_still_under_reduced_motion(wal
     at AA contrast in light and dark; no motion under prefers-reduced-motion; scrolled or resized across 960, the
     tooltip stays whole and the spotlight follows its part."""
     _passes(walked, "guide: nothing past the screen", "guide: at 390", "guide: its words", "guide: no motion", "guide: scrolled",
-            "guide: resized across 960", at_least=18)
+            "guide: resized across 960", at_least={"390": 8, "1280": 10})
 
 
 def test_the_guide_never_covers_what_it_lights_and_shows_a_findings_provenance(walked):
@@ -307,11 +362,11 @@ def test_the_guide_never_covers_what_it_lights_and_shows_a_findings_provenance(w
     the inspector (a sheet under 960, which the guide stays over), the next step closes it, and closed by the user it
     takes the guide a step on; in dark the dimming darkens the page's text at least threefold, the tooltip at AA."""
     _passes(walked, "guide: each step lights its part", "guide: step 3 opens a finding", "guide: the finding it opened",
-            "guide: in dark its dimming", "guide: Back to step 3", at_least=18)
+            "guide: in dark its dimming", "guide: Back to step 3", at_least={"390": 9, "1280": 9})
 
 
 def test_the_guide_gives_focus_back(walked):
-    _passes(walked, "guide: focus returns", at_least=4)
+    _passes(walked, "guide: focus returns", at_least={"390": 2, "1280": 2})
 
 
 def _guide_block() -> str:
@@ -320,18 +375,18 @@ def _guide_block() -> str:
     return script[start:]
 
 
-@pytest.fixture(scope="module")
-def v2_walked() -> dict:
+@pytest.fixture
+def v2_walked(viewport) -> dict:
     """One walk of tests/app/overview-v2.html (the Overview of OVERVIEW-V2, with C's card levels and rb open's live
-    module) by tests/app/v2.mjs, shared by the tests below as `walked` is."""
+    module) by tests/app/v2.mjs in this half, shared by the tests below as `walked` is."""
     parts = (SCRIPT, GUIDE_CSS, SCRIPT.with_name("live.js"), SCRIPT.with_name("open.css"), SCRIPT.with_name("shell.css"), APP / "overview-v2.html", APP / "v2.mjs",
              APP / "cdp.mjs")
     key = hashlib.sha256(b"".join(p.read_bytes() for p in parts)).hexdigest()[:16]
-    cache = Path(tempfile.gettempdir()) / f"rb-app-v2-{key}.json"
+    cache = Path(tempfile.gettempdir()) / f"rb-app-v2-{key}-w{viewport}.json"
     with _one_browser_at_a_time():
         if cache.is_file():
             return json.loads(cache.read_text(encoding="utf-8"))
-        said = harness(None, timeout=600, lock=False, runner="v2.mjs")
+        said = harness(None, timeout=600, lock=False, runner="v2.mjs", viewport=viewport)
         if said.get("exit") in (0, 1):
             tmp = cache.with_suffix(f".{os.getpid()}.tmp")
             tmp.write_text(json.dumps(said), encoding="utf-8")
@@ -342,29 +397,30 @@ def v2_walked() -> dict:
 def test_a_queue_button_opens_the_inspector_at_decide(v2_walked):
     """The queue's button opens its call in the inspector at the Decide level: its first action has focus, a key acts
     on it at once, Esc gives focus back to the button; without the script it jumps to the Decide part."""
-    _passes(v2_walked, "v2: a queue's button", "v2: opened at Decide", "v2: Esc closes it", "v2: after a live reload, Esc", "v2: without the script", at_least=17)
+    _passes(v2_walked, "v2: a queue's button", "v2: opened at Decide", "v2: Esc closes it", "v2: after a live reload, Esc", "v2: without the script", at_least={"390": 8, "1280": 9})
 
 
 def test_j_and_k_move_through_the_queue_and_enter_opens(v2_walked):
-    _passes(v2_walked, "v2: j and k move", "v2: Enter opens", "v2: on Your call, j opens", at_least=12)
+    _passes(v2_walked, "v2: j and k move", "v2: Enter opens", "v2: on Your call, j opens", at_least={"390": 6, "1280": 6})
 
 
 def test_rb_open_s_where_button_never_cuts_its_words(v2_walked):
-    _passes(v2_walked, "v2: the Where button's words are never cut", at_least=6)
+    _passes(v2_walked, "v2: the Where button's words are never cut", at_least={"390": 2, "1280": 4})
 
 
 def test_source_details_stay_as_they_were_across_a_live_reload(v2_walked):
-    _passes(v2_walked, "v2: Source details", at_least=8)
+    _passes(v2_walked, "v2: Source details", at_least={"390": 4, "1280": 4})
 
 
+@pytest.mark.viewports("1280")      # a slim rail, from 960
 def test_the_overview_inspector_shows_its_empty_line(v2_walked):
-    _passes(v2_walked, "v2: the Overview's inspector", at_least=2)
+    _passes(v2_walked, "v2: the Overview's inspector", at_least={"1280": 2})
 
 
 def test_the_guide_follows_the_new_overview(v2_walked):
     """The guide's steps on the Overview V2: where the record stands, how far to trust it (titled as that section's own
     heading), what needs your judgment, then a finding in the inspector; each lit, its tooltip beside it."""
-    _passes(v2_walked, "v2: the guide's steps", "v2: each guide step", "v2: the guide's integrity step", "v2: the guide's inspector step", at_least=16)
+    _passes(v2_walked, "v2: the guide's steps", "v2: each guide step", "v2: the guide's integrity step", "v2: the guide's inspector step", at_least={"390": 8, "1280": 8})
 
 
 def test_the_guide_says_rbs_own_words():
@@ -426,17 +482,17 @@ def _walked_whole(said: dict, calls: bool = False) -> None:
     """A walk of a shell page by its own markup that passed whole; `calls`: the record holds calls that wait and
     findings, so the Polish 1 checks of a call's row, the composer and the guide's step 3 must be among its checks."""
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
-    names = [c["name"] for c in said["checks"]]
-    for at in ("390 light", "390 dark", "1280 light", "1280 dark"):
+    names, vp = [c["name"] for c in said["checks"]], said["viewport"]
+    for at in _ats(vp, "390 light", "390 dark", "1280 light", "1280 dark"):
         assert f"generic: nothing past the screen in any view [{at}]" in names, at
-    assert "generic: no line runs past its box in any view [390 light]" in names
+    _expect(names, vp, "generic: no line runs past its box in any view [390 light]", "no script: nothing past the screen [390]")
     assert any(n.startswith("generic: each waiting item copies only its confirm") for n in names)
-    assert any(n.startswith("print") for n in names) and any(n.startswith("no script: nothing past the screen [390]") for n in names)
+    assert any(n.startswith("print") for n in names)
     # Polish 1: the inspector's state, a call's row, the composer, and the guide, on rb's own render
     if not calls:
         return
-    assert "generic: guide: each step lights its part, whole on the screen, over neither it nor the view's title and summary [390x667 light]" in names
-    for at in ("390 light", "390 dark", "1280 light", "1280 dark"):
+    _expect(names, vp, "generic: guide: each step lights its part, whole on the screen, over neither it nor the view's title and summary [390x667 light]")
+    for at in _ats(vp, "390 light", "390 dark", "1280 light", "1280 dark"):
         for part in ("no view shows a card of the document's under it", "a call's row in Your call opens its card",
                      "the composer's Copy and its Copied never cover the line", "guide: each step lights its part",
                      "guide: step 3 opens a finding", "guide: the finding it opened is closed"):
@@ -446,11 +502,11 @@ def _walked_whole(said: dict, calls: bool = False) -> None:
                    for n in names), at
         if at.startswith("1280"):
             assert f"generic: a view with no rail of its own shows rb's line, not another view's rail [{at}]" in names, at
-    assert "print: the document's cards print" in names
-    assert "generic: the Overview says when the record changed, relative only on rb open's live view [1280]" in names
+    _expect(names, vp, "print: the document's cards print",
+            "generic: the Overview says when the record changed, relative only on rb open's live view [1280]")
 
 
-def test_rb_page_s_render_holds_up_by_real_clicks(a_record, tmp_path):
+def test_rb_page_s_render_holds_up_by_real_clicks(a_record, tmp_path, viewport):
     """rb page's shell, the INT8 Owner example drawn, walked by its own markup: every view by its address and the nav,
     nothing past the screen at 390 in any view (SHELL-SPEC 3.1, light and dark, with the script, in print and with no
     script), the rails as roots, what waits copying only its confirm, the address, the theme and keys controls."""
@@ -458,11 +514,11 @@ def test_rb_page_s_render_holds_up_by_real_clicks(a_record, tmp_path):
     r = subprocess.run([*command(), "page", "--out", str(page)], cwd=a_record, env=_rb_env(EXAMPLE.format("owner")),
                        capture_output=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
     assert r.returncode == 0, r.stderr
-    _walked_whole(harness(page.as_uri(), "--generic", timeout=600), calls=True)
+    _walked_whole(harness(page.as_uri(), "--generic", timeout=600, viewport=viewport), calls=True)
 
 
 @pytest.mark.parametrize("surface", ["page", "export"])
-def test_an_empty_inspector_folds_to_a_slim_rail_on_every_page_the_script_runs(a_record, tmp_path, surface):
+def test_an_empty_inspector_folds_to_a_slim_rail_on_every_page_the_script_runs(a_record, tmp_path, surface, viewport):
     """Design pass 1, target 8: with nothing picked, from 960 the inspector is a slim rail and the working view takes its
     width; a card opened by a click takes it back and Esc folds it again. On rb page, and on rb export's page as the hub
     serves it (rb's script beside it, named by its sha256), whose styles carry none of A's own."""
@@ -477,22 +533,24 @@ def test_an_empty_inspector_folds_to_a_slim_rail_on_every_page_the_script_runs(a
         script = INLINED.read_text(encoding="utf-8")
         assert f'data-shell="sha256:{hashlib.sha256(script.encode()).hexdigest()}"' in html and "<script" not in html
         page.write_text(html.replace("</head>", f"<script>{script}</script></head>", 1), encoding="utf-8")
-    said = harness(page.as_uri(), timeout=240, runner="rail.mjs")
+    said = harness(page.as_uri(), timeout=240, runner="rail.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
     names = [c["name"] for c in said["checks"]]
-    for at in ("1280 light", "1100 dark", "390 light"):
+    for at in _ats(viewport, "1280 light", "1100 dark", "390 light"):
         assert any(n.endswith(f"[{at}]") for n in names), at
 
 
-def test_rb_open_s_render_holds_up_by_real_clicks(a_record):
+def test_rb_open_s_render_holds_up_by_real_clicks(a_record, viewport):
     """rb open's / under the shell (the Live example drawn, with the live module), walked the same way: started by the
     harness on a free port, and stopped by it."""
-    said = harness(None, "--generic", "--rb", command()[0], "--record", str(a_record), timeout=600, env=_rb_env(EXAMPLE.format("live")))
+    said = harness(None, "--generic", "--rb", command()[0], "--record", str(a_record), timeout=600,
+                   env=_rb_env(EXAMPLE.format("live")), viewport=viewport)
     _walked_whole(said, calls=True)
     assert said["started"]["rb_open_url"], said
-    for at in ("390 light", "390 dark", "1280 light", "1280 dark"):
-        assert f"generic: the top bar says no absolute path [{at}]" in [c["name"] for c in said["checks"]], at
-    assert "generic: past 30 days rb open's live view says the exact time it changed [1280]" in [c["name"] for c in said["checks"]]
+    names = [c["name"] for c in said["checks"]]
+    for at in _ats(viewport, "390 light", "390 dark", "1280 light", "1280 dark"):
+        assert f"generic: the top bar says no absolute path [{at}]" in names, at
+    _expect(names, viewport, "generic: past 30 days rb open's live view says the exact time it changed [1280]")
 
 
 def test_a_walk_has_time_for_a_slow_machine_and_stops_soon_when_it_hangs(tmp_path):
@@ -516,7 +574,7 @@ await run(async () => {{
     assert time.monotonic() - started < 30
 
 
-def test_a_single_checkout_s_top_bar_says_no_path(tmp_path):
+def test_a_single_checkout_s_top_bar_says_no_path(tmp_path, viewport):
     """The film rule: rb open on one checkout with no committed version (no Where picker) names the place by its
     branch on the top bar, at 390 and 1280, light and dark; its whole path is only the tooltip's. The bare record
     walks short of the generic walk's richer checks, so only the top bar's are read here."""
@@ -528,9 +586,9 @@ def test_a_single_checkout_s_top_bar_says_no_path(tmp_path):
     r = subprocess.run([*command(), "init", "INT8 ResNet-50 on ImageNet", "--no-agents"], cwd=root, env=env, capture_output=True,
                        encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
     assert r.returncode == 0, r.stderr
-    said = harness(None, "--generic", "--rb", command()[0], "--record", str(root), timeout=600, env=env)
+    said = harness(None, "--generic", "--rb", command()[0], "--record", str(root), timeout=600, env=env, viewport=viewport)
     bar = {c["name"]: c for c in said.get("checks", []) if c["name"].startswith("generic: the top bar says no absolute path")}
-    for at in ("390 light", "390 dark", "1280 light", "1280 dark"):
+    for at in _ats(viewport, "390 light", "390 dark", "1280 light", "1280 dark"):
         c = bar.get(f"generic: the top bar says no absolute path [{at}]")
         assert c and c["pass"], (at, c, said.get("error"), said.get("stderr", "")[-2000:])
         assert "main" in c["detail"] and str(root) not in c["detail"], c
@@ -566,61 +624,56 @@ def two_places():
 
 def _places(said: dict, wired: bool) -> None:
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
-    names = [c["name"] for c in said["checks"]]
-    for at in ("390 light", "1280 dark"):
-        assert f"places: choosing exp-b shows it, the address keeps it, the view stays [{at}]" in names, at
-        assert f"places: a place rb does not list falls back, saying why [{at}]" in names, at
-        assert f"places: a reload shows the place again [{at}]" in names and f"places: a reload shows the past version again [{at}]" in names, at
-        assert f"places: the open Version picker stays on the screen [{at}]" in names, at
-        assert f"places: of two quick choices the last stays [{at}]" in names, at
+    names, vp = [c["name"] for c in said["checks"]], said["viewport"]
+    for at in _ats(vp, "390 light", "1280 dark"):
+        _expect(names, vp, f"places: choosing exp-b shows it, the address keeps it, the view stays [{at}]",
+                f"places: a place rb does not list falls back, saying why [{at}]",
+                f"places: a reload shows the place again [{at}]", f"places: a reload shows the past version again [{at}]",
+                f"places: the open Version picker stays on the screen [{at}]", f"places: of two quick choices the last stays [{at}]")
         assert (f"places: a past version offers no command to copy [{at}]" in names) == wired, at
-    for w in (1280, 1440):
-        assert f"places: a space between the Version picker and the clock [{w}]" in names, w
-    for w in (960, 1000, 1050, 1100, 1279, 1280, 1440):
-        assert f"places: a long branch and title cut the branch, never the words [{w}]" in names, w
-    for w in (960, 1100, 1279):
-        assert f"places: the working view sits beside the navigator, wider than it [{w}]" in names, w
-    for w in (390, 1100, 1280):
-        for c in ("a click on the words opens the Where list, its commit with Copy", "Copy says Copied",
-                  "Esc closes the Where list and gives focus back to its button", "w opens and closes Where"):
-            assert f"places: {c} [{w}]" in names, (c, w)
-    for w in (1100, 1280):
-        assert f"places: the open Where list floats, moving neither the page nor Version [{w}]" in names, w
-    for w in (390, 1100, 1280):
-        for c in ("the Where list gives the evidence and scrolls inside 60vh", "Tab goes from the place to the commit's Copy, then the command's",
-                  "the command's Copy says Copied"):
-            assert f"places: {c} [{w}]" in names, (c, w)
-    assert "places: once rb open stops answering, the time reads 1 minute ago" in names
-    assert "places: a live redraw keeps the Where list open, focus in it" in names
-    assert "places: printed, the Where button keeps its words, its list closed" in names
+    _expect(names, vp, *(f"places: a space between the Version picker and the clock [{w}]" for w in (1280, 1440)))
+    _expect(names, vp, *(f"places: a long branch and title cut the branch, never the words [{w}]" for w in (960, 1000, 1050, 1100, 1279, 1280, 1440)))
+    _expect(names, vp, *(f"places: the working view sits beside the navigator, wider than it [{w}]" for w in (960, 1100, 1279)))
+    _expect(names, vp, *(f"places: {c} [{w}]" for w in (390, 1100, 1280)
+                         for c in ("a click on the words opens the Where list, its commit with Copy", "Copy says Copied",
+                                   "Esc closes the Where list and gives focus back to its button", "w opens and closes Where")))
+    _expect(names, vp, *(f"places: the open Where list floats, moving neither the page nor Version [{w}]" for w in (1100, 1280)))
+    _expect(names, vp, *(f"places: {c} [{w}]" for w in (390, 1100, 1280)
+                         for c in ("the Where list gives the evidence and scrolls inside 60vh", "Tab goes from the place to the commit's Copy, then the command's",
+                                   "the command's Copy says Copied")))
+    _expect(names, vp, "places: once rb open stops answering, the time reads 1 minute ago",
+            "places: a live redraw keeps the Where list open, focus in it",
+            "places: printed, the Where button keeps its words, its list closed")
 
 
-def test_rb_open_s_places_are_chosen_by_real_clicks(two_places):
+def test_rb_open_s_places_are_chosen_by_real_clicks(two_places, viewport):
     """rb open in a checkout with a second worktree: the Where and Version pickers by real clicks at 390 and 1280, light
     and dark; the live module swaps the other place in and the address keeps it; Back, a reload and a link show it
     again; a place rb does not list falls back to the place rb open started on, live, saying why; nothing past the
     screen with a picker open."""
     root, env = two_places
-    _places(harness(None, "--places", "--rb", command()[0], "--record", str(root), timeout=900, env=env), wired=False)
+    _places(harness(None, "--places", "--rb", command()[0], "--record", str(root), timeout=900, env=env, viewport=viewport), wired=False)
 
 
-def test_a_past_version_offers_no_command(two_places):
+def test_a_past_version_offers_no_command(two_places, viewport):
     """Away, the scope bar says where in words, read only, with the way back; a past version offers no command to copy,
     with rb's reason, and Back to now offers them again (BP 4b; guarantee 38)."""
     root, env = two_places
-    _places(harness(None, "--places", "--wired", "--rb", command()[0], "--record", str(root), timeout=900, env=env), wired=True)
+    _places(harness(None, "--places", "--wired", "--rb", command()[0], "--record", str(root), timeout=900, env=env, viewport=viewport), wired=True)
 
 
 @pytest.mark.parametrize("which", ["away", "past"])
-def test_rb_open_says_another_place_and_a_past_version(a_record, which):
+def test_rb_open_says_another_place_and_a_past_version(a_record, which, viewport):
     """rb open drawing the INT8 example away from the start place and at a past version: the title names the place
     first, once, on every view and card; a past version offers no command to copy and selects none whole, while away
     commands are offered; an address naming what is shown in other words is written as rb open names it; a refusal is
     said until the next move."""
-    said = harness(None, "--shown", which, "--rb", command()[0], "--record", str(a_record), timeout=600, env=_rb_env(EXAMPLE.format(which)))
+    said = harness(None, "--shown", which, "--rb", command()[0], "--record", str(a_record), timeout=600, env=_rb_env(EXAMPLE.format(which)),
+                   viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
     names = [c["name"] for c in said["checks"]]
-    assert sum(n.startswith("shown: ") for n in names) == 4 * 6, names
+    # six at each width and scheme: two of the four in each half
+    assert sum(n.startswith("shown: ") for n in names) == 2 * 6, names
 
 
 class _Doc(HTMLParser):
@@ -726,7 +779,7 @@ addEventListener('message', e => document.body.setAttribute('data-probe', e.data
 </script><iframe sandbox="allow-scripts" style="width:1440px;height:900px;border:0" src="{}"></iframe></body></html>"""
 
 
-def test_the_owner_s_view_composes_and_a_reader_s_view_offers_no_action(a_record, tmp_path):
+def test_the_owner_s_view_composes_and_a_reader_s_view_offers_no_action(a_record, tmp_path, viewport):
     """Your view and the reader's view: the hub injects <meta name="rb-viewer"> before the shell's script, "owner" on
     the owner's record address and "reader" on a share link; the script sets html[data-viewer]. The owner's queue row
     opens its call at Record a call and the composer composes and copies by real input; a reader's opens it to read, with
@@ -765,23 +818,25 @@ def test_the_owner_s_view_composes_and_a_reader_s_view_offers_no_action(a_record
         host.write_text(_VIEWER_HOST.format(inner.name), encoding="utf-8")
         framed.append([name, host.as_uri(), who])
     said = harness(None, "--none", page.as_uri(), "--owner", urls["owner"], "--reader", urls["reader"], "--export", share.as_uri(),
-                   "--framed", json.dumps(framed), "--failsafe", broken.as_uri(), timeout=420, runner="viewer.mjs")
+                   "--framed", json.dumps(framed), "--failsafe", broken.as_uri(), timeout=420, runner="viewer.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
     names = [c["name"] for c in said["checks"]]
-    for at in ("1440 light", "1440 dark", "390 light", "390 dark"):
+    for at in _ats(viewport, "1440 light", "1440 dark", "390 light", "390 dark"):
         for n in ("reader: no queue row shows, and the item a row links to opens to read, with no command, button or reason field", "owner: the composer composes the call with the reason and copies it",
                   "export, reader: no view or card shows an rb command, a Copy, a call's choices or reason"):
             assert f"{n} [{at}]" in names, (n, at)
-    assert sum(n.startswith("framed (") for n in names) == 2, names
-    assert "reader: the guide says where the calls stand, by no word of whose judgment [1440 light]" in names
-    assert "reader: where the app never starts, no rb command box shows" in names
+    # the two frames, at 1440
+    assert sum(n.startswith("framed (") for n in names) == (2 if viewport == "1280" else 0), names
+    _expect(names, viewport, "reader: the guide says where the calls stand, by no word of whose judgment [1440 light]",
+            "reader: where the app never starts, no rb command box shows")
 
 
 # the export passes since cf-2 (MP-1113-2018); rb page with the reader's meta still draws the owner's wording
 @pytest.mark.parametrize("surface", [pytest.param("page", marks=pytest.mark.xfail(strict=True, reason=(
     "R's and M's words: rb page's views draw the owner's wording whatever the meta says (by_viewer only on the export: "
     "views.rs:3024 the queue's heading, nodes.rs:435 the nav's Your call): requests.md, PLAIN4. Passes once they land."))), "export"])
-def test_a_reader_s_page_says_no_your_and_offers_no_action(a_record, tmp_path, surface):
+@pytest.mark.viewports("1280")
+def test_a_reader_s_page_says_no_your_and_offers_no_action(a_record, tmp_path, surface, viewport):
     """Plain words pass 4: rb page with the reader's meta (as the preview shows a reader), and rb export's page as the
     hub serves a share link, read as a reader's: no view, navigator or top bar says "your", and none offers an action
     (a queue row's Review button included)."""
@@ -794,11 +849,11 @@ def test_a_reader_s_page_says_no_your_and_offers_no_action(a_record, tmp_path, s
         assert r.returncode == 0, r.stderr
         reader = tmp_path / "reader.html"
         reader.write_text(page.read_text(encoding="utf-8").replace("<head>", "<head>" + _VIEWER.format("reader"), 1), encoding="utf-8")
-    said = harness(None, "--yours", reader.as_uri(), timeout=180, runner="viewer.mjs")
+    said = harness(None, "--yours", reader.as_uri(), timeout=180, runner="viewer.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
 
 
-def test_a_reader_s_queue_row_opens_by_its_own_link_with_no_review_button(a_record, tmp_path):
+def test_a_reader_s_queue_row_opens_by_its_own_link_with_no_review_button(a_record, tmp_path, viewport):
     """Plain words pass 4: a reader is shown no queue row's Review or Inspect button, on rb page with the reader's meta
     too. The queue is the Overview's Decisions (`ul[data-queue]`): each row wholly a link, with no button at all; a
     reader is shown the record's state in its place, and the row's own link, followed, opens the item to read."""
@@ -815,11 +870,12 @@ def test_a_reader_s_queue_row_opens_by_its_own_link_with_no_review_button(a_reco
     assert "qbtn" not in dq.group(1) and "<button" not in dq.group(1)
     reader = tmp_path / "reader.html"
     reader.write_text(rows.replace("<head>", "<head>" + _VIEWER.format("reader"), 1), encoding="utf-8")
-    said = harness(None, "--rows", reader.as_uri(), timeout=120, runner="viewer.mjs")
+    said = harness(None, "--rows", reader.as_uri(), timeout=120, runner="viewer.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
 
 
-def test_the_owner_reads_your_call_where_the_export_says_open_calls(a_record, tmp_path):
+@pytest.mark.viewports("1280")
+def test_the_owner_reads_your_call_where_the_export_says_open_calls(a_record, tmp_path, viewport):
     """R's request (MP-1025-15): the export names the calls "Open calls" in the attributes the script reads (a view's
     data-title and data-crumb, a rail's data-rootname and aria-label); served to its owner it reads "Your call" there
     (the tab's title, the crumbs, a question's rail), and on a share link "Open calls"."""
@@ -827,20 +883,21 @@ def test_the_owner_reads_your_call_where_the_export_says_open_calls(a_record, tm
     html = exp.read_text(encoding="utf-8")
     assert 'data-crumb="Open calls"' in html and 'data-rootname="Open calls' in html
     said = harness(None, "--ownerexp", exp.as_uri(), "--readerexp", _export_with(a_record, tmp_path / "r", "reader").as_uri(),
-                   timeout=120, runner="viewer.mjs")
+                   timeout=120, runner="viewer.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
 
 
-def test_inside_the_hub_the_page_draws_no_bar_of_its_own(a_record, tmp_path):
+def test_inside_the_hub_the_page_draws_no_bar_of_its_own(a_record, tmp_path, viewport):
     """Plain words pass 4, one bar on the hub (Oct 25 13:35 +08): a page the hub names a viewer of draws no top bar of
     its own, under the hub's; About is in the navigator, the guide's first step shows, and at 390 the navigator opens
     a view. The same export with no meta keeps its bar."""
     exp = _export_with(a_record, tmp_path, "owner")
     plain = tmp_path / "plain.html"
     plain.write_text(exp.read_text(encoding="utf-8").replace(_VIEWER.format("owner"), "", 1), encoding="utf-8")
-    said = harness(None, "--url", exp.as_uri(), "--plain", plain.as_uri(), timeout=180, runner="hub.mjs")
+    said = harness(None, "--url", exp.as_uri(), "--plain", plain.as_uri(), timeout=180, runner="hub.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
-    assert len(said["checks"]) == 3, said["checks"]
+    # two at 1440, one at 390
+    assert len(said["checks"]) == {"1280": 2, "390": 1}[viewport], said["checks"]
     # the DOM fixture, whose bar holds About and which carries the guide's styles, with the owner's meta
     fx = tmp_path / "fixture" / "tests" / "fixtures" / "shell"
     fx.mkdir(parents=True)
@@ -853,13 +910,14 @@ def test_inside_the_hub_the_page_draws_no_bar_of_its_own(a_record, tmp_path):
     for f in (SCRIPT, GUIDE_CSS):
         shutil.copy(f, assets / f.name)
     said = harness(None, "--url", (fx / "hub.html").as_uri(), "--plain", (fx / "dom-fixture.html").as_uri(), "--guide", "1", "--about", "1",
-                   timeout=180, runner="hub.mjs")
+                   timeout=180, runner="hub.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
-    assert len(said["checks"]) == 5, said["checks"]
+    # four at 1440 (the guide and About too), one at 390
+    assert len(said["checks"]) == {"1280": 4, "390": 1}[viewport], said["checks"]
 
 
 @pytest.mark.parametrize("surface", ["fixture", "page", "export"])
-def test_a_detail_on_another_view_opens_in_the_inspector_and_back_returns(a_record, tmp_path, surface):
+def test_a_detail_on_another_view_opens_in_the_inspector_and_back_returns(a_record, tmp_path, surface, viewport):
     """Design pass 1, P12: a link in a view or a card to a part in another view's fold (the project's notes, the open
     items, what the words mean) opens it in the inspector under its fold's words; the working view stays, the link where it
     was on the screen, and Back returns the view and its scroll as they were. By real clicks at 1280 and 390, light and dark: on the DOM fixture, rb page, and
@@ -877,10 +935,10 @@ def test_a_detail_on_another_view_opens_in_the_inspector_and_back_returns(a_reco
             html = page.read_text(encoding="utf-8")
             page.write_text(html.replace("</head>", _VIEWER.format("owner") + f"<script>{INLINED.read_text(encoding='utf-8')}</script></head>", 1), encoding="utf-8")
         url = page.as_uri()
-    said = harness(url, timeout=240, runner="p12.mjs")
+    said = harness(url, timeout=240, runner="p12.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
     names = [c["name"] for c in said["checks"]]
-    for at in ("1280 light", "390 dark"):
+    for at in _ats(viewport, "1280 light", "390 dark"):
         assert f"P12: the page holds a link to another view's fold [{at}]" in names, at
         assert any(n.startswith("P12: ") and "opens the part in the inspector" in n and n.endswith(f"[{at}]") for n in names), at
 
@@ -900,20 +958,22 @@ def _export_with(a_record, tmp_path, who: str) -> Path:
                    "rust/src/view.rs:3146 'rb confirm lists them', the uncited files' 'rb reconcile lists it by path') name an rb command "
                    "in a sentence; a reader is told the state ('The design is not confirmed yet.'): R draws both under html[data-viewer] "
                    "(requests.md, OWNER-READER). Passes once they land.")
-def test_a_reader_s_share_link_names_no_rb_command_in_a_sentence(a_record, tmp_path):
+@pytest.mark.viewports("1280")
+def test_a_reader_s_share_link_names_no_rb_command_in_a_sentence(a_record, tmp_path, viewport):
     """The reader's view on a share link: no command anywhere, sentences included, every fold open."""
-    said = harness(None, "--prose", _export_with(a_record, tmp_path, "reader").as_uri(), timeout=240, runner="viewer.mjs")
+    said = harness(None, "--prose", _export_with(a_record, tmp_path, "reader").as_uri(), timeout=240, runner="viewer.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
 
 
-def test_the_owner_s_export_composes_a_call_in_the_hub_s_frame(a_record, tmp_path):
+@pytest.mark.viewports("1280")
+def test_the_owner_s_export_composes_a_call_in_the_hub_s_frame(a_record, tmp_path, viewport):
     """The owner's record on the hub: rb export's page in the hub's sandboxed frame, the owner meta: a call's Decide part
     composes the line with the reason typed, keeping nothing and sending nothing."""
     page = _export_with(a_record, tmp_path, "owner")
     inner, host = tmp_path / "in-owner-exp.html", tmp_path / "host-owner-exp.html"
     inner.write_text(page.read_text(encoding="utf-8").replace("</body>", _VIEWER_PROBE + "</body>"), encoding="utf-8")
     host.write_text(_VIEWER_HOST.format(inner.name), encoding="utf-8")
-    said = harness(None, "--framed", json.dumps([["owner export", host.as_uri(), "owner"]]), timeout=120, runner="viewer.mjs")
+    said = harness(None, "--framed", json.dumps([["owner export", host.as_uri(), "owner"]]), timeout=120, runner="viewer.mjs", viewport=viewport)
     assert said["exit"] == 0 and said["ok"], (_failed(said), said["stderr"][-3000:])
 
 
@@ -964,7 +1024,7 @@ def _without_rerun(html: str) -> str:
     return out
 
 
-def test_rerun_this_research_copies_its_prompt_by_real_clicks(tmp_path):
+def test_rerun_this_research_copies_its_prompt_by_real_clicks(tmp_path, viewport):
     """Rerun this research on the DOM fixture, drawn as rb draws an export with a clone address (R's markup: the openers
     a.rrb[href="#rerun"], the panel aside#rerun, an experiment's prompt, rb's own addresses in the text, named by
     data-rb-bundle and data-rb-page; or each in a data-fill span): with none of it drawn nothing shows; with the hub's rb-clone and rb-page metas the bar's and the Overview's
@@ -1031,12 +1091,12 @@ setTimeout(() => parent.postMessage(JSON.stringify('ready'), '*'), 1500);
     (tmp_path / "want.json").write_text(json.dumps(want), encoding="utf-8")
     shots = os.environ.get("RB_RERUN_SHOTS")
     said = harness(None, *(x for k in ("none", "meta", "reader", "past", "hubnone", "bad", "query", "pagequery", "plain", "cloneonly", "framed", "spans", "framednone") for x in (f"--{k}", pages[k])),
-                   "--expect", str(tmp_path / "want.json"), *(["--shots", shots] if shots else []), timeout=420, runner="rerun.mjs")
+                   "--expect", str(tmp_path / "want.json"), *(["--shots", shots] if shots else []), timeout=420, runner="rerun.mjs", viewport=viewport)
     if os.environ.get("RB_RERUN_SAID"):
         Path(os.environ["RB_RERUN_SAID"]).write_text(json.dumps(said), encoding="utf-8")
     assert said["exit"] == 0 and said["ok"], [(c["name"], c["detail"][:600]) for c in said.get("checks") or [] if not c["pass"]] or said["stderr"][-3000:]
     names = [c["name"] for c in said["checks"]]
-    for at in ("1440 light", "1440 dark", "390 light", "390 dark"):
+    for at in _ats(viewport, "1440 light", "1440 dark", "390 light", "390 dark"):
         for n in ("rerun: without a clone address nothing of it shows", "rerun: Copy prompt puts the exact prompt on the clipboard and says Copied",
                   "rerun: the panel fits the screen and nothing runs past it", "rerun: a reader opens it and copies the prompt too",
                   "rerun: at a past version none of it is there, the metas whatever", "rerun: nothing is sent",
@@ -1050,14 +1110,12 @@ setTimeout(() => parent.postMessage(JSON.stringify('ready'), '*'), 1500);
                   "rerun: each command's Copy sits inside its box's corner or outside it, never on the border",
                   "rerun: each command's Copy copies the command it sits on alone"):
             assert f"{n} [{at}]" in names, (n, at)
-    assert "rerun: without a script the prompt is selectable text, whole" in names
-    assert "rerun: on a hub page a link under the title, inside the first screen, opens the panel [1280 light]" in names
-    for at in ("1024 light", "960 light", "800 light"):
-        assert f"rerun: the panel covers nothing of the top bar [{at}]" in names, at
-    for n in ("rerun: in the hub's sandboxed frame Copy prompt copies the prompt itself [1440]", "rerun: in the hub's sandboxed frame focus stays on Copy prompt after it copies [390]",
-              "rerun: in the hub's frame with no rb-clone meta none of it is there", "rerun: Copied is said aloud from inside the open panel [390 dark]",
-              "rerun: a selection dragged out of the prompt past the panel's edge leaves it open [390 light]", "rerun: Back while the panel is open closes it [1440 dark]"):
-        assert n in names, n
+    _expect(names, viewport, "rerun: without a script the prompt is selectable text, whole",
+            "rerun: on a hub page a link under the title, inside the first screen, opens the panel [1280 light]",
+            *(f"rerun: the panel covers nothing of the top bar [{at}]" for at in ("1024 light", "960 light", "800 light")),
+            "rerun: in the hub's sandboxed frame Copy prompt copies the prompt itself [1440]", "rerun: in the hub's sandboxed frame focus stays on Copy prompt after it copies [390]",
+            "rerun: in the hub's frame with no rb-clone meta none of it is there", "rerun: Copied is said aloud from inside the open panel [390 dark]",
+            "rerun: a selection dragged out of the prompt past the panel's edge leaves it open [390 light]", "rerun: Back while the panel is open closes it [1440 dark]")
 
 
 _RUN_ROW = re.compile(r'class="rr(?: [^"]*)?"')
@@ -1092,7 +1150,7 @@ def _rerun_want(html: str, bundle: str, page: str) -> dict:
             "card": xid, "rows": rows, "bar": False}
 
 
-def test_rerun_this_research_on_an_export_as_the_hub_serves_it(a_record, tmp_path):
+def test_rerun_this_research_on_an_export_as_the_hub_serves_it(a_record, tmp_path, viewport):
     """The same walk on the page rb draws: rb export --with-record --url, served as the hub serves it (the shell's script
     and the viewer, rb-clone and rb-page metas beside it); rb page (no clone address) offers none of it; a reader copies
     it too; the hub with no rb-clone shows none of it and keeps every run's row; with no script the prompt is selectable
@@ -1113,12 +1171,12 @@ def test_rerun_this_research_on_an_export_as_the_hub_serves_it(a_record, tmp_pat
     (tmp_path / "want.json").write_text(json.dumps(want), encoding="utf-8")
     shots = os.environ.get("RB_RERUN_SHOTS")
     said = harness(None, *(x for k in pages for x in (f"--{k}", pages[k])), "--expect", str(tmp_path / "want.json"),
-                   *(["--shots", shots] if shots else []), timeout=420, runner="rerun.mjs")
+                   *(["--shots", shots] if shots else []), timeout=420, runner="rerun.mjs", viewport=viewport)
     if os.environ.get("RB_RERUN_SAID"):
         Path(os.environ["RB_RERUN_SAID"]).write_text(json.dumps(said), encoding="utf-8")
     assert said["exit"] == 0 and said["ok"], [(c["name"], c["detail"][:600]) for c in said.get("checks") or [] if not c["pass"]] or said["stderr"][-3000:]
     names = [c["name"] for c in said["checks"]]
-    for at in ("1440 light", "390 dark"):
+    for at in _ats(viewport, "1440 light", "390 dark"):
         for n in ("rerun: without a clone address nothing of it shows", "rerun: Copy prompt puts the exact prompt on the clipboard and says Copied",
                   "rerun: an experiment's Copy prompt for this experiment copies its own prompt", "rerun: a reader opens it and copies the prompt too",
                   "rerun: in the hub with no rb-clone meta none of it is there, a run's row kept", "rerun: the top bar keeps to the screen with it",
@@ -1126,8 +1184,7 @@ def test_rerun_this_research_on_an_export_as_the_hub_serves_it(a_record, tmp_pat
                   "rerun: each command's Copy sits inside its box's corner or outside it, never on the border",
                   "rerun: each command's Copy copies the command it sits on alone"):
             assert f"{n} [{at}]" in names, (n, at)
-    for at in ("1440 light", "1280 light", "390 light", "1440 dark", "1280 dark", "390 dark"):
-        assert f"rerun: on a hub page a link under the title, inside the first screen, opens the panel [{at}]" in names, at
-    for at in ("1440 light", "1024 light", "960 light", "800 light"):
-        assert f"rerun: the panel covers nothing of the top bar [{at}]" in names, at
-    assert "rerun: without a script the prompt is selectable text, whole" in names
+    _expect(names, viewport, *(f"rerun: on a hub page a link under the title, inside the first screen, opens the panel [{at}]"
+                               for at in ("1440 light", "1280 light", "390 light", "1440 dark", "1280 dark", "390 dark")),
+            *(f"rerun: the panel covers nothing of the top bar [{at}]" for at in ("1440 light", "1024 light", "960 light", "800 light")),
+            "rerun: without a script the prompt is selectable text, whole")

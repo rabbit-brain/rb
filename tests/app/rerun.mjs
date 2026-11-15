@@ -18,7 +18,7 @@
 // The last line on stdout is JSON: {"ok", "checks": [{"name", "pass", "detail"}]}; exit 0, 1 on a failed check, 3 with
 // no Chrome.
 import { readFileSync } from 'node:fs';
-import { findChrome, launchChrome, onTheClipboard, parseArgs, progress, run, sleep } from './cdp.mjs';
+import { findChrome, inHalf, launchChrome, onTheClipboard, parseArgs, progress, run, sleep, widths } from './cdp.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 if (!a.none || !a.meta || !a.expect) { process.stderr.write('give --none, --meta and --expect\n'); process.exit(2); }
@@ -100,7 +100,7 @@ async function open(p, url, w, scheme, hash = 'overview') {
 await run(async () => {
   const b = await launchChrome({ chrome: findChrome() });
   const p = await b.page();
-  for (const w of [1440, 390]) for (const scheme of ['light', 'dark']) {
+  for (const w of widths([1440, 390])) for (const scheme of ['light', 'dark']) {
     const at = `${w} ${scheme}`;
     // no clone address: nothing of it shows, and an address naming the panel opens nothing
     await open(p, a.none, w, scheme);
@@ -241,9 +241,11 @@ await run(async () => {
     const s6b = await p.ev(SHOWN), h6 = await p.ev(`location.hash`);
     check(`rerun: #rerun followed after load opens the panel and keeps the address [${at}]`, s6b.open && h6 !== '#rerun', j({ open: s6b.open, h6 }));
     // print with the panel open: closed for the print, it prints in its place, not over the page; open again after
-    await p.media({ type: 'print', scheme }); await sleep(300);
+    // (the page closes it on matchMedia('print')'s change, which comes after the switch: waited for, not slept on, so a
+    // slow runner reads it once it has run; round cdp-1, at 6 times slower the panel still read open after 300 ms)
+    await p.media({ type: 'print', scheme }); await p.waitFor(`!document.querySelector('dialog.rerundlg').open`, 10000);
     const pr6 = await p.ev(`(() => { const d = document.querySelector('dialog.rerundlg'), e = document.getElementById('rerun'); return { open: d.open, vis: e.checkVisibility() && e.getBoundingClientRect().height > 0 }; })()`);
-    await p.media({ type: '', scheme }); await sleep(300);
+    await p.media({ type: '', scheme }); await p.waitFor(`document.querySelector('dialog.rerundlg').open`, 10000);
     const pr7 = await p.ev(SHOWN);
     check(`rerun: printed with the panel open, it prints in its place and opens again after [${at}]`, !pr6.open && pr6.vis && pr7.open, j({ pr6, open: pr7.open }));
     await p.key('Escape', 'Escape', 27);
@@ -305,7 +307,7 @@ await run(async () => {
     }
   }
   // between 640 and 1280 a top bar shows (in the hub, its slim bar with Open calls): the panel opens under it
-  for (const w of [1024, 960, 800]) {
+  for (const w of widths([1024, 960, 800])) {
     const at = `${w} light`;
     await open(p, a.meta, w, 'light');
     await p.clickEl(`Array.from(document.querySelectorAll('a[href="#rerun"]')).find(l => l.checkVisibility())`);
@@ -317,7 +319,7 @@ await run(async () => {
   }
   if (a.framed) {
     // in the hub's sandboxed frame (no clipboard permission, no storage): Copy prompt in the open panel copies the prompt
-    for (const w of [1440, 390]) {
+    for (const w of widths([1440, 390])) {
       await p.blank(); await p.viewport(w, w < 600 ? 844 : 900); await p.media({ type: '', scheme: 'light' });
       await p.goto(a.framed);
       await p.ev(`navigator.clipboard.writeText('SENTINEL').then(() => true, () => false)`);
@@ -336,7 +338,9 @@ await run(async () => {
       check(`rerun: in the hub's sandboxed frame Copy prompt copies the prompt itself [${w}]`, label === 'Copied' && clip === onTheClipboard(want.prompt + '\n'), j({ label, clip: typeof clip === 'string' ? clip.slice(0, 80) : clip, r }));
     }
   }
-  if (a.framednone) {
+  // (the three below at 1440: the 1280 half's)
+  const wide = inHalf(1440);
+  if (a.framednone && wide) {
     // a page the hub frames with neither a viewer nor an rb-clone meta: none of it
     await p.blank(); await p.viewport(1440, 900);
     await p.goto(a.framednone);
@@ -346,12 +350,14 @@ await run(async () => {
     check(`rerun: in the hub's frame with no rb-clone meta none of it is there`, ok && r === '0', j(r));
   }
   // print: the panel is part of the page
+  if (wide) {
   await open(p, a.meta, 1440, 'light');
   await p.media({ type: 'print', scheme: 'light' });
   const pr = await p.ev(`(() => { const e = document.getElementById('rerun'); return !!(e && e.checkVisibility() && e.getBoundingClientRect().height > 0); })()`);
   check(`rerun: print shows the panel as part of the page`, pr, String(pr));
   await p.media({ type: '', scheme: 'light' });
-  if (a.plain) {
+  }
+  if (a.plain && wide) {
     await p.blank(); await p.noScript(true);
     // with no script the bar's link goes to the panel, which shows as its target
     await p.goto(a.plain + '#rerun');

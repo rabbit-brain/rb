@@ -6,7 +6,7 @@
 //   node tests/app/p12.mjs --url <address> [--timeout <s>, 240]
 // The last line on stdout is JSON: {"ok", "checks": [{"name", "pass", "detail"}]}; exit 0, 1 on a failed check, 3 with
 // no Chrome.
-import { findChrome, launchChrome, parseArgs, progress, run, sleep } from './cdp.mjs';
+import { findChrome, launchChrome, parseArgs, progress, run, sleep, widths } from './cdp.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 if (!a.url) { process.stderr.write('give --url\n'); process.exit(2); }
@@ -38,7 +38,7 @@ const STATE = `(() => { const v = document.querySelector('main .view.on'), c = d
 await run(async () => {
   const b = await launchChrome({ chrome: findChrome() });
   const p = await b.page();
-  for (const w of [1280, 390]) for (const scheme of ['light', 'dark']) {
+  for (const w of widths([1280, 390])) for (const scheme of ['light', 'dark']) {
     const at = `${w} ${scheme}`;
     await p.blank(); await p.viewport(w, w < 600 ? 844 : 900); await p.media({ type: '', scheme });
     await p.goto(a.url + '#overview');

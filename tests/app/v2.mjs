@@ -10,7 +10,7 @@ import { createServer } from 'node:http';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findChrome, launchChrome, parseArgs, progress, run, sleep } from './cdp.mjs';
+import { findChrome, inHalf, launchChrome, parseArgs, progress, run, sleep, widths } from './cdp.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -72,7 +72,7 @@ await run(async () => {
   }
   const shots = a.shots; if (shots) mkdirSync(shots, { recursive: true });
 
-  for (const w of [390, 1280]) for (const scheme of ['light', 'dark']) {
+  for (const w of widths([390, 1280])) for (const scheme of ['light', 'dark']) {
     const at = `${w} ${scheme}`;
     // the Overview's inspector: rb's empty line, never a second copy of the queue
     await open(w, scheme);
@@ -173,7 +173,7 @@ await run(async () => {
   }
 
   // rb open's top bar: the Where button's words are never cut; a long branch gives way first, with an ellipsis
-  for (const w of [390, 1100, 1280]) for (const lab of ['main', 'long']) {
+  for (const w of widths([390, 1100, 1280])) for (const lab of ['main', 'long']) {
     await p.blank(); await p.viewport(w, 900); await p.goto(srv.url + 'topbar?lab=' + lab); await sleep(200);
     const got = await p.ev(`(() => { const g = document.querySelector('#where .gs'), s = g.parentElement, l = s.querySelector('.lab'), r = g.getBoundingClientRect(), b = s.getBoundingClientRect();
       return { whole: g.scrollWidth <= g.clientWidth + 1 && r.right <= b.right + 0.5 && r.right <= document.documentElement.clientWidth + 0.5 && r.left >= 0,
@@ -182,12 +182,14 @@ await run(async () => {
   }
 
   // without the script, the queue's button jumps to the Decide part in the document
-  await p.blank(); await p.viewport(1280, 900); await p.noScript(true);
-  await p.goto(srv.url); await p.settle({ script: false });
-  await p.clickEl(`document.querySelector('#queue a.qbtn[href="#call-c2"]')`);
-  const jumped = await p.ev(`location.hash`);
-  await p.noScript(false);
-  check(`v2: without the script the queue's button jumps to the Decide part`, jumped === '#call-c2', j(jumped));
+  if (inHalf(1280)) {
+    await p.blank(); await p.viewport(1280, 900); await p.noScript(true);
+    await p.goto(srv.url); await p.settle({ script: false });
+    await p.clickEl(`document.querySelector('#queue a.qbtn[href="#call-c2"]')`);
+    const jumped = await p.ev(`location.hash`);
+    await p.noScript(false);
+    check(`v2: without the script the queue's button jumps to the Decide part`, jumped === '#call-c2', j(jumped));
+  }
 
   srv.close();
   const failed = results.filter(r => !r.pass);

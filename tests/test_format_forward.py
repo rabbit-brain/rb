@@ -416,11 +416,12 @@ def test_an_older_rb_reads_a_record_whose_design_the_user_confirmed(repo, capsys
 
 
 @pytest.mark.skipif(not os.environ.get("RB_OLD_BIN"), reason="RB_OLD_BIN names an rb from before an experiment's design was confirmed")
+@pytest.mark.older_rb(from_="0.6", reason="an rb from before 0.6.0 confirms no design, so it has none to write")
 def test_a_design_an_earlier_build_confirmed_is_one_the_user_owns(repo, capsys, monkeypatch):
     """The snapshot rule (Oct 14): a design confirmation an earlier build wrote kept the design as that build said it,
     under the hash it named it by (one with the snapshot rule in rb's structured form too). This rb reads it as a design
     the user owns: the design reads confirmed, the user's own write keeps it so, and a session's change after it is said
-    against it. An rb from before designs were confirmed has none to write, and is skipped."""
+    against it. An rb from before designs were confirmed has none to write, and is deselected (older_rb)."""
     def older(*argv, agent=False) -> dict:
         env = {**os.environ, **({"CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "sess-older-4b1d"} if agent else {})}
         r = subprocess.run([os.environ["RB_OLD_BIN"], *argv, "--json"], capture_output=True, text=True, env=env)
@@ -436,8 +437,7 @@ def test_a_design_an_earlier_build_confirmed_is_one_the_user_owns(repo, capsys, 
     older("criterion", "add", "INT8 keeps top-1", "-e", "e1", "--metric", "change.top1", "--at-least", "-0.005", "--id", "c1", agent=True)
     r = subprocess.run([os.environ["RB_OLD_BIN"], "confirm", "--json"], capture_output=True, text=True, env=dict(os.environ))
     waiting = (json.loads(r.stdout).get("data") or {}).get("designs_pending")
-    if not waiting:
-        pytest.skip("this older rb confirms no design")
+    assert waiting, "this older rb confirms no design: its older_rb marker says it does"
     older("confirm", waiting[0]["confirm"].split()[2])
     lines = [json.loads(x) for x in (Path(".rb") / "log.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [x for x in lines if x["op"] == "gate" and "design" in x.get("detail", {})], "the earlier build's own line"
@@ -497,6 +497,7 @@ def _older(*argv) -> dict:
 
 
 @pytest.mark.skipif(not os.environ.get("RB_OLD_BIN"), reason="RB_OLD_BIN names an rb from before reconcile kept the paths it saw")
+@pytest.mark.older_rb(until="0.5", reason="0.6.0 and later keep the paths on reconcile's line themselves (uncited_seen)")
 def test_an_older_rb_s_apply_records_no_path_and_clears_no_changed_file(repo, capsys):
     """An older rb's rb reconcile --apply keeps no paths on its line: the changed files this rb counts stay counted."""
     Path("configs").mkdir()
@@ -513,8 +514,7 @@ def test_an_older_rb_s_apply_records_no_path_and_clears_no_changed_file(repo, ca
     Path("results/fp32_run/metrics.json").write_text('{"top1": 0.761}', encoding="utf-8")
     _older("reconcile", "--apply")
     lines = [json.loads(x) for x in (Path(".rb") / "log.jsonl").read_text(encoding="utf-8").splitlines()]
-    if any("uncited_seen" in (x.get("detail") or {}) for x in lines if x["op"] == "reconciled"):
-        pytest.skip("this rb keeps the paths on its line itself")
+    assert not any("uncited_seen" in (x.get("detail") or {}) for x in lines if x["op"] == "reconciled"), "its older_rb marker says it keeps no paths"
     assert [u["path"] for u in rbj(capsys, "status")[1].data["uncited_changes"]] == ["configs/train.yaml"]
 
 

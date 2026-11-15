@@ -5,7 +5,7 @@
 //   node tests/app/hub.mjs --url <the page with the meta> --plain <the same page with none> [--guide 1] [--about 1] [--timeout <s>]
 // The last line on stdout is JSON: {"ok", "checks": [{"name", "pass", "detail"}]}; exit 0, 1 on a failed check, 3 with
 // no Chrome.
-import { findChrome, launchChrome, parseArgs, progress, run, sleep } from './cdp.mjs';
+import { findChrome, inHalf, launchChrome, parseArgs, progress, run, sleep } from './cdp.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 if (!a.url || !a.plain) { process.stderr.write('give --url and --plain\n'); process.exit(2); }
@@ -34,7 +34,8 @@ await run(async () => {
   const b = await launchChrome({ chrome: findChrome() });
   const p = await b.page();
   // the guide on a first visit, where its styles are on the page (--guide): its first step's spot shows
-  if (a.guide) {
+  const wide = inHalf(1440);
+  if (a.guide && wide) {
   await open(p, a.url, 1440);
   await p.ev(`localStorage.removeItem('rb.guide.1')`); await open(p, a.url, 1440);
   await p.waitFor(`!!document.querySelector('.guide:not([hidden]) #guide-h')`, 10000);
@@ -44,6 +45,7 @@ await run(async () => {
       shows: !!r && r.width > 20 && r.height > 20 && r.top >= 0 && r.left >= 0 && r.top < innerHeight && r.left < innerWidth }; })()`);
   check(`hub: the guide's first step points at something on the screen [1440]`, first.title && first.shows, j(first));
   }
+  if (wide) {
   await p.ev(`(() => { try { localStorage.setItem('rb.guide.1', 'ended'); } catch (e) {} const g = document.querySelector('.guide:not([hidden]) .gskip'); if (g) g.click(); return true; })()`);
   await open(p, a.url, 1440); await sleep(200);
   const hub = await p.ev(TWICE);
@@ -54,15 +56,24 @@ await run(async () => {
   const onAbout = await p.ev(`(document.querySelector('main .view.on') || {}).id`);
   check(`hub: About is in the navigator and opens its view [1440]`, !!about && onAbout === 'about', j({ about: about && about.text, onAbout }));
   }
+  }
+  if (inHalf(390)) {
+  // (alone in its half, as after the wide checks: the guide seen and ended)
+  if (!wide) { await open(p, a.url, 390);
+  await p.ev(`(() => { try { localStorage.setItem('rb.guide.1', 'ended'); } catch (e) {} const g = document.querySelector('.guide:not([hidden]) .gskip'); if (g) g.click(); return true; })()`);
+  }
   await open(p, a.url, 390); await sleep(200);
   const nav = await p.clickEl(`Array.from(document.querySelectorAll('#nav a[href^="#"], #nav summary, #nav button:not(.fclose)')).find(e => e.checkVisibility() && e.getAttribute('href') !== '#overview')`); await sleep(300);
   // under 1280 the hub's slim bar says the view's name alone (R's one bar): the page's own bar shows nothing else
   const after = await p.ev(`(() => { const t = document.querySelector('header.top'), v = document.querySelector('main .view.on') || {};
     return { view: v.id, crumb: (v.dataset && v.dataset.crumb) || '', bar: t && t.checkVisibility() ? t.innerText.replace(/\\s+/g, ' ').trim() : '' }; })()`);
   check(`hub: at 390 the navigator still opens a view, under no bar of the page's own but the view's name [390]`, !!nav && after.view !== 'overview' && (!after.bar || after.bar === after.crumb), j({ nav: nav && nav.text, after }));
+  }
+  if (wide) {
   await open(p, a.plain, 1440); await sleep(200);
   const plain = await p.ev(TWICE);
   check(`no meta: the page keeps its own bar [1440]`, plain.bar, j(plain));
+  }
   const failed = results.filter(r => !r.pass);
   if (failed.length) throw Object.assign(new Error(`${failed.length} of ${results.length} checks failed: ${failed.map(f => f.name).join('; ')}`), { results });
   return { checks: results };

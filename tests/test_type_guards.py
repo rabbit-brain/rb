@@ -651,13 +651,14 @@ def test_late_criteria_name_both_arms_where_runs_are_expected(rec):
 
 
 @pytest.mark.skipif(not os.environ.get("RB_OLD_BIN"), reason="RB_OLD_BIN names an rb from before these guards")
-def test_writes_that_use_no_new_feature_leave_the_record_as_an_older_rb_reads_it(rec):
+def test_writes_that_use_no_new_feature_leave_the_record_as_an_older_rb_reads_it(rec, older_show):
     """A run with a command, a run from a file with --produced-at, and a note leave the record as an older rb reads
     it; only a cited log line (--command-source) adds a key to a receipt."""
     rec.write("out/m.json", '{"fp32.top1": 76.1, "int8.top1": 75.9}')
     rec.ok("run", "add", "int8", "--from", "out/m.json", "--set", "seed=1", "--produced-at", MAY, "--command", "python eval.py")
     rec.ok("note", "add", "UNSUPPORTED by the recording agent", "-e", "int8", agent=AGENT)
-    for argv in (["status"], ["show", "--long", "int8"], ["doctor"]):
+    # each older rb's own long form: rb show --long from 0.8.6, rb show before it (older_show, tests/conftest.py)
+    for argv in (["status"], [*older_show, "int8"], ["doctor"]):
         r = subprocess.run([os.environ["RB_OLD_BIN"], *argv, "--json"], cwd=rec.root, capture_output=True, text=True, env=rec.env)
         env = json.loads(r.stdout)
         assert env["ok"], (argv, env["errors"])

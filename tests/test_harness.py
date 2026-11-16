@@ -292,6 +292,159 @@ await cdp.run(async () => {
     assert said["noscript"]["late"] is False and said["noscript"]["hash"] == "#x" and said["noscript"]["ms"] < 5000, said["noscript"]
 
 
+# round mac-tabs: GitHub's macOS runner drew the card's sheet at its start for over 300 ms, so clickEl's three equal
+# reads 50 ms apart took a sheet that had not started moving for one that had stopped, and pressed Rule at 499 px in a
+# 390 px sheet; nothing pressed it again once the sheet came in
+def test_a_click_waits_for_a_target_that_has_not_started_moving_and_presses_again_where_it_went(tmp_path):
+    """clickEl waits out a slide still in its delay (the target drawn where it starts, its box the same read after
+    read, its transition running), and presses where it stops; given the state the click brings, when that has not come
+    and the target moved away under the press, it presses once more where the target went, and says both presses."""
+    from test_shell import _cdp_script, _node, _runner
+    late = tmp_path / "late.html"
+    late.write_text("<!doctype html><style>#b{position:fixed;left:200px;top:100px;width:60px;height:30px;"
+                    "transition:transform .6s linear .8s}html.go #b{transform:translateX(-180px)}</style><button id=b>Go</button>"
+                    "<script>window.down=null;window.got=false;"
+                    "b.addEventListener('mousedown',()=>{window.down={moving:document.getAnimations().length,x:Math.round(b.getBoundingClientRect().x)}});"
+                    "b.addEventListener('click',()=>{window.got=true});"
+                    "requestAnimationFrame(()=>requestAnimationFrame(()=>document.documentElement.classList.add('go')));</script>", encoding="utf-8")
+    away = tmp_path / "away.html"
+    away.write_text("<!doctype html><style>#b{position:fixed;left:200px;top:100px;width:60px;height:30px}"
+                    "#b.moved{left:20px;top:300px}</style><button id=b>Go</button>"
+                    "<script>window.got=false;window.downs=0;"
+                    "b.addEventListener('mousedown',()=>{if(!window.downs++)b.classList.add('moved')});"
+                    "b.addEventListener('click',()=>{window.got=true});</script>", encoding="utf-8")
+    script = _cdp_script(tmp_path / "late.mjs", """
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  await page.goto(%s);
+  await page.waitFor("document.documentElement.classList.contains('go')", 10000, 'the slide is asked for');
+  const late = await page.clickEl("document.getElementById('b')");
+  const first = { down: await page.ev('window.down'), got: await page.ev('window.got'), said: late && late.said };
+  await page.goto(%s);
+  const again = await page.clickEl("document.getElementById('b')", { until: 'window.got', againMs: 1000 });
+  return { first, again: { got: await page.ev('window.got'), downs: await page.ev('window.downs'), said: again && again.said,
+    presses: again && (again.presses || [again.at]).map(p => [Math.round(p.x), Math.round(p.y)]) } };
+}, { timeoutMs: 120000 });
+""" % (json.dumps(late.as_uri()), json.dumps(away.as_uri())))
+    code, said, err = _runner(_node(), script, env=dict(os.environ))
+    assert code == 0 and said["ok"], err
+    # pressed once the slide had run its course, where the button stopped (200 - 180 = 20), with nothing still moving
+    assert said["first"]["down"] == {"moving": 0, "x": 20} and said["first"]["got"] is True and said["first"]["said"] == "50, 115", said
+    # the first press moved the button away before the button came up; the second found it where it went
+    assert said["again"]["got"] is True and said["again"]["downs"] == 2, said
+    assert said["again"]["presses"] == [[230, 115], [50, 315]] and said["again"]["said"] == "230, 115, then at 50, 315", said
+
+
+def test_a_click_presses_again_only_where_the_target_still_shows_and_never_after_its_state_came(tmp_path):
+    """A second press is for a target that moved and is still shown: not one the first press hid (its box then reads
+    0, 0, and a press there lands on whatever is in the corner), not one whose state came while it settled (a second
+    press would undo it); a target gone before it could be pressed gives null at once, not a press 10 s later; a
+    colour moving on what the target sits in is not waited for, a cover still sliding off a target that never moved
+    is, and a target that never stops is said so."""
+    from test_shell import _cdp_script, _node, _runner
+    pages = {
+        # the first press hides the button (it moves and is hidden); a link sits in the top left corner
+        "hide": "<a id=corner href=#corner style='position:fixed;left:0;top:0;width:40px;height:40px'>x</a>"
+                "<button id=b style='position:fixed;left:200px;top:100px;width:60px;height:30px'>Go</button>"
+                "<script>window.n=0;b.addEventListener('mousedown',()=>{window.n++;b.style.left='20px';b.hidden=true})</script>",
+        # the first press moves the button 5 px and its state comes 3.2 s later, after againMs, before the last check ends
+        "slow": "<button id=b style='position:fixed;left:200px;top:100px;width:60px;height:30px'>Go</button>"
+                "<script>window.n=0;window.on=false;b.addEventListener('click',()=>{window.n++;b.style.left='205px';"
+                "setTimeout(()=>{window.on=!window.on},3200)})</script>",
+        # the button is removed 200 ms into its slide
+        "gone": "<style>#b{position:fixed;left:200px;top:100px;width:60px;height:30px;transition:transform 2s linear}"
+                "html.go #b{transform:translateX(-180px)}</style><button id=b>Go</button>"
+                "<script>requestAnimationFrame(()=>requestAnimationFrame(()=>{document.documentElement.classList.add('go');setTimeout(()=>b.remove(),200)}))</script>",
+        # a 30 s colour change on the body the button sits in
+        "colour": "<style>body{transition:background-color 30s linear}body.go{background-color:#888}</style>"
+                  "<button id=b style='position:fixed;left:200px;top:100px;width:60px;height:30px'>Go</button>"
+                  "<script>requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.add('go')))</script>",
+        # a still button under a cover that slides off it over 0.8 s, as a closing sheet over the menu's button
+        "cover": "<style>#c{position:fixed;left:150px;top:80px;width:200px;height:80px;background:#ccc;transition:transform .8s linear}"
+                 "html.go #c{transform:translateX(400px)}</style>"
+                 "<button id=b style='position:fixed;left:200px;top:100px;width:60px;height:30px'>Go</button><div id=c></div>"
+                 "<script>window.got=false;b.addEventListener('click',()=>{window.got=true});"
+                 "requestAnimationFrame(()=>requestAnimationFrame(()=>document.documentElement.classList.add('go')))</script>",
+        # a button moved by the page on every frame
+        "jiggle": "<button id=b style='position:fixed;left:200px;top:100px;width:60px;height:30px'>Go</button>"
+                  "<script>let i=0;(function f(){b.style.left=(200+(i++%7))+'px';requestAnimationFrame(f)})()</script>",
+    }
+    urls = {}
+    for name, body in pages.items():
+        (tmp_path / f"{name}.html").write_text("<!doctype html>" + body, encoding="utf-8")
+        urls[name] = (tmp_path / f"{name}.html").as_uri()
+    script = _cdp_script(tmp_path / "again.mjs", """
+const U = %s, B = "document.getElementById('b')";
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  const out = {};
+  await page.goto(U.hide);
+  let r = await page.clickEl(B, { until: 'false', againMs: 500 });
+  out.hide = { said: r && r.said, n: await page.ev('window.n'), hash: await page.ev('location.hash') };
+  await page.goto(U.slow);
+  r = await page.clickEl(B, { until: 'window.on', againMs: 3000 });
+  await cdp.sleep(1500);
+  out.slow = { said: r && r.said, n: await page.ev('window.n'), on: await page.ev('window.on') };
+  await page.goto(U.gone);
+  await page.waitFor("document.documentElement.classList.contains('go')", 10000, 'the slide starts');
+  let t0 = Date.now();
+  r = await page.clickEl(B);
+  out.gone = { r, ms: Date.now() - t0 };
+  await page.goto(U.colour);
+  await page.waitFor("document.body.classList.contains('go')", 10000, 'the colour starts');
+  t0 = Date.now();
+  r = await page.clickEl(B);
+  out.colour = { said: r && r.said, ms: Date.now() - t0 };
+  await page.goto(U.cover);
+  await page.waitFor("document.documentElement.classList.contains('go')", 10000, 'the cover starts to slide');
+  r = await page.clickEl(B);
+  out.cover = { said: r && r.said, hit: r && r.hit, got: await page.ev('window.got') };
+  await page.goto(U.jiggle);
+  out.jiggle = await page.stopped(B, { timeoutMs: 1500 });
+  return out;
+}, { timeoutMs: 120000 });
+""" % json.dumps(urls))
+    code, said, err = _runner(_node(), script, env=dict(os.environ))
+    assert code == 0 and said["ok"], err
+    assert said["hide"] == {"said": "230, 115", "n": 1, "hash": ""}, said["hide"]
+    assert said["slow"]["said"] == "230, 115" and said["slow"]["n"] == 1 and said["slow"]["on"] is True, said["slow"]
+    assert said["gone"]["r"] is None and said["gone"]["ms"] < 5000, said["gone"]
+    assert said["colour"]["said"] == "230, 115" and said["colour"]["ms"] < 3000, said["colour"]
+    assert said["cover"] == {"said": "230, 115", "hit": "BUTTON#b Go", "got": True}, said["cover"]
+    assert said["jiggle"]["stopped"] is False and said["jiggle"]["gone"] is False and said["jiggle"]["frames"] is True, said["jiggle"]
+
+
+def test_rb_app_frame_stall_holds_each_animation_at_its_first_frame(tmp_path):
+    """RB_APP_FRAME_STALL=1500 holds every animation and transition a page starts at its first frame for 1.5 s, still
+    running, as GitHub's macOS runner drew the card's sheet at its start; unset, nothing is held, and a value under 0
+    stops the runner."""
+    from test_shell import _cdp_script, _node, _runner
+    page = tmp_path / "go.html"
+    page.write_text("<!doctype html><style>#b{transition:transform 1s linear}html.go #b{transform:translateX(100px)}</style>"
+                    "<button id=b>Go</button>", encoding="utf-8")
+    script = _cdp_script(tmp_path / "stall.mjs", """
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  await page.goto(%s);
+  await page.ev("document.documentElement.classList.add('go'); true");
+  await cdp.sleep(500);
+  return { at: await page.ev("Math.round(document.getElementById('b').getBoundingClientRect().x)"), stall: cdp.FRAME_STALL,
+    state: await page.ev("(document.getAnimations()[0] || {}).playState || null") };
+}, { timeoutMs: 120000 });
+""" % json.dumps(page.as_uri()))
+    node = _node()
+    said = {}
+    for ms in ("", "1500"):
+        code, said[ms], err = _runner(node, script, env={**os.environ, "RB_APP_FRAME_STALL": ms})
+        assert code == 0 and said[ms]["ok"], err
+    # the button starts at 8 (the body's margin): unheld it is well on its way after 0.5 s, held it has moved a frame's
+    # worth at most (the clock stops once Chrome says the transition started), and it still reads as running
+    assert said[""]["stall"] == 0 and said[""]["at"] > 30, said
+    assert said["1500"]["stall"] == 1500 and 8 <= said["1500"]["at"] <= 12 and said["1500"]["state"] == "running", said
+    bad = subprocess.run([node, script], env={**os.environ, "RB_APP_FRAME_STALL": "-1"}, capture_output=True, text=True, timeout=60)
+    assert bad.returncode == 2 and "RB_APP_FRAME_STALL is a number of ms from 0" in bad.stderr, bad.stderr
+
+
 def test_rb_app_cpu_throttle_slows_every_page_it_opens(tmp_path):
     """RB_APP_CPU_THROTTLE=4 runs every page cdp.mjs opens four times slower (Emulation.setCPUThrottlingRate), so a walk
     can be read as a slow runner reads it; unset, no page is slowed, and a value under 1 stops the runner."""

@@ -4964,14 +4964,17 @@ _CARD_PROBE = r"""(() => {
 
 # a walk's own steps: `press` is cdp.mjs's clickEl, which clicks a target only once it has stopped moving (round tabs-1:
 # at 390 px the card-tabs walk measured the Rule tab while the sheet slid in and pressed beside it; cdp-1 moved that
-# settle into cdp.mjs, read from node so it ends with the page's scripts off); `step` does an act and waits for the state
-# it brings with cdp.mjs's named waitFor, which, when that never comes, throws naming the step (here with where the
-# click was), what it last read and what `state` reads of the page then
+# settle into cdp.mjs, read from node so it ends with the page's scripts off; mac-tabs: it waits for a frame, for no
+# animation on the target or what it sits in, and for its box the same across two frames, since GitHub's macOS runner
+# drew the sheet at its start long enough for equal reads, and pressed once more where it stopped when the state it
+# brings has not come); `step` does an act, handing it the state it waits for, and waits for that state with cdp.mjs's
+# named waitFor, which, when it never comes, throws naming the step (here with each press), what it last read and what
+# `state` reads of the page then
 _WALK_STEPS = r"""
-const press = (page, sel) => page.clickEl(sel);
+const press = (page, sel, until = null) => page.clickEl(sel, { until });
 const step = async (page, name, act, until, { timeoutMs = 60000, state = null } = {}) => {
-  const did = await act();
-  const where = did && typeof did === 'object' && 'x' in did ? ` (the click was at ${Math.round(did.x)}, ${Math.round(did.y)})` : '';
+  const did = await act(until);
+  const where = did && typeof did === 'object' && did.said ? ` (pressed at ${did.said})` : '';
   return page.waitFor(until, timeoutMs, name + where, state);
 };
 """
@@ -5048,14 +5051,14 @@ await cdp.run(async () => {
     const on = (name, hash) => "(() => { const t = [...document.querySelectorAll('#insp [role=tab]')].find(t => t.getAttribute('aria-selected') === 'true');"
       + " return !!t && t.textContent.trim() === '" + name + "'" + (hash === undefined ? "" : " && location.hash === '" + hash + "'") + "; })()";
     const focused = name => "(document.activeElement && document.activeElement.textContent.trim()) === '" + name + "'";
-    await step(page, 'a click on Rule', () => press(page, tab('Rule')), on('Rule', '#c-c2:rule'), { state: STATE }); got.rule = await page.ev(PROBE);
-    await step(page, 'a click on Source', () => press(page, tab('Source')), on('Source', '#c-c2:source'), { state: STATE }); got.source = await page.ev(PROBE);
+    await step(page, 'a click on Rule', u => press(page, tab('Rule'), u), on('Rule', '#c-c2:rule'), { state: STATE }); got.rule = await page.ev(PROBE);
+    await step(page, 'a click on Source', u => press(page, tab('Source'), u), on('Source', '#c-c2:source'), { state: STATE }); got.source = await page.ev(PROBE);
     await step(page, 'Back to Rule', () => page.ev("history.back(); true"), on('Rule', '#c-c2:rule'), { state: STATE }); got.back = await page.ev(PROBE);
     await step(page, 'Back to Result', () => page.ev("history.back(); true"), on('Result', '#c-c2'), { state: STATE }); got.back2 = await page.ev(PROBE);
     await page.ev(tab('Result') + ".focus(); true");
     await step(page, 'ArrowRight to Rule', () => page.key('ArrowRight', 'ArrowRight', 39), on('Rule') + " && " + focused('Rule'), { state: STATE }); got.arrow = await page.ev(PROBE);
     await step(page, 'ArrowLeft to Result', () => page.key('ArrowLeft', 'ArrowLeft', 37), on('Result') + " && " + focused('Result'), { state: STATE });
-    await step(page, 'a click on the runs chip', () => press(page, "document.querySelector('#insp .chip.k-runs')"), on('Runs', '#c-c2:runs'), { state: STATE }); got.chip = await page.ev(PROBE);
+    await step(page, 'a click on the runs chip', u => press(page, "document.querySelector('#insp .chip.k-runs')", u), on('Runs', '#c-c2:runs'), { state: STATE }); got.chip = await page.ev(PROBE);
     out[width] = got;
     await cdp.stopAll();
   }

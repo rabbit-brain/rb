@@ -122,7 +122,11 @@ def test_the_owners_own_screen_shows_the_copy_and_asks_for_a_link(sample):
     assert "use Rabbit Brain to record where imagenet-val can be downloaded: its URL or its Hugging Face id." in page
     assert 'class="cpp" data-act="copy-text"' in page and "rb resource locate imagenet-val url" not in page
     assert "rb resource locate" not in page
-    assert "missing here: /srv/lab/cache/resnet50 (a path on the machine that recorded it)" in page
+    # the path as the record holds it: /srv/lab/... on POSIX, and on Windows, where a path that starts with / names no
+    # drive, the same path on the drive rb ran on (C:/srv/lab/...); either way outside the repository, the recorder's
+    far = [loc["ref"] for loc in rbj(sample, "show", "resnet50-fp32")["data"]["availability"]["locations"] if loc["provider"] == "local"]
+    assert len(far) == 1 and far[0].endswith("/srv/lab/cache/resnet50") and far[0] in ("/srv/lab/cache/resnet50", f"{far[0][:2]}/srv/lab/cache/resnet50"), far
+    assert f"missing here: {far[0]} (a path on the machine that recorded it)" in page
     st = rbj(sample, "status")["data"]
     asked = [i for i in st["open"] if i["code"] == "no_download_link"]
     assert [(i["subject"], i["do"]) for i in asked] == [("imagenet-val", "rb resource locate imagenet-val url <its URL>")]

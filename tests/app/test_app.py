@@ -32,10 +32,6 @@ GUIDE_CSS = ROOT / "rust" / "src" / "shell" / "assets" / "guide.css"
 CONTRACT = ROOT / "tests" / "fixtures" / "shell" / "dom-contract.json"
 EXAMPLE = str(ROOT / "tests" / "fixtures" / "shell" / "int8-demo.{}.view.json")
 REQUIRED = os.environ.get("RB_REQUIRE_BROWSER") == "1"
-# the two checks that still fail on GitHub's Windows runner (issue #2): a sheet's focus on a cold link, and the guide.
-# rec-2 (ac8cd5c) fixed both for macOS and Linux; the marks stay until L's Windows harness shows them passing (step 59)
-RUNNER_KNOWN = pytest.mark.xfail(os.environ.get("GITHUB_ACTIONS") == "true" and sys.platform == "win32",
-                                 reason="fails on GitHub's Windows runner (issue #2)", strict=False)
 
 # The walks split by viewport (tests/conftest.py's viewport switch, RB_APP_VIEWPORT): a test that takes `viewport` runs
 # once in each half it is for, its walk taking that half's widths (tests/app/cdp.mjs's inHalf), and asks of each half
@@ -274,7 +270,6 @@ def test_the_inspector_stack_crumbs_back_and_esc(walked):
     _passes(walked, "stack", "crumbs", "back", "esc", "close", "moves", at_least={"390": 18, "1280": 22})
 
 
-@RUNNER_KNOWN
 def test_cold_links_land_on_their_card_and_back_stays_on_the_page(walked):
     _passes(walked, "cold", at_least={"390": 23, "1280": 17})
 
@@ -347,7 +342,6 @@ def test_the_guide_is_never_in_print_no_script_or_a_deep_link(walked):
     _passes(walked, "guide: never in print", "guide: never in the no-script", "guide: never on a deep link", at_least={"390": 6, "1280": 6})
 
 
-@RUNNER_KNOWN
 def test_the_guide_fits_390_reads_at_aa_and_keeps_still_under_reduced_motion(walked):
     """No horizontal scroll at any step, each tooltip whole on the screen and at 390 below or above its part; its words
     at AA contrast in light and dark; no motion under prefers-reduced-motion; scrolled or resized across 960, the
@@ -1067,10 +1061,16 @@ def test_rerun_this_research_copies_its_prompt_by_real_clicks(tmp_path, viewport
     # the hub's frame: sandbox="allow-scripts", no storage and no clipboard permission; its probe says where the opener
     # and Copy prompt are, and what the button reads, to the host, which the walk clicks through
     probe = """<script>
-addEventListener('message', e => { const at = x => { if (!x) return null; const b = x.getBoundingClientRect(); return { x: b.x + Math.min(b.width / 2, 30), y: b.y + b.height / 2 }; };
+addEventListener('message', async e => {
+  // where a target is once it has stopped, as cdp.mjs's clickEl reads it (round mac-tabs): a frame, nothing running on it
+  // or what it sits in, its box the same across two frames; the host presses there, so the frame says it only then
+  const still = async x => { for (let i = 0, was = null, same = 0; i < 300; i++) { await new Promise(r => requestAnimationFrame(r));
+    let on = 0; for (let a = x; a; a = a.parentElement) for (const n of a.getAnimations()) { const t = n.effect && n.effect.getComputedTiming ? n.effect.getComputedTiming() : {}; if ((n.playState === 'running' || n.pending) && t.endTime !== Infinity) on++; }
+    const b = x.getBoundingClientRect(), now = [b.x, b.y, b.width, b.height].join(); same = !on && now === was ? same + 1 : 0; if (same >= 2) return; was = on ? null : now; } };
+  const at = async x => { if (!x) return null; await still(x); const b = x.getBoundingClientRect(); return { x: b.x + Math.min(b.width / 2, 30), y: b.y + b.height / 2 }; };
   const cp = () => document.querySelector('#rerun [data-copybtn="rerun-prompt"] .cp'); let out = null;
-  if (e.data === 'opener') out = at(Array.from(document.querySelectorAll('a[href="#rerun"]')).find(l => l.checkVisibility()));
-  else if (e.data === 'copy') out = at(cp());
+  if (e.data === 'opener') out = await at(Array.from(document.querySelectorAll('a[href="#rerun"]')).find(l => l.checkVisibility()));
+  else if (e.data === 'copy') out = await at(cp());
   else if (e.data === 'label') out = cp() && cp().textContent.trim();
   else if (e.data === 'focus') out = document.activeElement && (document.activeElement.className + ' ' + document.activeElement.textContent.trim());
   else if (e.data === 'parts') out = document.querySelectorAll('a[href="#rerun"][data-rerun], #rerun, .rrx, #reproduce.rrun, [data-rerun]').length;

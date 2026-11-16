@@ -188,13 +188,16 @@ await run(async () => {
     const s4 = await p.ev(SHOWN);
     check(`rerun: the Overview's link opens it and Close closes it, focus back on the link [${at}]`, s3.open && !s4.open && /\brrb\b/.test(s4.focus || ''), j({ s3, s4 }));
     await p.clickEl(OPENER);
-    // a selection dragged from the prompt out past the panel's edge leaves it open
+    // a selection dragged from the prompt out past the panel's edge leaves it open; its start read once the panel has
+    // stopped (cdp.mjs's stopped, round mac-tabs), as clickEl reads where it presses
+    await p.stopped(`document.querySelector('#rerun-prompt')`);
     const pr = await p.ev(`(() => { const r = document.querySelector('#rerun-prompt').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + 20 }; })()`);
     for (const [type, x, y] of [['mouseMoved', pr.x, pr.y], ['mousePressed', pr.x, pr.y], ['mouseMoved', 4, pr.y + 40], ['mouseMoved', 3, (w < 600 ? 840 : 896)], ['mouseReleased', 3, (w < 600 ? 840 : 896)]])
       await p.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1, ...(type === 'mouseMoved' ? { buttons: type === 'mouseMoved' && x !== pr.x ? 1 : 0 } : {}) });
     await sleep(300);
     const drag = await p.ev(`({ open: document.querySelector('dialog.rerundlg').open, sel: String(getSelection()).length })`);
     check(`rerun: a selection dragged out of the prompt past the panel's edge leaves it open [${at}]`, drag.open && drag.sel > 0, j(drag));
+    await p.stopped(`document.querySelector('dialog.rerundlg')`);
     const box = await p.ev(FIT);
     await p.clickAt(Math.max(2, box.left - 4 > 2 ? box.left / 2 : 2), Math.min(box.h - 2, box.bottom + (box.h - box.bottom) / 2));
     const s5 = await p.ev(SHOWN);

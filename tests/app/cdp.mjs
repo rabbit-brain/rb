@@ -22,6 +22,12 @@ export const widths = ws => ws.filter(inHalf);
 // number from 1, or unset
 export const CPU_THROTTLE = Number(process.env.RB_APP_CPU_THROTTLE || 1);
 if (!(CPU_THROTTLE >= 1)) { process.stderr.write(`RB_APP_CPU_THROTTLE is a number from 1, or unset; not ${JSON.stringify(process.env.RB_APP_CPU_THROTTLE)}\n`); process.exit(2); }
+// how long each animation or transition a page starts holds at its first frame, in ms (RB_APP_FRAME_STALL, round
+// mac-tabs): the page's animation clock is held (Animation.setPlaybackRate 0) from when Chrome starts one, and runs
+// again that long after. GitHub's macOS runner drew a sheet at its start for over 300 ms while the walk read its box
+// (a tab pressed at 499 px in a 390 px sheet); a slowed CPU alone never holds it so. Unset, or 0, no hold
+export const FRAME_STALL = Number(process.env.RB_APP_FRAME_STALL || 0);
+if (!(FRAME_STALL >= 0)) { process.stderr.write(`RB_APP_FRAME_STALL is a number of ms from 0, or unset; not ${JSON.stringify(process.env.RB_APP_FRAME_STALL)}\n`); process.exit(2); }
 // the machine's own display settings, set on Chrome (RB_APP_MACHINE, round media-1): a comma list of reduced-motion,
 // dark and high-contrast, each a Chrome switch that stands for that setting on the system, as GitHub's macOS image has
 // reduced motion and transparency turned on. A walk then reads what the machine says wherever a page's emulated media
@@ -373,6 +379,18 @@ export async function launchChrome({ chrome = findChrome(), timeoutMs = 30000, t
     lastSent: method => conn.sent.get(method) };
 }
 
+// what moves an element: each animation or transition still running, on it or on an element it sits in, that can
+// move it (one of colour or opacity alone cannot; a keyframe's own offset, easing and composite say when and how, not
+// what changes), and that ends (a spinner is not waited for); evaluated in the page, the element as its argument
+const MOVING = `e => { const on = [];
+  const moves = k => /^(transform|translate|rotate|scale|left|top|right|bottom|inset|margin|padding|width|height|min|max|flex|grid|fontSize|lineHeight|zoom|visibility|display)/.test(k);
+  for (let x = e; x; x = x.parentElement) for (const a of x.getAnimations()) {
+    const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : {};
+    const keys = a.effect && a.effect.getKeyframes ? a.effect.getKeyframes().flatMap(f => Object.keys(f)).filter(k => !['offset', 'computedOffset', 'easing', 'composite'].includes(k)) : [];
+    if ((a.playState === 'running' || a.pending) && t.endTime !== Infinity && (!keys.length || keys.some(moves)))
+      on.push(x.tagName.toLowerCase() + (x.id ? '#' + x.id : '') + ' ' + (a.animationName || a.transitionProperty || a.constructor.name));
+  } return on; }`;
+
 async function openPage(conn) {
   const { targetId } = await conn.send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await conn.send('Target.attachToTarget', { targetId, flatten: true });
@@ -392,7 +410,22 @@ async function openPage(conn) {
   // a slow runner, emulated (RB_APP_CPU_THROTTLE, round cdp-1): every page's CPU slowed by that factor, so a walk reads
   // a transition as GitHub's macOS and Windows runners do, earlier in its course. Unset, or 1, the machine's own speed
   if (CPU_THROTTLE > 1) await send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
-  let media = { type: '', scheme: 'light' };
+  if (FRAME_STALL > 0) {
+    // the page's animation clock held (Animation.setPlaybackRate 0) from when Chrome starts an animation, its start
+    // time then known, and run again that long after: each still reads as running, drawn where the clock stopped, and
+    // goes on from there. Held from when one is made, while its start was pending, a transition got a start far in the
+    // future once the clock ran again, so it never moved; paused one by one (Animation.setPaused) it reads as paused,
+    // which the runner's did not; sought back to its start every 16 ms its box moved a frame's worth between reads
+    let held = false;
+    conn.on(m => {
+      if (m.sessionId !== sessionId || m.method !== 'Animation.animationStarted' || held) return;
+      held = true;
+      send('Animation.setPlaybackRate', { playbackRate: 0 }).catch(() => {});
+      setTimeout(() => { send('Animation.setPlaybackRate', { playbackRate: 1 }).catch(() => {}).finally(() => { held = false; }); }, FRAME_STALL);
+    });
+    await send('Animation.enable');
+  }
+  let media = { type: '', scheme: 'light' }, scriptOff = false;
 
   // every page starts with its media said whole: a page no walk sets media on reads no machine setting either
   await send('Emulation.setEmulatedMedia', { media: '', features: mediaFeatures() });
@@ -411,7 +444,7 @@ async function openPage(conn) {
       media = { type, scheme };
       await send('Emulation.setEmulatedMedia', { media: type, features: sent });
     },
-    async noScript(v) { await send('Emulation.setScriptExecutionDisabled', { value: v }); },
+    async noScript(v) { await send('Emulation.setScriptExecutionDisabled', { value: v }); scriptOff = !!v; },
     // loads `url`; a page that cannot be loaded, or does not finish loading in `timeoutMs`, is an error
     async goto(url, { timeoutMs = 30000 } = {}) {
       const responses = [];
@@ -486,32 +519,94 @@ async function openPage(conn) {
     async rect(selectorExpr) {
       return page.ev(`(() => { const e = (${selectorExpr}); if (!e) return null; e.scrollIntoView({block:'center', inline:'nearest'}); const r = e.getBoundingClientRect(), f = e.getClientRects()[0] || r; return {x: f.x + Math.min(f.width/2, 30), y: f.y + f.height/2, w: r.width, h: r.height, text: (e.innerText||e.textContent||'').trim().slice(0,120), tag: e.tagName, href: e.getAttribute('href')}; })()`);
     },
-    // a real mouse click on the element `selectorExpr` evaluates to; null when there is none
-    async clickEl(selectorExpr) {
+    // until the element `selectorExpr` evaluates to has stopped: the first frame drawn after the act that moves it,
+    // then no animation or transition running on it or on any element it sits in that can move it (one of colour or
+    // opacity alone cannot, and one that never ends, a spinner, is not waited for), then its box the same across two
+    // frames (round mac-tabs: GitHub's macOS runner drew a sheet at its start for over 300 ms, so three equal reads
+    // 50 ms apart took a sheet that had not started moving for one that had stopped, and the press went to 499 px in a
+    // 390 px sheet). Where no frame is drawn (the page's scripts off, round cdp-1, or a page Chrome draws no frame for)
+    // equal reads 50 ms apart stand in for the frames. `timeoutMs` at most. It says whether the target stopped, whether
+    // it is still there, what still ran at the end, whether frames were drawn, and how long it waited
+    async stopped(selectorExpr, { timeoutMs = 10000 } = {}) {
+      const t0 = Date.now(), until = t0 + timeoutMs;
+      let frames = !scriptOff;
+      const frame = async () => {
+        if (!frames) { await sleep(50); return; }
+        const r = await Promise.race([page.ev('new Promise(r => requestAnimationFrame(() => r(true)))'), sleep(2000).then(() => 'late')]);
+        if (r === 'late') frames = false;
+      };
+      const running = `(() => { const e = (${selectorExpr}); if (!e) return null; return (${MOVING})(e); })()`;
+      const box = `(() => { const e = (${selectorExpr}); if (!e) return null; const r = e.getClientRects()[0] || e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].join(); })()`;
+      const said = (stopped, on) => ({ stopped, gone: on === null, running: on || [], frames, ms: Date.now() - t0 });
+      await frame();
+      let on = await page.ev(running);
+      while (on && on.length && Date.now() < until) { await frame(); on = await page.ev(running); }
+      if (on === null) return said(false, null);
+      // the same box across two frames: three reads, each after a frame is drawn (four 50 ms apart where none is)
+      let was = await page.ev(box), same = 0;
+      while (same < (frames ? 2 : 3) && Date.now() < until) {
+        await frame();
+        const now = await page.ev(box);
+        if (now === null) return said(false, null);
+        same = now === was ? same + 1 : 0; was = now;
+      }
+      return said(same >= (frames ? 2 : 3), on);
+    },
+    // a real mouse click on the element `selectorExpr` evaluates to, once it has stopped (stopped() above), at where it
+    // is then; null when there is none, or when it went before it could be pressed. Given `until`, an expression for
+    // the state the click brings: when that has not come `againMs` after the press, the target is still shown, and its
+    // box has moved since, it is pressed once more where it stopped this time, unless the state comes while it settles
+    // or in half a second after. Only for a click that a second one cannot undo (a tab, a link): a toggle's slow state
+    // would be flipped back. It says each press (`presses`: where, what was under the point, how its wait ended) and in
+    // `said` where each was and any wait that did not end in a stop; the last press's point as `x`, `y` and `at`
+    async clickEl(selectorExpr, { until = null, againMs = 3000 } = {}) {
       const r = await page.rect(selectorExpr);
       if (!r || r.__error) return null;
-      await sleep(150);
-      // a target still moving (a sheet sliding in, a card's entrance) is clicked where it stops, never where it was:
-      // its box the same over three reads 50 ms apart (150 ms, several drawn frames even on a slowed CPU), 10 s at most (the card-tabs walk,
-      // round tabs-1: at 390 px the click was measured in the sheet's slide and landed beside the tab). Read from here,
-      // not in a frame callback of the page's, which never runs while the page's scripts are off (round cdp-1)
-      {
-        const box = `(() => { const e = (${selectorExpr}); if (!e) return null; const r = e.getClientRects()[0] || e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].join(); })()`;
-        let was = await page.ev(box), same = 0;
-        for (const until = Date.now() + 10000; same < 3 && Date.now() < until;) {
+      const presses = [];
+      const point = `(() => { const e = (${selectorExpr}); if (!e || !e.getClientRects().length || !e.checkVisibility()) return null;
+        const r = e.getClientRects()[0]; return {x: r.x + Math.min(r.width/2, 30), y: r.y + r.height/2}; })()`;
+      const pressOnce = async () => {
+        const settled = await page.stopped(selectorExpr);
+        // a link that wraps is clicked on its first line, where its box begins (its whole box's left edge may be
+        // another element's); read now, after it stopped, never before
+        let at = settled.gone ? null : await page.ev(point);
+        // what lies over the point and is not the target (a sheet sliding away over a button that never moved) is
+        // waited for too, while it still moves, within the same 10 s
+        const over = p => `(() => { const e = (${selectorExpr}), h = document.elementFromPoint(${p.x}, ${p.y}); if (!e || !h || e.contains(h) || h.contains(e)) return [];
+          return (${MOVING})(h); })()`;
+        for (const until = Date.now() + Math.max(0, 10000 - settled.ms); at && !at.__error && Date.now() < until;) {
+          const moving = await page.ev(over(at));
+          if (!moving || moving.__error || !moving.length) break;
+          settled.covered = moving;
           await sleep(50);
-          const now = await page.ev(box);
-          same = now === was ? same + 1 : 0; was = now;
+          at = await page.ev(point);
+        }
+        if (!at || at.__error) { presses.push({ gone: true, settled }); return null; }
+        // what is under the point as the button goes down: a click that lands on another element says which
+        const hit = await page.ev(`(() => { const e = document.elementFromPoint(${at.x}, ${at.y}); return e ? (e.tagName + (e.id ? '#' + e.id : '') + ' ' + (e.textContent || '').trim().slice(0, 40)) : null; })()`);
+        for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
+        presses.push({ x: at.x, y: at.y, hit, settled });
+        return at;
+      };
+      const at = await pressOnce();
+      if (!at) return null;
+      if (until && !(await page.waitFor(until, againMs))) {
+        // still shown and somewhere else: pressed there, unless the state came while it settled
+        const now = await page.ev(point);
+        if (now && !now.__error && (Math.abs(now.x - at.x) > 1 || Math.abs(now.y - at.y) > 1)) {
+          await page.ev(`(() => { const e = (${selectorExpr}); if (!e) return false; const r = e.getBoundingClientRect();
+            if (r.right < 0 || r.bottom < 0 || r.left > innerWidth || r.top > innerHeight) e.scrollIntoView({block:'center', inline:'nearest'}); return true; })()`);
+          const settled = await page.stopped(selectorExpr);
+          if (!settled.gone && !(await page.waitFor(until, 500))) await pressOnce();
         }
       }
-      // a link that wraps is clicked on its first line, where its box begins (its whole box's left edge may be another
-      // element's)
-      const r2 = await page.ev(`(() => { const e = (${selectorExpr}); const r = e.getClientRects()[0] || e.getBoundingClientRect(); return {x: r.x + Math.min(r.width/2, 30), y: r.y + r.height/2}; })()`);
-      // what is under the point as the button goes down: a click that lands on another element says which
-      r.hit = await page.ev(`(() => { const e = document.elementFromPoint(${r2.x}, ${r2.y}); return e ? (e.tagName + (e.id ? '#' + e.id : '') + ' ' + (e.textContent || '').trim().slice(0, 40)) : null; })()`);
-      r.at = r2;
-      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: r2.x, y: r2.y, button: 'left', clickCount: 1 });
       await sleep(300);
+      const last = presses.filter(p => !p.gone).pop();
+      r.first = { x: r.x, y: r.y };
+      r.x = last.x; r.y = last.y; r.at = { x: last.x, y: last.y }; r.hit = last.hit;
+      r.presses = presses;
+      r.said = presses.map(p => (p.gone ? 'nowhere: it went before the press' : `${Math.round(p.x)}, ${Math.round(p.y)}`)
+        + (!p.settled.stopped && !p.settled.gone ? ` (not still after ${Math.round(p.settled.ms / 1000)} s${p.settled.running.length ? ': ' + p.settled.running.join(', ') + ' running' : ''})` : '')).join(', then at ');
       return r;
     },
     // a real mouse click at (x, y)

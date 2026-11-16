@@ -65,7 +65,9 @@ await run(async () => {
         if (${l.card}) { m.scrollTop = Math.min(250, m.scrollHeight - m.clientHeight); scrollTo(0, Math.min(250, document.documentElement.scrollHeight - innerHeight)); }
         return true; })()`);
       if (!found) { check(`P12: ${l.from} → #${l.id} shows its link [${at}]`, false, j(l)); continue; }
-      await sleep(150);
+      // the link where it stops (cdp.mjs's stopped: a frame, nothing moving, its box the same across two frames), as
+      // clickEl presses, since the point below is read once and pressed at (round mac-tabs)
+      await p.stopped(mark);
       const before = await p.ev(STATE);
       // a real click on the link, on a part of it that is not a term (a term says its meaning and follows nothing)
       const pt = await p.ev(`(() => { const l = ${mark}; for (const q of l.getClientRects()) for (let x = q.left + 2; x < q.right; x += 4) {

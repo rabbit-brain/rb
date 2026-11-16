@@ -391,6 +391,31 @@ const MOVING = `e => { const on = [];
       on.push(x.tagName.toLowerCase() + (x.id ? '#' + x.id : '') + ' ' + (a.animationName || a.transitionProperty || a.constructor.name));
   } return on; }`;
 
+// where a press on an element lands: on its first line box (a link that wraps is clicked where its box begins; its
+// whole box's left edge may be another element's), and only on the part of it the viewport and every box that clips it
+// show, so a target half out of view is pressed where it shows (round r19: one half off the viewport was pressed
+// outside it); `shown` false where none of it is in view, and the point then its box's own, which is not pressed.
+// What clips it is asked of the browser, never worked out from CSS: an IntersectionObserver's intersectionRect is the
+// box clipped by the viewport and by each box that clips it for layout, so an overflow box it escapes (placed
+// absolutely by a box above it, or fixed) does not (round r19b: r-19 clipped by every overflow box above it, and the
+// Files sheet at 390, placed by the nav under an overflow-hidden list, was never pressed). elementFromPoint would ask
+// too much: a cover over the target is a press that lands on the cover and says so, not a target out of view. Read
+// at the next frame; a page that draws no frame in 2 s, or whose scripts are off (no observer's callback nor timer
+// runs there: the second argument), is clipped by the viewport alone. Evaluated in the page, the element as its first
+// argument; it gives a promise
+const PRESS_POINT = `async (e, off) => { const r = e.getClientRects()[0];
+  let l = Math.max(r.left, 0), t = Math.max(r.top, 0), rt = Math.min(r.right, innerWidth), b = Math.min(r.bottom, innerHeight);
+  const seen = off ? null : await new Promise(res => { const o = new IntersectionObserver(es => { o.disconnect(); res(es[es.length - 1]); });
+    o.observe(e); setTimeout(() => { o.disconnect(); res(null); }, 2000); });
+  if (seen) { const q = seen.intersectionRect, f = e.getClientRects()[0] || r;
+    l = Math.max(f.left, q.left); t = Math.max(f.top, q.top); rt = Math.min(f.right, q.right); b = Math.min(f.bottom, q.bottom);
+    if (!seen.isIntersecting) rt = l; }
+  const shown = rt > l && b > t, s = shown ? null : e.getClientRects()[0] || r;
+  return shown ? { x: l + Math.min((rt - l) / 2, 30), y: (t + b) / 2, shown } : { x: s.x + Math.min(s.width / 2, 30), y: s.y + s.height / 2, shown }; }`;
+
+// an element as a failure names it: its tag, id and first words
+const NAMED = `e => e.tagName + (e.id ? '#' + e.id : '') + ' ' + (e.textContent || '').trim().slice(0, 40)`;
+
 async function openPage(conn) {
   const { targetId } = await conn.send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await conn.send('Target.attachToTarget', { targetId, flatten: true });
@@ -426,6 +451,10 @@ async function openPage(conn) {
     await send('Animation.enable');
   }
   let media = { type: '', scheme: 'light' }, scriptOff = false;
+  // the presses since the page was last loaded that landed on something other than their target, or were not made
+  // since their target was out of view, each as a failure names it: a step that fails later says them (round r19: a
+  // tab's press that hit another tab was pressed again and passed, and the walk failed two steps on, naming that step)
+  const misses = [];
 
   // every page starts with its media said whole: a page no walk sets media on reads no machine setting either
   await send('Emulation.setEmulatedMedia', { media: '', features: mediaFeatures() });
@@ -447,6 +476,7 @@ async function openPage(conn) {
     async noScript(v) { await send('Emulation.setScriptExecutionDisabled', { value: v }); scriptOff = !!v; },
     // loads `url`; a page that cannot be loaded, or does not finish loading in `timeoutMs`, is an error
     async goto(url, { timeoutMs = 30000 } = {}) {
+      misses.length = 0;
       const responses = [];
       let loaded = false;
       const off = conn.on(m => {
@@ -486,7 +516,8 @@ async function openPage(conn) {
         if (Date.now() > until) {
           if (!step) return null;
           const seen = state ? await page.ev(state) : undefined;
-          throw new Error(`${step}: not so after ${timeoutMs / 1000} s (last ${JSON.stringify(v)})` + (state ? `; the page then: ${JSON.stringify(seen)}` : ''));
+          throw new Error(`${step}: not so after ${timeoutMs / 1000} s (last ${JSON.stringify(v)})` + (state ? `; the page then: ${JSON.stringify(seen)}` : '')
+            + (misses.length ? `; before it, ${misses.join('; ')}` : ''));
         }
         await sleep(100);
       }
@@ -563,12 +594,11 @@ async function openPage(conn) {
       const r = await page.rect(selectorExpr);
       if (!r || r.__error) return null;
       const presses = [];
-      const point = `(() => { const e = (${selectorExpr}); if (!e || !e.getClientRects().length || !e.checkVisibility()) return null;
-        const r = e.getClientRects()[0]; return {x: r.x + Math.min(r.width/2, 30), y: r.y + r.height/2}; })()`;
+      const point = `(async () => { const e = (${selectorExpr}); if (!e || !e.getClientRects().length || !e.checkVisibility()) return null;
+        const p = await (${PRESS_POINT})(e, ${scriptOff}); return {x: p.x, y: p.y}; })()`;
       const pressOnce = async () => {
-        const settled = await page.stopped(selectorExpr);
-        // a link that wraps is clicked on its first line, where its box begins (its whole box's left edge may be
-        // another element's); read now, after it stopped, never before
+        const t0 = Date.now(), settled = await page.stopped(selectorExpr);
+        // where it shows (PRESS_POINT), read now, after it stopped, never before
         let at = settled.gone ? null : await page.ev(point);
         // what lies over the point and is not the target (a sheet sliding away over a button that never moved) is
         // waited for too, while it still moves, within the same 10 s
@@ -581,11 +611,38 @@ async function openPage(conn) {
           await sleep(50);
           at = await page.ev(point);
         }
-        if (!at || at.__error) { presses.push({ gone: true, settled }); return null; }
-        // what is under the point as the button goes down: a click that lands on another element says which
-        const hit = await page.ev(`(() => { const e = document.elementFromPoint(${at.x}, ${at.y}); return e ? (e.tagName + (e.id ? '#' + e.id : '') + ' ' + (e.textContent || '').trim().slice(0, 40)) : null; })()`);
+        // read once more as the button goes down, in one evaluation: where the point is now, whether the viewport and
+        // every box the target scrolls in still show any of it, and what is under the point. A target that moved since its
+        // point was read (the page scrolled it between the read and the press), or that a scroll took out of its
+        // scroller's view (clipped there, still drawn on the page, so a press lands on what is beside it), is brought into
+        // view, waited for again and read again, within the same 10 s (round l1: a scroll between the read and the press
+        // beat the read, and a target scrolled out of its scroller was pressed at its clipped place, y 0); one still out
+        // of view then is not pressed (round r19: it was, outside the viewport)
+        const last = `(async () => { const e = (${selectorExpr}); if (!e || !e.getClientRects().length || !e.checkVisibility()) return null;
+          const { x, y, shown } = await (${PRESS_POINT})(e, ${scriptOff}), h = shown ? document.elementFromPoint(x, y) : null;
+          return { x, y, shown, me: (${NAMED})(e), hit: h ? (${NAMED})(h) : null, on: !!h && (h === e || e.contains(h)) }; })()`;
+        let now = at && !at.__error ? await page.ev(last) : null;
+        for (const until = t0 + 10000; now && !now.__error && (!now.shown || Math.abs(now.x - at.x) > 1 || Math.abs(now.y - at.y) > 1) && Date.now() < until;) {
+          settled.again = (settled.again || 0) + 1;
+          if (!now.shown) await page.ev(`(() => { const e = (${selectorExpr}); if (e) e.scrollIntoView({block:'center', inline:'nearest'}); return true; })()`);
+          const s2 = await page.stopped(selectorExpr, { timeoutMs: Math.max(0, until - Date.now()) });
+          if (s2.gone) { now = null; break; }
+          at = await page.ev(point);
+          now = at && !at.__error ? await page.ev(last) : null;
+        }
+        if (!at || at.__error || !now || now.__error) { presses.push({ gone: true, settled }); return null; }
+        const where = `${Math.round(now.x)}, ${Math.round(now.y)}`;
+        if (!now.shown) {
+          presses.push({ x: now.x, y: now.y, unshown: true, settled });
+          misses.push(`a click on ${now.me} was not pressed: ${where} was out of view for 10 s`);
+          return null;
+        }
+        at = { x: now.x, y: now.y };
+        const hit = now.hit;
+        // what the press lands on, when it is not the target: said in the press's own words and in a later failure's
+        if (!now.on) misses.push(`a click on ${now.me} pressed ${where} on ${hit || 'nothing'}`);
         for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
-        presses.push({ x: at.x, y: at.y, hit, settled });
+        presses.push({ x: at.x, y: at.y, hit, off: !now.on, settled });
         return at;
       };
       const at = await pressOnce();
@@ -594,18 +651,23 @@ async function openPage(conn) {
         // still shown and somewhere else: pressed there, unless the state came while it settled
         const now = await page.ev(point);
         if (now && !now.__error && (Math.abs(now.x - at.x) > 1 || Math.abs(now.y - at.y) > 1)) {
-          await page.ev(`(() => { const e = (${selectorExpr}); if (!e) return false; const r = e.getBoundingClientRect();
-            if (r.right < 0 || r.bottom < 0 || r.left > innerWidth || r.top > innerHeight) e.scrollIntoView({block:'center', inline:'nearest'}); return true; })()`);
+          // brought into view first where none of it shows (PRESS_POINT); one partly shown is pressed where it shows
+          await page.ev(`(async () => { const e = (${selectorExpr}); if (!e || !e.getClientRects().length) return false;
+            if (!(await (${PRESS_POINT})(e, ${scriptOff})).shown) e.scrollIntoView({block:'center', inline:'nearest'}); return true; })()`);
           const settled = await page.stopped(selectorExpr);
           if (!settled.gone && !(await page.waitFor(until, 500))) await pressOnce();
         }
       }
       await sleep(300);
-      const last = presses.filter(p => !p.gone).pop();
+      const last = presses.filter(p => !p.gone && !p.unshown).pop();
       r.first = { x: r.x, y: r.y };
       r.x = last.x; r.y = last.y; r.at = { x: last.x, y: last.y }; r.hit = last.hit;
       r.presses = presses;
-      r.said = presses.map(p => (p.gone ? 'nowhere: it went before the press' : `${Math.round(p.x)}, ${Math.round(p.y)}`)
+      // each press, and what it landed on where that was not the target (round r19: a second press that passed hid a
+      // first that hit another tab)
+      r.said = presses.map(p => (p.gone ? 'nowhere: it went before the press'
+          : p.unshown ? `nowhere: ${Math.round(p.x)}, ${Math.round(p.y)} was out of view for 10 s` : `${Math.round(p.x)}, ${Math.round(p.y)}`)
+        + (p.off ? ` on ${p.hit || 'nothing'}, not the target` : '')
         + (!p.settled.stopped && !p.settled.gone ? ` (not still after ${Math.round(p.settled.ms / 1000)} s${p.settled.running.length ? ': ' + p.settled.running.join(', ') + ' running' : ''})` : '')).join(', then at ');
       return r;
     },

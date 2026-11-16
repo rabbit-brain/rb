@@ -50,10 +50,13 @@ def run(root, size, check, theme=None):
         async with app.run_test(size=size) as pilot:
             if theme:
                 app.theme = theme
-            for _ in range(80):
-                await pilot.pause(0.1)
-                if isinstance(app.screen, HomeScreen) and app.screen.query_one("#story-head").render().plain:
+            # the story's head drawn, waited for on the screen itself; a screen that never draws it fails, saying so
+            drawn = lambda: isinstance(app.screen, HomeScreen) and bool(app.screen.query_one("#story-head").render().plain)
+            for _ in range(600):
+                if drawn():
                     break
+                await pilot.pause(0.1)
+            assert drawn(), f"rb ui did not draw the story's head of the record at {root} within 60 s"
             await pilot.pause(0.4)
             return await check(app, pilot)
     return asyncio.run(go())

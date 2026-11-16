@@ -2,6 +2,7 @@
 page and in rb open, over the INT8 demo, the scale record and, where RB_SAMPLE_RECORDS names them, the sample records,
 the walk opens every field card the page shows and follows every link each holds. None leads nowhere."""
 import os
+import socket
 import subprocess
 from pathlib import Path
 
@@ -40,6 +41,18 @@ def test_every_cite_a_page_shows_opens(which, request, tmp_path):
     assert said["opened"] > 0 and said["followed"] > 0
     kinds = {c["kind"] for c in said["cards"].values() if c}
     assert {"check", "experiment"} <= kinds, kinds
+
+
+def test_a_load_that_never_comes_fails_naming_what_it_waited_for():
+    """rb open draws the whole record at each load, which on the scale record and GitHub's Windows runner took longer
+    than a load's usual 30 s (round f61w): each load of the walk waits up to its own --load-timeout, 120 s unless given,
+    and one that never comes fails naming the page and that bound."""
+    with socket.socket() as silent:            # takes the connection, never answers
+        silent.bind(("127.0.0.1", 0))
+        silent.listen(8)
+        url = f"http://127.0.0.1:{silent.getsockname()[1]}/"
+        said = harness(url, "--load-timeout", "2", timeout=120, runner="cites.mjs")
+    assert said["exit"] == 1 and said["error"] == f"{url} did not finish loading in 2 s", (said.get("error"), said["stderr"][-2000:])
 
 
 @pytest.mark.parametrize("which", ["int8_demo", "scale_record", *[f"sample:{p}" for p in samples()]])

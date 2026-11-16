@@ -5240,7 +5240,11 @@ def test_nothing_scrolls_sideways_and_a_reader_is_shown_state_not_actions(int8_d
     for v in ("owner", "reader"):
         pages[v] = tmp_path / f"{v}.html"
         pages[v].write_text((out / "page.html").read_text(encoding="utf-8").replace("</head>", f'<meta name="rb-viewer" content="{v}"><script>{script}</script></head>', 1), encoding="utf-8")
+    # each width is a resize of the page already shown (its address changes only by its anchor): the probe reads once the
+    # page has laid out at the new width (layout.mjs), never after a fixed time. GitHub's macOS runner read 1024 after
+    # 250 ms with the inspector still sliding out as the sheet it becomes under 1280 (round f19d)
     js = _cdp_script(tmp_path / "clip.mjs", """
+import { laidOut, resize } from %s;
 const out = {};
 const PROBE = %s;
 await cdp.run(async () => {
@@ -5248,13 +5252,13 @@ await cdp.run(async () => {
   for (const [v, url] of %s) {
     await page.viewport(1440, 900); await page.goto(url); await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
     for (const w of [1024, 1280, 1440, 1920]) for (const h of ['#overview', '#c-c1', '#c-c2']) {
-      await page.viewport(w, 900); await page.goto(url + h);
-      await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await cdp.sleep(250);
+      await resize(page, w, 900); await page.goto(url + h);
+      await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await laidOut(page, w, 900);
       out[v + '@' + w + h] = await page.ev(PROBE);
     }
     if (v === 'reader') for (const h of ['#your-call', '#to-confirm', '#call-c1', '#q-q1', '#experiments', '#x-e1']) {
-      await page.viewport(1440, 900); await page.goto(url + h);
-      await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await cdp.sleep(250);
+      await resize(page, 1440, 900); await page.goto(url + h);
+      await page.waitFor("document.documentElement.classList.contains('ready')", 10000); await laidOut(page, 1440, 900);
       out['reader-go' + h] = await page.ev(PROBE);
     }
   }
@@ -5262,7 +5266,7 @@ await cdp.run(async () => {
   return {};
 }, { timeoutMs: 240000 });
 console.log(JSON.stringify({ ok: true, out }));
-""" % (json.dumps(_CLIP_PROBE), json.dumps([[v, p.as_uri()] for v, p in pages.items()])))
+""" % (json.dumps((BROWSER / "layout.mjs").as_uri()), json.dumps(_CLIP_PROBE), json.dumps([[v, p.as_uri()] for v, p in pages.items()])))
     code, said, err = _runner(_node(), js, env=dict(os.environ), timeout=300)
     assert code == 0 and said.get("ok"), err[-3000:]
     got = said["out"]
@@ -5277,6 +5281,42 @@ console.log(JSON.stringify({ ok: true, out }));
     # the owner's view keeps its list
     assert got["owner@1440#overview"]["owner"], got["owner@1440#overview"]
 
+
+def test_a_resize_is_read_once_the_page_has_laid_out_at_its_new_width(tmp_path):
+    """layout.mjs's resize() returns once the page has laid out at the new width (round f19d): GitHub's macOS runner
+    read 1024 after 1440 with the inspector still sliding out as the sheet it becomes under 1280 (a right edge at 1297),
+    and RB_APP_FRAME_STALL=200 reads the same. Here a pane slides off the window's edge over 0.4 s once it is under 1280,
+    and the page's animation clock is held 200 ms: read at once after the viewport is set, the pane still stands on
+    the screen; after resize(), it is off it. A layout that never stops throws, naming the size and why."""
+    pane = tmp_path / "pane.html"
+    pane.write_text('<!doctype html><meta name="viewport" content="width=device-width"><style>body { margin: 0 }'
+                    ' #insp { position: fixed; top: 0; right: 0; width: 400px; height: 100px; background: #ccc }'
+                    ' @media (max-width: 1279px) { #insp { transform: translateX(102%); transition: transform .4s linear } }</style>'
+                    '<aside id="insp">a card</aside><main id="m" style="position:absolute;left:0">x</main>', encoding="utf-8")
+    js = _cdp_script(tmp_path / "pane.mjs", """
+import { laidOut, resize } from %s;
+const CUT = "(() => { const W = document.documentElement.clientWidth, r = document.getElementById('insp').getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), cut: r.left < W - 1 && r.right > W + 1 }; })()";
+const out = {};
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  await page.viewport(1440, 900); await page.goto(%s);
+  await page.viewport(1024, 900); await cdp.sleep(50); out.at_once = await page.ev(CUT);
+  await page.viewport(1440, 900); await laidOut(page, 1440, 900);
+  out.waited = await resize(page, 1024, 900); out.after = await page.ev(CUT);
+  // a box moved every frame: the layout never stops
+  await page.ev("(function f() { const m = document.getElementById('m'); m.style.left = (parseInt(m.style.left) + 1) %% 50 + 'px'; requestAnimationFrame(f); })(), true");
+  try { await laidOut(page, 1024, 900, { timeoutMs: 1500 }); out.never = 'returned'; } catch (e) { out.never = e.message; }
+  await cdp.stopAll();
+  return {};
+}, { timeoutMs: 60000 });
+console.log(JSON.stringify({ ok: true, out }));
+""" % (json.dumps((BROWSER / "layout.mjs").as_uri()), json.dumps(pane.as_uri())))
+    code, said, err = _runner(_node(), js, env={**os.environ, "RB_APP_FRAME_STALL": "200"}, timeout=90)
+    assert code == 0 and said.get("ok"), err[-3000:]
+    got = said["out"]
+    assert got["at_once"]["left"] < 1024, got
+    assert not got["after"]["cut"] and got["after"]["left"] >= 1024 and got["waited"]["ms"] >= 400, got
+    assert got["never"].startswith("the page did not lay out at 1024x900 in 1.5 s (its layout still changing)"), got["never"]
 
 # empty-state sentences as they were written before the UX lead's rule (Nov 13 2026); none may be drawn
 _EMPTY_SENTENCES = r"No rule tests this question yet|No experiment is filed under this question|No recorded run is read yet|Nothing links to it yet|Nothing recorded yet|Nothing waits\.|Not tested: nothing is read|No note on these rules yet|Nothing waits on you here|No call is open"

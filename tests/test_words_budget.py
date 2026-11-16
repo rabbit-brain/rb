@@ -50,9 +50,17 @@ def test_rb_ui_home_stays_within_its_words(which, request, monkeypatch):
         monkeypatch.delenv(k, raising=False)
 
     async def drawn():
+        from rabbit_brain.tui import HomeScreen
         app = RBApp(rec.root)
         async with app.run_test(size=(120, 40)) as pilot:
-            await pilot.pause(1.0)
+            # the story's head drawn, waited for on the screen itself, never only a pause; one never drawn fails, saying so
+            ready = lambda: isinstance(app.screen, HomeScreen) and bool(app.screen.query_one("#story-head").render().plain)
+            for _ in range(600):
+                if ready():
+                    break
+                await pilot.pause(0.1)
+            assert ready(), f"rb ui did not draw the story's head of {which} within 60 s"
+            await pilot.pause(0.4)
             return home_story_text(app)
     words = rbs_words(asyncio.run(drawn()), st)
     assert len(words) <= BUDGET["ui_home"], _say("ui_home", words, st)

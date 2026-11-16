@@ -16,6 +16,7 @@
 import { findChrome, inHalf, launchChrome, parseArgs, progress, run, sleep, startRbOpen, widths } from './cdp.mjs';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
+import { resize } from './layout.mjs';
 import { execFileSync } from 'node:child_process';
 
 const a = parseArgs(process.argv.slice(2), { flags: ['generic', 'places', 'wired', 'copy-only'] });
@@ -153,6 +154,9 @@ const GUIDE_STEP = `(() => {
 })()`;
 // the guide as it stands, its spotlight read by what each step names at this width
 const GUIDE_ALL = `Object.assign(${GUIDE}, (s => ({ lit: s.lit, beside: s.shown ? !s.covers_part : null }))(${GUIDE_STEP}))`;
+// after a resize, the guide placed again: hidden, or its spotlight on its part (the guide places it at once and again
+// 300 ms after the last resize, for a part that was still moving)
+const GUIDE_PLACED = `(s => !s.shown || s.lit)(${GUIDE_STEP})`;
 // where the working parts stand: the guide moves none of them
 const LAYOUT = `(() => ['#nav', '#main', 'aside.insp', '#main .view.on h1'].map(q => { const e = document.querySelector(q); if (!e) return null; const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }).concat([document.documentElement.scrollWidth, document.documentElement.scrollHeight]))()`;
 
@@ -194,7 +198,7 @@ await run(async () => {
   async function walkGuide(w, scheme, prefix, h) {
     const at = `${w}${h ? 'x' + h : ''} ${scheme}`;
     await open(w, scheme, '', { first: true });
-    if (h) { await p.viewport(w, h); await sleep(700); }
+    if (h) { await resize(p, w, h); await p.waitFor(GUIDE_PLACED, 5000); }
     const steps = [];
     for (let k = 0; k < 4; k++) {
       const g = await p.ev(GUIDE_STEP);
@@ -347,9 +351,9 @@ await run(async () => {
         check(`guide: scrolled, the tooltip stays whole on the screen [${at}]`, g.shown && g.whole && g.lit, j(g));
         // across 960, the spotlight follows the part as it is drawn now
         await p.clickEl(sel('.guide .gnext'));
-        await p.viewport(800, 900); await sleep(700);
+        await resize(p, 800, 900); await p.waitFor(GUIDE_PLACED, 5000);
         const narrow = await p.ev(GUIDE_ALL);
-        await p.viewport(w, 900); await sleep(700);
+        await resize(p, w, 900); await p.waitFor(GUIDE_PLACED, 5000);
         const wide = await p.ev(GUIDE_ALL);
         check(`guide: resized across 960, the spotlight follows its part [${at}]`, narrow.shown && narrow.lit && narrow.whole && wide.shown && wide.lit, j({ narrow, wide }));
         await p.key('Escape', 'Escape', 27);
@@ -810,12 +814,12 @@ await run(async () => {
       await open(1280, scheme, 'runs');
       await p.clickEl(sel('#runs details[data-for="run-runs1"] > summary'));
       await p.clickEl(sel('.ibody a[href="#c-c1"]'));
-      await p.viewport(390, 844); await sleep(400);
+      await resize(p, 390, 844);
       let s = await st();
       check(`moves: narrowed across 960, the card becomes a sheet with focus in it [${scheme}]`, s.sheet && s.inert && s.top === 'c-c1' && s.focus === 'inspector:H3', j(s));
       const o = await p.ev(OVERFLOW);
       check(`moves: narrowed across 960, nothing past the screen [${scheme}]`, o.n === 0 && o.scroll <= o.width, j(o));
-      await p.viewport(1280, 900); await sleep(400);
+      await resize(p, 1280, 900);
       s = await st();
       check(`moves: widened across 960, the card stands beside the work, focus kept in it [${scheme}]`, !s.sheet && !s.inert && s.top === 'c-c1' && s.focus === 'inspector:H3', j(s));
       await p.send('Page.reload'); await sleep(300);
@@ -859,7 +863,7 @@ await run(async () => {
       await p.key('Escape', 'Escape', 27);
       await p.clickEl(sel('#runs details[data-for="run-runs2b"] > summary'));
       if (w >= 960) await p.clickEl(sel('#runs details[data-for="run-runs2b"] > summary'));
-      await p.viewport(w < 960 ? 1280 : 390, 900); await sleep(300); await p.viewport(w, w < 600 ? 844 : 900); await sleep(300);
+      await resize(p, w < 960 ? 1280 : 390, 900); await resize(p, w, w < 600 ? 844 : 900);
       let cards = await p.ev('window.__cards');
       check(`live: rb:card once for each card you bring to the top, none for a resize or the same card again [${at}]`, j(cards) === j(['run-runs1', 'c-c1', 'run-runs1', 'run-runs2b']), j(cards));
       await open(w, 'light', 'c-c1');

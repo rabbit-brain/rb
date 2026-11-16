@@ -54,13 +54,15 @@ def repo(workdir, monkeypatch, tmp_path_factory, capsys):
     return rb
 
 
-async def until(pilot, ready, timeout: float = 15.0) -> None:
+async def until(pilot, ready, timeout: float = 15.0, what: str = "") -> None:
     """Pause until the screen is in the state the next key acts on; fixed pauses alone are too short on a loaded
-    machine."""
+    machine. With `what`, a screen that never gets there fails, naming the state it was waited for and how long."""
     for _ in range(int(timeout * 10)):
         if ready():
             return
         await pilot.pause(0.1)
+    if what and not ready():
+        raise AssertionError(f"rb ui did not show {what} within {timeout:g} s")
 
 
 def _waits(screen):
@@ -2029,7 +2031,8 @@ def test_every_check_under_a_top_level_question_counts_in_one_strip_as_rb_status
     async def drive():
         app = RBApp(root)
         async with app.run_test(size=(120, 40)) as pilot:
-            await until(pilot, lambda: app.screen.query("#others-list") and app.screen.query_one("#others-list").option_count > 1)
+            await until(pilot, lambda: app.screen.query("#others-list") and app.screen.query_one("#others-list").option_count > 1,
+                        60, "Other questions' rows on the scale record")
             home = app.screen
             ol = home.query_one("#others-list")
             rows = {ol.get_option_at_index(i).id[2:]: ol.get_option_at_index(i).prompt.plain for i in range(1, ol.option_count)}

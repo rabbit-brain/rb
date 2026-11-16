@@ -3,6 +3,10 @@
 // and follows every link each card holds. Each must lead somewhere real: a card in the inspector (never "nothing here
 // is called ..."), a view shown, or Files at a folder. At 1280 and 390.
 //   node tests/app/cites.mjs (--url <page> | --rb <rb> --record <checkout>) [--most <cards>] [--timeout <s>, 600]
+//        [--load-timeout <s>, 120]
+// rb open draws the whole record at each load: on a large record and a slow runner that takes longer than a load's
+// usual 30 s, so each load waits up to --load-timeout for the page to load and then for its own ready class, and a
+// load that never comes fails naming which it waited for.
 // The last line on stdout is JSON: {"ok", "checks": [{"name", "pass", "detail"}], "opened": n, "followed": n, "cards":
 // {id: {kind, fields: [label...]}}}; exit 0, 1 on a failed check, 3 with no Chrome.
 import { findChrome, launchChrome, parseArgs, progress, run, startRbOpen } from './cdp.mjs';
@@ -12,6 +16,8 @@ if (!a.url && !(a.rb && a.record)) { process.stderr.write('give --url, or --rb a
 const results = [];
 const check = (name, pass, detail = '') => { results.push({ name, pass: !!pass, detail }); progress(name); if (!pass) process.stderr.write(`FAIL ${name}: ${detail}\n`); };
 const MOST = +(a.most || 100000);
+const LOAD = 1000 * +(a['load-timeout'] || 120);
+const READY = "document.documentElement.classList.contains('ready')";
 
 // in the page: open an address and say what it shows (the inspector's top card, or the view shown), waiting while rb
 // open serves a field card
@@ -48,11 +54,16 @@ await run(async () => {
   let opened = 0, followed = 0;
   for (const [w, h] of [[1280, 900], [390, 844]]) {
     await p.viewport(w, h);
-    await p.goto(url);
-    await p.ev("localStorage.setItem('rb.guide.1','seen'); true");
-    await p.goto(url);
-    await p.settle();
     const at = `[${w}]`;
+    // the guide is marked seen once, at the first load: the second width loads straight away
+    if (w === 1280) {
+      await p.goto(url, { timeoutMs: LOAD });
+      await p.ev("localStorage.setItem('rb.guide.1','seen'); true");
+    }
+    await p.goto(url, { timeoutMs: LOAD });
+    await p.waitFor(READY, LOAD, `${url} ${at}: the page's script marks it ready`, "document.documentElement.className");
+    await p.settle();
+    progress(`loaded ${at}`);
     // where the walk starts: the Overview's links to field cards and to the rests-on cards, and on a page every field
     // card it holds
     const start = await p.ev(`(() => { const ov = document.getElementById('overview'); const out = new Set();
@@ -111,4 +122,4 @@ await run(async () => {
   const failed = results.filter(r => !r.pass);
   if (failed.length) throw Object.assign(new Error(`${failed.length} of ${results.length} checks failed: ${failed.map(f => f.name).join('; ')}`), { results });
   return { checks: results, opened, followed, cards };
-}, { timeoutMs: (+(a.timeout || 600)) * 1000, idleMs: 120000 });
+}, { timeoutMs: (+(a.timeout || 600)) * 1000, idleMs: Math.max(120000, 2 * LOAD + 30000) });   // two loads come before the first check

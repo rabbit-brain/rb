@@ -414,6 +414,169 @@ await cdp.run(async () => {
     assert said["jiggle"]["stopped"] is False and said["jiggle"]["gone"] is False and said["jiggle"]["frames"] is True, said["jiggle"]
 
 
+def test_a_click_reads_its_point_again_as_it_presses_and_brings_back_a_target_scrolled_out_of_view(tmp_path):
+    """Round l1 (run 43713175764's rail check, after a scroll into view): a target the page scrolls out of its
+    scroller's view after the click is asked for is still drawn on the page, clipped, and a press at its place lands
+    beside it; clickEl reads the point once more as it presses, and a target its scroller no longer shows is brought into
+    view again, waited for and pressed there. A target the page scrolls (smoothly or at once) while the click waits is
+    pressed where it is, whenever the scroll comes."""
+    from test_shell import _cdp_script, _node, _runner
+    box = ("<style>#s{position:fixed;left:50px;top:50px;width:400px;height:300px;overflow:auto%s}#pad,#pad2{height:1500px}"
+           "#b{display:block;width:120px;height:30px}</style><div id=s><div id=pad></div><button id=b>Go</button><div id=pad2></div></div>"
+           "<script>window.got=false;window.down=null;b.addEventListener('mousedown',()=>{window.down=Math.round(s.scrollTop)});"
+           "b.addEventListener('click',()=>{window.got=true});%s</script>")
+    # the first scroll into view is taken away 20 ms later, once: the button is then above its scroller's top, clipped
+    away = box % ("", "let once=true;s.addEventListener('scroll',()=>{if(once){once=false;setTimeout(()=>{s.scrollTop+=200},20)}});")
+    pages = {"away": away, "smooth": box % (";scroll-behavior:smooth", ""), "instant": box % ("", "")}
+    urls = {}
+    for name, body in pages.items():
+        (tmp_path / f"{name}.html").write_text("<!doctype html>" + body, encoding="utf-8")
+        urls[name] = (tmp_path / f"{name}.html").as_uri()
+    script = _cdp_script(tmp_path / "scroll.mjs", """
+const U = %s, B = "document.getElementById('b')";
+await cdp.run(async () => {
+  const p = await (await cdp.launchChrome()).page();
+  const one = async (u, pre) => { await p.goto(u); await p.settle({ quietMs: 50 }); if (pre) await p.ev(pre);
+    const r = await p.clickEl(B); await new Promise(z => setTimeout(z, 1200));
+    return { got: await p.ev('window.got'), down: await p.ev('window.down'), said: r && r.said }; };
+  const out = { away: await one(U.away) };
+  // the page scrolls the shown button by 200 px, smoothly or at once, d ms after the click is asked for
+  for (const kind of ['smooth', 'instant']) for (const d of [10, 20, 30, 150, 300])
+    out[kind + d] = await one(U[kind], `s.style.scrollBehavior='auto';b.scrollIntoView({block:'center'});s.style.scrollBehavior='';setTimeout(()=>{s.scrollTop+=200},${d});true`);
+  return out;
+}, { timeoutMs: 180000 });
+""" % json.dumps(urls))
+    code, said, err = _runner(_node(), script, env=dict(os.environ), timeout=240)
+    assert code == 0 and said["ok"], err
+    # brought back into view (the button is 1500 px down a 300 px box: its centre sits at scrollTop 1365) and pressed there
+    assert said["away"] == {"got": True, "down": 1365, "said": "80, 200"}, json.dumps(said)
+    for k in [f"{kind}{d}" for kind in ("smooth", "instant") for d in (10, 20, 30, 150, 300)]:
+        assert said[k]["got"] is True, f"{k}: {json.dumps(said)}"
+
+
+def test_a_click_says_what_each_press_landed_on_when_it_was_not_the_target(tmp_path):
+    """Round r19 (MP-1116-0723's later items): a press that lands on something other than its target (here a still
+    cover that takes the first press, then goes while the button moves) says what it landed on, in its own words and in
+    the failure of any step after it, so a second press that passes cannot hide a first that hit another tab, and a
+    walk that fails later names that press, not only its own step."""
+    from test_shell import _cdp_script, _node, _runner
+    pages = {
+        "decoy": "<button id=b style='position:fixed;left:200px;top:100px;width:60px;height:30px'>Go</button>"
+                 "<div id=d style='position:fixed;left:180px;top:90px;width:120px;height:50px;background:#ccc'>cover</div>"
+                 "<script>window.got=false;b.addEventListener('click',()=>{window.got=true});"
+                 "d.addEventListener('click',()=>{d.remove();b.style.left='20px';b.style.top='300px'})</script>",
+    }
+    urls = {}
+    for name, body in pages.items():
+        (tmp_path / f"{name}.html").write_text("<!doctype html>" + body, encoding="utf-8")
+        urls[name] = (tmp_path / f"{name}.html").as_uri()
+    script = _cdp_script(tmp_path / "landed.mjs", """
+const U = %s, B = "document.getElementById('b')";
+const later = async page => { try { await page.waitFor('false', 300, 'a later step'); return null; } catch (e) { return e.message; } };
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  const out = {};
+  await page.goto(U.decoy);
+  const r = await page.clickEl(B, { until: 'window.got', againMs: 1000 });
+  out.decoy = { said: r && r.said, got: await page.ev('window.got'), later: await later(page) };
+  return out;
+}, { timeoutMs: 120000 });
+""" % json.dumps(urls))
+    code, said, err = _runner(_node(), script, env=dict(os.environ))
+    assert code == 0 and said["ok"], err
+    assert said["decoy"]["got"] is True, said["decoy"]
+    assert said["decoy"]["said"] == "230, 115 on DIV#d cover, not the target, then at 50, 315", said["decoy"]
+    assert said["decoy"]["later"] == ("a later step: not so after 0.3 s (last false); before it, "
+                                      "a click on BUTTON#b Go pressed 230, 115 on DIV#d cover"), said["decoy"]
+
+def test_a_click_presses_only_where_its_target_shows_in_the_viewport(tmp_path):
+    """Round r19 (MP-1116-0723's later items): a target half out of the viewport is pressed where it shows, never
+    outside the viewport, and one wholly out of view (fixed, so no scroll brings it back) is not pressed at all, and
+    the failure of a step after it says so."""
+    from test_shell import _cdp_script, _node, _runner
+    pages = {
+        # 40 of its 100 px left of the viewport
+        "half": "<button id=b style='position:fixed;left:-40px;top:100px;width:100px;height:30px'>Go</button>"
+                "<script>window.got=false;window.x=null;b.addEventListener('mousedown',e=>{window.x=e.clientX});"
+                "b.addEventListener('click',()=>{window.got=true})</script>",
+        # wholly left of the viewport
+        "off": "<button id=b style='position:fixed;left:-200px;top:100px;width:60px;height:30px'>Go</button>",
+    }
+    urls = {}
+    for name, body in pages.items():
+        (tmp_path / f"{name}.html").write_text("<!doctype html>" + body, encoding="utf-8")
+        urls[name] = (tmp_path / f"{name}.html").as_uri()
+    script = _cdp_script(tmp_path / "landed.mjs", """
+const U = %s, B = "document.getElementById('b')";
+const later = async page => { try { await page.waitFor('false', 300, 'a later step'); return null; } catch (e) { return e.message; } };
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  const out = {};
+  await page.goto(U.half);
+  let r = await page.clickEl(B);
+  out.half = { said: r && r.said, got: await page.ev('window.got'), x: await page.ev('window.x'), later: await later(page) };
+  await page.goto(U.off);
+  const t0 = Date.now();
+  r = await page.clickEl(B);
+  out.off = { r, ms: Date.now() - t0, later: await later(page) };
+  return out;
+}, { timeoutMs: 120000 });
+""" % json.dumps(urls))
+    code, said, err = _runner(_node(), script, env=dict(os.environ))
+    assert code == 0 and said["ok"], err
+    assert said["half"] == {"said": "30, 115", "got": True, "x": 30,
+                            "later": "a later step: not so after 0.3 s (last false)"}, said["half"]
+    assert said["off"]["r"] is None and said["off"]["ms"] < 15000, said["off"]
+    assert said["off"]["later"] == ("a later step: not so after 0.3 s (last false); before it, "
+                                    "a click on BUTTON#b Go was not pressed: -170, 115 was out of view for 10 s"), said["off"]
+
+def test_a_click_presses_a_target_that_an_overflow_box_it_escapes_does_not_clip(tmp_path):
+    """Round r19b (T's t19b 7): an overflow box clips only what it holds for layout. A target placed absolutely under
+    a positioned box above it, or fixed, is drawn outside an overflow-hidden box between them, and is pressed where it
+    shows (r-19 judged it clipped there and pressed nothing: the Files sheet at 390); one placed absolutely by the
+    overflow-hidden box itself, outside it, is clipped there and not pressed."""
+    from test_shell import _cdp_script, _node, _runner
+    clicks = ("<script>window.got=false;window.x=null;b.addEventListener('mousedown',e=>{window.x=[e.clientX,e.clientY]});"
+              "b.addEventListener('click',()=>{window.got=true})</script>")
+    box = "overflow:hidden;height:30px;width:300px;margin:0;padding:0"
+    pages = {
+        # the sheet's shape: positioned nav, an overflow-hidden list in it, the sheet placed by the nav, under the list
+        "absolute": "<nav style='position:relative;margin:0'><ul style='" + box + "'><li style='list-style:none'>row"
+                    "<div style='position:absolute;left:0;top:80px;width:200px'><button id=b style='width:100px;height:30px;margin:0'>Go</button>"
+                    "</div></li></ul></nav>" + clicks,
+        # fixed: only the viewport clips it
+        "fixed": "<div style='" + box + "'><button id=b style='position:fixed;left:10px;top:200px;width:100px;height:30px;margin:0'>Go</button></div>" + clicks,
+        # placed by the overflow-hidden box itself, above its top where no scroll reaches: clipped, never pressed
+        "clipped": "<div style='position:relative;margin-top:300px;" + box + "'><button id=b style='position:absolute;left:10px;top:-100px;"
+                   "width:100px;height:30px;margin:0'>Go</button></div>" + clicks,
+    }
+    urls = {}
+    for name, body in pages.items():
+        (tmp_path / f"{name}.html").write_text("<!doctype html><body style='margin:0'>" + body, encoding="utf-8")
+        urls[name] = (tmp_path / f"{name}.html").as_uri()
+    script = _cdp_script(tmp_path / "escape.mjs", """
+const U = %s, B = "document.getElementById('b')";
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  await page.viewport(390, 844);
+  const out = {};
+  for (const k of Object.keys(U)) {
+    await page.goto(U[k]);
+    const r = await page.clickEl(B);
+    out[k] = { said: r && r.said, got: await page.ev('window.got'), x: await page.ev('window.x') };
+  }
+  return out;
+}, { timeoutMs: 120000 });
+""" % json.dumps(urls))
+    code, said, err = _runner(_node(), script, env=dict(os.environ))
+    assert code == 0 and said["ok"], err
+    # the press as said, and the mousedown the page saw there (its clientX a whole number, the press's point may not be)
+    for k, at in (("absolute", (30, 95)), ("fixed", (40, 215))):
+        assert said[k]["said"] == "%d, %d" % at and said[k]["got"] is True, (k, said[k])
+        assert all(abs(a - b) <= 1 for a, b in zip(said[k]["x"], at)), (k, said[k])
+    assert said["clipped"] == {"said": None, "got": False, "x": None}, said["clipped"]
+
+
 def test_rb_app_frame_stall_holds_each_animation_at_its_first_frame(tmp_path):
     """RB_APP_FRAME_STALL=1500 holds every animation and transition a page starts at its first frame for 1.5 s, still
     running, as GitHub's macOS runner drew the card's sheet at its start; unset, nothing is held, and a value under 0
@@ -437,10 +600,11 @@ await cdp.run(async () => {
     for ms in ("", "1500"):
         code, said[ms], err = _runner(node, script, env={**os.environ, "RB_APP_FRAME_STALL": ms})
         assert code == 0 and said[ms]["ok"], err
-    # the button starts at 8 (the body's margin): unheld it is well on its way after 0.5 s, held it has moved a frame's
-    # worth at most (the clock stops once Chrome says the transition started), and it still reads as running
+    # the button starts at 8 (the body's margin): unheld it is well on its way after 0.5 s, held it has moved a few
+    # frames' worth at most (the clock stops once Chrome says the transition started, which a loaded box says later:
+    # 13 in the l1 dry run, beside three other Chromes), and it still reads as running
     assert said[""]["stall"] == 0 and said[""]["at"] > 30, said
-    assert said["1500"]["stall"] == 1500 and 8 <= said["1500"]["at"] <= 12 and said["1500"]["state"] == "running", said
+    assert said["1500"]["stall"] == 1500 and 8 <= said["1500"]["at"] <= 20 and said["1500"]["state"] == "running", said
     bad = subprocess.run([node, script], env={**os.environ, "RB_APP_FRAME_STALL": "-1"}, capture_output=True, text=True, timeout=60)
     assert bad.returncode == 2 and "RB_APP_FRAME_STALL is a number of ms from 0" in bad.stderr, bad.stderr
 

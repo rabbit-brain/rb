@@ -15,7 +15,9 @@ export function pageSteps({ base, start = null, agentDone, done, timeoutMs, fres
   const first = start ? `${base}#${start}` : base;
   const steps = [
     { goto: base }, { waitFor: "document.readyState === 'complete'" },
-    { lead: true, eval: "localStorage.setItem('rb.guide.1', 'ended')" }, { lead: true, goto: first },
+    // the page loaded again once the guide is set seen, before a view's address: that address alone only changes the
+    // address, and the first document, set after it loaded, could still start the guide on a late first frame (r61s)
+    { lead: true, eval: "localStorage.setItem('rb.guide.1', 'ended')" }, ...(start ? [{ lead: true, goto: base }] : []), { lead: true, goto: first },
     { lead: true, waitFor: shows(start) }, { lead: true, wait: 1200 },
     { mark: "ready" },
   ];

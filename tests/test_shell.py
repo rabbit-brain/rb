@@ -4384,6 +4384,7 @@ const PROBE = %s, BOTTOM = %s;
 await cdp.run(async () => {
   for (const [name, url, width] of %s) {
     const page = await (await cdp.launchChrome()).page();
+    await page.guideSeen();   // the guide seen before each document's DOMContentLoaded (round r61s), not after it loaded
     await page.viewport(width, width < 600 ? 780 : 900);
     await page.goto(url);
     await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
@@ -5033,6 +5034,10 @@ const PROBE = %s;
 await cdp.run(async () => {
   for (const width of [1440, 1280, 390]) {
     const page = await (await cdp.launchChrome()).page();
+    // the guide seen before each document's DOMContentLoaded (round r61s): the second goto below only changes the address, so
+    // the first document stays, and set after it loaded, the guide still started on a first frame that came late, over
+    // the tabs (GitHub's macOS, a4bcfdb: the click on Rule landed on P#guide-p at 390)
+    await page.guideSeen();
     await page.viewport(width, width < 600 ? 844 : 900);
     await page.goto(%s);
     await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
@@ -5144,6 +5149,7 @@ const PROBE = %s;
 await cdp.run(async () => {
   for (const [name, url, width] of [['page', %s, 1440], ['page', %s, 390], ['reader', %s, 1440]]) {
     const page = await (await cdp.launchChrome()).page();
+    await page.guideSeen();   // the guide seen before each document's DOMContentLoaded (round r61s), not after it loaded
     await page.viewport(width, 900);
     await page.goto(url);
     await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
@@ -5249,6 +5255,7 @@ const out = {};
 const PROBE = %s;
 await cdp.run(async () => {
   const page = await (await cdp.launchChrome()).page();
+  await page.guideSeen();   // the guide seen before each document's DOMContentLoaded (round r61s), not after it loaded
   for (const [v, url] of %s) {
     await page.viewport(1440, 900); await page.goto(url); await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
     for (const w of [1024, 1280, 1440, 1920]) for (const h of ['#overview', '#c-c1', '#c-c2']) {
@@ -5369,6 +5376,7 @@ const out = {};
 const PROBE = %s, RE = %s;
 await cdp.run(async () => {
   const page = await (await cdp.launchChrome()).page();
+  await page.guideSeen();   // the guide seen before each document's DOMContentLoaded (round r61s), not after it loaded
   for (const [name, url, views] of %s) for (const w of [1440, 390]) {
     await page.viewport(w, 900); await page.goto(url); await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");
     for (const v of views) {

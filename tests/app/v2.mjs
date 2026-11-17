@@ -60,7 +60,11 @@ await run(async () => {
   const browser = await launchChrome({ chrome: findChrome() });
   const p = await browser.page();
   const st = () => p.ev(STATE);
+  // the guide seen before each page's DOMContentLoaded where it is not looked at (round r61s): set once the page loaded, it
+  // could still start on a first frame that came late, since the gotos after it only change the address
+  let seenOff = null;
   async function open(w, scheme, hash = '', { guide = false } = {}) {
+    if (guide) { if (seenOff) { await seenOff(); seenOff = null; } } else if (!seenOff) seenOff = await p.guideSeen();
     await p.blank();
     await p.viewport(w, w < 600 ? 844 : 900);
     await p.media({ type: '', scheme });

@@ -62,6 +62,7 @@ def test_a_rules_chip_and_a_strip_count_filter_the_rules(int8_demo, tmp_path):
 let got = {};
 await cdp.run(async () => {
   const p = await (await cdp.launchChrome()).page();
+  await p.guideSeen();   // the guide seen before each document's DOMContentLoaded (round r61s), not after it loaded
   await p.viewport(1440, 900);
   await p.goto(%s);
   await p.ev("localStorage.setItem('rb.guide.1', 'ended'); true");

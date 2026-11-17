@@ -5,9 +5,14 @@ The older_rb marker (tests/conftest.py, PLAN-R19 C0): a test that does not apply
 through it, never skipped, and the older-rb stage's RB_NO_SKIP=1 counts every skip as a failure.
 Each pin runs pytest on a small test file beside a copy of tests/conftest.py, with a stand-in RB_OLD_BIN that says its
 version as rb version does."""
+import contextlib
+import functools
+import http.server
 import json
+import re
 import os
 import shutil
+import threading
 import subprocess
 import sys
 from pathlib import Path
@@ -423,7 +428,8 @@ def test_a_click_reads_its_point_again_as_it_presses_and_brings_back_a_target_sc
     from test_shell import _cdp_script, _node, _runner
     box = ("<style>#s{position:fixed;left:50px;top:50px;width:400px;height:300px;overflow:auto%s}#pad,#pad2{height:1500px}"
            "#b{display:block;width:120px;height:30px}</style><div id=s><div id=pad></div><button id=b>Go</button><div id=pad2></div></div>"
-           "<script>window.got=false;window.down=null;b.addEventListener('mousedown',()=>{window.down=Math.round(s.scrollTop)});"
+           "<script>window.got=false;window.down=null;b.addEventListener('mousedown',ev=>{const r=b.getBoundingClientRect(),v=s.getBoundingClientRect();"
+           "window.down={on:ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom,shown:r.top>=v.top&&r.bottom<=v.top+s.clientHeight}});"
            "b.addEventListener('click',()=>{window.got=true});%s</script>")
     # the first scroll into view is taken away 20 ms later, once: the button is then above its scroller's top, clipped
     away = box % ("", "let once=true;s.addEventListener('scroll',()=>{if(once){once=false;setTimeout(()=>{s.scrollTop+=200},20)}});")
@@ -438,7 +444,7 @@ await cdp.run(async () => {
   const p = await (await cdp.launchChrome()).page();
   const one = async (u, pre) => { await p.goto(u); await p.settle({ quietMs: 50 }); if (pre) await p.ev(pre);
     const r = await p.clickEl(B); await new Promise(z => setTimeout(z, 1200));
-    return { got: await p.ev('window.got'), down: await p.ev('window.down'), said: r && r.said }; };
+    return { got: await p.ev('window.got'), down: await p.ev('window.down'), hit: r && r.hit, said: r && r.said }; };
   const out = { away: await one(U.away) };
   // the page scrolls the shown button by 200 px, smoothly or at once, d ms after the click is asked for
   for (const kind of ['smooth', 'instant']) for (const d of [10, 20, 30, 150, 300])
@@ -448,10 +454,41 @@ await cdp.run(async () => {
 """ % json.dumps(urls))
     code, said, err = _runner(_node(), script, env=dict(os.environ), timeout=240)
     assert code == 0 and said["ok"], err
-    # brought back into view (the button is 1500 px down a 300 px box: its centre sits at scrollTop 1365) and pressed there
-    assert said["away"] == {"got": True, "down": 1365, "said": "80, 200"}, json.dumps(said)
+    # brought back into view and pressed there, once: the press lands on the button, which its scroller shows whole as it
+    # goes down (round r20f: what the press hits, not the point, which the layout decides)
+    away = said["away"]
+    assert away["got"] is True and away["down"] == {"on": True, "shown": True} and away["hit"] == "BUTTON#b Go", json.dumps(said)
+    assert ", then at " not in away["said"] and "not the target" not in away["said"], json.dumps(said)
     for k in [f"{kind}{d}" for kind in ("smooth", "instant") for d in (10, 20, 30, 150, 300)]:
         assert said[k]["got"] is True, f"{k}: {json.dumps(said)}"
+
+
+def test_a_click_whose_target_the_page_moves_as_it_is_pressed_is_pressed_again_where_it_is(tmp_path):
+    """Round r67a (MP-1116-1626's flake: instant150 got no press at a load of about 26): the last read and the press
+    are two steps, and a scroll the page makes between them sends the press to where the target was. Here the page
+    scrolls on the press's own first mouse move, so the race comes every time: the press that landed beside the target
+    is said, and the target is read and pressed again where it is."""
+    from test_shell import _cdp_script, _node, _runner
+    body = ("<style>#s{position:fixed;left:50px;top:50px;width:400px;height:300px;overflow:auto}#pad,#pad2{height:1500px}"
+            "#b{display:block;width:120px;height:30px}</style><div id=s><div id=pad></div><button id=b>Go</button><div id=pad2></div></div>"
+            "<script>window.got=false;window.downs=0;b.addEventListener('mousedown',()=>{window.downs++});"
+            "b.addEventListener('click',()=>{window.got=true});let once=true;"
+            "addEventListener('mousemove',()=>{if(once){once=false;s.scrollTop+=200}},true);</script>")
+    (tmp_path / "moves.html").write_text("<!doctype html>" + body, encoding="utf-8")
+    script = _cdp_script(tmp_path / "moves.mjs", """
+const U = %s, B = "document.getElementById('b')";
+await cdp.run(async () => {
+  const p = await (await cdp.launchChrome()).page();
+  await p.goto(U); await p.settle({ quietMs: 50 });
+  await p.ev("s.style.scrollBehavior='auto';b.scrollIntoView({block:'center'});true");
+  const r = await p.clickEl(B); await new Promise(z => setTimeout(z, 500));
+  return { got: await p.ev('window.got'), downs: await p.ev('window.downs'), said: r && r.said, n: r && r.presses.length };
+}, { timeoutMs: 120000 });
+""" % json.dumps((tmp_path / "moves.html").as_uri()))
+    code, said, err = _runner(_node(), script, env=dict(os.environ))
+    assert code == 0 and said["ok"], err
+    assert said["got"] is True and said["downs"] == 1 and said["n"] == 2, json.dumps(said)
+    assert said["said"] == "80, 200 on DIV#pad2 , not the target, then at 80, 200", json.dumps(said)
 
 
 def test_a_click_says_what_each_press_landed_on_when_it_was_not_the_target(tmp_path):
@@ -607,6 +644,196 @@ await cdp.run(async () => {
     assert said["1500"]["stall"] == 1500 and 8 <= said["1500"]["at"] <= 20 and said["1500"]["state"] == "running", said
     bad = subprocess.run([node, script], env={**os.environ, "RB_APP_FRAME_STALL": "-1"}, capture_output=True, text=True, timeout=60)
     assert bad.returncode == 2 and "RB_APP_FRAME_STALL is a number of ms from 0" in bad.stderr, bad.stderr
+
+
+def test_rb_app_first_frame_holds_a_documents_first_frames(tmp_path):
+    """RB_APP_FIRST_FRAME=800 holds every animation frame a document asks for until 800 ms after it starts, as GitHub's
+    macOS runner drew its first page's first frame after the walk read it as ready (round r61r); a frame cancelled while
+    held never comes; unset, frames come as drawn, and a value under 0 stops the runner. The hold counts from the
+    document's start, and so does the held frame's time (round r20f: read from DOMContentLoaded, a slow first page took
+    its parse time off the margin); the page here takes 300 ms to parse, as a slow first page on a macOS runner may."""
+    from test_shell import _cdp_script, _node, _runner
+    page = tmp_path / "frames.html"
+    page.write_text("<!doctype html><script>window.said = {}; const slow = performance.now() + 300; while (performance.now() < slow) {}"
+                    " document.addEventListener('DOMContentLoaded', () => {"
+                    " const t = performance.now(); requestAnimationFrame(() => { said.first = Math.round(performance.now() - t);"
+                    " said.fromStart = Math.round(performance.now()); });"
+                    " const c = requestAnimationFrame(() => { said.cancelled = true; }); cancelAnimationFrame(c); });</script><p>frames</p>",
+                    encoding="utf-8")
+    script = _cdp_script(tmp_path / "first.mjs", """
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  await page.goto(%s);
+  await page.waitFor('window.said.first !== undefined', 20000);
+  await cdp.sleep(300);
+  return { said: await page.ev('window.said'), hold: cdp.FIRST_FRAME };
+}, { timeoutMs: 120000 });
+""" % json.dumps(page.as_uri()))
+    node = _node()
+    said = {}
+    for ms in ("", "800"):
+        code, said[ms], err = _runner(node, script, env={**os.environ, "RB_APP_FIRST_FRAME": ms})
+        assert code == 0 and said[ms]["ok"], err
+    assert said[""]["hold"] == 0 and said[""]["said"]["first"] < 700 and "cancelled" not in said[""]["said"], said
+    # held: 800 ms after the document started at the soonest (performance.now() counts from the navigation, before the
+    # hold's own start; 5 ms for a timer's rounding)
+    assert said["800"]["hold"] == 800 and said["800"]["said"]["fromStart"] >= 795 and "cancelled" not in said["800"]["said"], said
+    bad = subprocess.run([node, script], env={**os.environ, "RB_APP_FIRST_FRAME": "-1"}, capture_output=True, text=True, timeout=60)
+    assert bad.returncode == 2 and "RB_APP_FIRST_FRAME is a number of ms from 0" in bad.stderr, bad.stderr
+
+
+# a folder served on 127.0.0.1 for the length of a with block, its address given: a walk that writes localStorage in
+# one document and reads it in the next loads its page over http, since Chrome lost such a write between two file://
+# documents 5 times in 20 (round r20d), and 0 in 20 over http
+@contextlib.contextmanager
+def _served(folder):
+    class Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(folder)))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_a_guide_seen_before_the_page_runs_never_opens_however_late_the_first_frame(tmp_path):
+    """A page's guide decides at DOMContentLoaded whether to start and starts on the next frame, as rb's shell does.
+    Put away once the page reads ready, it opens after the walk when the first frame is late (RB_APP_FIRST_FRAME, round
+    r61r); page.guideSeen() marks it seen before the page's DOMContentLoaded listeners run, in every document after, so it never opens,
+    until the function it gives back stops it. Each case starts with no guide key (round r20f: the cases share a profile
+    and an origin, and "seen first" read the key "after ready" had set, so it passed without guideSeen)."""
+    from test_shell import _cdp_script, _node, _runner
+    page = tmp_path / "guide.html"
+    page.write_text("<!doctype html><script>document.addEventListener('DOMContentLoaded', () => {"
+                    " document.documentElement.classList.add('ready');"
+                    " if (localStorage.getItem('rb.guide.1') !== null) return;"
+                    " requestAnimationFrame(() => { document.getElementById('g').hidden = false; }); });</script>"
+                    "<div id=g class=guide hidden>guide</div>", encoding="utf-8")
+    with _served(tmp_path) as base:
+        script = _cdp_script(tmp_path / "seen.mjs", """
+const SKIP = `(() => { try { localStorage.setItem('rb.guide.1', 'ended'); } catch (e) {} return true; })()`;
+await cdp.run(async () => {
+  const b = await cdp.launchChrome();
+  const out = {};
+  for (const how of ['after ready', 'seen first', 'stopped']) {
+    const page = await b.page();
+    if (how !== 'after ready') { const off = await page.guideSeen(); if (how === 'stopped') await off(); }
+    // every case starts with no guide key: the cases share a profile and an origin, and the case before set it
+    await page.goto(%s);
+    await page.ev("localStorage.removeItem('rb.guide.1'); true");
+    await page.goto(%s);
+    await page.waitFor(`document.documentElement.classList.contains('ready')`, 20000);
+    await page.ev(SKIP);
+    await cdp.sleep(1500);
+    out[how] = await page.ev(`!document.getElementById('g').hidden`);
+  }
+  return out;
+}, { timeoutMs: 120000 });
+""" % ((json.dumps(base + page.name),) * 2))
+        code, said, err = _runner(_node(), script, env={**os.environ, "RB_APP_FIRST_FRAME": "800"})
+    assert code == 0 and said["ok"], err
+    # stopped (the function guideSeen gives back), the next document marks nothing: a guide forgotten opens again
+    assert said["after ready"] is True and said["seen first"] is False and said["stopped"] is True, said
+
+
+def test_a_guide_seen_leaves_storage_alone_until_the_page_s_own_dom_content_loaded(tmp_path):
+    """page.guideSeen() marks the guide at DOMContentLoaded, by a listener it adds before the page's own, and touches
+    no storage before then: written as each document started (round r61s's first try), it lost the theme the document
+    before had just stored, and app.mjs's "dark wins over a light system and is kept" read null 10 times in 30. The
+    page's script reads no guide key while it is parsed, its own DOMContentLoaded listener reads it ended, and a key
+    already there is kept as it is."""
+    from test_shell import _cdp_script, _node, _runner
+    page = tmp_path / "early.html"
+    page.write_text("<!doctype html><script>window.early = localStorage.getItem('rb.guide.1');"
+                    " document.addEventListener('DOMContentLoaded', () => { window.atload = localStorage.getItem('rb.guide.1'); });</script>"
+                    "INT8 ResNet-50", encoding="utf-8")
+    with _served(tmp_path) as base:
+        script = _cdp_script(tmp_path / "early.mjs", """
+await cdp.run(async () => {
+  const page = await (await cdp.launchChrome()).page();
+  await page.guideSeen();
+  await page.goto(%s);
+  const first = await page.ev('[window.early, window.atload]');
+  await page.ev("localStorage.setItem('rb.guide.1', 'seen'); true");
+  await page.goto(%s);
+  return { first, kept: await page.ev('[window.early, window.atload]') };
+}, { timeoutMs: 120000 });
+""" % ((json.dumps(base + page.name),) * 2))
+        code, said, err = _runner(_node(), script, env=dict(os.environ))
+    assert code == 0 and said["ok"], err
+    assert said["first"] == [None, "ended"] and said["kept"] == ["seen", "seen"], said
+
+
+def test_the_rail_walk_folds_its_card_on_esc_when_the_first_frame_comes_late(tmp_path):
+    """Run 43910176640 (public main a4bcfdb, GitHub's macOS): rail.mjs's "Esc folds it back [1280 light]" read "closed"
+    late. The walk's first page drew its first frame after the walk read it as ready and put the guide away; the guide
+    opened then, and the walk's Esc ended the guide, not the card. With the first frames held 1 s (RB_APP_FIRST_FRAME)
+    the walk passes: the guide is seen before the page's DOMContentLoaded (page.guideSeen())."""
+    from test_shell import _node, _runner
+    rec = tmp_path / "rec"
+    rec.mkdir()
+    env = {k: v for k, v in os.environ.items() if k not in AGENT_VARS and not k.startswith("RB_TEST_SHELL")}
+    env.update(RB_TELEMETRY="0", DO_NOT_TRACK="1", RB_TEST_NOW="2026-10-19T09:41:00.000+00:00", RB_TEST_SHELL="1",
+               RB_TEST_SHELL_MODEL=str(ROOT / "tests" / "fixtures" / "shell" / "int8-demo.owner.view.json"))
+    subprocess.run(["git", "init", "-q"], cwd=rec, check=True)
+    for argv in (["init", "INT8 ResNet-50 on ImageNet", "--no-agents"], ["page", "--out", str(tmp_path / "page.html")]):
+        r = subprocess.run([*command(), *argv], cwd=rec, env=env, capture_output=True, encoding="utf-8", errors="replace",
+                           stdin=subprocess.DEVNULL)
+        assert r.returncode == 0, r.stderr
+    walk = {k: v for k, v in os.environ.items() if k not in ("RB_APP_VIEWPORT", "RB_APP_FRAME_STALL")}
+    walk.update(RB_APP_VIEWPORT="1280", RB_APP_FIRST_FRAME="1000")
+    code, said, err = _runner(_node(), str(APP / "rail.mjs"), "--url", (tmp_path / "page.html").as_uri(), env=walk, timeout=600)
+    failed = [c for c in said.get("checks") or said.get("results") or [] if not c.get("pass")]
+    assert code == 0 and said["ok"], "\n".join([*(f"{c['name']}: {c['detail']}" for c in failed), err[-3000:]])
+
+
+def test_the_card_tabs_walk_clicks_its_tabs_when_the_first_frame_comes_late(int8_demo, tmp_path, monkeypatch):
+    """Run 43910303264 (public main a4bcfdb, GitHub's macOS, job leaving): test_shell's card-tabs walk pressed Rule at
+    390 and hit P#guide-p for 60 s. It set the guide ended once the first page had loaded, then went to '#c-c2', which
+    only changes the address, so the first document stayed; its first frame came late and the guide started on it, over
+    the tabs. With the first frames held 1 s (RB_APP_FIRST_FRAME) the walk passes: the guide is seen before each
+    document's DOMContentLoaded (page.guideSeen())."""
+    import test_shell
+    monkeypatch.setenv("RB_APP_FIRST_FRAME", "1000")
+    test_shell.test_a_card_opens_as_tabs_with_its_result_drawn(int8_demo, tmp_path)
+
+
+# a walk that sets the guide ended from a page already loaded (an ev, or a demo walk's eval step): a line that sets an
+# item and names the key, as setItem('rb.guide.1', ...) or a list of keys it sets
+_GUIDE_SET = re.compile(r"""setItem\(.*['"]rb\.guide\.1['"]|['"]rb\.guide\.1['"].*setItem\(""")
+
+
+def test_no_walk_marks_the_guide_seen_only_once_its_page_has_loaded():
+    """Rounds r61r and r61s (GitHub's macOS, public main a4bcfdb): the shell's guide decides at DOMContentLoaded and
+    starts on the next frame, so a walk that sets rb.guide.1 once the page has loaded, and stays in that document (it
+    reads on, or only changes the address), can have the guide open over it when the first frame comes late. Every
+    browser walk under tests/ and tools/ that sets it so also marks it seen before each document's DOMContentLoaded
+    (page.guideSeen()), or is one of the walks below that load the page again after setting it."""
+    reloads = {
+        # its lead steps load the page again after the eval, before a view's address (r61s)
+        "tools/demo/agent_page.mjs",
+        # a stand-in page with no guide, loaded again after its lead eval
+        "tests/test_demo_record.py",
+    }
+    own = {"tests/app/cdp.mjs", "tests/test_harness.py"}   # guideSeen itself, and the stand-ins that pin it
+    files = sorted(p for d in ("tests", "tools") for ext in ("*.py", "*.mjs") for p in (ROOT / d).rglob(ext)
+                   if "__pycache__" not in p.parts)
+    late, seen_by_reload = [], []
+    for p in files:
+        rel = p.relative_to(ROOT).as_posix()
+        text = p.read_text(encoding="utf-8", errors="replace")
+        lines = [n for n, line in enumerate(text.splitlines(), 1) if _GUIDE_SET.search(line) and "<script>" not in line]
+        if not lines or rel in own:
+            continue
+        if rel in reloads:
+            seen_by_reload.append(rel)
+        elif "guideSeen(" not in text:
+            late.append(f"{rel}:{lines[0]}")
+    assert not late, "sets rb.guide.1 once the page has loaded, with no page.guideSeen() first: " + ", ".join(late)
+    assert sorted(seen_by_reload) == sorted(reloads), seen_by_reload
 
 
 def test_rb_app_cpu_throttle_slows_every_page_it_opens(tmp_path):

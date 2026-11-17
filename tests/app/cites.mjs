@@ -50,6 +50,7 @@ await run(async () => {
   const live = !a.url;
   const c = await launchChrome({ chrome });
   const p = await c.page();
+  await p.guideSeen();   // the guide seen before each page's DOMContentLoaded (round r61s), not after it loaded
   const cards = {};
   let opened = 0, followed = 0;
   for (const [w, h] of [[1280, 900], [390, 844]]) {

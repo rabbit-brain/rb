@@ -2240,7 +2240,10 @@ def test_an_agent_beat_films_the_agent_on_the_view_it_is_given_and_the_fresh_ses
 
     on = steps("x-e1")
     gotos = [s["goto"] for s in on if "goto" in s]
-    assert gotos == ["http://127.0.0.1:8941/", "http://127.0.0.1:8941/#x-e1", "http://127.0.0.1:8941/"]
+    # (loaded again once the guide is set seen, before the view's address, which alone keeps the first document: r61s)
+    assert gotos == ["http://127.0.0.1:8941/", "http://127.0.0.1:8941/", "http://127.0.0.1:8941/#x-e1", "http://127.0.0.1:8941/"]
+    reload = on.index({"lead": True, "goto": "http://127.0.0.1:8941/"})
+    assert "rb.guide.1" in on[reload - 1].get("eval", "") and on[reload + 1] == {"lead": True, "goto": "http://127.0.0.1:8941/#x-e1"}
     watches = [s for s in on if "watch" in s]
     assert [w["until"] for w in watches] == ["/t/.agent-done", "/t/.done"]
     marks = [s["mark"] for s in on if "mark" in s]

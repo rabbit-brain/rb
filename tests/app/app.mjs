@@ -173,7 +173,11 @@ await run(async () => {
   const sel = css => `document.querySelector(${j(css)})`;
   // `first`: as on a first visit to the page, the pointer guide not yet seen in this browser; otherwise as on a later
   // visit, so a check that is not about the guide finds the page as it starts once the guide has been seen
+  // a later visit's guide is seen before each page's DOMContentLoaded (round r61s): marked once the page read ready, it could
+  // still start on a first frame that came late, after the check below looked for it; a first visit stops that
+  let seenOff = null;
   async function open(w, scheme, hash = '', { first = false } = {}) {
+    if (first) { if (seenOff) { await seenOff(); seenOff = null; } } else if (!seenOff) seenOff = await p.guideSeen();
     await p.blank();
     await p.viewport(w, w < 600 ? 844 : 900);
     await p.media({ type: '', scheme });

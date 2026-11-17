@@ -100,6 +100,9 @@ async function open(p, url, w, scheme, hash = 'overview') {
 await run(async () => {
   const b = await launchChrome({ chrome: findChrome() });
   const p = await b.page();
+  // the guide seen before each page's DOMContentLoaded (round r61s): put away once the page read ready, it could still start
+  // on a first frame that came late, over the walk (r61r: GitHub's macOS); stopped where a step shows it on purpose
+  let off = await p.guideSeen();
   for (const w of widths([1440, 390])) for (const scheme of ['light', 'dark']) {
     const at = `${w} ${scheme}`;
     // no clone address: nothing of it shows, and an address naming the panel opens nothing
@@ -232,12 +235,12 @@ await run(async () => {
 
     // an address naming the panel opens it over the Overview, the guide not shown over it on a first visit
     await open(p, a.meta, w, scheme);
-    await p.ev(`(() => { try { localStorage.removeItem('rb.guide.1'); } catch (e) {} return true; })()`);
+    await off(); await p.ev(`(() => { try { localStorage.removeItem('rb.guide.1'); } catch (e) {} return true; })()`);
     await p.blank(); await p.goto(a.meta + '#rerun');
     await p.waitFor(`document.documentElement.classList.contains('ready')`, 10000); await p.settle({ quietMs: 100 }); await sleep(400);
     const s6 = await p.ev(SHOWN), g6 = await p.ev(`!!Array.from(document.querySelectorAll('.guide')).find(g => !g.hidden && g.checkVisibility())`);
     check(`rerun: an address #rerun opens the panel over the Overview, focus on Copy prompt, no guide over it [${at}]`, s6.open && !g6 && /Copy prompt$/.test(s6.focus || '') && (await p.ev(`document.querySelector('#main .view.on').id`)) === 'overview', j({ s6, g6 }));
-    await p.ev(`(() => { try { localStorage.setItem('rb.guide.1', 'ended'); } catch (e) {} return true; })()`);
+    await p.ev(`(() => { try { localStorage.setItem('rb.guide.1', 'ended'); } catch (e) {} return true; })()`); off = await p.guideSeen();
     await p.key('Escape', 'Escape', 27);
     // followed once the page is up: it opens, and the address stays where it was
     await p.ev(`location.hash = '#rerun'`); await sleep(400);

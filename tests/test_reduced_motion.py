@@ -16,6 +16,7 @@ def test_nothing_moves_under_reduced_motion(int8_demo, tmp_path):
 let moving = [];
 await cdp.run(async () => {
   const p = await (await cdp.launchChrome()).page();
+  await p.guideSeen();   // the guide seen before each document's DOMContentLoaded (round r61s), not after it loaded
   await p.viewport(1440, 900);
   await p.send('Emulation.setEmulatedMedia', { media: '', features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await p.goto(%s);

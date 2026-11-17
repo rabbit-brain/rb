@@ -141,6 +141,7 @@ const PROBE = `(() => { const li = document.querySelector('#nav li.fls'), t = li
 await cdp.run(async () => {
   for (const width of [1440, 390]) {
     const page = await (await cdp.launchChrome()).page();
+    await page.guideSeen();   // the guide seen before each document's DOMContentLoaded (round r61s), not after it loaded
     await page.viewport(width, width < 600 ? 844 : 900);
     await page.goto(%s);
     await page.ev("localStorage.setItem('rb.guide.1', 'ended'); true");

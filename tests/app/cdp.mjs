@@ -28,6 +28,12 @@ if (!(CPU_THROTTLE >= 1)) { process.stderr.write(`RB_APP_CPU_THROTTLE is a numbe
 // (a tab pressed at 499 px in a 390 px sheet); a slowed CPU alone never holds it so. Unset, or 0, no hold
 export const FRAME_STALL = Number(process.env.RB_APP_FRAME_STALL || 0);
 if (!(FRAME_STALL >= 0)) { process.stderr.write(`RB_APP_FRAME_STALL is a number of ms from 0, or unset; not ${JSON.stringify(process.env.RB_APP_FRAME_STALL)}\n`); process.exit(2); }
+// how long after a document starts its first animation frames come, in ms (RB_APP_FIRST_FRAME, round r61r): each
+// requestAnimationFrame the page asks for before then runs then, as on GitHub's macOS runner, whose first page in a new
+// Chrome drew its first frame after the walk had read the page as ready (the guide, started on that frame, opened after
+// the walk had put it away, and took the walk's Esc). Unset, or 0, frames come as the machine draws them
+export const FIRST_FRAME = Number(process.env.RB_APP_FIRST_FRAME || 0);
+if (!(FIRST_FRAME >= 0)) { process.stderr.write(`RB_APP_FIRST_FRAME is a number of ms from 0, or unset; not ${JSON.stringify(process.env.RB_APP_FIRST_FRAME)}\n`); process.exit(2); }
 // the machine's own display settings, set on Chrome (RB_APP_MACHINE, round media-1): a comma list of reduced-motion,
 // dark and high-contrast, each a Chrome switch that stands for that setting on the system, as GitHub's macOS image has
 // reduced motion and transparency turned on. A walk then reads what the machine says wherever a page's emulated media
@@ -450,6 +456,15 @@ async function openPage(conn) {
     });
     await send('Animation.enable');
   }
+  if (FIRST_FRAME > 0) {
+    // each document's frames held until FIRST_FRAME ms after it starts: a frame asked for before then is asked for
+    // again then, and cancelling it cancels both
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { const t0 = performance.now(), raf = window.requestAnimationFrame.bind(window),
+      caf = window.cancelAnimationFrame.bind(window), held = new Map(); let n = 0;
+      window.requestAnimationFrame = cb => { const wait = t0 + ${FIRST_FRAME} - performance.now(); if (wait <= 0) return raf(cb);
+        const id = 'held' + (++n), h = { raf: 0 }; h.timer = setTimeout(() => { h.raf = raf(t => { held.delete(id); cb(t); }); }, wait); held.set(id, h); return id; };
+      window.cancelAnimationFrame = id => { const h = held.get(id); if (!h) return caf(id); clearTimeout(h.timer); if (h.raf) caf(h.raf); held.delete(id); }; })()` });
+  }
   let media = { type: '', scheme: 'light' }, scriptOff = false;
   // the presses since the page was last loaded that landed on something other than their target, or were not made
   // since their target was out of view, each as a failure names it: a step that fails later says them (round r19: a
@@ -472,6 +487,19 @@ async function openPage(conn) {
       const sent = mediaFeatures({ scheme, ...features });
       media = { type, scheme };
       await send('Emulation.setEmulatedMedia', { media: type, features: sent });
+    },
+    // the guide marked as seen (rb.guide.1 ended) in every document this page loads from now, before the page's own
+    // DOMContentLoaded listeners run: the guide decides at DOMContentLoaded whether to start and starts on the next frame, so marking it
+    // once the page reads ready leaves a window where it starts after the walk put it away (round r61r, GitHub's
+    // macOS: its first frame came late, the guide opened over the walk and took its Esc). It gives back a function
+    // that stops it for the documents loaded after, for a walk that then shows the guide on purpose
+    async guideSeen() {
+      // (marked at DOMContentLoaded, by a listener added before the page's own, and only where it is not set: storage
+      // written as the document starts lost what the document before it had just stored, the theme a walk set and read
+      // back after a reload, 10 of 30 times in round r61s)
+      const { identifier } = await send('Page.addScriptToEvaluateOnNewDocument', { source: "document.addEventListener('DOMContentLoaded', () => { try { if (localStorage.getItem('rb.guide.1') === null) localStorage.setItem('rb.guide.1', 'ended'); } catch (e) {} }, { capture: true, once: true });" });
+      let on = true;   // (stopped once: a second call does nothing)
+      return async () => { if (on) { on = false; await send('Page.removeScriptToEvaluateOnNewDocument', { identifier }); } };
     },
     async noScript(v) { await send('Emulation.setScriptExecutionDisabled', { value: v }); scriptOff = !!v; },
     // loads `url`; a page that cannot be loaded, or does not finish loading in `timeoutMs`, is an error
@@ -621,29 +649,54 @@ async function openPage(conn) {
         const last = `(async () => { const e = (${selectorExpr}); if (!e || !e.getClientRects().length || !e.checkVisibility()) return null;
           const { x, y, shown } = await (${PRESS_POINT})(e, ${scriptOff}), h = shown ? document.elementFromPoint(x, y) : null;
           return { x, y, shown, me: (${NAMED})(e), hit: h ? (${NAMED})(h) : null, on: !!h && (h === e || e.contains(h)) }; })()`;
-        let now = at && !at.__error ? await page.ev(last) : null;
-        for (const until = t0 + 10000; now && !now.__error && (!now.shown || Math.abs(now.x - at.x) > 1 || Math.abs(now.y - at.y) > 1) && Date.now() < until;) {
+        // the read and the press are two steps, and the page runs between them: a scroll that comes there (round r67a:
+        // at a load of 26, a scroll set 150 ms after the click was asked for came after the last read and before the
+        // press, which landed where the target had been). So the last read also notes, in the page, what the next
+        // mousedown lands on; a press that landed on something else while the target moved away from its point is
+        // said, and the target is read and pressed again where it is, within the same 10 s. A page whose scripts are
+        // off runs no listener, notes nothing, and is pressed once, as before
+        const lastNoting = `(async () => { const r = await ${last}; if (r && !r.__error) { const e = (${selectorExpr});
+          if (window.__rbDownH) removeEventListener('mousedown', window.__rbDownH, true);
+          window.__rbDown = null; window.__rbDownH = ev => { window.__rbDown = { on: !!e && (ev.target === e || e.contains(ev.target)), hit: (${NAMED})(ev.target) }; };
+          addEventListener('mousedown', window.__rbDownH, { capture: true, once: true }); } return r; })()`;
+        const landed = `(() => { const d = window.__rbDown || null; if (window.__rbDownH) removeEventListener('mousedown', window.__rbDownH, true);
+          window.__rbDownH = null; window.__rbDown = null; return d; })()`;
+        for (;;) {
+          let now = at && !at.__error ? await page.ev(lastNoting) : null;
+          for (const until = t0 + 10000; now && !now.__error && (!now.shown || Math.abs(now.x - at.x) > 1 || Math.abs(now.y - at.y) > 1) && Date.now() < until;) {
+            settled.again = (settled.again || 0) + 1;
+            if (!now.shown) await page.ev(`(() => { const e = (${selectorExpr}); if (e) e.scrollIntoView({block:'center', inline:'nearest'}); return true; })()`);
+            const s2 = await page.stopped(selectorExpr, { timeoutMs: Math.max(0, until - Date.now()) });
+            if (s2.gone) { now = null; break; }
+            at = await page.ev(point);
+            now = at && !at.__error ? await page.ev(lastNoting) : null;
+          }
+          if (!at || at.__error || !now || now.__error) { await page.ev(landed); presses.push({ gone: true, settled }); return null; }
+          const where = `${Math.round(now.x)}, ${Math.round(now.y)}`;
+          if (!now.shown) {
+            await page.ev(landed);
+            presses.push({ x: now.x, y: now.y, unshown: true, settled });
+            misses.push(`a click on ${now.me} was not pressed: ${where} was out of view for 10 s`);
+            return null;
+          }
+          at = { x: now.x, y: now.y };
+          let hit = now.hit, off = !now.on;
+          // what the press lands on, when it is not the target: said in the press's own words and in a later failure's
+          if (off) misses.push(`a click on ${now.me} pressed ${where} on ${hit || 'nothing'}`);
+          for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
+          const down = await page.ev(landed), raced = !off && !!down && !down.__error && !down.on;
+          if (raced) {
+            off = true; hit = down.hit;
+            misses.push(`a click on ${now.me} pressed ${where} on ${hit || 'nothing'}: the target moved as it was pressed`);
+          }
+          presses.push({ x: at.x, y: at.y, hit, off, settled });
+          if (!raced || Date.now() >= t0 + 10000) return at;
+          const moved = await page.ev(point);
+          if (!moved || moved.__error || (Math.abs(moved.x - at.x) <= 1 && Math.abs(moved.y - at.y) <= 1)) return at;
+          // moved since the press: read and pressed again where it is
           settled.again = (settled.again || 0) + 1;
-          if (!now.shown) await page.ev(`(() => { const e = (${selectorExpr}); if (e) e.scrollIntoView({block:'center', inline:'nearest'}); return true; })()`);
-          const s2 = await page.stopped(selectorExpr, { timeoutMs: Math.max(0, until - Date.now()) });
-          if (s2.gone) { now = null; break; }
-          at = await page.ev(point);
-          now = at && !at.__error ? await page.ev(last) : null;
+          at = moved;
         }
-        if (!at || at.__error || !now || now.__error) { presses.push({ gone: true, settled }); return null; }
-        const where = `${Math.round(now.x)}, ${Math.round(now.y)}`;
-        if (!now.shown) {
-          presses.push({ x: now.x, y: now.y, unshown: true, settled });
-          misses.push(`a click on ${now.me} was not pressed: ${where} was out of view for 10 s`);
-          return null;
-        }
-        at = { x: now.x, y: now.y };
-        const hit = now.hit;
-        // what the press lands on, when it is not the target: said in the press's own words and in a later failure's
-        if (!now.on) misses.push(`a click on ${now.me} pressed ${where} on ${hit || 'nothing'}`);
-        for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
-        presses.push({ x: at.x, y: at.y, hit, off: !now.on, settled });
-        return at;
       };
       const at = await pressOnce();
       if (!at) return null;

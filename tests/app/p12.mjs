@@ -38,6 +38,9 @@ const STATE = `(() => { const v = document.querySelector('main .view.on'), c = d
 await run(async () => {
   const b = await launchChrome({ chrome: findChrome() });
   const p = await b.page();
+  // the guide seen before each page's DOMContentLoaded: put away once the page read ready, it could still start a frame
+  // later, over the walk (round r61r: on GitHub's macOS it opened so in rail.mjs's first page and took its Esc)
+  await p.guideSeen();
   for (const w of widths([1280, 390])) for (const scheme of ['light', 'dark']) {
     const at = `${w} ${scheme}`;
     await p.blank(); await p.viewport(w, w < 600 ? 844 : 900); await p.media({ type: '', scheme });

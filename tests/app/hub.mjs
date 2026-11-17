@@ -33,17 +33,21 @@ async function open(p, url, w, hash = 'overview') {
 await run(async () => {
   const b = await launchChrome({ chrome: findChrome() });
   const p = await b.page();
+  // the guide seen before each page's DOMContentLoaded (round r61s): put away once the page read ready, it could still start
+  // on a first frame that came late, over the walk (r61r: GitHub's macOS); stopped where a step shows it on purpose
+  let off = await p.guideSeen();
   // the guide on a first visit, where its styles are on the page (--guide): its first step's spot shows
   const wide = inHalf(1440);
   if (a.guide && wide) {
   await open(p, a.url, 1440);
-  await p.ev(`localStorage.removeItem('rb.guide.1')`); await open(p, a.url, 1440);
+  await off(); await p.ev(`localStorage.removeItem('rb.guide.1')`); await open(p, a.url, 1440);
   await p.waitFor(`!!document.querySelector('.guide:not([hidden]) #guide-h')`, 10000);
   await sleep(400);
   const first = await p.ev(`(() => { const s = document.querySelector('.guide-spot'); const r = s && !s.hidden ? s.getBoundingClientRect() : null;
     return { title: (document.querySelector('#guide-h') || {}).textContent || '', spot: r && [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
       shows: !!r && r.width > 20 && r.height > 20 && r.top >= 0 && r.left >= 0 && r.top < innerHeight && r.left < innerWidth }; })()`);
   check(`hub: the guide's first step points at something on the screen [1440]`, first.title && first.shows, j(first));
+  off = await p.guideSeen();
   }
   if (wide) {
   await p.ev(`(() => { try { localStorage.setItem('rb.guide.1', 'ended'); } catch (e) {} const g = document.querySelector('.guide:not([hidden]) .gskip'); if (g) g.click(); return true; })()`);

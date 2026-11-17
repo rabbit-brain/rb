@@ -87,6 +87,9 @@ async function prose(p) {
 await run(async () => {
   const b = await launchChrome({ chrome: findChrome() });
   const p = await b.page();
+  // the guide seen before each page's DOMContentLoaded (round r61s): put away once the page read ready, it could still start
+  // on a first frame that came late, over the walk (r61r: GitHub's macOS); stopped where a step shows it on purpose
+  let off = await p.guideSeen();
   if (a.prose) {
     await prose(p);
     const failed = results.filter(r => !r.pass);
@@ -278,7 +281,7 @@ await run(async () => {
     // the pointer guide, on a first visit where the browser keeps it: the owner is asked for a call, a reader told
     // where the calls stand, by no word that says whose judgment
     if (w >= 960 && scheme === 'light') for (const who of ['owner', 'reader']) {
-      await p.blank(); await p.viewport(w, 900); await p.goto(a[who] + '#overview');
+      await off(); await p.blank(); await p.viewport(w, 900); await p.goto(a[who] + '#overview');
       await p.ev(`localStorage.removeItem('rb.guide.1')`);
       await p.blank(); await p.goto(a[who] + '#overview');
       await p.waitFor(`!!document.querySelector('.guide:not([hidden]) #guide-h')`, 10000);
@@ -292,6 +295,7 @@ await run(async () => {
       const said = titles.join(' | ');
       check(`${who}: the guide ${who === 'reader' ? "says where the calls stand, by no word of whose judgment" : 'asks for a call where one waits'} [${at}]`,
         titles.length >= 3 && (who === 'reader' ? said.includes('Still open:') && !/your judgment|your call|Your call|ready for/.test(said) : said.includes('Decisions:')), said);
+      off = await p.guideSeen();
     }
     // a reader is shown every warning, open item and trust line the owner is
     // a reader is shown what stands, never the owner's list: the count of results not decided in place of its rows

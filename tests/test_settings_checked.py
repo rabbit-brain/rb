@@ -75,6 +75,7 @@ def test_keyboard_focus_shows_what_hover_shows(rec, tmp_path):
 let got;
 await cdp.run(async () => {
   const p = await (await cdp.launchChrome()).page();
+  await p.guideSeen();   // the guide seen before each document's DOMContentLoaded (round r61s), not after it loaded
   await p.viewport(1440, 900);
   await p.goto(%s);
   await p.ev("localStorage.setItem('rb.guide.1', 'ended'); true");

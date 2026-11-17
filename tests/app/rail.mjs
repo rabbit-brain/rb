@@ -35,6 +35,9 @@ const CARD = `(() => { document.querySelectorAll('[data-rail-pick]').forEach(x =
 await run(async () => {
   const b = await launchChrome({ chrome: findChrome() });
   const p = await b.page();
+  // the guide seen before each page's DOMContentLoaded: put away once the page read ready, it could still start a frame
+  // later and take the walk's Esc (round r61r, GitHub's macOS: "closed" late at [1280 light], the first page)
+  await p.guideSeen();
   for (const w of widths([1280, 1100, 390])) for (const scheme of ['light', 'dark']) {
     const at = `${w} ${scheme}`;
     await p.blank(); await p.viewport(w, w < 600 ? 844 : 900); await p.media({ type: '', scheme });

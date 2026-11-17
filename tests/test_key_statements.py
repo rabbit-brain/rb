@@ -69,6 +69,7 @@ const out = {};
 await cdp.run(async () => {
   for (const [id, width] of [['x-e1', 390], ['x-e2', 1440]]) {
     const p = await (await cdp.launchChrome()).page();
+    await p.guideSeen();   // the guide seen before each document's DOMContentLoaded (round r61s), not after it loaded
     await p.viewport(width, 900);
     await p.goto(%s);
     await p.ev("localStorage.setItem('rb.guide.1', 'ended'); true");

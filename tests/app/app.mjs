@@ -1385,8 +1385,10 @@ await run(async () => {
   // the Overview's "changed <time>": relative on rb open's live view, its exact time kept as the hint; exact on a page
   if (want('generic') && inHalf(1280)) {
     await open(1280, 'light', '');
-    const ch = await p.ev(`(() => { const t = document.querySelector('#overview time[data-changed]'); return t && { text: t.textContent, title: t.title, days: (Date.now() - Date.parse(t.getAttribute('datetime'))) / 864e5, live: !!document.getElementById('rb-live'), past: !!document.querySelector('#withheld .withheld') }; })()`);
-    // (past 30 days the live view says the exact time too, its hint the same)
+    const ch = await p.ev(`(() => { const t = document.querySelector('#overview time[data-changed]'); return t && { text: t.textContent, title: t.title, days: Math.floor(Math.max(0, Date.now() - Date.parse(t.getAttribute('datetime'))) / 864e5), live: !!document.getElementById('rb-live'), past: !!document.querySelector('#withheld .withheld') }; })()`);
+    // (past 30 whole days the live view says the exact time too, its hint the same: rb's own edge, so "30 days ago"
+    // holds until 31 whole days, whatever day the walk runs on; round r61t, a check that read 30.5 days as past the
+    // edge failed on the one day the example was 30 to 31 days old)
     if (ch) check(`generic: the Overview says when the record changed, relative only on rb open's live view [1280]`,
       ch.live && !ch.past ? (ch.days > 30 ? / UTC$/.test(ch.text) && ch.title === ch.text : /^(just now|\d+ (minute|hour|day)s? ago)$/.test(ch.text) && / UTC$/.test(ch.title)) : / UTC$/.test(ch.text) && !ch.title, j(ch));
     if (ch && ch.live && !ch.past) {
@@ -1395,6 +1397,25 @@ await run(async () => {
         t.setAttribute('datetime', at + 'Z'); t.textContent = at.replace('T', ' ') + ' UTC'; delete t.dataset.exact;
         document.dispatchEvent(new CustomEvent('rb:swapped', { cancelable: true })); return { text: t.textContent, want: at.replace('T', ' ') + ' UTC' }; })()`);
       check(`generic: past 30 days rb open's live view says the exact time it changed [1280]`, old.text === old.want, j(old));
+      // each age drawn again as a live swap draws it, whatever the example's own age on the day the walk runs: just now,
+      // minutes, hours and days to 30 whole days say how long ago, each with its exact time as the hint; from 31 the
+      // exact time, its hint the same. The element is put back as it was after
+      const ages = await p.ev(`(() => { const t = document.querySelector('#overview time[data-changed]'),
+        was = { at: t.getAttribute('datetime'), text: t.textContent, title: t.title, exact: t.dataset.exact };
+        const M = 6e4, H = 60 * M, D = 24 * H, now = Date.now(), said = [];
+        for (const [age, want] of [[0, 'just now'], [20 * 1000, 'just now'], [M + 1000, '1 minute ago'], [5 * M, '5 minutes ago'],
+            [H, '1 hour ago'], [3 * H + 5 * M, '3 hours ago'], [D, '1 day ago'], [2 * D, '2 days ago'], [30 * D + 12 * H, '30 days ago'],
+            [31 * D - M, '30 days ago'], [31 * D, null], [31 * D + 12 * H, null]]) {
+          const at = new Date(now - age), exact = at.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+          t.setAttribute('datetime', at.toISOString()); t.textContent = exact; delete t.dataset.exact;
+          document.dispatchEvent(new CustomEvent('rb:swapped', { cancelable: true }));
+          said.push({ age, want: want || exact, text: t.textContent, title: t.title, exact });
+        }
+        t.setAttribute('datetime', was.at); t.textContent = was.exact || was.text; delete t.dataset.exact;
+        document.dispatchEvent(new CustomEvent('rb:swapped', { cancelable: true }));
+        return { said, back: t.getAttribute('datetime') === was.at && t.title === was.title && t.textContent === was.text }; })()`);
+      check(`generic: rb open's live view says how long ago the record changed up to 30 whole days, then the exact time [1280]`,
+        ages.said.every(a => a.text === a.want && a.title === a.exact) && ages.back, j(ages));
     }
   }
   // print: every view in the document, no app chrome

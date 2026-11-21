@@ -31,6 +31,8 @@ def test_a_rule_written_before_its_subjects_runs_says_its_results_came_after_it(
         rb("run", "add", "e1", "fp32.top1=76.1", "--set", f"seed={seed}", "--produced-at", "2026-05-01")
     rb("criterion", "add", "INT8 keeps top1 within a point", "-e", "e1", "--metric", "change.top1", "--at-least", "-1", "--id", "c1")
     Path("out").mkdir()
+    # the day the results are written, read before and after: a test that runs across 00:00 UTC writes them on either
+    began = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
     for seed in (1, 2, 3):
         Path(f"out/int8-{seed}.json").write_text(json.dumps({"top1": 75.8 + seed / 10}), encoding="utf-8")
         rb("run", "add", "e1", "--from", f"out/int8-{seed}.json", "--variant", "int8", "--set", f"seed={seed}")
@@ -47,4 +49,4 @@ def test_a_rule_written_before_its_subjects_runs_says_its_results_came_after_it(
     assert got.returncode == 0, got.stderr
     when = json.loads(dump.read_text(encoding="utf-8"))["findings"]["c1"]["when"]
     today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
-    assert when["results"] == today and when["results"] >= when["rule"] and when["results"] != "2026-05-01", when
+    assert when["results"] in (began, today) and when["results"] >= when["rule"] and when["results"] != "2026-05-01", when

@@ -544,7 +544,8 @@ def test_rb_open_s_render_holds_up_by_real_clicks(a_record, viewport):
     names = [c["name"] for c in said["checks"]]
     for at in _ats(viewport, "390 light", "390 dark", "1280 light", "1280 dark"):
         assert f"generic: the top bar says no absolute path [{at}]" in names, at
-    _expect(names, viewport, "generic: past 30 days rb open's live view says the exact time it changed [1280]")
+    _expect(names, viewport, "generic: past 30 days rb open's live view says the exact time it changed [1280]",
+            "generic: rb open's live view says how long ago the record changed up to 30 whole days, then the exact time [1280]")
 
 
 def test_a_walk_has_time_for_a_slow_machine_and_stops_soon_when_it_hangs(tmp_path):

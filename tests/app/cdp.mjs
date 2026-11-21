@@ -34,6 +34,12 @@ if (!(FRAME_STALL >= 0)) { process.stderr.write(`RB_APP_FRAME_STALL is a number 
 // the walk had put it away, and took the walk's Esc). Unset, or 0, frames come as the machine draws them
 export const FIRST_FRAME = Number(process.env.RB_APP_FIRST_FRAME || 0);
 if (!(FIRST_FRAME >= 0)) { process.stderr.write(`RB_APP_FIRST_FRAME is a number of ms from 0, or unset; not ${JSON.stringify(process.env.RB_APP_FIRST_FRAME)}\n`); process.exit(2); }
+// the page's clock (RB_APP_NOW, round r61t): an ISO time Date.now reads in every document, going on from there as the
+// machine's clock goes, so a walk reads a record's age on a chosen day (rb open's "changed <time>" said "30 days ago"
+// up to 31 days, and a check that read 30 days as the edge failed on the one day the example was 30 to 31 days old).
+// Unset, the machine's clock
+export const NOW = process.env.RB_APP_NOW || '';
+if (NOW && isNaN(Date.parse(NOW))) { process.stderr.write(`RB_APP_NOW is an ISO time, or unset; not ${JSON.stringify(NOW)}\n`); process.exit(2); }
 // the machine's own display settings, set on Chrome (RB_APP_MACHINE, round media-1): a comma list of reduced-motion,
 // dark and high-contrast, each a Chrome switch that stands for that setting on the system, as GitHub's macOS image has
 // reduced motion and transparency turned on. A walk then reads what the machine says wherever a page's emulated media
@@ -464,6 +470,10 @@ async function openPage(conn) {
       window.requestAnimationFrame = cb => { const wait = t0 + ${FIRST_FRAME} - performance.now(); if (wait <= 0) return raf(cb);
         const id = 'held' + (++n), h = { raf: 0 }; h.timer = setTimeout(() => { h.raf = raf(t => { held.delete(id); cb(t); }); }, wait); held.set(id, h); return id; };
       window.cancelAnimationFrame = id => { const h = held.get(id); if (!h) return caf(id); clearTimeout(h.timer); if (h.raf) caf(h.raf); held.delete(id); }; })()` });
+  }
+  if (NOW) {
+    // Date.now moved by one offset, set once for the walk, so every document reads the same clock
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { const now = Date.now.bind(Date), off = ${Date.parse(NOW) - Date.now()}; Date.now = () => now() + off; })()` });
   }
   let media = { type: '', scheme: 'light' }, scriptOff = false;
   // the presses since the page was last loaded that landed on something other than their target, or were not made
